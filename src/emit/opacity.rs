@@ -1251,6 +1251,10 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::AssertConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
+            StateDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
+            StateDefBodyElement::ConstraintUsage(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             StateDefBodyElement::Then(_) | StateDefBodyElement::FinalState(_) => {}
         }
     }

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **State-definition bodies retain part and constraint usages.** `StateBodyItem` admits
+  `NonBehaviorBodyItem -> StructureUsageMember -> PartUsage` and its sibling
+  `BehaviorUsageMember -> ConstraintUsage` (SysML textual BNF 1200-1205, 910-920, 262-268,
+  356-389, 623, and 1382-1395; the pinned Pilot `SysML.xtext` StateBodyItem agrees). Both
+  existing source-backed usage nodes now have owning `StateDefBodyElement` variants, exhaustive
+  emission, semantic projection, visitor, and opacity traversal. Recovery synchronizes at both
+  kinds and every shared occurrence-prefix starter. Fixtures:
+  `tests/snapshots/sysml/state_body_part_and_constraint_usages.md` and
+  `tests/snapshots/sysml/state_body_part_and_constraint_usages_recovery.md`. **AST version 197.**
+
 - **Control-node `then` targets retain anonymous declarations.** `merge`, `decide`, `join`, and
   `fork` now share an explicit anonymous-or-named declaration state and retain their mandatory
   `ActionBody` (SysML textual BNF 898-909, 969-998; the zero-width-capable

@@ -227,6 +227,14 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"#",
     b"@",
     b"accept",
+    // `StateBodyItem -> NonBehaviorBodyItem -> StructureUsageMember -> PartUsage`, and the
+    // sibling `BehaviorUsageMember -> ConstraintUsage`, each begin with the complete
+    // OccurrenceUsagePrefix. These entries are recovery FIRST-set membership, not a permissive
+    // parser: the owning part/constraint parsers still validate the complete production.
+    b"abstract",
+    b"constant",
+    b"constraint",
+    b"derived",
     b"doc",
     b"do",
     b"entry",
@@ -236,11 +244,16 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"if",
     b"in",
     b"inout",
+    b"individual",
     b"out",
+    b"part",
     b"ref",
+    b"snapshot",
     b"state",
     b"then",
+    b"timeslice",
     b"transition",
+    b"variation",
 ];
 
 pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[

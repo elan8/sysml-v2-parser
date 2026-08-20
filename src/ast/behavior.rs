@@ -859,6 +859,15 @@ pub enum StateDefBodyElement {
     SuccessionUsage(Node<crate::ast::SuccessionUsage>),
     /// `assert constraint { ... }` member (spec42 Gap 42).
     AssertConstraint(Node<crate::ast::AssertConstraintMember>),
+    /// `part` usage through `StateBodyItem -> NonBehaviorBodyItem ->
+    /// StructureUsageMember -> StructureUsageElement -> PartUsage` (SysML BNF 1200-1205,
+    /// 910-917, 262-264, 356-363, 623).  It keeps the existing source-backed PartUsage shape
+    /// rather than treating a state body as a special spelling of a part body.
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// `constraint` usage through the state body's `BehaviorUsageMember` branch (SysML BNF
+    /// 1200-1205, 266-268, 374-389, 1382-1395).  ConstraintUsage already owns its complete
+    /// occurrence prefix, specialization clauses, and CalculationBody.
+    ConstraintUsage(Box<Node<crate::ast::ConstraintUsage>>),
 }
 
 /// Entry action: `entry` (`;` or body).

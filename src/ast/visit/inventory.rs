@@ -5534,6 +5534,12 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::AssertConstraint(field_0) => {
                     visitor.visit_assert_constraint_member(field_0);
                 }
+                StateDefBodyElement::PartUsage(field_0) => {
+                    visitor.visit_part_usage(&$($mutability)? **field_0);
+                }
+                StateDefBodyElement::ConstraintUsage(field_0) => {
+                    visitor.visit_constraint_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

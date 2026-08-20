@@ -461,6 +461,21 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
             crate::parser::occurrence_body::assert_constraint_member,
             |n| node_from_to(start, input, StateDefBodyElement::AssertConstraint(n)),
         ),
+        // `StateBodyItem` first admits `NonBehaviorBodyItem`, whose StructureUsageMember branch
+        // owns PartUsage, then separately admits BehaviorUsageMember, whose alternatives include
+        // ConstraintUsage (SysML BNF 1200-1205, 910-920, 262-268, 356-389, 623, 1382).  Reuse
+        // those grammar-owned parsers and their source-backed nodes; a state body adds no
+        // alternate header or body spelling of either production.
+        map(crate::parser::part::part_usage, |n| {
+            node_from_to(start, input, StateDefBodyElement::PartUsage(Box::new(n)))
+        }),
+        map(crate::parser::constraint::constraint_usage, |n| {
+            node_from_to(
+                start,
+                input,
+                StateDefBodyElement::ConstraintUsage(Box::new(n)),
+            )
+        }),
         map(crate::parser::action::in_out_decl, |n| {
             node_from_to(start, input, StateDefBodyElement::InOutDecl(n))
         }),

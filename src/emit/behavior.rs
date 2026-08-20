@@ -850,6 +850,10 @@ fn emit_state_def_body_element(
         StateDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
+        StateDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
+        StateDefBodyElement::ConstraintUsage(c) => {
+            super::view::emit_constraint_usage(w, path, &c.value)
+        }
         StateDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }

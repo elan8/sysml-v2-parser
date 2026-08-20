@@ -1357,6 +1357,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
+                        StateDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
+                        }
+                        StateDefBodyElement::ConstraintUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
