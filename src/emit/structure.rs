@@ -7,10 +7,10 @@ use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
     ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
-    EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
-    InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement, PortDef,
-    PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
+    EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody,
+    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement,
+    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
     SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
@@ -901,6 +901,18 @@ pub(crate) fn emit_end_decl(
     path: &str,
     end: &EndDecl,
 ) -> Result<(), EmitError> {
+    if end.nested_usage.is_some()
+        && (end.typing.is_some()
+            || end.references.is_some()
+            || end.redefines.is_some()
+            || end.crosses.is_some()
+            || end.type_ref_span.is_some())
+    {
+        return w.unsupported(
+            path,
+            "EndDecl nested usage with outer type/reference relationship",
+        );
+    }
     w.push_str("end ");
     if let Some(short_name) = &end.short_name {
         w.push_char('<');
@@ -915,13 +927,21 @@ pub(crate) fn emit_end_decl(
         },
     }
     if let Some(nested) = &end.nested_usage {
-        return w.unsupported(
-            path,
-            format!("EndDecl nested_usage {nested:?}")
-                .chars()
-                .take(64)
-                .collect::<String>(),
-        );
+        if let Some(mult) = &end.multiplicity {
+            w.push_char(' ');
+            emit_multiplicity(w, &mult.value)?;
+        }
+        w.push_char(' ');
+        return match nested.as_ref() {
+            EndNestedUsage::Occurrence(usage) => super::behavior::emit_occurrence_usage(
+                w,
+                &format!("{path}/nested-occurrence"),
+                &usage.value,
+            ),
+            EndNestedUsage::Item(usage) => {
+                super::requirement::emit_item_usage(w, &format!("{path}/nested-item"), &usage.value)
+            }
+        };
     }
     if let Some(typing) = &end.typing {
         emit_typing_clause(w, &typing.value)?;

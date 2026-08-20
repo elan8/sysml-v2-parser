@@ -3785,9 +3785,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_optional_subsetting("references", end.references.as_ref())?;
         self.writer.write_char(' ')?;
+        self.writer.write_str("(multiplicity ")?;
+        self.write_multiplicity_clause(end.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
         self.write_optional_subsetting("redefines", end.redefines.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("crosses", end.crosses.as_ref())?;
+        self.writer.write_str(" (nested-usage ")?;
+        match end.nested_usage.as_deref() {
+            Some(super::EndNestedUsage::Occurrence(usage)) => {
+                self.write_occurrence(&usage.value)?
+            }
+            Some(super::EndNestedUsage::Item(usage)) => self.write_item_usage(&usage.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_char(')')?;
         self.writer.write_char(')')
     }
 
