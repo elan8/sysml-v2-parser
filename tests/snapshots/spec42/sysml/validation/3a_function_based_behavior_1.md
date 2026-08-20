@@ -224,8 +224,18 @@ package '3a-Function-based Behavior-1' {
             bind wheelTorque1 = 'distribute torque'.wheelTorque1;
             bind wheelTorque2 = 'distribute torque'.wheelTorque2;
             first start then continue {
+                /*
+				 * A first is an assertion that one thing must occur
+				 * before another, acting like a "control flow". 'start' is
+				 * the start snapshot of the action, which acts like an
+				 * "initial node".
+				 */
             }
             merge continue {
+                /*
+				 * A merge node is necessary to prevent a loop of successions
+				 * from being unsatisfiable.
+				 */
             }
             first continue then engineStarted;
             action engineStarted accept engineStart : EngineStart {

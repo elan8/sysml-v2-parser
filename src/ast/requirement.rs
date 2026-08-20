@@ -106,6 +106,36 @@ pub enum RequirementDefBodyElement {
     /// body -- including the `RequirementBody` a satisfy usage owns itself, which is why this is
     /// boxed.
     Satisfy(Box<Node<SatisfyRequirementUsage>>),
+    // The general usage families below all reach this scope the same way `Satisfy` does:
+    // `RequirementBodyItem → DefinitionBodyItem` (SysML BNF 1407, 237) admits the whole
+    // `NonOccurrenceUsageElement`/`OccurrenceUsageElement` member set, not just the
+    // requirement-specific members. Each was rejected outright with `unexpected_keyword_in_scope`
+    // -- not captured as an unsupported or recovery node, so nothing downstream could see that
+    // legal syntax had been written at all.
+    /// `action` / `ref action` usage (`DefinitionBodyItem → … → BehaviorUsageElement →
+    /// ActionUsage`).
+    ActionUsage(Box<Node<crate::ast::behavior::ActionUsage>>),
+    /// `succession` (name)? (`: Type`)? multiplicity? `first` ... `then` ... (BNF
+    /// `SuccessionAsUsage`), the same node `OccurrenceBodyElement`/`PartUsageBodyElement` spell.
+    SuccessionUsage(Node<crate::ast::SuccessionUsage>),
+    /// `perform` action usage, both the `perform action a;` and reference `perform a;` spellings
+    /// (`BehaviorUsageElement → PerformActionUsage`).
+    Perform(Node<crate::ast::Perform>),
+    /// `state` usage, including the `exhibit state` spelling (`BehaviorUsageElement →
+    /// StateUsage`/`ExhibitStateUsage`).
+    StateUsage(Node<crate::ast::behavior::StateUsage>),
+    /// `item` usage (`StructureUsageElement → ItemUsage`).
+    ItemUsage(Node<crate::ast::ItemUsage>),
+    /// `part` usage (`StructureUsageElement → PartUsage`). Boxed for the same reason
+    /// [`RequirementUsage`](Self::RequirementUsage) is: a part usage body may nest further
+    /// requirement members.
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// The keyword-less `connect a to b;` spelling of `ConnectionUsage`.
+    Connect(Node<crate::ast::Connect>),
+    /// The `connection` -led spelling of the same `ConnectionUsage` production, e.g.
+    /// `connection c connect a to b;`. Two nodes, one production: adding only one of them would
+    /// leave its sibling spelling in recovery.
+    ConnectionUsage(Box<Node<crate::ast::ConnectionUsageMember>>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.

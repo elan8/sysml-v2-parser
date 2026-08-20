@@ -8,9 +8,9 @@
 //! traversal knows about it -- there is no separate list here to keep in step.
 
 use super::visit::{
-    walk_comment_annotation, walk_first_merge_brace_body, walk_import_target,
-    walk_metadata_annotation, walk_metadata_keyword_usage, walk_occurrence_usage_prefix,
-    walk_satisfy_requirement_usage, walk_usage_extension_keyword, Visitor,
+    walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_metadata_annotation,
+    walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
+    walk_usage_extension_keyword, Visitor,
 };
 use super::*;
 
@@ -497,15 +497,16 @@ impl Visitor for ProvenanceValidator<'_> {
         walk_usage_extension_keyword(self, node);
     }
 
-    /// A `first`/`merge`/`decide`/`join`/`fork` brace body records both delimiters explicitly.
-    fn visit_first_merge_brace_body(&mut self, node: &Node<FirstMergeBraceBody>) {
+    /// A `first`/`merge`/`decide`/`join`/`fork` body carries stricter rules than the delimiter
+    /// checks `visit_body_braces` applies to every body; see
+    /// [`validate_first_merge_body_provenance`].
+    fn visit_first_merge_body(&mut self, node: &FirstMergeBody) {
         if self.error.is_some() {
             return;
         }
-        let result = node
-            .value
-            .validate_provenance(&node.span, &self.document.source);
+        let result =
+            crate::ast::behavior::validate_first_merge_body_provenance(node, &self.document.source);
         self.check(result);
-        walk_first_merge_brace_body(self, node);
+        walk_first_merge_body(self, node);
     }
 }

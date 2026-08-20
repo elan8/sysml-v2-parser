@@ -7,6 +7,28 @@
 //! regression it exists to catch.
 //!
 //! It failing to *compile* is the finding. The assertions inside are incidental.
+//!
+//! # What each half of the gate now holds
+//!
+//! The longest simple path through the AST type graph is over 120 distinct types, which is more
+//! than the default limit of 128 leaves room for once the `Vec`/`RawVec`/`PhantomData` plumbing of
+//! each of its fourteen nested body levels is counted. Rather than cap the grammar at whatever
+//! depth that arithmetic allows, [`ParsedDocument`] carries explicit `Send`/`Sync` implementations
+//! so the obligation is O(1) here, and the structural proof that discharges them lives in
+//! `ast::root::send_sync_structural_proof` -- inside the library, which raises `recursion_limit`
+//! for precisely this reason.
+//!
+//! So the two halves are:
+//!
+//! - *this* file proves the property a consumer actually needs, at the limit a consumer actually
+//!   has, and still fails to compile if those implementations are removed or narrowed; and
+//! - the library-side proof fails to compile if a field is added to [`ParsedDocument`] without an
+//!   assertion, or if any type anywhere in the AST stops being `Send`/`Sync` -- an `Rc`, a
+//!   `RefCell`, a raw pointer. It is a `cargo check` error, so CI catches it without a lint.
+//!
+//! Neither half is sufficient alone: drop the first and consumers silently regress to needing
+//! their own `recursion_limit`; drop the second and the `unsafe` implementations become an
+//! unchecked assertion.
 
 use sysml_v2_parser::{parse, parse_for_editor, ParseResult, ParsedDocument};
 
@@ -15,6 +37,11 @@ fn assert_sync<T: Sync>() {}
 
 /// The two public entry-point results prove the auto traits a consumer needs to move a parsed
 /// document across threads, without that consumer raising its recursion limit.
+///
+/// This is the property `ast::root`'s explicit `Send`/`Sync` implementations exist to provide. If
+/// they are removed, this file stops compiling at the default limit, which is the regression the
+/// gate is here to catch; the structural obligation they stand on is proved separately in the
+/// library, so nothing is taken on trust by making the obligation cheap here.
 #[test]
 fn public_documents_prove_auto_traits_at_the_default_recursion_limit() {
     assert_send::<ParsedDocument>();

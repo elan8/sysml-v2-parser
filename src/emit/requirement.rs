@@ -153,6 +153,26 @@ fn emit_requirement_body_element(
             super::behavior::emit_allocation_usage(w, path, &a.value)
         }
         RequirementDefBodyElement::Satisfy(s) => emit_satisfy(w, path, &s.value),
+        // The general usage families `RequirementBodyItem` inherits from `DefinitionBodyItem`,
+        // each emitted through the same writer the scope that owns it already uses.
+        RequirementDefBodyElement::ActionUsage(a) => {
+            super::behavior::emit_action_usage(w, path, &a.value)
+        }
+        RequirementDefBodyElement::SuccessionUsage(s) => {
+            super::behavior::emit_succession_usage(w, path, &s.value)
+        }
+        RequirementDefBodyElement::Perform(p) => super::behavior::emit_perform(w, path, &p.value),
+        RequirementDefBodyElement::StateUsage(s) => {
+            super::behavior::emit_state_usage(w, path, &s.value)
+        }
+        RequirementDefBodyElement::ItemUsage(i) => emit_item_usage(w, path, &i.value),
+        RequirementDefBodyElement::PartUsage(p) => {
+            super::structure::emit_part_usage(w, path, &p.value)
+        }
+        RequirementDefBodyElement::Connect(c) => super::structure::emit_connect(w, path, &c.value),
+        RequirementDefBodyElement::ConnectionUsage(c) => {
+            super::structure::emit_connection_usage(w, path, &c.value)
+        }
         RequirementDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         RequirementDefBodyElement::SubjectRef(_) => {
             w.push_str("subject;");

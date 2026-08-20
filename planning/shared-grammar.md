@@ -520,13 +520,21 @@ gates on type-level cost, checked from an integration test -- which compiles as 
 *default* recursion limit, unlike the library, which raises it:
 
 - `ParseResult` and `ParsedDocument` prove `Send` and `Sync` without the consumer raising
-  `recursion_limit`;
+  `recursion_limit`. `ParsedDocument` carries explicit implementations of both so that obligation
+  is O(1) downstream; they are not an exemption from the gate but a relocation of it, and are valid
+  only while `ast::root::send_sync_structural_proof` still compiles. That proof destructures
+  `ParsedDocument` exhaustively and walks the whole AST type graph structurally inside this crate,
+  so a new field, or any `Rc`/`RefCell`/raw pointer added anywhere beneath it, is a `cargo check`
+  error. Removing or weakening either half is a breaking change to this gate;
 - serde derivation and exhaustive matching still compile downstream;
 - compile time for a representative consumer does not regress materially; and
 - decoding and dropping a deeply nested document remains stack-safe.
 
 Raising a consumer's recursion limit is a workaround, not a resolution: it hides which type cycle
-grew and lets the next phase grow it further.
+grew and lets the next phase grow it further. The explicit implementations above are not that
+workaround -- they do not raise any limit, and the structural obligation is still discharged in
+full, just once and in the crate that owns the types rather than in every consumer. The distinction
+that matters is whether a compiler-checked proof still exists, not where it runs.
 
 Snapshot updates must be explicit. A representation-only change should normally preserve semantic
 `AST` and `FORMAT` output. If an output changes, document whether it corrects a lost grammatical

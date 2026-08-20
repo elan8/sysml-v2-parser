@@ -77,6 +77,21 @@ fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<Relatio
     relationship_body_element(input)
 }
 
+/// Whether a member boundary is at the keyword-less `Comment` spelling (`/* ... */`).
+///
+/// Takes trivia-free input, i.e. input already advanced past [`crate::parser::lex::ws_and_notes`].
+///
+/// A scope must test this *before* its own member dispatch, whether that dispatch is a keyword
+/// lookup or an ordered `alt` over productions. `/*` selects no production keyword, so a keyword
+/// chain never reaches [`annotating_member`] at all; and every sibling production begins by
+/// skipping trivia with `ws_and_comments`, which swallows the comment and then reads the member
+/// written *after* it as its own. Either way the annotating member is lost and its successor is
+/// misparsed. The test is exact rather than merely early: no other member spelling in any scope
+/// can begin with `/*`.
+pub(crate) fn starts_bare_comment(input: Input<'_>) -> bool {
+    input.fragment().starts_with(b"/*")
+}
+
 /// The grammar's `AnnotatingElement` production (KerML 8.2.3.3.1, SysML 8.2.2.4.1).
 ///
 /// A scope accepts the whole production or none of it, so every scope that owns annotating
@@ -91,7 +106,7 @@ pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, Annotati
     }
     // Last resort among the four alternatives even though it is tested first: the keyword-led
     // spellings cannot begin with `/*`, so this test is exact rather than merely earlier.
-    if input.fragment().starts_with(b"/*") {
+    if starts_bare_comment(input) {
         return map(
             crate::parser::requirement::bare_comment,
             AnnotatingMember::Comment,

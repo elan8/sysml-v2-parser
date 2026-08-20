@@ -9,6 +9,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A keyword-less `/* ... */` member is dispatched before the member set of every scope, not only
+  the scopes whose dispatch happened to reach `annotating_member`.** Fixtures:
+  `tests/snapshots/spec42/bare_comment_member_dispatch.md`,
+  `tests/snapshots/spec42/bare_comment_member_recovery.md`.
+
+  `Comment = ( 'comment' Identification ... )? ( 'locale' ... )? REGULAR_COMMENT` (KerML BNF 199)
+  makes every group before the body optional, so a bare block comment at a member position is the
+  production's shortest legal spelling. Four scopes dispatch their members by keyword lookup or by
+  an ordered `alt` whose alternatives each begin by skipping trivia, and `/*` selects no production
+  keyword: the calc-shaped body that KerML type bodies share with a SysML calculation body, an
+  action definition body, an action usage body, and a constraint body. In all four the comment fell
+  through to a sibling production, which consumed it as trivia and then read the *following*
+  member's declaration as its own.
+
+  With a KerML type-relationship tail the member then failed outright -- `/* c */ feature f : T
+  unions x;` reported `recovered_calc_body_element` on `": T unions x;"`, for all four of `unions`,
+  `intersects`, `differences` and `disjoint from`. Without one the same shredding was silent:
+  `/* c */ feature f : T [*];` became an expression statement `'feature';` plus an unrelated
+  binding named `f`, with no diagnostic at all, and formatted back out that way.
+
+  `body::starts_bare_comment` is the one place that test is written, so a scope that gains a
+  keyword-led dispatch cannot forget it.
+
+- **A requirement body owns the general usage families it inherits from `DefinitionBodyItem`.**
+  Fixtures: `tests/snapshots/sysml/requirement_body_usage_members.md`,
+  `tests/snapshots/sysml/requirement_body_usage_member_recovery.md`. **AST version 185.**
+
+  `RequirementBodyItem = DefinitionBodyItem | ...` (SysML BNF 1407) and `DefinitionBodyItem`
+  admits `NonOccurrenceUsageElement` and `OccurrenceUsageElement` (BNF 237), so a requirement
+  definition or usage body legally contains the whole usage zoo, not only the requirement-specific
+  members. `RequirementDefBodyElement` had no variant for any of them and each was rejected
+  outright with `unexpected_keyword_in_scope` -- not captured as an unsupported or recovery node,
+  so nothing downstream could see that legal syntax had been written at all.
+
+  Added, with starters, source-ordered traversal, emission and opacity walking: `ActionUsage`,
+  `SuccessionUsage`, `Perform` (both the `perform action a;` declaration and the `perform a;`
+  reference), `StateUsage`, `ItemUsage`, `PartUsage`, and both spellings of `ConnectionUsage` --
+  the keyword-less `Connect` and the `connection`-led `ConnectionUsageMember`. They are dispatched
+  after `ref_decl`, which requires its own `ref` token, so no `ref`-prefixed member moves off the
+  node it already parses to.
+
+- **An `intersects` clause on a KerML feature is no longer parsed and thrown away.** Fixture:
+  `tests/snapshots/spec42/bare_comment_member_dispatch.md`.
+
+  `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
+  `TypeRelationshipPart` alternatives (KerML BNF 408, 424), alongside `unions`, `differences` and
+  `disjoint from`. `specialization_clauses` claimed it first, because the SysML usage headers that
+  helper also serves model it as a subsetting-family clause, and `kerml_feature` then read every
+  other clause it returns and dropped this one. An authored `feature f : T intersects g;` lost the
+  whole clause: no relationship, no subsetting, no diagnostic, and nothing to emit. It now joins
+  its three siblings in `type_relationships`, positioned by its authored span so the list's
+  documented source order still holds when `intersects` is written first.
+
+- **`first`/`merge`/`decide`/`join`/`fork` bodies share `Body` instead of a body type of their
+  own, and their `;` is no longer unlocatable.** **AST version 185.**
+
+  `FirstMergeBody` was `Semicolon | Brace(Node<FirstMergeBraceBody>)`, a hand-rolled duplicate of
+  the shared `Body<E>` that cost two things. Its semicolon alternative carried no span, so `first x
+  then y;` was the one body in the AST whose terminator could not be located without re-scanning
+  the source. Its brace alternative wrapped the delimiters in a second `Node`, making the body
+  extent two representations of one fact -- which its own provenance validation then had to
+  cross-check against each other. Both are gone: `FirstMergeBody` is now
+  `Body<FirstMergeBodyElement>`, `FirstMergeBraceBody` is removed from the public API, and the
+  semantic projection reads `(body semicolon (span ...))` and `(body brace (open-brace ...)
+  (members ...) (close-brace ...))`.
+
+  The delimiter checks this scope validated for itself are the ones
+  `ProvenanceVisitor::visit_body_braces` already applies to every `Body<E>`. The stricter rules it
+  added -- ordered non-empty element spans, no unmodeled non-trivia between members, and each
+  element's span matching the member it retains -- are kept in
+  `ast::behavior::validate_first_merge_body_provenance`. Generalizing the first three to all
+  fourteen body families is worthwhile and deliberately not attempted here.
+
+### Changed
+
+- **`ParsedDocument` implements `Send` and `Sync` explicitly, so consumers stop paying to prove
+  it.** Policy: `planning/shared-grammar.md`; proof: `ast::root::send_sync_structural_proof`;
+  gate: `tests/type_level_cost.rs`.
+
+  The longest simple path through the AST type graph is over 120 distinct types -- fourteen nested
+  body levels, each costing a `Body`, an element enum, the owning declaration, and three frames of
+  `Vec`/`RawVec`/`PhantomData` plumbing. Proving `ParsedDocument: Send` structurally cost 119
+  trait-solver frames before the requirement-body work above and 134 after it, against rustc's
+  default `recursion_limit` of 128. Every consumer wanting to move a document between threads paid
+  that, and had to raise its own limit to do so.
+
+  The explicit implementations make that obligation O(1) downstream. They are not an exemption from
+  the type-level cost gate but a relocation of it: `send_sync_structural_proof` destructures
+  `ParsedDocument` exhaustively and walks the whole AST type graph structurally inside this crate,
+  which already raises `recursion_limit`. Adding a field without an assertion is an `E0027`; an
+  `Rc`, `RefCell` or raw pointer added anywhere beneath it is an `E0277` naming the offending type.
+  Both are `cargo check` errors, so no separate lint is required. `tests/type_level_cost.rs`
+  continues to compile at the default limit and so still fails if the implementations are removed.
+
 - **KerML's `FeaturePrefix` is modelled as the choice the grammar writes, not as eight independent
   booleans.** Audit and evidence: `planning/kerml-feature-prefix-matrix.md`.
   **AST version 179 -> 184.**

@@ -203,6 +203,17 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"ref",
     b"verify",
     b"variant",
+    // `RequirementBodyItem -> DefinitionBodyItem` (SysML BNF 1407, 237) admits the general usage
+    // families as well as the requirement-specific members, so these are FIRST tokens of this
+    // scope. Without them a legal `action a;` was classified `unexpected_keyword_in_scope`.
+    b"action",
+    b"succession",
+    b"perform",
+    b"state",
+    b"item",
+    b"part",
+    b"connect",
+    b"connection",
     b":>>",
     b":>",
 ];

@@ -983,6 +983,34 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
+                        // The general usage families `RequirementBodyItem` inherits from
+                        // `DefinitionBodyItem`. Each is projected exactly as the sibling scopes
+                        // that already own it project it, so a member reads the same wherever it
+                        // is written.
+                        RequirementDefBodyElement::ActionUsage(_usage) => {
+                            self.write_marker(&mut first, "action-usage")?;
+                        }
+                        RequirementDefBodyElement::SuccessionUsage(_usage) => {
+                            self.write_marker(&mut first, "succession-usage")?;
+                        }
+                        RequirementDefBodyElement::Perform(_perform) => {
+                            self.write_marker(&mut first, "perform")?;
+                        }
+                        RequirementDefBodyElement::StateUsage(_usage) => {
+                            self.write_marker(&mut first, "state-usage")?;
+                        }
+                        RequirementDefBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
+                        }
+                        RequirementDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
+                        }
+                        RequirementDefBodyElement::Connect(_connect) => {
+                            self.write_marker(&mut first, "connect")?;
+                        }
+                        RequirementDefBodyElement::ConnectionUsage(_usage) => {
+                            self.write_marker(&mut first, "connection")?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -1801,14 +1829,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
 
     fn write_first_merge_body(&mut self, body: &FirstMergeBody) -> io::Result<()> {
         match body {
-            FirstMergeBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            FirstMergeBody::Brace(body) => {
-                self.writer.write_str("(body brace (span ")?;
-                write_span(self.writer, &body.span)?;
-                self.writer.write_str(") (open-brace ")?;
-                write_span(self.writer, &body.value.open_brace_span)?;
+            FirstMergeBody::Semicolon { semicolon_span } => {
+                // The semicolon spelling had no span at all while this scope owned its own body
+                // enum, so this projected a bare `(body semicolon)` and a consumer could not
+                // locate the terminator. The shared `Body` keeps the token.
+                self.writer.write_str("(body semicolon (span ")?;
+                write_span(self.writer, semicolon_span)?;
+                self.writer.write_str("))")
+            }
+            FirstMergeBody::Brace {
+                open_span,
+                elements,
+                close_span,
+            } => {
+                // No `(span ...)` for the body as a whole: it was a second representation of the
+                // extent the two delimiter spans already give, and it is gone with the `Node`
+                // wrapper that carried it.
+                self.writer.write_str("(body brace (open-brace ")?;
+                write_span(self.writer, open_span)?;
                 self.writer.write_str(") (members")?;
-                for element in &body.value.elements {
+                for element in elements {
                     self.writer.write_char(' ')?;
                     match &element.value {
                         FirstMergeBodyElement::Member(member) => {
@@ -1823,7 +1863,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     }
                 }
                 self.writer.write_str(") (close-brace ")?;
-                write_span(self.writer, &body.value.close_brace_span)?;
+                write_span(self.writer, close_span)?;
                 self.writer.write_str("))")
             }
         }

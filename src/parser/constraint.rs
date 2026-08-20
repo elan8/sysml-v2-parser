@@ -173,6 +173,14 @@ pub(crate) fn constraint_def_body_element(
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // Ahead of every guard below; see `body::starts_bare_comment` and the matching branch in
+    // `calc_def_body_element`.
+    if crate::parser::body::starts_bare_comment(input) {
+        let comment_start = input;
+        let (input, member) = crate::parser::body::annotating_member(comment_start)?;
+        let elem = ConstraintDefBodyElement::Annotating(member);
+        return Ok((input, node_from_to(comment_start, input, elem)));
+    }
     // `MemberPrefix` precedes the member's own keyword, so the usage guards below look past it;
     // each arm's parser re-reads it. Without this a `private ref constraint hidden;` matched no
     // guard and reached the expression fallback.
@@ -1157,6 +1165,37 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // (`Occurrences.kerml`).
     let (input, type_relationships) =
         crate::parser::package::kerml_type_relationship_clauses(input)?;
+    // `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
+    // `TypeRelationshipPart` alternatives (KerML BNF 408, 424), so it belongs in the same list as
+    // the three siblings just parsed. `specialization_clauses` above claims it first, because the
+    // SysML usage headers that helper also serves model it as a subsetting-family clause; this
+    // scope then read every other clause it returns and dropped this one. An authored `feature f
+    // : T intersects g;` lost the whole clause -- no relationship, no subsetting, no diagnostic,
+    // and nothing to emit.
+    //
+    // Positioned by its authored span rather than appended, so the list's documented source order
+    // still holds when `intersects` is written ahead of another clause.
+    let type_relationships = match clauses.intersects {
+        None => type_relationships,
+        Some(intersecting) => {
+            let span = intersecting.span.clone();
+            let node = crate::ast::Node::new(
+                span.clone(),
+                crate::ast::KermlTypeRelationship {
+                    keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
+                    targets: intersecting.value.target,
+                    span,
+                },
+            );
+            let mut merged = type_relationships;
+            let at = merged
+                .iter()
+                .position(|existing| existing.span.offset > node.span.offset)
+                .unwrap_or(merged.len());
+            merged.insert(at, node);
+            merged
+        }
+    };
     // `inverse of` may also trail the type relationships (`... unions successors, ... inverse
     // of withoutOccurrences { ... }`, `Occurrences.kerml`).
     let (input, inverse_of) = if inverse_of.is_none() {
@@ -1277,6 +1316,17 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // Ahead of every guard below, including the two computed eagerly: they all reach a parser
+    // that skips `/* ... */` as trivia, which then reads the *following* member's declaration as
+    // its own. `/* c */ feature f : T unions x;` lost the comment, took `feature f` as a
+    // declaration whose specialization tail no longer fit, and dropped the member into recovery.
+    // See `body::starts_bare_comment`.
+    if crate::parser::body::starts_bare_comment(input) {
+        let comment_start = input;
+        let (input, member) = crate::parser::body::annotating_member(comment_start)?;
+        let elem = CalcDefBodyElement::Annotating(member);
+        return Ok((input, node_from_to(comment_start, input, elem)));
+    }
     // Keyword dispatch looks past an optional visibility prefix (`private attribute ...`,
     // `private connector all ...`); each arm's parser re-parses the prefix itself.
     let after_visibility = crate::parser::lex::visibility_prefix(input)

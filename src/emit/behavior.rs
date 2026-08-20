@@ -1238,15 +1238,15 @@ fn emit_first_merge_body(
     body: &crate::ast::FirstMergeBody,
 ) -> Result<(), EmitError> {
     match body {
-        crate::ast::FirstMergeBody::Semicolon => {
+        crate::ast::FirstMergeBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::FirstMergeBody::Brace(body) => {
+        crate::ast::FirstMergeBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
-            for (index, element) in body.value.elements.iter().enumerate() {
+            for (index, element) in elements.iter().enumerate() {
                 let element_path = format!("{path}/body[{index}]");
                 match &element.value {
                     crate::ast::FirstMergeBodyElement::Member(member) => {

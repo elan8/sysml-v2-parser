@@ -902,11 +902,6 @@ macro_rules! ast_traversal {
                 walk_first_merge_body(self, node)
             }
 
-            /// Visits [`FirstMergeBraceBody`]; the default implementation walks its children.
-            fn visit_first_merge_brace_body(&mut self, node: &$($mutability)? Node<FirstMergeBraceBody>) {
-                walk_first_merge_brace_body(self, node)
-            }
-
             /// Visits [`FirstMergeBodyElement`]; the default implementation walks its children.
             fn visit_first_merge_body_element(&mut self, node: &$($mutability)? Node<FirstMergeBodyElement>) {
                 walk_first_merge_body_element(self, node)
@@ -5275,23 +5270,19 @@ macro_rules! ast_traversal {
 
         pub fn walk_first_merge_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? FirstMergeBody) {
             match node {
-                FirstMergeBody::Semicolon => {}
-                FirstMergeBody::Brace(field_0) => {
-                    visitor.visit_first_merge_brace_body(field_0);
+                FirstMergeBody::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                FirstMergeBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_first_merge_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
                 }
             }
-        }
-
-        pub fn walk_first_merge_brace_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FirstMergeBraceBody>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let FirstMergeBraceBody { open_brace_span, elements, close_brace_span } = &$($mutability)? node.value;
-            visitor.visit_span(open_brace_span);
-            for inner in elements {
-                visitor.visit_first_merge_body_element(inner);
-            }
-            visitor.visit_span(close_brace_span);
-            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_first_merge_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FirstMergeBodyElement>) {
@@ -5752,6 +5743,30 @@ macro_rules! ast_traversal {
                 }
                 RequirementDefBodyElement::AllocationUsage(field_0) => {
                     visitor.visit_allocation_usage(&$($mutability)? **field_0);
+                }
+                RequirementDefBodyElement::ActionUsage(field_0) => {
+                    visitor.visit_action_usage(&$($mutability)? **field_0);
+                }
+                RequirementDefBodyElement::SuccessionUsage(field_0) => {
+                    visitor.visit_succession_usage(field_0);
+                }
+                RequirementDefBodyElement::Perform(field_0) => {
+                    visitor.visit_perform(field_0);
+                }
+                RequirementDefBodyElement::StateUsage(field_0) => {
+                    visitor.visit_state_usage(field_0);
+                }
+                RequirementDefBodyElement::ItemUsage(field_0) => {
+                    visitor.visit_item_usage(field_0);
+                }
+                RequirementDefBodyElement::PartUsage(field_0) => {
+                    visitor.visit_part_usage(&$($mutability)? **field_0);
+                }
+                RequirementDefBodyElement::Connect(field_0) => {
+                    visitor.visit_connect(field_0);
+                }
+                RequirementDefBodyElement::ConnectionUsage(field_0) => {
+                    visitor.visit_connection_usage_member(&$($mutability)? **field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);

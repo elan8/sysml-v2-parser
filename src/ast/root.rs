@@ -58,6 +58,54 @@ pub struct ParsedDocument {
     pub root: RootNamespace,
 }
 
+// SAFETY: every field of `ParsedDocument` is itself `Send` and `Sync`, which is exactly what the
+// automatic implementations would have required. These explicit implementations exist only to stop
+// the *proof* from being recomputed structurally in every consumer.
+//
+// The AST is a deeply mutually recursive tree -- a requirement body holds a part usage holds a
+// perform holds a variant requirement holds a requirement body -- so the longest simple path
+// through its type graph is over 120 distinct types. Proving `ParsedDocument: Send` structurally
+// costs that many trait-solver frames, which is more than rustc's default `recursion_limit` of
+// 128 allows, so every consumer that merely wants to move a document between threads had to raise
+// its own limit. These implementations make the obligation O(1) for them.
+//
+// The safety obligation is not discharged by review: `send_sync_structural_proof` below proves it
+// structurally, field by field, inside this crate (which raises `recursion_limit` for exactly this
+// reason). Adding a field, or changing one to a type that is not `Send`/`Sync` such as `Rc`,
+// `RefCell` or a raw pointer, fails that proof to compile.
+unsafe impl Send for ParsedDocument {}
+// SAFETY: as above -- `send_sync_structural_proof` proves every field `Sync`.
+unsafe impl Sync for ParsedDocument {}
+
+/// The compiler-checked proof that discharges the `unsafe impl Send`/`Sync` above.
+///
+/// This must never assert anything about [`ParsedDocument`] itself: the explicit implementations
+/// would make such an assertion vacuously true and the guard would silently stop guarding. It
+/// asserts the *field types*, which still resolve structurally, and destructures the struct so the
+/// field list cannot drift away from the assertions.
+///
+/// It lives in the library rather than in a test so that it is checked by every build, including
+/// `cargo check`, rather than only when the test suite runs.
+#[allow(dead_code)]
+fn send_sync_structural_proof(document: ParsedDocument) {
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    // Exhaustive by construction: adding or renaming a field of `ParsedDocument` fails here, so a
+    // new field cannot reach the `unsafe impl`s without an assertion of its own below.
+    let ParsedDocument {
+        source,
+        qualified_references,
+        root,
+    } = document;
+    let _ = (&source, &qualified_references, &root);
+
+    assert_send_sync::<SourceStorage>();
+    assert_send_sync::<QualifiedReferenceArena>();
+    // The expensive one: this is the full structural walk of the AST type graph, the proof the
+    // `unsafe impl`s stand on and the reason this crate raises `recursion_limit`.
+    assert_send_sync::<RootNamespace>();
+}
+
 impl ParsedDocument {
     /// Resolve a parser span through this document's canonical source-position index.
     pub fn range(&self, span: &Span) -> Option<SourceRange> {
@@ -346,6 +394,12 @@ mod serde_tests {
         assert!(error.to_string().contains("filter close bracket"));
     }
 
+    /// A `first`/`merge` body is the innermost body of this fixture, so tampering the innermost
+    /// `open_span` tampers that body specifically.
+    ///
+    /// It used to spell its delimiters as `open_brace_span`/`close_brace_span` on a body type of
+    /// its own; sharing `Body` means those are the ordinary `open_span`/`close_span` every body
+    /// carries, and the field name alone no longer selects this scope.
     #[test]
     fn parsed_document_rejects_tampered_first_merge_delimiter_provenance() {
         let document = crate::parse(
@@ -353,12 +407,42 @@ mod serde_tests {
         )
         .expect("parse first/merge body");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
-        let open = find_field_mut(&mut encoded, "open_brace_span").expect("open brace span");
+        let open =
+            find_innermost_field_mut(&mut encoded, "open_span").expect("first/merge open brace");
         open["len"] = serde_json::json!(2);
 
         let error = serde_json::from_value::<ParsedDocument>(encoded)
             .expect_err("tampered first/merge delimiter must be rejected");
-        assert!(error.to_string().contains("first/merge open brace"));
+        assert!(
+            error.to_string().contains("first/merge open brace"),
+            "unexpected error: {error}"
+        );
+    }
+
+    /// The rules this scope keeps beyond the delimiter checks every body now gets: an element's
+    /// span must match the span of the member it retains.
+    #[test]
+    fn parsed_document_rejects_a_first_merge_element_span_that_left_its_member_behind() {
+        let document = crate::parse(
+            "package P { action def A { first Actions::start then Actions::finish { out pin; } } }",
+        )
+        .expect("parse first/merge body");
+        let mut encoded = serde_json::to_value(document).expect("serialize document");
+        let elements = find_innermost_field_mut(&mut encoded, "elements")
+            .and_then(|elements| elements.get_mut(0))
+            .and_then(|element| element.get_mut("span"))
+            .expect("first/merge body element span");
+        let shrunk = elements["len"].as_u64().expect("element span length") - 1;
+        elements["len"] = serde_json::json!(shrunk);
+
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("a first/merge element span must still match its retained member");
+        assert!(
+            error
+                .to_string()
+                .contains("first/merge body element and retained member spans must match"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -426,6 +510,33 @@ mod serde_tests {
                 fields
                     .values_mut()
                     .find_map(|value| find_field_mut(value, field))
+            }
+            _ => None,
+        }
+    }
+
+    /// Like [`find_field_mut`], but returns the *deepest* match along the first matching path.
+    ///
+    /// Field names that used to name one scope's bespoke type now name the shared one, so the
+    /// outermost match is a different body than the test means.
+    fn find_innermost_field_mut<'a>(
+        value: &'a mut serde_json::Value,
+        field: &str,
+    ) -> Option<&'a mut serde_json::Value> {
+        match value {
+            serde_json::Value::Array(values) => values
+                .iter_mut()
+                .find_map(|value| find_innermost_field_mut(value, field)),
+            serde_json::Value::Object(fields) => {
+                let nested = fields
+                    .values_mut()
+                    .any(|value| find_innermost_field_mut(value, field).is_some());
+                if nested {
+                    return fields
+                        .values_mut()
+                        .find_map(|value| find_innermost_field_mut(value, field));
+                }
+                fields.get_mut(field)
             }
             _ => None,
         }
