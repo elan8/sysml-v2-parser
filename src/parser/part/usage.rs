@@ -5,9 +5,10 @@ use crate::parser::feature_value_part as usage_value_part;
 use crate::parser::item::item_usage;
 
 fn usage_ordered_modifier(
+    prior: crate::ast::MultiplicityModifiers,
     input: Input<'_>,
 ) -> IResult<Input<'_>, crate::ast::MultiplicityModifiers> {
-    crate::parser::usage::multiplicity_modifier_slots(input)
+    crate::parser::usage::multiplicity_modifier_slots_after(prior, input)
 }
 
 /// Everything a `PartUsage` head recognizes before the declaration.
@@ -44,7 +45,8 @@ fn part_usage_redefines_only<'a>(
     let (type_ref_span, _, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, multiplicity_modifiers) = usage_ordered_modifier(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     // This form has no declaration name; the target spelling lives only in `redefines`.
@@ -83,12 +85,12 @@ fn part_usage_named<'a>(
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, modifiers_before_type) = usage_ordered_modifier(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, early_typing) = optional_typings(input)?;
     let (input, trailing_multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
-    let (input, modifiers_after_type) = usage_ordered_modifier(input)?;
-    let multiplicity_modifiers = modifiers_before_type.merge(modifiers_after_type);
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     // Typing may follow redefinition: `in part anEngine :>> alternative : Engine;` (validation `10b`).
     let (input, type_result) = if early_typing.is_some() {
@@ -102,8 +104,7 @@ fn part_usage_named<'a>(
     });
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
-    let (input, modifiers_after_clauses) = usage_ordered_modifier(input)?;
-    let multiplicity_modifiers = multiplicity_modifiers.merge(modifiers_after_clauses);
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
@@ -232,7 +233,8 @@ fn anonymous_part_usage<'a>(
     head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
-    let (input, modifiers_before_type) = usage_ordered_modifier(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, (type_ref_span, is_conjugated, targets, spelling)) = typings(input)?;
     let typing = Some(typing_node(
         type_ref_span.clone(),
@@ -242,13 +244,11 @@ fn anonymous_part_usage<'a>(
     ));
     let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
-    let (input, modifiers_after_type) = usage_ordered_modifier(input)?;
-    let multiplicity_modifiers = modifiers_before_type.merge(modifiers_after_type);
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, clauses) = specialization_clauses(input)?;
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
-    let (input, modifiers_after_clauses) = usage_ordered_modifier(input)?;
-    let multiplicity_modifiers = multiplicity_modifiers.merge(modifiers_after_clauses);
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     Ok((
@@ -1175,7 +1175,8 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // `connector::ref_decl`).
     let (input, trailing_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, multiplicity_modifiers) = usage_ordered_modifier(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, subsets) =
         opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);

@@ -612,18 +612,41 @@ pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_
     Ok((input, ()))
 }
 
-/// Parse `MultiplicityPart`'s ordering and uniqueness keyword slots (SysML BNF 495, KerML BNF
-/// 639), returning the authored spellings and their exact spans.
+/// One authored `MultiplicityPart` keyword, tagged with the slot it fills.
 ///
-/// Both slots are optional and either order is accepted, matching what this parser has always
-/// taken. Each slot keeps the *first* spelling it sees, so a repeated keyword cannot silently
-/// replace the span already recorded for it.
+/// The production gives each slot its own alternation, so a keyword cannot fill both and the
+/// caller never has to ask which of two booleans a spelling meant.
+#[derive(Clone, Copy)]
+enum MultiplicitySlot {
+    Ordering(crate::ast::MultiplicityOrdering),
+    Uniqueness(crate::ast::MultiplicityUniqueness),
+}
+
+/// Parse `MultiplicityPart`'s ordering and uniqueness keyword slots (SysML BNF 495-496, KerML BNF
+/// 639-640), returning the authored spellings and their exact spans.
 ///
-/// `unique` and `nonordered` -- the explicit spellings of the two metamodel defaults, which the
-/// pinned productions do not list -- are recognized here rather than discarded: consuming
-/// authored syntax and recording nothing is the one outcome the parser must not produce, and a
-/// consumer that cannot tell "the author stated the default" from "the author said nothing" has
-/// lost a fact the source contains.
+/// ```text
+/// ( isOrdered ?= 'ordered' ( { isUnique = false } 'nonunique' )?
+/// | { isUnique = false } 'nonunique' ( isOrdered ?= 'ordered' )? )
+/// ```
+///
+/// The production is a two-way alternation over *distinct* slots, so it admits at most one
+/// ordering keyword and at most one uniqueness keyword, in either order. This reads exactly that:
+/// one keyword, then at most one more filling the *other* slot. A third keyword, a repeat of a
+/// slot already filled, or a contradiction (`ordered nonordered`) is left unconsumed rather than
+/// folded into the slot that already has a span. The enclosing declaration then fails at that
+/// token and the enclosing scope's member recovery captures the whole member by source span, so
+/// the excess becomes an explicit malformed node instead of a keyword the parser quietly drops.
+/// The OMG Pilot's generated parser behaves the same way: `MultiplicityPart` is an Xtext fragment
+/// matched once, so the token after it is a syntax error (`KerML.xtext` 578-584,
+/// `SysML.xtext` 370-376).
+///
+/// `unique` and `nonordered` -- the explicit spellings of the two metamodel defaults, which
+/// neither pinned production lists and which the Pilot grammar does not spell at all -- are
+/// recognized here rather than discarded: consuming authored syntax and recording nothing is the
+/// one outcome the parser must not produce, and a consumer that cannot tell "the author stated
+/// the default" from "the author said nothing" has lost a fact the source contains. They occupy
+/// the same two slots, so they obey the same cardinality.
 ///
 /// Keywords match on a token boundary, so a declaration continuing `orderedBy` is not read as an
 /// `ordered` modifier followed by a stray `By`.
@@ -632,28 +655,75 @@ pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_
 pub(crate) fn multiplicity_modifier_slots(
     input: Input<'_>,
 ) -> IResult<Input<'_>, crate::ast::MultiplicityModifiers> {
-    use crate::ast::{MultiplicityOrdering, MultiplicityUniqueness};
+    multiplicity_modifier_slots_after(crate::ast::MultiplicityModifiers::default(), input)
+}
 
-    let mut input = input;
-    let mut modifiers = crate::ast::MultiplicityModifiers::default();
+/// [`multiplicity_modifier_slots`] resuming from what an earlier position of the same declaration
+/// already read.
+///
+/// `FeatureSpecializationPart` (SysML BNF 424-426, KerML BNF 632-634) puts the `MultiplicityPart`
+/// either before the specializations or after them, so declarations that accept both positions
+/// parse the slots twice. Passing the first group in as the accumulator makes a slot filled at the
+/// first position stop consumption at the second exactly as a repeat within one position does --
+/// otherwise `ordered ordered` is read as one slot per position and the second spelling is folded
+/// away with no diagnostic, which is the silent drop this parser must not produce.
+pub(crate) fn multiplicity_modifier_slots_after(
+    mut modifiers: crate::ast::MultiplicityModifiers,
+    mut input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::MultiplicityModifiers> {
+    // Terminates: every iteration that continues fills one of two slots that is not yet filled.
     loop {
         let (after_ws, _) = ws_and_comments(input)?;
-        if let Some((rest, span)) = modifier_keyword(after_ws, b"nonunique") {
-            modifiers.set_uniqueness(MultiplicityUniqueness::Nonunique, span);
-            input = rest;
-        } else if let Some((rest, span)) = modifier_keyword(after_ws, b"unique") {
-            modifiers.set_uniqueness(MultiplicityUniqueness::Unique, span);
-            input = rest;
-        } else if let Some((rest, span)) = modifier_keyword(after_ws, b"nonordered") {
-            modifiers.set_ordering(MultiplicityOrdering::Nonordered, span);
-            input = rest;
-        } else if let Some((rest, span)) = modifier_keyword(after_ws, b"ordered") {
-            modifiers.set_ordering(MultiplicityOrdering::Ordered, span);
-            input = rest;
-        } else {
-            return Ok((input, modifiers));
+        let Some((rest, slot, span)) = multiplicity_slot_keyword(after_ws) else {
+            // Leave the whitespace before a non-modifier token unconsumed, as `preceded` did.
+            break;
+        };
+        match slot {
+            MultiplicitySlot::Ordering(ordering) if modifiers.ordering.is_none() => {
+                modifiers.ordering = Some(crate::ast::Node::new(span, ordering));
+            }
+            MultiplicitySlot::Uniqueness(uniqueness) if modifiers.uniqueness.is_none() => {
+                modifiers.uniqueness = Some(crate::ast::Node::new(span, uniqueness));
+            }
+            // The slot this keyword fills already has an authored spelling and its span. Leave it
+            // for the enclosing scope's recovery rather than consuming it into nothing.
+            MultiplicitySlot::Ordering(_) | MultiplicitySlot::Uniqueness(_) => break,
         }
+        input = rest;
     }
+    Ok((input, modifiers))
+}
+
+/// Consume one `MultiplicityPart` keyword, returning the slot it fills and its exact span.
+fn multiplicity_slot_keyword(input: Input<'_>) -> Option<(Input<'_>, MultiplicitySlot, Span)> {
+    use crate::ast::{MultiplicityOrdering, MultiplicityUniqueness};
+
+    // `nonunique` before `unique` and `nonordered` before `ordered`: the shorter spelling is not a
+    // prefix of the longer one, but keeping the longer alternative first documents that ordering
+    // is deliberate rather than incidental.
+    const KEYWORDS: [(&[u8], MultiplicitySlot); 4] = [
+        (
+            b"nonunique",
+            MultiplicitySlot::Uniqueness(MultiplicityUniqueness::Nonunique),
+        ),
+        (
+            b"unique",
+            MultiplicitySlot::Uniqueness(MultiplicityUniqueness::Unique),
+        ),
+        (
+            b"nonordered",
+            MultiplicitySlot::Ordering(MultiplicityOrdering::Nonordered),
+        ),
+        (
+            b"ordered",
+            MultiplicitySlot::Ordering(MultiplicityOrdering::Ordered),
+        ),
+    ];
+
+    KEYWORDS.iter().find_map(|&(keyword, slot)| {
+        let (rest, span) = modifier_keyword(input, keyword)?;
+        Some((rest, slot, span))
+    })
 }
 
 /// Consume one modifier keyword on a token boundary, returning its exact span.

@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`MultiplicityPart` admits one keyword per slot, and the excess reaches recovery instead of
+  being swallowed.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`.
+
+  `MultiplicityPart` (SysML BNF 495-496, KerML BNF 639-640) is an alternation over two *distinct*
+  slots: at most one ordering keyword, at most one uniqueness keyword, either order, preceded by at
+  most one multiplicity range. The OMG Pilot matches it as an Xtext fragment exactly once, so the
+  token after it is a syntax error there.
+
+  This parser looped instead, and every excess spelling was dropped with **no diagnostic and a
+  silently different document**: `Real[0..*] ordered ordered` re-emitted as `Real[0..*] ordered`,
+  and `[1] ordered [2] nonunique` re-emitted as `[1] ordered nonunique` -- the `[2]` vanished.
+  That is the permissive fallback `AGENTS.md` forbids.
+
+  Each slot now fills at most once and any excess is left unconsumed, so the enclosing declaration
+  fails at that token and the scope's member recovery captures the whole member by source span with
+  a stable code, an exact span, and the valid sibling after it intact.
+
+  - **The cardinality is per declaration, not per parse position.** `FeatureSpecializationPart`
+    (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations, so
+    the parsers offer the position twice and used to fold the two groups first-wins -- which is how
+    `ordered ordered` survived the narrowing, one slot per position. The value is now threaded
+    through both positions as an accumulator, so a filled field is what stops the next position
+    from consuming. `MultiplicityModifiers::merge` and the first-wins `set_ordering`/`set_uniqueness`
+    setters are deleted: that fallback was living in the owning API.
+  - **No new diagnostic code.** Every scope that owns member recovery already produces the exact
+    contract for this input -- stable code, precise span, `found` equal to the authored slice,
+    recovered emission reproducing it verbatim, surviving sibling. A `MultiplicityPart`-specific
+    code would duplicate it.
+
+  Corpus evidence for the narrowing being safe: across the pinned release the only authored
+  sequences are `nonunique` (440), `ordered` (203), `ordered nonunique` (82) and `nonunique
+  ordered` (5) -- all four legal, with no repetition, interleaving or adjacent range anywhere.
+  Neither `unique` nor `nonordered` appears in either Pilot grammar; both remain accepted and
+  retained here, now subject to the same cardinality as the spellings the production does list.
+
 - **A bare `/* ... */` is a `Comment`, not trivia, and every annotating body keeps its raw span
   and one normalization policy.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`
   (spec42 Gap 55). **AST version 177 -> 178.**

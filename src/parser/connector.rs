@@ -411,8 +411,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // interfacingPorts default ...;` (Systems Library `Interfaces.sysml`). The later capture
     // below covers the post-clause position (`... :>> participant [2..*] nonunique ordered
     // { ... }`).
-    let (input, modifiers_after_multiplicity) =
-        crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // `:>>` redefines may also follow the type instead of preceding it, e.g. `ref self: Item
     // :>> Object::self;` (Systems Library `Items.sysml`) -- only retry if the earlier attempt
     // (before the type) didn't already find one.
@@ -450,8 +449,8 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // `nonunique`/`ordered` feature modifiers may also follow the specialization clauses
     // (real usage: `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique
     // ordered { ... }`).
-    let (input, modifiers_after_clauses) =
-        crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     // Optional value/default clause, e.g. `ref item :>> localClock : Clock[1] default
     // Time::universalClock { ... }` (Domain Libraries `SpatialItems.sysml`).
     let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
@@ -473,7 +472,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 subsets,
                 redefines,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
-                multiplicity_modifiers: modifiers_after_multiplicity.merge(modifiers_after_clauses),
+                multiplicity_modifiers: modifiers,
                 value,
                 body,
                 name_span: Some(name_span),

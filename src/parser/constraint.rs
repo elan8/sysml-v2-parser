@@ -645,7 +645,8 @@ fn typed_parameter_member_inner(
         } else {
             (input, None)
         };
-    let (input, post_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -663,7 +664,7 @@ fn typed_parameter_member_inner(
                 multiplicity: leading_multiplicity
                     .or(trailing_multiplicity)
                     .or(post_redefines_multiplicity),
-                multiplicity_modifiers: modifiers.merge(post_modifiers),
+                multiplicity_modifiers: modifiers,
                 value,
                 body,
             },

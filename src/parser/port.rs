@@ -198,9 +198,10 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     // `MultiplicityPart`'s `ordered`/`nonunique`, which may sit either side of a specialization
     // clause: `port ports : Port[0..*] nonunique :> objects;` (`Systems Library/Ports.sysml:48`).
-    let (input, modifiers_before) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = specialization_clauses(input)?;
-    let (input, modifiers_after) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
     // §6 G11: `port :>> pe = c1.pb;` -- a port usage may carry a feature value, which binds it to
     // another port rather than declaring a fresh one.
@@ -221,7 +222,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
                 short_name,
                 typing,
                 multiplicity,
-                multiplicity_modifiers: modifiers_before.merge(modifiers_after),
+                multiplicity_modifiers: modifiers,
                 subsets: clauses.subsets,
                 redefines,
                 references: clauses.references,

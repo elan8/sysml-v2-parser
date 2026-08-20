@@ -28,13 +28,42 @@
 //! `unique nonunique` unrepresentable rather than merely unusual.
 //!
 //! `nonordered` and `unique` are the explicit spellings of the two defaults. The pinned
-//! productions above do not list them -- they spell only `ordered` and `nonunique` -- but this
-//! parser has always accepted them, and silently discarding recognized syntax is the one thing it
-//! must not do. They are retained here as authored facts, distinct from omission, so a consumer
-//! can tell "the author stated the default" from "the author said nothing" and a formatter
-//! reproduces what was written.
+//! productions above do not list them -- they spell only `ordered` and `nonunique` -- and neither
+//! does the OMG Pilot implementation, whose grammars contain no `unique` or `nonordered` token at
+//! all (`KerML.xtext` 578-586, `SysML.xtext` 370-378; `nonunique` is their only spelling of the
+//! uniqueness slot, and it is not even a reserved word in the pin -- see the keyword lists at
+//! SysML BNF 21 and KerML BNF 121, which list `nonunique` and `ordered` and neither of the other
+//! two). This parser has nevertheless always accepted them, and silently discarding recognized
+//! syntax is the one thing it must not do. They are retained here as authored facts, distinct
+//! from omission, so a consumer can tell "the author stated the default" from "the author said
+//! nothing" and a formatter reproduces what was written. They fill the same two slots, so they
+//! obey the same cardinality as the spellings the production does list.
+//!
+//! # One slot each, and what happens to the excess
+//!
+//! The production is an alternation over two *distinct* slots, so it admits at most one ordering
+//! keyword and at most one uniqueness keyword, and the range that may precede them at most once.
+//! Two `Option` fields say exactly that: a repetition is unrepresentable, as is the contradiction
+//! `ordered nonordered`.
+//!
+//! That leaves the question of what the parser does when an author writes one anyway. It does not
+//! keep the first spelling and swallow the rest -- that is the permissive fallback `AGENTS.md`
+//! forbids, and it made `Real[0..*] ordered ordered` re-emit as `Real[0..*] ordered` with no
+//! diagnostic at all. Instead the parser stops at the excess and leaves it unconsumed, so the
+//! enclosing declaration fails at that token and the enclosing scope's member recovery captures
+//! the whole member by source span as a malformed node with a stable code. Nothing is invented,
+//! nothing is dropped, and the valid sibling after it still parses. This also matches the
+//! reference tool: `MultiplicityPart` is an Xtext fragment matched once, so the Pilot's generated
+//! parser reports a syntax error on the token after it.
+//!
+//! The cardinality is per *declaration*, not per parse position. `FeatureSpecializationPart`
+//! (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations, so
+//! the parsers offer the position twice and thread this value through as an accumulator rather
+//! than parsing two groups and folding them. Folding was how `ordered ordered` used to survive the
+//! narrowing above: one slot filled per position, second spelling discarded. There is therefore no
+//! `merge` here; a filled field is what stops the next position from consuming.
 
-use super::core::{Node, Span};
+use super::core::Node;
 
 /// The `isOrdered` slot of `MultiplicityPart`: one keyword, two spellings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,30 +147,5 @@ impl MultiplicityModifiers {
         self.uniqueness
             .as_ref()
             .is_none_or(|uniqueness| uniqueness.value.is_unique())
-    }
-
-    /// Record an authored `ordered`/`nonordered` keyword, keeping the first spelling if the
-    /// declaration reaches this slot more than once.
-    pub fn set_ordering(&mut self, ordering: MultiplicityOrdering, span: Span) {
-        self.ordering
-            .get_or_insert_with(|| Node::new(span, ordering));
-    }
-
-    /// Record an authored `unique`/`nonunique` keyword, keeping the first spelling if the
-    /// declaration reaches this slot more than once.
-    pub fn set_uniqueness(&mut self, uniqueness: MultiplicityUniqueness, span: Span) {
-        self.uniqueness
-            .get_or_insert_with(|| Node::new(span, uniqueness));
-    }
-
-    /// Fold a second occurrence of the slots into this one, first spelling winning.
-    ///
-    /// Declarations that admit modifiers both before and after the typing clause parse the slots
-    /// twice and merge; see `parser::attribute::feature_modifiers`.
-    pub fn merge(self, other: MultiplicityModifiers) -> MultiplicityModifiers {
-        MultiplicityModifiers {
-            ordering: self.ordering.or(other.ordering),
-            uniqueness: self.uniqueness.or(other.uniqueness),
-        }
     }
 }

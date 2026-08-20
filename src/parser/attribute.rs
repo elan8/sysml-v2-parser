@@ -168,54 +168,77 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
     )
 }
 
-/// Multiplicity-adjacent modifiers from `MultiplicityPart` (BNF §8.2.2.6.6): an optional
-/// multiplicity range plus the ordering and uniqueness keyword slots.
+/// One `MultiplicityPart` (BNF §8.2.2.6.6): an optional multiplicity range plus the ordering and
+/// uniqueness keyword slots, each admitted at most once.
 ///
-/// Results are merged first-wins across every occurrence -- callers that invoke this more than
-/// once per declaration (leading and trailing modifier positions) fold the results together.
+/// Callers that accept the part on either side of the specializations -- the two positions
+/// `FeatureSpecializationPart` allows -- parse it at both and fold with [`Self::merge`],
+/// first-wins.
 #[derive(Default, Clone)]
 struct FeatureModifiers {
     multiplicity: Option<Node<Multiplicity>>,
     modifiers: crate::ast::MultiplicityModifiers,
 }
 
-impl FeatureModifiers {
-    fn merge(self, other: FeatureModifiers) -> FeatureModifiers {
-        FeatureModifiers {
-            multiplicity: self.multiplicity.or(other.multiplicity),
-            modifiers: self.modifiers.merge(other.modifiers),
-        }
-    }
+/// Parse one `MultiplicityPart`: an optional multiplicity range followed by the ordering and
+/// uniqueness keyword slots (SysML BNF 492-496, KerML BNF 636-640).
+///
+/// ```text
+/// MultiplicityPart : Feature =
+///       ownedRelationship += OwnedMultiplicity
+///     | ( ownedRelationship += OwnedMultiplicity )?
+///       ( isOrdered ?= 'ordered' ... | ... 'nonunique' ... )
+/// ```
+///
+/// The production admits *one* `OwnedMultiplicity`, and it comes before the keywords. So this
+/// reads at most one range and then defers to
+/// [`crate::parser::usage::multiplicity_modifier_slots`], which owns the keyword spellings, their
+/// spans, and their own cardinality. A second range, or a range written after a keyword
+/// (`[1] ordered [2]`), is left unconsumed: the enclosing declaration fails at that `[` and the
+/// enclosing scope's member recovery captures the whole member by source span, so the excess is an
+/// explicit malformed node rather than a range the parser consumes and ignores.
+///
+/// The result is written straight into the returned struct: collecting into a `Vec` first would
+/// allocate on a path the grammar re-enters speculatively for every attribute declaration, only to
+/// fold the result into these same two fields.
+fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
+    feature_modifiers_after(FeatureModifiers::default(), input)
 }
 
-/// Parse the multiplicity and ordering/uniqueness modifiers that may follow a feature.
+/// [`feature_modifiers`] resuming from what an earlier position of the same declaration read.
 ///
-/// The keyword slots themselves belong to [`crate::parser::usage::multiplicity_modifier_slots`],
-/// which owns the spellings and their spans; this adds only the range the same production admits
-/// beside them. Modifiers accumulate directly into the returned struct: collecting them into a
-/// `Vec` first would allocate on a path the grammar re-enters speculatively for every attribute
-/// declaration, only to fold the result into these same two fields.
-fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
-    let mut result = FeatureModifiers::default();
-    let mut input = input;
-    loop {
-        let (after_ws, _) = ws_and_comments(input)?;
-        if let Ok((rest, node)) = multiplicity_node(after_ws) {
-            // The first multiplicity wins; a repeated one is consumed and ignored.
-            if result.multiplicity.is_none() {
-                result.multiplicity = Some(node);
+/// A declaration may offer this position more than once, because `FeatureSpecializationPart`
+/// (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations.
+/// Threading the earlier result through as the accumulator keeps the whole declaration to one
+/// range and one spelling per keyword slot: a filled field stops consumption instead of consuming
+/// the excess and folding it away.
+fn feature_modifiers_after(
+    prior: FeatureModifiers,
+    input: Input<'_>,
+) -> IResult<Input<'_>, FeatureModifiers> {
+    let (input, multiplicity) = match prior.multiplicity {
+        // A range is already authored for this declaration, so a second one is not this
+        // production's; leave it for recovery.
+        already @ Some(_) => (input, already),
+        None => {
+            let (after_ws, _) = ws_and_comments(input)?;
+            match multiplicity_node(after_ws) {
+                Ok((rest, node)) => (rest, Some(node)),
+                // No range here: leave the whitespace before the next token unconsumed, as
+                // `preceded` did.
+                Err(_) => (input, None),
             }
-            input = rest;
-            continue;
         }
-        let (rest, slots) = crate::parser::usage::multiplicity_modifier_slots(input)?;
-        if !slots.is_authored() {
-            // No modifier here: leave the whitespace before it unconsumed, as `preceded` did.
-            return Ok((input, result));
-        }
-        result.modifiers = std::mem::take(&mut result.modifiers).merge(slots);
-        input = rest;
-    }
+    };
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(prior.modifiers, input)?;
+    Ok((
+        input,
+        FeatureModifiers {
+            multiplicity,
+            modifiers,
+        },
+    ))
 }
 
 #[derive(Clone, Copy)]
@@ -413,12 +436,11 @@ pub(crate) fn attribute_feature_binding(
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods1.merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
@@ -776,7 +798,7 @@ pub(crate) fn attribute_def(
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
@@ -809,8 +831,7 @@ pub(crate) fn attribute_def(
     let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
     let value_span = value.as_ref().map(|node| node.span.clone());
     let (input, _) = specialization_clauses(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods1.merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -1012,8 +1033,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
@@ -1036,8 +1056,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
@@ -1063,8 +1082,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
@@ -1092,8 +1110,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 Some(name_span),
@@ -1110,7 +1127,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         }
     };
     let (input, leading_clauses) = specialization_clauses(input)?;
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers_after(mods0, input)?;
     let leading_subsets_value = leading_clauses
         .subsets
         .as_ref()
@@ -1120,8 +1137,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods0.merge(mods1).merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let redefines = trailing_clauses
         .redefines
         .or(leading_clauses.redefines)

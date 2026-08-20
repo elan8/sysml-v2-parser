@@ -408,7 +408,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // (`Actions.sysml`). Accept one multiplicity clause in either position.
         let (input, leading_multiplicity) =
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-        let (input, leading_modifiers) = multiplicity_modifier_slots(input)?;
+        let (input, modifiers) = multiplicity_modifier_slots(input)?;
         // In action usages, pin declarations may omit the type (e.g. `out videoStream;`)
         // to reference the corresponding typed parameter on the referenced action definition.
         // Action definitions generally include the type (e.g. `out videoStream : String;`),
@@ -454,7 +454,8 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         } else {
             (input, None)
         };
-        let (input, trailing_modifiers) = multiplicity_modifier_slots(input)?;
+        let (input, modifiers) =
+            crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
         // Trailing `:>>` redefinition after a named declaration, including the comma-separated
         // multi-target form: `in transitionLinkSource[1]: StateAction :>>
         // TransitionAction::transitionLinkSource, StateTransitionPerformance::
@@ -511,7 +512,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 subsets,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
-                multiplicity_modifiers: leading_modifiers.merge(trailing_modifiers),
+                multiplicity_modifiers: modifiers,
                 redefines,
                 value,
                 body,

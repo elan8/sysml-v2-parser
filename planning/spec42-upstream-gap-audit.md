@@ -114,6 +114,13 @@ from omission, `nonordered` no longer disappears, and no combination the grammar
 `ordered nonordered` -- is representable. `readonly`/`variable` continue to reach recovery with a
 stable diagnostic and an exact span, pinned as such.
 
+A follow-up slice narrowed the parser to the production's actual cardinality: each slot fills at
+most once per *declaration* (threaded as an accumulator through both positions
+`FeatureSpecializationPart` offers, rather than folded first-wins), the multiplicity range likewise,
+and any excess is left unconsumed so the member reaches the enclosing scope's recovery instead of
+being swallowed. Pinned by `tests/snapshots/spec42/multiplicity_part_cardinality_legal.md`,
+`multiplicity_part_repeated_slot.md` and `multiplicity_part_range_cardinality.md`.
+
 ## Gap 53 -- missing multiplicity, uniqueness and short-name fields
 
 **Claim.** Fifteen nodes are missing a `multiplicity`, `nonunique` or `short_name` field a sibling
@@ -276,9 +283,17 @@ Found during the audit, out of scope for these commits, recorded so it is not re
 - `KermlFeatureMember` and `TypedParameterMember` split one production (`BasicFeaturePrefix`) across
   two AST nodes on whether a direction was authored. They should share one prefix component the way
   the occurrence-usage families now share `OccurrenceUsagePrefix`.
-- `feature_modifiers` accepts `ordered`/`nonunique` in any order and any repetition, which is wider
-  than `MultiplicityPart` (which spells at most one of each, `ordered` first or `nonunique` first).
-  Narrowing it needs its own recovery slice.
+- `FeatureSpecializationPart` admits one `MultiplicityPart`, but a declaration that authors two
+  *disjoint* slots across its two positions (`[1] ordered : T nonunique`) still retains both. That
+  over-accepts against the enclosing production rather than this one, and nothing is dropped, so it
+  is not the silent-drop class the cardinality slice closed. It belongs to
+  `FeatureSpecializationPart`.
+- In a *package* body, a malformed member whose first keyword is in `extended_library_decl`'s
+  starter list is classified `unsupported_grammar_form` at severity **warning**, with the message
+  "the spec-valid extended-library declaration production is retained but not structurally
+  implemented" -- which is false for an ordinary malformed `attribute`/`part` member. The text and
+  the siblings are preserved, so nothing is lost, but the classification misattributes the cause.
+  Pre-existing and independent of any gap here; it is a body-dispatch question.
 - The parser accepts `derived end feature`, `abstract end feature` and `composite end feature`,
   which `EndFeaturePrefix` does not spell. Narrowing that is the mirror image of gap 59 and needs
   corpus evidence for what tolerated it.
@@ -293,6 +308,3 @@ Found during the audit, out of scope for these commits, recorded so it is not re
   `attribute def x : Real;`, inventing a `def` keyword no production spells. `AttributeUsage`
   exists and is reached by other spellings, so this is a dispatch-order question, not a missing
   node. The same shape produced the `calc` gap that Gap 53 closed.
-- `feature_modifiers` accepts the two `MultiplicityPart` keyword slots in any order and any
-  repetition, which is wider than the production (at most one of each, `ordered` first or
-  `nonunique` first).
