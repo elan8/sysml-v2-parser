@@ -29,7 +29,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
             CaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,
@@ -73,7 +73,7 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
             AnalysisCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 body,
                 membership: crate::ast::Membership::owning(
@@ -139,7 +139,7 @@ pub(crate) fn verification_case_def(
             VerificationCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,

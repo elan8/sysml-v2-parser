@@ -185,7 +185,9 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
 }
 
 fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // `metadata` is ambiguous with KerML MetadataFeature. This SysML scope owns MetadataUsage,
     // so its more specific production gets first refusal before AnnotatingElement.

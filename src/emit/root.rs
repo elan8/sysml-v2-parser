@@ -305,6 +305,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::ConstraintDef(c) => view::emit_constraint_def(w, path, &c.value),
         PackageBodyElement::ConstraintUsage(c) => view::emit_constraint_usage(w, path, &c.value),
         PackageBodyElement::CalcDef(c) => view::emit_calc_def(w, path, &c.value),
+        PackageBodyElement::CalcUsage(c) => view::emit_calc_usage(w, path, &c.value),
         PackageBodyElement::ConcernUsage(c) => requirement::emit_concern_usage(w, path, &c.value),
         PackageBodyElement::UseCaseDef(u) => requirement::emit_use_case_def(w, path, &u.value),
         PackageBodyElement::UseCaseUsage(u) => requirement::emit_use_case_usage(w, path, &u.value),
@@ -355,7 +356,6 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::BindingConnectorUsage(b) => {
             structure::emit_binding_connector_usage(w, path, &b.value)
         }
-        PackageBodyElement::ClassDef(c) => structure::emit_class_def(w, path, &c.value),
         PackageBodyElement::Succession(f) => behavior::emit_first_stmt(w, path, &f.value),
         PackageBodyElement::ExhibitState(e) => behavior::emit_exhibit_state(w, path, &e.value),
         PackageBodyElement::IncludeUseCase(i) => {
@@ -385,8 +385,8 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::KermlInvariant(invariant) => {
             super::view::emit_kerml_invariant_member(w, path, &invariant.value)
         }
-        PackageBodyElement::KermlFeatureMember(feature) => {
-            super::view::emit_kerml_feature_member(w, path, &feature.value)
+        PackageBodyElement::KermlFeature(feature) => {
+            super::view::emit_kerml_feature(w, path, &feature.value)
         }
         PackageBodyElement::FlowDef(f) => behavior::emit_flow_def(w, path, &f.value),
         other @ PackageBodyElement::Actor(_) => w.unsupported(
@@ -471,7 +471,7 @@ fn emit_relationship_body_element(
     match el {
         RelationshipBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
         RelationshipBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
+            super::view::emit_kerml_feature(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
     }

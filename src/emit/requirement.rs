@@ -3,8 +3,8 @@
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_identification, emit_import};
 use super::structure::{
-    self, emit_attribute_body, emit_direction, emit_multiplicity, emit_subsetting_clause,
-    emit_typing_clause,
+    self, emit_attribute_body, emit_definition_prefix, emit_direction, emit_multiplicity,
+    emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
 };
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -21,9 +21,7 @@ pub(crate) fn emit_requirement_def(
     def: &RequirementDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("requirement def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -162,6 +160,11 @@ fn emit_requirement_body_element(
         }
         RequirementDefBodyElement::RequirementActorDecl(a) => {
             w.push_str("actor ");
+            if let Some(short) = &a.value.short_name {
+                w.push_char('<');
+                w.push_str(&format_name(short));
+                w.push_str("> ");
+            }
             if !a.value.name.is_empty() {
                 w.push_str(&format_name(&a.value.name));
             }
@@ -262,12 +265,7 @@ pub(crate) fn emit_redefinition_attribute_binding(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
@@ -321,6 +319,11 @@ fn emit_verify_requirement(
 
 fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<(), EmitError> {
     w.push_str("subject");
+    if let Some(short) = &subject.short_name {
+        w.push_str(" <");
+        w.push_str(&format_name(short));
+        w.push_char('>');
+    }
     if !subject.name.is_empty() {
         w.push_char(' ');
         w.push_str(&format_name(&subject.name));
@@ -450,12 +453,7 @@ pub(crate) fn emit_item_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -501,9 +499,7 @@ pub(crate) fn emit_use_case_def(
     def: &UseCaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("use case def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -542,9 +538,7 @@ pub(crate) fn emit_analysis_case_def(
     def: &crate::ast::AnalysisCaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -589,9 +583,7 @@ pub(crate) fn emit_verification_case_def(
     def: &crate::ast::VerificationCaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("verification def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -630,9 +622,7 @@ pub(crate) fn emit_case_def(
     def: &crate::ast::CaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("case def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -727,6 +717,11 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::ActorUsage(a) => {
             emit_visibility(w, a.value.membership.visibility);
             w.push_str("actor");
+            if let Some(short) = &a.value.short_name {
+                w.push_str(" <");
+                w.push_str(&format_name(short));
+                w.push_char('>');
+            }
             if !a.value.name.is_empty() {
                 w.push_char(' ');
                 w.push_str(&format_name(&a.value.name));
@@ -1006,12 +1001,7 @@ pub(crate) fn emit_satisfy(
     if let Some(multiplicity) = &satisfy.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if satisfy.ordered {
-        w.push_str(" ordered");
-    }
-    if satisfy.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &satisfy.multiplicity_modifiers);
     for clause in [
         satisfy.subsets.as_ref(),
         satisfy.references.as_ref(),

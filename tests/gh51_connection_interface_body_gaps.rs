@@ -210,7 +210,8 @@ fn interface_def_body_accepts_anonymous_ref_port_with_redefines_type_and_modifie
     );
     assert!(port.typing.is_some());
     assert!(port.multiplicity.is_some());
-    assert!(port.ordered && port.nonunique);
+    assert!(port.multiplicity_modifiers.is_ordered());
+    assert!(!port.multiplicity_modifiers.is_unique());
 }
 
 /// Real usage: Domain Library `Requirement Derivation/DerivationConnections.sysml`'s `ref

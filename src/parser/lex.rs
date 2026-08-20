@@ -471,6 +471,59 @@ pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
     Ok((nom::Input::take_from(&input, skipped), ()))
 }
 
+/// Skip whitespace and *notes* only, leaving a `/* ... */` block comment for the caller.
+///
+/// The pinned grammar defines three lexical forms and only two of them are notes:
+///
+/// ```text
+/// SINGLE_LINE_NOTE = '//' LINE_TEXT
+/// MULTILINE_NOTE   = '//*' COMMENT_TEXT '*/'
+/// REGULAR_COMMENT  = '/*'  COMMENT_TEXT '*/'
+/// ```
+///
+/// (KerML BNF 32-39.) A `REGULAR_COMMENT` is the body of a `Comment`, and every group preceding
+/// that body in `Comment = ( 'comment' Identification ( 'about' ... )? )? ( 'locale' ... )? body`
+/// (KerML BNF 199) is optional -- so a bare `/* ... */` at a member position is an
+/// `AnnotatingElement`, i.e. syntax, not trivia.
+///
+/// Used exactly where a member may begin: the structured brace-member loop and
+/// [`crate::parser::body::annotating_member`]. Everywhere else keeps [`ws_and_comments`], because
+/// the grammar has no member between the tokens of a declaration for a comment there to be.
+pub(crate) fn ws_and_notes(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let skipped = note_trivia_len(input.fragment());
+    Ok((nom::Input::take_from(&input, skipped), ()))
+}
+
+/// Byte length of the whitespace-and-notes run at the start of `bytes`.
+///
+/// Mirrors [`trivia_len`] minus its `/* ... */` arm. An unterminated `//*` is an ordinary line
+/// note, exactly as there.
+fn note_trivia_len(bytes: &[u8]) -> usize {
+    let mut pos = 0usize;
+    loop {
+        while let Some(&byte) = bytes.get(pos) {
+            if byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r' {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        let rest = &bytes[pos..];
+        if rest.starts_with(b"//") {
+            if rest.starts_with(b"//*") {
+                if let Some(end) = block_comment_end(rest, 3) {
+                    pos += end;
+                    continue;
+                }
+            }
+            pos += line_comment_len(rest);
+        } else {
+            return pos;
+        }
+    }
+}
+
 /// Byte length of the trivia run at the start of `bytes`.
 ///
 /// This is the parser's hottest lexical routine: it runs before every token and again for every

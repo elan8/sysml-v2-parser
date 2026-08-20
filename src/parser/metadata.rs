@@ -14,12 +14,19 @@ use nom::IResult;
 use nom::Parser;
 
 /// Metadata definition: `metadata def` Identification body (optional `abstract` prefix).
+///
+/// `MetadataDefinition = ( isAbstract ?= 'abstract' )? DefinitionExtensionKeyword* 'metadata' 'def'
+/// Definition` (SysML BNF 1652; Pilot `SysML.xtext` 121) is one of only two definition productions
+/// in the pin that does *not* reach `BasicDefinitionPrefix`: it inlines the `abstract` flag and has
+/// no `variation` alternative, so this is the one definition kind whose prefix is genuinely a
+/// boolean rather than a one-of-two slot. See [`crate::parser::definition_prefix::BasicPrefixSlot`].
 pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
         DefinitionPrefixOptions::new(b"metadata")
             .def_required()
+            .abstract_only_prefix()
             .with_captured_visibility(),
     )?;
     let (input, body) = metadata_body(input)?;
@@ -29,7 +36,7 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
             start,
             input,
             MetadataDef {
-                is_abstract: prefix.is_abstract,
+                is_abstract: prefix.basic_prefix.is_some(),
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

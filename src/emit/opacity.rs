@@ -106,9 +106,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::KermlConnector(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlRelationship(_) => {}
         PackageBodyElement::KermlInvariant(n) => walk_calc_def_body(report, path, &n.value.body),
-        PackageBodyElement::KermlFeatureMember(n) => {
-            walk_calc_def_body(report, path, &n.value.body)
-        }
+        PackageBodyElement::KermlFeature(n) => walk_calc_def_body(report, path, &n.value.body),
         // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
         // an opaque/recovery node.
         PackageBodyElement::KermlBareDeclaration(_) => {}
@@ -188,6 +186,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             walk_constraint_def_body(report, path, &c.value.body)
         }
         PackageBodyElement::CalcDef(c) => walk_calc_def_body(report, path, &c.value.body),
+        PackageBodyElement::CalcUsage(c) => walk_calc_def_body(report, path, &c.value.body),
         PackageBodyElement::MetadataDef(m) => walk_attribute_body(report, path, &m.value.body),
         PackageBodyElement::MetadataUsage(m) => walk_attribute_body(report, path, &m.value.body),
         PackageBodyElement::ConcernUsage(c) => {
@@ -206,7 +205,6 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         }
         PackageBodyElement::PerformUsage(p) => walk_perform_body(report, path, &p.value.body),
         PackageBodyElement::BindingConnectorUsage(b) => walk_ref_body(report, path, &b.value.body),
-        PackageBodyElement::ClassDef(c) => walk_attribute_body(report, path, &c.value.body),
         PackageBodyElement::Succession(first) => {
             walk_first_merge_body(report, path, &first.value.body)
         }
@@ -332,7 +330,6 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
             CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            CalcDefBodyElement::TypedParameter(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Connector(n) => walk_calc_def_body(report, &p, &n.value.body),
@@ -340,9 +337,6 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
             CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
-            CalcDefBodyElement::EndMember(n) => {
-                walk_calc_def_body(report, &p, &n.value.feature.value.body)
-            }
             CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             CalcDefBodyElement::Binding(_)
             | CalcDefBodyElement::Succession(_)
@@ -702,7 +696,6 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::KermlConnector(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
-            AttributeBodyElement::ClassDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             AttributeBodyElement::Connection(n) => {
                 walk_connection_def_body(report, &p, &n.value.body)

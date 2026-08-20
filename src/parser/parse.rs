@@ -211,7 +211,9 @@ fn parse_with_diagnostics_document(
     let mut elements = Vec::new();
     let mut errors = Vec::new();
 
-    let (mut input, _) = match lex::ws_and_comments(located) {
+    // `ws_and_notes`, matching the strict entry point: a leading `/* ... */` is the document's
+    // first member, not trivia ahead of it.
+    let (mut input, _) = match lex::ws_and_notes(located) {
         Ok(x) => x,
         Err(_) => {
             return (
@@ -224,8 +226,10 @@ fn parse_with_diagnostics_document(
     };
 
     while errors.len() < MAX_RECOVERY_ERRORS {
-        // Skip leading ws/comments; if nothing left, we're done (avoids parsing "" as root_element).
-        let (rest, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
+        // Skip leading whitespace and notes; if nothing left, we're done (avoids parsing "" as
+        // root_element). A bare `/* ... */` is left for `root_element`, because at a member
+        // boundary it is the `Comment` production rather than trivia.
+        let (rest, _) = lex::ws_and_notes(input).unwrap_or((input, ()));
         input = rest;
         if input.fragment().is_empty() {
             break;

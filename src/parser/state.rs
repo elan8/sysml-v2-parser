@@ -41,6 +41,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
             start,
             input,
             StateDef {
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -353,8 +354,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 redefines: None,
                 subsets: None,
                 multiplicity: None,
-                ordered: false,
-                nonunique: false,
+                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 value,
                 body,
                 name_span: Some(name_span),

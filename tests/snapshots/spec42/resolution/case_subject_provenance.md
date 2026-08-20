@@ -29,6 +29,6 @@ package M {
 (parsed-document
   (references
   )
-  (root (package (name "M") (body brace (part-def (name "P") (body semicolon)) (analysis-case-def))))
+  (root (package (name "M") (body brace (part-def (name "P") (modifiers) (body semicolon)) (analysis-case-def (modifiers)))))
 )
 ~~~

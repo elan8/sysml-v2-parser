@@ -485,8 +485,22 @@ pub struct DocComment {
     pub identification: Option<Identification>,
     /// Optional locale string (e.g. "en").
     pub locale: Option<String>,
-    /// Body text (content between /* and */).
+    /// Body text exactly as authored, i.e. the bytes between `/*` and `*/`.
+    ///
+    /// Raw, not normalized: [`Self::normalized_text`] applies the pinned processing rules, and
+    /// [`Self::body_span`] locates this text in the source. Keeping the authored bytes here is
+    /// what lets the formatter reproduce the document it was given.
     pub text: String,
+    /// Source span of [`Self::text`], i.e. the `REGULAR_COMMENT` body without its delimiters.
+    pub body_span: Span,
+}
+
+impl DocComment {
+    /// The body text with the pinned `Comment`/`Documentation` processing applied.
+    /// See [`normalize_comment_body`].
+    pub fn normalized_text(&self) -> String {
+        normalize_comment_body(&self.text)
+    }
 }
 
 /// KerML Comment: `( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )?
@@ -511,7 +525,67 @@ pub struct CommentAnnotation {
     /// records the same clause of the same shape.
     pub about_targets: Vec<QualifiedReferenceId>,
     pub locale: Option<String>,
+    /// Body text exactly as authored. See [`DocComment::text`].
     pub text: String,
+    /// Source span of [`Self::text`]. See [`DocComment::body_span`].
+    pub body_span: Span,
+}
+
+impl CommentAnnotation {
+    /// The body text with the pinned `Comment` processing applied.
+    /// See [`normalize_comment_body`].
+    pub fn normalized_text(&self) -> String {
+        normalize_comment_body(&self.text)
+    }
+}
+
+/// Apply the pinned `REGULAR_COMMENT` body processing (KerML BNF 214 note 1, which BNF 231 note
+/// 1 extends to `TextualRepresentation`) to an authored comment body.
+///
+/// The delimiters are already stripped by the parser, so the remaining rules are:
+///
+/// - remove any white space immediately after the initial `/*`, up to and including the first
+///   line terminator, if any;
+/// - on each subsequent line, strip leading white space other than line terminators, then one
+///   leading `*` if present, then one following space if present.
+///
+/// This lives here, beside the three types that own such a body, because the alternative is every
+/// consumer normalizing it slightly differently and then disagreeing about what a document says.
+/// It is deliberately *not* applied at parse time: [`DocComment::text`] keeps the authored bytes
+/// so the formatter can reproduce them, and normalization is a view over that.
+pub fn normalize_comment_body(raw: &str) -> String {
+    let mut lines = raw.split_inclusive('\n');
+    let mut out = String::with_capacity(raw.len());
+
+    // The first line is special: only the run of white space after `/*` is removed, and only
+    // through the first line terminator. A body written entirely on one line therefore keeps its
+    // interior spacing.
+    if let Some(first) = lines.next() {
+        let trimmed = first.trim_start_matches([' ', '\t', '\r', '\x0c']);
+        if trimmed.starts_with('\n') {
+            // The white space ran to the end of the line: drop the line terminator too.
+        } else {
+            out.push_str(trimmed);
+            if !trimmed.ends_with('\n') {
+                return out;
+            }
+        }
+    }
+
+    for line in lines {
+        let (body, terminator) = match line.strip_suffix('\n') {
+            Some(body) => (body.strip_suffix('\r').unwrap_or(body), true),
+            None => (line, false),
+        };
+        let body = body.trim_start_matches([' ', '\t', '\x0c']);
+        let body = body.strip_prefix('*').unwrap_or(body);
+        let body = body.strip_prefix(' ').unwrap_or(body);
+        out.push_str(body);
+        if terminator {
+            out.push('\n');
+        }
+    }
+    out
 }
 
 /// KerML TextualRepresentation: ( 'rep' Identification )? 'language' STRING_VALUE body.
@@ -521,7 +595,18 @@ pub struct TextualRepresentation {
     pub rep_identification: Option<Identification>,
     pub language: String,
     pub language_span: Option<Span>,
+    /// Body text exactly as authored. See [`DocComment::text`].
     pub text: String,
+    /// Source span of [`Self::text`]. See [`DocComment::body_span`].
+    pub body_span: Span,
+}
+
+impl TextualRepresentation {
+    /// The body text with the pinned processing applied -- KerML BNF 231 note 1 specifies the
+    /// same rules as for a `Comment`. See [`normalize_comment_body`].
+    pub fn normalized_text(&self) -> String {
+        normalize_comment_body(&self.text)
+    }
 }
 
 impl PartialEq for TextualRepresentation {

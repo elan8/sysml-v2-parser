@@ -67,7 +67,7 @@ pub(crate) fn relationship_body_annotations(
 fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature_member, |n| {
+    if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature, |n| {
         RelationshipBodyElement::KermlFeature(Box::new(n))
     })
     .parse(input)
@@ -82,9 +82,21 @@ fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<Relatio
 /// A scope accepts the whole production or none of it, so every scope that owns annotating
 /// members dispatches through here rather than repeating the four alternatives.
 pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, AnnotatingMember> {
-    let (input, _) = ws_and_comments(input)?;
+    // `ws_and_notes`, not `ws_and_comments`: a bare `/* ... */` is this production's shortest
+    // legal spelling, so skipping it as trivia here would delete the member before it could be
+    // recognized. `//` and `//*` notes stay trivia, as the pinned lexical rules make them.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     if input.fragment().starts_with(b"@") {
         return map(metadata_annotation, AnnotatingMember::MetadataAnnotation).parse(input);
+    }
+    // Last resort among the four alternatives even though it is tested first: the keyword-led
+    // spellings cannot begin with `/*`, so this test is exact rather than merely earlier.
+    if input.fragment().starts_with(b"/*") {
+        return map(
+            crate::parser::requirement::bare_comment,
+            AnnotatingMember::Comment,
+        )
+        .parse(input);
     }
     if let Ok(parsed) = map(doc_comment, AnnotatingMember::Doc).parse(input) {
         return Ok(parsed);
@@ -218,7 +230,12 @@ where
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // Member boundary: `ws_and_notes` leaves a `/* ... */` for the member parser, because a
+        // bare block comment is the `Comment` production's shortest spelling rather than trivia
+        // (KerML BNF 199, and see `lex::ws_and_notes`). A scope whose member set does not model
+        // an annotating element still refuses it; the fallback below then consumes it as trivia,
+        // so this widening cannot turn a previously-parsing document into a recovered one.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().is_empty() {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -262,6 +279,17 @@ where
             }
             Err(_) => {
                 input.extra.rollback_references(reference_checkpoint);
+                // This scope's member set has no annotating element to hold a bare `/* ... */`,
+                // so it stays what it was before this position started offering it a member:
+                // trivia. Reported nowhere, because there is nothing wrong with the document --
+                // only with how much of it this scope can yet describe.
+                if input.fragment().starts_with(b"/*") {
+                    let (after_comment, _) = ws_and_comments(input)?;
+                    if after_comment.location_offset() > input.location_offset() {
+                        input = after_comment;
+                        continue;
+                    }
+                }
                 let start_unknown = input;
                 let (after_ws, _) = ws_and_comments(input)?;
                 if after_ws.fragment().starts_with(b"}") {

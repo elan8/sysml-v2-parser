@@ -52,7 +52,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             start,
             input,
             ConstraintDef {
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -170,7 +170,9 @@ pub(crate) fn constraint_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // `MemberPrefix` precedes the member's own keyword, so the usage guards below look past it;
     // each arm's parser re-reads it. Without this a `private ref constraint hidden;` matched no
     // guard and reached the expression fallback.
@@ -395,6 +397,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             start,
             input,
             CalcDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -530,143 +533,6 @@ fn calc_usage_follows_visibility(input: Input<'_>) -> bool {
         return false;
     };
     had_modifiers && starts_with_keyword(after_mods.fragment(), b"calc")
-}
-
-/// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
-/// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
-/// Libraries). The kind keyword distinguishes it from the keyword-less [`in_out_decl`]
-/// parameter form, and its `{ ... }` body follows the calc-body member grammar (nested
-/// parameters plus a `return` result).
-pub(crate) fn typed_parameter_member(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::TypedParameterMember>> {
-    crate::parser::span::reference_transaction(input, typed_parameter_member_inner)
-}
-
-fn typed_parameter_member_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::TypedParameterMember>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
-    // `in abstract feature onOccurrence : Occurrence [1] { ... }`
-    // (`FeatureReferencingPerformances.kerml`).
-    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, kind) = alt((
-        map(preceded(tag(&b"expr"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Expr
-        }),
-        map(preceded(tag(&b"bool"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Bool
-        }),
-        map(preceded(tag(&b"feature"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Feature
-        }),
-        map(preceded(tag(&b"calc"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Calc
-        }),
-        map(preceded(tag(&b"step"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Step
-        }),
-    ))
-    .parse(input)?;
-    // Leading redefinition may replace the name entirely: `in bool redefines ifTest { ... }`,
-    // `inout feature redefines replacementValues[0..*] : ObserveChange;`.
-    let (input, leading_redefines) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::redefinition,
-    ))
-    .parse(input)?;
-    let (input, name_str) = if leading_redefines.is_some() {
-        (input, String::new())
-    } else {
-        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
-        (input, n)
-    };
-    let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::multiplicity_node,
-    ))
-    .parse(input)?;
-    let (input, type_name) = opt(map(
-        (
-            preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, qualified_reference),
-        ),
-        |(_, tn)| tn,
-    ))
-    .parse(input)?;
-    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
-        opt(preceded(
-            ws_and_comments,
-            crate::parser::usage::multiplicity_node,
-        ))
-        .parse(input)?
-    } else {
-        (input, None)
-    };
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
-    let (input, redefines) = if leading_redefines.is_none() {
-        opt(preceded(
-            ws_and_comments,
-            crate::parser::usage::redefinition,
-        ))
-        .parse(input)?
-    } else {
-        (input, leading_redefines)
-    };
-    // The typing may trail a leading redefinition target: `in step redefines thenClause :
-    // BooleanEvaluationResultToMonitorPerformance { ... }` (`Observation.kerml`).
-    let (input, type_name) = if type_name.is_none() {
-        opt(map(
-            (
-                preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, qualified_reference),
-            ),
-            |(_, tn)| tn,
-        ))
-        .parse(input)?
-    } else {
-        (input, type_name)
-    };
-    // The multiplicity may trail the redefinition target: `inout feature replacementValues :
-    // Anything redefines values [*] nonunique;` (`FeatureReferencingPerformances.kerml`).
-    let (input, post_redefines_multiplicity) =
-        if leading_multiplicity.is_none() && trailing_multiplicity.is_none() {
-            opt(preceded(
-                ws_and_comments,
-                crate::parser::usage::multiplicity_node,
-            ))
-            .parse(input)?
-        } else {
-            (input, None)
-        };
-    let (input, (post_ordered, post_nonunique)) =
-        crate::parser::usage::usage_feature_modifier_flags(input)?;
-    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, body) = calc_def_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::TypedParameterMember {
-                direction,
-                is_abstract: is_abstract.is_some(),
-                kind,
-                name: name_str,
-                redefines,
-                type_name,
-                multiplicity: leading_multiplicity
-                    .or(trailing_multiplicity)
-                    .or(post_redefines_multiplicity),
-                ordered: ordered || post_ordered,
-                nonunique: nonunique || post_nonunique,
-                value,
-                body,
-            },
-        ),
-    ))
 }
 
 /// One end of a connector/binding/succession member: `[mult]?` feature chain.
@@ -934,68 +800,8 @@ fn kerml_succession_member_inner(
 /// KerML end member with an owned cross feature: `end` name? mult? (`subsets` targets)?
 /// `feature` <feature member> (`end happensDuring [1..*] feature longerOccurrence: Occurrence
 /// redefines targetOccurrence;`, Kernel Semantic Library `Occurrences.kerml`). Plain
-/// `end feature ...` stays on [`kerml_feature_member`] (its name parse fails on `feature`
+/// `end feature ...` stays on [`kerml_feature`] (its name parse fails on `feature`
 /// here, so dispatch order tries that first).
-pub(crate) fn kerml_end_member(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlEndMember>> {
-    crate::parser::span::reference_transaction(input, kerml_end_member_inner)
-}
-
-fn kerml_end_member_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlEndMember>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    // `const end [1] feature a;` (KerML `associations` fixture; spec42 Gap 36).
-    let (input, is_const) = opt(preceded(tag(&b"const"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"end"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    // The end name is optional: `end [1] feature transferSource references source;`
-    // (`Transfers.kerml`).
-    let (input, name_str) = if starts_with_keyword(input.fragment(), b"feature")
-        || input.fragment().starts_with(b"[")
-    {
-        (input, String::new())
-    } else {
-        let (input, n) = name(input)?;
-        (input, n)
-    };
-    let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::multiplicity_node,
-    ))
-    .parse(input)?;
-    let (input, subsets) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
-    let subsets = subsets.map(|(target, _value)| target);
-    // The owned cross feature, starting at its `feature` keyword.
-    let (peek, _) = ws_and_comments(input)?;
-    if !starts_with_keyword(peek.fragment(), b"feature") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (input, feature) = kerml_feature_member(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::KermlEndMember {
-                is_const: is_const.is_some(),
-                name: name_str,
-                multiplicity,
-                subsets,
-                feature: Box::new(feature),
-                membership: Membership::feature(visibility, visibility_span),
-            },
-        ),
-    ))
-}
-
 /// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
 /// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
 /// else 0;`, `private thisClock : Clock :>> self;` (Kernel Semantic Library
@@ -1093,63 +899,165 @@ fn calc_named_binding_inner(
 /// declaration surface (name or leading redefinition, typing, multiplicity, `ordered`/
 /// `nonunique`, subsets/redefines/references, `inverse of`, value, body). Kernel Semantic
 /// Library `KerML.kerml`/`Occurrences.kerml`.
-pub(crate) fn kerml_feature_member(
+/// The feature-kind keyword of `Feature` (562), `Step` (863), `Expression` (895) and
+/// `BooleanExpression` (908) -- the one column in which those four productions differ -- with its
+/// exact span.
+///
+/// Optional, because the first alternative of `Feature` makes `FeatureDeclaration` optional and
+/// the prefixed keyword-less spelling `portion redefines portionOfLife = ...;`
+/// (`Occurrences.kerml`) reaches this node through a prefix alone. Takes trivia-free input.
+fn feature_kind_keyword(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
-    crate::parser::span::reference_transaction(input, kerml_feature_member_inner)
+) -> (Input<'_>, Option<Node<crate::ast::KermlFeatureKind>>) {
+    for (keyword, value) in [
+        (&b"feature"[..], crate::ast::KermlFeatureKind::Feature),
+        (&b"step"[..], crate::ast::KermlFeatureKind::Step),
+        (&b"expr"[..], crate::ast::KermlFeatureKind::Expr),
+        (&b"bool"[..], crate::ast::KermlFeatureKind::Bool),
+    ] {
+        if let Some((rest, span)) = crate::parser::occurrence_prefix::slot_keyword(input, keyword) {
+            return (rest, Some(Node::new(span, value)));
+        }
+    }
+    (input, None)
 }
 
-fn kerml_feature_member_inner(
+/// Which member keyword a directed body element introduces, looking past the whole
+/// `BasicFeaturePrefix` (KerML BNF 577) rather than just the direction.
+///
+/// Looking past the *whole* prefix is the point: `in derived feature q;`, `in composite feature
+/// o;`, `in var feature p;` and `in portion feature s;` are all legal, and all reached recovery
+/// while the directed spelling had its own node modelling only `direction` + `abstract`.
+///
+/// Returns `None` when no direction was authored, or when no member keyword follows it -- the
+/// plain `in x;` parameter, which belongs to `InOutDecl`. Consumes nothing.
+fn directed_member_keyword(input: Input<'_>) -> Option<&'static [u8]> {
+    // A lookahead, so the prefix metadata run it walks past is allocated and discarded rather
+    // than kept: the arm this guard picks re-parses the same bytes.
+    crate::parser::span::reference_probe(input, |input| {
+        let (input, _) = ws_and_comments(input).ok()?;
+        let (rest, prefix) = crate::parser::feature_prefix::feature_prefix(input).ok()?;
+        prefix.direction()?;
+        [&b"feature"[..], b"step", b"expr", b"bool", b"calc"]
+            .into_iter()
+            .find(|keyword| starts_with_keyword(rest.fragment(), keyword))
+    })
+}
+
+/// `OwnedCrossFeature : Feature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), carried
+/// by `OwnedCrossFeatureMember` (592) between `end` and the feature's own kind keyword:
+/// `end guardedLink [0..1] feature constrainedHBLink: HappensBefore;`
+/// (`Kernel Semantic Library/TransitionPerformances.kerml:61`).
+///
+/// Fails -- so the caller keeps its input -- unless a kind keyword actually follows. That check is
+/// the whole disambiguation, and it is forced by `Feature` (562) having a *keyword-less* second
+/// alternative: `end x;` is `EndFeaturePrefix FeatureDeclaration`, a feature named `x` with no
+/// cross, while `end x feature y;` is `FeaturePrefix 'feature' FeatureDeclaration` with `x` as the
+/// cross. Only the trailing keyword tells them apart. Callers wrap this in
+/// [`crate::parser::span::reference_transaction`] so a refused attempt rolls its arena entries
+/// back.
+fn owned_cross_feature(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
+) -> IResult<Input<'_>, Node<crate::ast::OwnedCrossFeature>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let (input, prefix) = crate::parser::feature_prefix::basic_feature_prefix(input);
+    // `FeatureIdentification` is optional here: `end [1] feature transferSource references
+    // source;` (`Transfers.kerml`) crosses a multiplicity with no name.
+    let (input, name_str) = if input.fragment().starts_with(b"[") {
+        (input, String::new())
+    } else {
+        let (input, parsed) = name(input)?;
+        (input, parsed)
+    };
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
+    if name_str.is_empty()
+        && multiplicity.is_none()
+        && subsets.is_none()
+        && !prefix.is_authored()
+        && !multiplicity_modifiers.is_authored()
+    {
+        // Nothing stands between `end` and the keyword, so there is no cross feature to own.
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // The cross feature ends where the owning feature's kind keyword begins, so the trivia between
+    // them is consumed here: every slot parser downstream takes trivia-free input.
+    let (rest, _) = ws_and_comments(input)?;
+    if !starts_with_any_keyword(
+        rest.fragment(),
+        &[&b"feature"[..], b"step", b"expr", b"bool"],
+    ) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((
+        rest,
+        node_from_to(
+            start,
+            input,
+            crate::ast::OwnedCrossFeature {
+                prefix,
+                name: name_str,
+                multiplicity,
+                multiplicity_modifiers,
+                subsets,
+            },
+        ),
+    ))
+}
+
+pub(crate) fn kerml_feature(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
+    crate::parser::span::reference_transaction(input, kerml_feature_inner)
+}
+
+fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, is_member) = opt(preceded(tag(&b"member"[..]), ws1)).parse(input)?;
-    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
-    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, composite_or_portion) = opt(alt((
-        map(preceded(tag(&b"composite"[..]), ws1), |_| true),
-        map(preceded(tag(&b"portion"[..]), ws1), |_| false),
-    )))
-    .parse(input)?;
-    let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
-    // `const end feature b;` (KerML `associations` fixture; spec42 Gap 36).
-    let (input, is_const) = opt(preceded(tag(&b"const"[..]), ws1)).parse(input)?;
-    let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
-    let had_prefix = is_member.is_some()
-        || is_derived.is_some()
-        || is_abstract.is_some()
-        || composite_or_portion.is_some()
-        || is_var.is_some()
-        || is_const.is_some()
-        || is_end.is_some();
+    // `FeaturePrefix` (KerML BNF 584). `member` is not part of it -- `TypeFeatureMember` (523)
+    // puts that keyword on the membership, ahead of the whole prefix.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, mut prefix) = crate::parser::feature_prefix::feature_prefix(input)?;
+    // `OwnedCrossFeatureMember` (592) hangs off the `end` alternative only, and needs the
+    // declaration parsers this scope already has, so the choice is filled in here.
+    let input = if let crate::ast::FeaturePrefixHead::End { cross, .. } = &mut prefix.head {
+        match crate::parser::span::reference_transaction(input, owned_cross_feature) {
+            Ok((rest, parsed)) => {
+                *cross = Some(Box::new(parsed));
+                rest
+            }
+            Err(_) => input,
+        }
+    } else {
+        input
+    };
+    let had_prefix = is_member.is_some() || prefix.is_authored();
     // The kind keyword is optional when a prefix already marks this as a feature member:
     // `portion redefines portionOfLife = (that as Occurrence).portionOfLife;`
     // (`Occurrences.kerml`).
-    let (input, kind) = opt(alt((
-        map(preceded(tag(&b"feature"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Feature
-        }),
-        map(preceded(tag(&b"step"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Step
-        }),
-        map(preceded(tag(&b"expr"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Expr
-        }),
-        map(preceded(tag(&b"bool"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Bool
-        }),
-    )))
-    .parse(input)?;
-    let has_kind_keyword = kind.is_some();
+    let (input, kind) = feature_kind_keyword(input);
     if kind.is_none() && !had_prefix {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let kind = kind.unwrap_or(crate::ast::KermlFeatureKind::Feature);
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
     // Leading redefinition may replace the name: `portion feature redefines spaceBoundary [1];`.
     let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
@@ -1198,8 +1106,28 @@ fn kerml_feature_member_inner(
     } else {
         (input, None)
     };
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
+    // `FeatureSpecializationPart` offers a second multiplicity position, after the specialization
+    // clauses: `inout feature replacementValues : Anything redefines values [*] nonunique;`
+    // (Kernel Semantic Library `FeatureReferencingPerformances.kerml:89`). Only the directed node
+    // this one absorbed used to read that position, so it has to be read here or the spelling
+    // regresses to recovery.
+    let (input, post_specialization_multiplicity) =
+        if leading_multiplicity.is_none() && trailing_multiplicity.is_none() {
+            opt(preceded(
+                ws_and_comments,
+                crate::parser::usage::multiplicity_node,
+            ))
+            .parse(input)?
+        } else {
+            (input, None)
+        };
+    // Threaded as an accumulator rather than parsed twice and folded: each `MultiplicityPart`
+    // keyword slot holds one authored spelling, and a second independent read would silently drop
+    // whichever position lost.
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let subsets = clauses.subsets.map(|(target, _value)| target);
     let redefines = leading_redefines.or(clauses.redefines);
     let references = clauses.references;
@@ -1253,23 +1181,17 @@ fn kerml_feature_member_inner(
         node_from_to(
             start,
             input,
-            crate::ast::KermlFeatureMember {
+            crate::ast::KermlFeature {
                 is_member: is_member.is_some(),
-                is_derived: is_derived.is_some(),
-                is_abstract: is_abstract.is_some(),
-                is_composite: composite_or_portion == Some(true),
-                is_portion: composite_or_portion == Some(false),
-                is_var: is_var.is_some(),
-                is_const: is_const.is_some(),
-                is_end: is_end.is_some(),
+                prefix,
                 kind,
-                has_kind_keyword,
                 is_all: is_all.is_some(),
                 name: name_str,
                 typing,
-                multiplicity: leading_multiplicity.or(trailing_multiplicity),
-                ordered,
-                nonunique,
+                multiplicity: leading_multiplicity
+                    .or(trailing_multiplicity)
+                    .or(post_specialization_multiplicity),
+                multiplicity_modifiers: modifiers,
                 subsets,
                 redefines,
                 references,
@@ -1352,7 +1274,9 @@ const PART_USAGE_PREFIX_STARTERS: &[&[u8]] = &[
 
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // Keyword dispatch looks past an optional visibility prefix (`private attribute ...`,
     // `private connector all ...`); each arm's parser re-parses the prefix itself.
     let after_visibility = crate::parser::lex::visibility_prefix(input)
@@ -1462,21 +1386,10 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"expr",
         ],
     ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end", b"const"])
-        && kerml_feature_member(input).is_ok())
+        && kerml_feature(input).is_ok())
     {
-        map(kerml_feature_member, |n| {
+        map(kerml_feature, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
-        })
-        .parse(input)?
-    } else if starts_with_keyword(after_visibility, b"end")
-        // `const end [1] feature a;` / `const end feature b;` (KerML `associations` fixture;
-        // spec42 Gap 36): `const` prefixes the end/feature member, so it must not fall through
-        // to the bare-expression fallback as a dangling `const` feature reference.
-        || (starts_with_keyword(after_visibility, b"const")
-            && kerml_end_member(input).is_ok())
-    {
-        map(kerml_end_member, |n| {
-            CalcDefBodyElement::EndMember(Box::new(n))
         })
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"inv") {
@@ -1497,6 +1410,11 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"datatype",
             b"metaclass",
             b"assoc",
+            b"association",
+            // `class` joined this list when `ClassDef` was deleted: it is an ordinary
+            // `KermlClassifierDecl` keyword like its siblings, and a nested `class Inner { ... }`
+            // inside a type body had been reaching the old bespoke node instead.
+            b"class",
             b"classifier",
             b"function",
             b"behavior",
@@ -1516,18 +1434,32 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     {
         // A directed `in part …` was claimed here before the scope had a `PartUsage` arm at all;
         // the arm above owns every part usage now, directed or not.
-        if let Ok((input, param)) = typed_parameter_member(input) {
-            // `in expr …` / `in bool …` / `in feature …` kinded parameters (Kernel
-            // Function/Semantic Libraries), before plain InOutDecl, which would misread the
-            // kind keyword as the parameter name.
-            (input, CalcDefBodyElement::TypedParameter(Box::new(param)))
-        } else if named_in_out_missing_type(input) {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        } else {
-            map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
+        match directed_member_keyword(input) {
+            // `in calc scenario : NominalScenario;` (validation `10c-Fuel Economy Analysis`) is a
+            // SysML `CalculationUsage = OccurrenceUsagePrefix 'calc' …` (SysML BNF 1355), not a
+            // KerML `Feature`. It reached the directed-parameter node only because this arm ran
+            // before the `calc` arm below; `CalcUsage` already models direction, `abstract` and
+            // `ref` through `RefPrefix`, so the production keeps its own node.
+            Some(keyword) if keyword == b"calc" => {
+                map(calc_usage, |n| CalcDefBodyElement::CalcUsage(Box::new(n))).parse(input)?
+            }
+            // `in expr …` / `in bool …` / `in feature …` / `in step …` are `FeaturePrefix`'s
+            // direction slot in front of the same four productions the undirected spelling uses
+            // (KerML BNF 577/562/863/895/908), so they are the same node. Ahead of plain
+            // `InOutDecl`, which would misread the kind keyword as the parameter name.
+            Some(_) => map(kerml_feature, |n| {
+                CalcDefBodyElement::KermlFeature(Box::new(n))
+            })
+            .parse(input)?,
+            None if named_in_out_missing_type(input) => {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+            None => {
+                map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
+            }
         }
     } else if calc_def_follows_visibility(input) {
         // Nested `(private|protected|public)? calc def Name { ... }` rollup helper (Domain
@@ -1772,7 +1704,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // Trailing redefinitions; repeated clauses merge targets (`... redefines result redefines
     // values;`, `FeatureReferencingPerformances.kerml`).
     let mut input = input;
@@ -1805,8 +1737,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
                 is_redefine,
                 is_subsetting,
                 multiplicity,
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 redefines,
                 value,
                 body,
@@ -1823,25 +1754,59 @@ mod const_prefix_tests {
         crate::parser::span::test_input(text)
     }
 
-    /// Spec42 Gap 36: `const end [1] feature a;` attaches `const` to the end member instead of
-    /// misparsing it as a dangling feature reference (KerML `associations` fixture).
+    /// Spec42 Gap 36: `const end [1] feature a;` attaches `const` to the end prefix and the
+    /// `[1]` to the owned cross feature (KerML BNF 573/592/595), rather than to a second node
+    /// wrapping a feature that offered `end` and `const` all over again.
     #[test]
     fn const_prefix_is_retained_on_end_members() {
         let (rest, node) =
-            kerml_end_member(input("const end [1] feature a;")).expect("const end member");
+            kerml_feature(input("const end [1] feature a;")).expect("const end member");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_const);
-        assert_eq!(node.value.feature.value.name, "a");
+        let crate::ast::FeaturePrefixHead::End { prefix, cross } = &node.value.prefix.head else {
+            panic!("expected the end alternative of FeaturePrefix");
+        };
+        assert!(prefix.constant_span.is_some(), "const span");
+        let cross = cross.as_ref().expect("owned cross feature");
+        assert!(cross.value.name.is_empty(), "the cross feature is unnamed");
+        assert!(
+            cross.value.multiplicity.is_some(),
+            "[1] is the cross feature's"
+        );
+        assert_eq!(node.value.name, "a");
     }
 
+    /// `const end feature b;` takes `FeaturePrefix`'s `EndFeaturePrefix` alternative (KerML BNF
+    /// 573/584), so `const` lands in that alternative's own slot rather than on a second,
+    /// independently settable flag beside `end`.
     #[test]
     fn const_prefix_is_retained_on_feature_members() {
-        let (rest, node) =
-            kerml_feature_member(input("const end feature b;")).expect("const end feature");
+        let (rest, node) = kerml_feature(input("const end feature b;")).expect("const end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_const);
-        assert!(node.value.is_end);
+        let end = node
+            .value
+            .prefix
+            .head
+            .end()
+            .expect("the end alternative of FeaturePrefix");
+        assert!(end.constant_span.is_some(), "const span");
+        assert!(node.value.prefix.is_end());
+        assert!(node.value.prefix.is_constant());
         assert_eq!(node.value.name, "b");
+    }
+
+    /// `var const feature b;` spells one slot twice: `BasicFeaturePrefix`'s last group is
+    /// `( isVariable ?= 'var' | isConstant ?= 'const' )?` (KerML BNF 577), an alternation. Before
+    /// the `FeaturePrefix` seam both keywords were accepted and set two independent booleans.
+    #[test]
+    fn variability_slot_admits_one_keyword() {
+        let parsed = kerml_feature(input("var const feature b;"));
+        let Ok((rest, _)) = parsed else {
+            return;
+        };
+        assert!(
+            !rest.fragment().is_empty(),
+            "`var const` must not be consumed as one prefix"
+        );
     }
 }
 

@@ -277,29 +277,24 @@ impl KermlTypeRelationshipKeyword {
 /// { ... }` (`Occurrences.kerml`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KermlFeatureMember {
-    /// `member` prefix (KerML `NonFeatureMember` shorthand used by `KerML.kerml`).
+pub struct KermlFeature {
+    /// `member` prefix (KerML `TypeFeatureMember`'s discriminator, BNF 523). On the membership,
+    /// ahead of the whole prefix -- `member abstract feature carSpeed : Real;` -- so it is not a
+    /// [`FeaturePrefix`](crate::ast::FeaturePrefix) slot.
     pub is_member: bool,
-    /// `derived` prefix.
-    pub is_derived: bool,
-    /// `abstract` prefix.
-    pub is_abstract: bool,
-    /// `composite` prefix.
-    pub is_composite: bool,
-    /// `portion` prefix.
-    pub is_portion: bool,
-    /// `var` prefix.
-    pub is_var: bool,
-    /// `const` prefix (`const end feature b;`, KerML `associations` fixture; spec42 Gap 36).
-    pub is_const: bool,
-    /// `end` prefix.
-    pub is_end: bool,
-    /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`. `has_kind_keyword` is
-    /// `false` for the keyword-less prefixed forms (`portion redefines portionOfLife = ...;`,
-    /// Kernel Semantic Library `Occurrences.kerml`), where the kind defaults to `Feature`.
-    pub kind: KermlFeatureKind,
-    /// Whether the kind keyword was authored. See `kind`.
-    pub has_kind_keyword: bool,
+    /// `FeaturePrefix` (KerML BNF 584): the `EndFeaturePrefix | BasicFeaturePrefix` choice and its
+    /// trailing prefix metadata keywords, as the grammar's own nesting.
+    ///
+    /// Replaces the seven independent booleans this node used to carry. Those made `var const
+    /// feature b;` representable (and, before this seam, *accepted*) and put end-ness in two
+    /// places at once; see `planning/kerml-feature-prefix-matrix.md` §5.
+    pub prefix: crate::ast::FeaturePrefix,
+    /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`, with its exact span.
+    ///
+    /// `None` for the keyword-less prefixed forms (`portion redefines portionOfLife = ...;`,
+    /// Kernel Semantic Library `Occurrences.kerml`), where `Feature` is implied. Presence *is*
+    /// "the keyword was authored", so there is no separate flag to disagree with the value.
+    pub kind: Option<Node<KermlFeatureKind>>,
     /// `all` after the kind keyword (KerML `isSufficient`).
     pub is_all: bool,
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form
@@ -310,10 +305,9 @@ pub struct KermlFeatureMember {
     /// Multiplicity clause, accepted before or after the typing (and after a leading
     /// redefinition target).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `subsets`/`:>` clause (multi-target, chains allowed).
     pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
     /// `redefines`/`:>>` clause (multi-target).
@@ -340,7 +334,7 @@ pub struct KermlFeatureMember {
     pub membership: crate::ast::Membership,
 }
 
-/// The kind keyword of a [`KermlFeatureMember`].
+/// The kind keyword of a [`KermlFeature`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum KermlFeatureKind {
@@ -452,28 +446,6 @@ pub struct KermlSuccessionMember {
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
     pub first: Node<KermlConnectorEnd>,
     pub then: Node<KermlConnectorEnd>,
-    pub membership: crate::ast::Membership,
-}
-
-/// KerML end member with an owned cross feature: `end` name? multiplicity? (`subsets` targets)?
-/// `feature` feature-member, e.g. `end happensDuring [1..*] feature longerOccurrence:
-/// Occurrence redefines targetOccurrence;` (Kernel Semantic Library `Occurrences.kerml`).
-/// Distinct from a plain `end feature ...` member, which stays on [`KermlFeatureMember`] with
-/// `is_end` -- here the end itself is named/constrained and owns the nested feature.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KermlEndMember {
-    /// `const` prefix (`const end [1] feature a;`, KerML `associations` fixture; spec42
-    /// Gap 36).
-    pub is_const: bool,
-    /// End name; empty when the end is anonymous (`end guardedLink [0..1] feature ...` has a
-    /// name; none of the library ends are anonymous, but the grammar permits it).
-    pub name: String,
-    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
-    /// `subsets` clause on the end itself.
-    pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// The owned cross feature.
-    pub feature: Box<Node<KermlFeatureMember>>,
     pub membership: crate::ast::Membership,
 }
 

@@ -31,6 +31,7 @@ pub mod diagnostic_catalog;
 mod diagnostics;
 mod enumeration;
 mod expr;
+mod feature_prefix;
 mod feature_value;
 mod flow;
 mod grammar_scope;

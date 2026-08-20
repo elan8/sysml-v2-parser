@@ -27,7 +27,9 @@ const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
@@ -96,7 +98,9 @@ fn rendering_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingUsageBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -236,7 +240,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             input,
             ViewDef {
                 identification: prefix.identification,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -260,6 +264,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
             start,
             input,
             ViewpointDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -275,7 +280,9 @@ fn rendering_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -356,7 +363,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             input,
             RenderingDef {
                 identification: prefix.identification,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -367,7 +374,9 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
 
 fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -500,8 +509,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
                 subsets: header.subsets,
                 redefines: header.redefines,
                 multiplicity: header.multiplicity,
-                ordered: header.ordered,
-                nonunique: header.nonunique,
+                multiplicity_modifiers: header.multiplicity_modifiers.clone(),
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -519,7 +527,7 @@ fn view_usage_redefines_only<'a>(
 ) -> IResult<Input<'a>, Node<ViewUsage>> {
     let (input, (_, redefines_target)) = prefix_redefinition_target(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -533,8 +541,7 @@ fn view_usage_redefines_only<'a>(
                 subsets: None,
                 redefines: Some(redefines_target),
                 multiplicity: multiplicity_opt,
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 body,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
@@ -614,7 +621,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     } else {
         (input, None)
     };
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, redefines) = if leading_redefines.is_none() {
         opt(preceded(
             ws_and_comments,
@@ -640,8 +647,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
                 name: name_str,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 subsets,
                 redefines,
                 value,

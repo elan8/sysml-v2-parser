@@ -135,6 +135,12 @@ pub enum PackageBodyElement {
     ConstraintDef(Node<ConstraintDef>),
     ConstraintUsage(Node<ConstraintUsage>),
     CalcDef(Node<CalcDef>),
+    /// `CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
+    /// (SysML BNF 1354), a `BehaviorUsageElement` and therefore a legal `PackageMember`.
+    /// Dispatched after [`Self::CalcDef`], which stays `def`-optional for the bare namespace-level
+    /// definitions the Systems Library authors; this variant catches the usage shapes that
+    /// definition grammar cannot accept, such as the multiplicity in `calc estimate [1];`.
+    CalcUsage(Node<crate::ast::CalcUsage>),
     ViewDef(Node<ViewDef>),
     ViewpointDef(Node<ViewpointDef>),
     RenderingDef(Node<RenderingDef>),
@@ -177,8 +183,8 @@ pub enum PackageBodyElement {
     KermlRelationship(Box<Node<crate::ast::KermlRelationshipDecl>>),
     /// Package-level KerML feature member with the full feature-member surface (`feature i:
     /// Complex[1] = rect(0.0, 1.0);`, Kernel Function Library `ComplexFunctions.kerml`); see
-    /// [`crate::ast::KermlFeatureMember`].
-    KermlFeatureMember(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
     /// Structurally recognized bare KerML declaration: keyword, optional name, optional
     /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].
@@ -229,9 +235,6 @@ pub enum PackageBodyElement {
     /// Package-level `BindingConnectorAsUsage`, e.g. `binding instant[instantNum] of startShot =
     /// endShot;`. See `crate::ast::BindingConnectorUsage`'s doc comment for the full grammar.
     BindingConnectorUsage(Node<crate::ast::BindingConnectorUsage>),
-    /// KerML `class` classifier definition, e.g. `class B :> A { }`. See
-    /// `crate::ast::ClassDef`'s doc comment.
-    ClassDef(Node<crate::ast::ClassDef>),
     /// Package-level `SuccessionAsUsage` (BNF §8.2.2.13.3), e.g. `succession s1 : AB first a then
     /// b;`, `first a then b;`. Reuses [`FirstStmt`], the identical shape already parsed inside
     /// action bodies (GH-38): optional `succession` name/type/multiplicity prefix, `first`

@@ -18,7 +18,7 @@ use crate::parser::lex::{
 };
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::{multiplicity_node, redefinition, usage_feature_modifier_flags};
+use crate::parser::usage::{multiplicity_modifier_slots, multiplicity_node, redefinition};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -210,8 +210,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
                 redefines,
                 subsets,
                 multiplicity,
-                ordered: false,
-                nonunique: false,
+                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 value,
                 body,
                 name_span: Some(name_span),
@@ -363,7 +362,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         .parse(input)?;
         let (input, multiplicity) =
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-        let (input, (ordered, nonunique)) = usage_feature_modifier_flags(input)?;
+        let (input, modifiers) = multiplicity_modifier_slots(input)?;
         let (input, value) = opt(feature_value_part).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         return Ok((
@@ -379,8 +378,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                     subsets: None,
                     type_name,
                     multiplicity,
-                    ordered,
-                    nonunique,
+                    multiplicity_modifiers: modifiers,
                     redefines: Some(redefines),
                     value,
                     body: None,
@@ -410,7 +408,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // (`Actions.sysml`). Accept one multiplicity clause in either position.
         let (input, leading_multiplicity) =
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-        let (input, (leading_ordered, leading_nonunique)) = usage_feature_modifier_flags(input)?;
+        let (input, modifiers) = multiplicity_modifier_slots(input)?;
         // In action usages, pin declarations may omit the type (e.g. `out videoStream;`)
         // to reference the corresponding typed parameter on the referenced action definition.
         // Action definitions generally include the type (e.g. `out videoStream : String;`),
@@ -456,7 +454,8 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         } else {
             (input, None)
         };
-        let (input, (trailing_ordered, trailing_nonunique)) = usage_feature_modifier_flags(input)?;
+        let (input, modifiers) =
+            crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
         // Trailing `:>>` redefinition after a named declaration, including the comma-separated
         // multi-target form: `in transitionLinkSource[1]: StateAction :>>
         // TransitionAction::transitionLinkSource, StateTransitionPerformance::
@@ -513,8 +512,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 subsets,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
-                ordered: leading_ordered || trailing_ordered,
-                nonunique: leading_nonunique || trailing_nonunique,
+                multiplicity_modifiers: modifiers,
                 redefines,
                 value,
                 body,
@@ -861,6 +859,7 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
             start,
             input,
             ActionDef {
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -1273,7 +1272,9 @@ pub(crate) fn action_usage_body_element(
 ) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
     use crate::parser::state::state_usage;
 
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see
@@ -1646,13 +1647,13 @@ mod in_out_decl_tests {
     fn in_out_decl_retains_ordered_and_nonunique_flags() {
         let (_, node) = in_out_decl(input("inout replacementValues : Anything[0..*] nonunique;"))
             .expect("nonunique after typing");
-        assert!(node.value.nonunique);
-        assert!(!node.value.ordered);
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
 
         let (_, node) =
             in_out_decl(input("in seq[1..*] nonunique ordered;")).expect("untyped modifiers");
-        assert!(node.value.nonunique);
-        assert!(node.value.ordered);
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(node.value.multiplicity_modifiers.is_ordered());
         assert!(node.value.type_name.is_none());
     }
 

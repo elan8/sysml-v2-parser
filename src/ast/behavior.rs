@@ -16,6 +16,11 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ActionDefinition` (SysML BNF 894) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual action def FuelConsumption_1 :> FuelConsumption;` (GH-90.1, `Individuals
     /// Examples/AnalysisIndividualExample.sysml:77`).
     pub is_individual: bool,
@@ -180,11 +185,9 @@ pub struct InOutDecl {
     /// it (`inout replacementValues : Anything[0..*] nonunique;`, `Actions.sysml`); the parser
     /// accepts one clause in either position.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`in seq[1..*] nonunique ordered;`,
-    /// Systems Library `Interfaces.sysml`).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Arena-backed redefinition targets, from either position the grammar allows: the leading
     /// unnamed form (`in :>> target = expr;`, validation `08`; `name` is empty) or trailing a
     /// named declaration (`in transitionLinkSource : Action :>> A::x, B::y;`, Systems Library
@@ -199,73 +202,6 @@ pub struct InOutDecl {
     /// `;`-terminated form. Parameter bodies share the action-body member grammar, matching the
     /// parser, which always dispatched brace terminators through the action-body machinery.
     pub body: Option<Vec<Node<ActionDefBodyElement>>>,
-}
-
-/// KerML kinded parameter member (BNF `FeatureDirection` + a feature-kind keyword), e.g.
-/// `in expr selector[0..*] { in argument: Anything[1]; return : Boolean[1]; }`,
-/// `in bool onOccurrence = changeSignal.signalCondition;`, or `in feature clock : Clock[1]
-/// default localClock { ... }` (Kernel Function/Semantic Libraries). Distinct from [`InOutDecl`]
-/// (which owns the keyword-less parameter form): the kind keyword types the parameter as an
-/// expression/boolean-expression/untyped feature, and its body members follow the calc-body
-/// grammar (nested parameters and a `return` result), which the action-body-element bodies of
-/// [`InOutDecl`] cannot represent.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TypedParameterMember {
-    pub direction: InOut,
-    /// `abstract` between the direction and the kind keyword (`in abstract feature
-    /// onOccurrence : Occurrence [1] { ... }`, `FeatureReferencingPerformances.kerml`).
-    pub is_abstract: bool,
-    pub kind: KermlParameterKind,
-    /// Declared parameter name. Empty for the redefinition-only form
-    /// (`in bool redefines ifTest { ... }`).
-    pub name: String,
-    /// Arena-backed redefinition targets (`redefines`/`:>>`), from either the leading position
-    /// (`inout feature redefines replacementValues[0..*] : ObserveChange;`) or trailing the
-    /// typing (`in feature monitor : ChangeMonitor redefines onOccurrence { ... }`).
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    pub type_name: Option<QualifiedReferenceId>,
-    /// Multiplicity clause, accepted before or after the typing.
-    pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
-    /// Value clause: `= expr` or `default (=|:=)? expr`.
-    pub value: Option<Node<FeatureValue>>,
-    /// Body following the calc-body member grammar: `;` or `{ ... }`.
-    pub body: crate::ast::CalcDefBody,
-}
-
-/// The feature-kind keyword of a [`TypedParameterMember`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum KermlParameterKind {
-    /// `expr` -- an expression-typed parameter.
-    Expr,
-    /// `bool` -- a boolean-expression-typed parameter.
-    Bool,
-    /// `feature` -- an explicitly feature-kinded parameter.
-    Feature,
-    /// `calc` -- a calculation-typed parameter (`in calc calculation { in x; }`, Domain
-    /// Libraries `SampledFunctions.sysml`).
-    Calc,
-    /// `step` -- a step-typed parameter (`in step redefines thenClause :
-    /// BooleanEvaluationResultToMonitorPerformance { ... }`, `Observation.kerml`).
-    Step,
-}
-
-impl KermlParameterKind {
-    /// The authored keyword spelling.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Expr => "expr",
-            Self::Bool => "bool",
-            Self::Feature => "feature",
-            Self::Calc => "calc",
-            Self::Step => "step",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -513,7 +449,7 @@ pub enum ActionUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
@@ -815,7 +751,7 @@ pub struct Allocate {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
@@ -853,6 +789,11 @@ pub struct AllocationUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `StateDefinition` (SysML BNF 1191) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual state def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix `isIndividual`,
     /// GH-90.1), mirroring `ActionDef::is_individual`.
     pub is_individual: bool,

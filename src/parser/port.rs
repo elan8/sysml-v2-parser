@@ -36,7 +36,9 @@ fn port_body(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
 
 fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // `port_usage` is the first alternative, so this scope needs no contended pre-dispatch: it
     // already sees `ref port q;` (`Simple Tests/PartTest.sysml:21`) and `#Tag port t;` before
     // `connector::ref_decl` and the annotating members below can claim their first token.
@@ -196,11 +198,10 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     // `MultiplicityPart`'s `ordered`/`nonunique`, which may sit either side of a specialization
     // clause: `port ports : Port[0..*] nonunique :> objects;` (`Systems Library/Ports.sysml:48`).
-    let (input, (ordered_before, nonunique_before)) =
-        crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = specialization_clauses(input)?;
-    let (input, (ordered_after, nonunique_after)) =
-        crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
     // §6 G11: `port :>> pe = c1.pb;` -- a port usage may carry a feature value, which binds it to
     // another port rather than declaring a fresh one.
@@ -221,8 +222,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
                 short_name,
                 typing,
                 multiplicity,
-                ordered: ordered_before || ordered_after,
-                nonunique: nonunique_before || nonunique_after,
+                multiplicity_modifiers: modifiers,
                 subsets: clauses.subsets,
                 redefines,
                 references: clauses.references,
@@ -242,7 +242,9 @@ const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first -- the two `#` arms immediately below
     // and `connector::ref_decl` further down; see `occurrence_prefix::starts_contended_prefix`.
@@ -375,6 +377,7 @@ pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
             start,
             input,
             PortDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -461,8 +464,8 @@ mod par_002_widening_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.prefix.basic.ref_prefix.variance.is_some());
         assert!(node.value.multiplicity.is_some());
-        assert!(node.value.nonunique);
-        assert!(!node.value.ordered);
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
         assert!(node.value.subsets.is_some());
     }
 

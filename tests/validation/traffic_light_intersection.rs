@@ -33,12 +33,14 @@ fn test_parse_traffic_light_intersection() {
         ),
     };
 
+    // The file's leading `/* ... */` header is the keyword-less `Comment` spelling, so it is a
+    // root member of its own ahead of the package.
     assert_eq!(
         root.elements.len(),
-        1,
-        "expected exactly one root element (package TrafficLightIntersection)"
+        2,
+        "expected the header comment and the package TrafficLightIntersection"
     );
-    let first = &root.elements[0];
+    let first = &root.elements[1];
     let package = match &first.value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected root to be a Package, got {:?}", other),
@@ -101,7 +103,8 @@ fn test_requirement_constraints_keep_doc_members() {
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
     let root = parse(&input).expect("fixture should parse");
-    let package = match &root.elements[0].value {
+    // Element 0 is the file's leading header comment; the package follows it.
+    let package = match &root.elements[1].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected root package, got {:?}", other),
     };

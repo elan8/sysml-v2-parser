@@ -32,6 +32,7 @@ pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Ite
             start,
             input,
             ItemDef {
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -102,8 +103,7 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
                 redefines: header.redefines,
                 subsets: header.subsets,
                 multiplicity: multiplicity.or(header.multiplicity),
-                ordered: header.ordered,
-                nonunique: header.nonunique,
+                multiplicity_modifiers: header.multiplicity_modifiers.clone(),
                 value,
                 body,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),

@@ -18,16 +18,31 @@ fn test_parse_kitchen_timer() {
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
+    // Two root members: the file's leading `/* ... */` header block, which is the `Comment`
+    // production's keyword-less spelling and therefore a member rather than trivia, and the
+    // package itself.
     let strict = parse(&input).expect("strict parse should succeed");
-    assert_eq!(strict.elements.len(), 1);
+    assert_eq!(strict.elements.len(), 2);
 
     let result = parse_with_diagnostics(&input);
     assert_eq!(
         result.document.root.elements.len(),
-        1,
-        "fixture should produce one root package"
+        2,
+        "fixture should produce its header comment and one root package"
     );
     match &result.document.root.elements[0].value {
+        RootElement::Member(member) => match &member.value {
+            sysml_v2_parser::ast::PackageBodyElement::Annotating(
+                sysml_v2_parser::ast::AnnotatingMember::Comment(comment),
+            ) => {
+                assert!(comment.value.keyword_span.is_none());
+                assert!(comment.value.text.contains("Kitchen Timer"));
+            }
+            other => panic!("expected the header comment, got {other:?}"),
+        },
+        other => panic!("expected the header comment, got {other:?}"),
+    }
+    match &result.document.root.elements[1].value {
         RootElement::Package(pkg) => {
             assert_eq!(pkg.identification.simple_name(), Some("KitchenTimer"));
         }

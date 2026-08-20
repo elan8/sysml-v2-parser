@@ -36,6 +36,6 @@ package AssignTest {
 (parsed-document
   (references
   )
-  (root (package (name "AssignTest") (body brace (action-def (name "A") (specializes none) (body brace (assign) (assign) (assign))))))
+  (root (package (name "AssignTest") (body brace (action-def (name "A") (modifiers) (specializes none) (body brace (assign) (assign) (assign))))))
 )
 ~~~

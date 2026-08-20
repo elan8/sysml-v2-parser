@@ -91,7 +91,9 @@ const ENUMERATION_BODY_STARTERS: &[&[u8]] = &[b"enum", b"doc", b"comment", b"rep
 
 fn enumeration_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, element) = nom::branch::alt((
         nom::combinator::map(
             crate::parser::body::annotating_member,
@@ -110,7 +112,7 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
         input,
         DefinitionPrefixOptions::new(b"enum")
             .def_required()
-            .no_abstract()
+            .no_basic_prefix()
             .with_captured_visibility(),
     )?;
     let (input, body) = enumeration_body(input)?;

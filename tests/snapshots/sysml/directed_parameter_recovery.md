@@ -29,6 +29,6 @@ action def Recovering {
   (references
     (reference r0 (scope relative) (span (offset 47) (line 3) (column 13) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 47) (line 3) (column 13) (len 4)))))
   )
-  (root (action-def (name "Recovering") (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "in : ;") (span (offset 28) (line 2) (column 5) (len 11))) (in-out (direction in) (reference false) (declaration "ok") (subsets none) (type (ref r0)) (multiplicity none) (ordered false) (nonunique false) (redefines none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54) (line 3) (column 20) (len 3)) (real "1.0"))))) (span (offset 39) (line 3) (column 5) (len 19))))))
+  (root (action-def (name "Recovering") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "in : ;") (span (offset 28) (line 2) (column 5) (len 11))) (in-out (direction in) (reference false) (declaration "ok") (subsets none) (type (ref r0)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (redefines none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54) (line 3) (column 20) (len 3)) (real "1.0"))))) (span (offset 39) (line 3) (column 5) (len 19))))))
 )
 ~~~

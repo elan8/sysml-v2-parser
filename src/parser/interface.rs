@@ -19,7 +19,9 @@ use nom::Parser;
 fn interface_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first -- the two `#` arms and
@@ -171,9 +173,7 @@ fn parse_interface_def(
             start,
             input,
             InterfaceDef {
-                definition_prefix: prefix
-                    .is_abstract
-                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

@@ -23,7 +23,9 @@ use nom::Parser;
 fn connection_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConnectionDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
@@ -235,9 +237,7 @@ fn parse_connection_def(
             start,
             input,
             ConnectionDef {
-                definition_prefix: prefix
-                    .is_abstract
-                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 derivation_role: prefix.derivation_role,
                 identification: prefix.identification,

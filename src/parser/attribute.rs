@@ -168,70 +168,77 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
     )
 }
 
-/// Multiplicity-adjacent modifiers from `MultiplicityPart` (BNF §8.2.2.6.6): an optional
-/// multiplicity range plus `ordered`/`nonunique` (and their negations `nonordered`/`unique`).
-/// Results are OR-merged / first-wins across every occurrence -- callers that invoke this more
-/// than once per declaration (leading and trailing modifier positions) fold the results together.
+/// One `MultiplicityPart` (BNF §8.2.2.6.6): an optional multiplicity range plus the ordering and
+/// uniqueness keyword slots, each admitted at most once.
+///
+/// Callers that accept the part on either side of the specializations -- the two positions
+/// `FeatureSpecializationPart` allows -- parse it at both and fold with [`Self::merge`],
+/// first-wins.
 #[derive(Default, Clone)]
 struct FeatureModifiers {
     multiplicity: Option<Node<Multiplicity>>,
-    ordered: bool,
-    nonunique: bool,
+    modifiers: crate::ast::MultiplicityModifiers,
 }
 
-impl FeatureModifiers {
-    fn merge(self, other: FeatureModifiers) -> FeatureModifiers {
-        FeatureModifiers {
-            multiplicity: self.multiplicity.or(other.multiplicity),
-            ordered: self.ordered || other.ordered,
-            nonunique: self.nonunique || other.nonunique,
-        }
-    }
-}
-
-/// Consume `literal` if the input starts with it, matching `nom`'s `tag` (no word boundary).
-fn consume_literal<'a>(input: Input<'a>, literal: &[u8]) -> Option<Input<'a>> {
-    input
-        .fragment()
-        .starts_with(literal)
-        .then(|| nom::Input::take_from(&input, literal.len()))
-}
-
-/// Parse the multiplicity and ordering/uniqueness modifiers that may follow a feature.
+/// Parse one `MultiplicityPart`: an optional multiplicity range followed by the ordering and
+/// uniqueness keyword slots (SysML BNF 492-496, KerML BNF 636-640).
 ///
-/// Modifiers accumulate directly into the returned struct. Collecting them into a `Vec` first
-/// would allocate on a path the grammar re-enters speculatively for every attribute declaration,
-/// only to fold the result into these same three fields.
+/// ```text
+/// MultiplicityPart : Feature =
+///       ownedRelationship += OwnedMultiplicity
+///     | ( ownedRelationship += OwnedMultiplicity )?
+///       ( isOrdered ?= 'ordered' ... | ... 'nonunique' ... )
+/// ```
+///
+/// The production admits *one* `OwnedMultiplicity`, and it comes before the keywords. So this
+/// reads at most one range and then defers to
+/// [`crate::parser::usage::multiplicity_modifier_slots`], which owns the keyword spellings, their
+/// spans, and their own cardinality. A second range, or a range written after a keyword
+/// (`[1] ordered [2]`), is left unconsumed: the enclosing declaration fails at that `[` and the
+/// enclosing scope's member recovery captures the whole member by source span, so the excess is an
+/// explicit malformed node rather than a range the parser consumes and ignores.
+///
+/// The result is written straight into the returned struct: collecting into a `Vec` first would
+/// allocate on a path the grammar re-enters speculatively for every attribute declaration, only to
+/// fold the result into these same two fields.
 fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
-    let mut result = FeatureModifiers::default();
-    let mut input = input;
-    loop {
-        let (after_ws, _) = ws_and_comments(input)?;
-        if let Ok((rest, node)) = multiplicity_node(after_ws) {
-            // The first multiplicity wins; a repeated one is consumed and ignored.
-            if result.multiplicity.is_none() {
-                result.multiplicity = Some(node);
+    feature_modifiers_after(FeatureModifiers::default(), input)
+}
+
+/// [`feature_modifiers`] resuming from what an earlier position of the same declaration read.
+///
+/// A declaration may offer this position more than once, because `FeatureSpecializationPart`
+/// (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations.
+/// Threading the earlier result through as the accumulator keeps the whole declaration to one
+/// range and one spelling per keyword slot: a filled field stops consumption instead of consuming
+/// the excess and folding it away.
+fn feature_modifiers_after(
+    prior: FeatureModifiers,
+    input: Input<'_>,
+) -> IResult<Input<'_>, FeatureModifiers> {
+    let (input, multiplicity) = match prior.multiplicity {
+        // A range is already authored for this declaration, so a second one is not this
+        // production's; leave it for recovery.
+        already @ Some(_) => (input, already),
+        None => {
+            let (after_ws, _) = ws_and_comments(input)?;
+            match multiplicity_node(after_ws) {
+                Ok((rest, node)) => (rest, Some(node)),
+                // No range here: leave the whitespace before the next token unconsumed, as
+                // `preceded` did.
+                Err(_) => (input, None),
             }
-            input = rest;
-            continue;
         }
-        // `unique` and `nonordered` are the defaults: recognized and consumed, but not recorded.
-        // These match as bare prefixes, exactly as the `tag` alternatives they replace did.
-        if let Some(rest) = consume_literal(after_ws, b"nonunique") {
-            result.nonunique = true;
-            input = rest;
-        } else if let Some(rest) = consume_literal(after_ws, b"unique") {
-            input = rest;
-        } else if let Some(rest) = consume_literal(after_ws, b"ordered") {
-            result.ordered = true;
-            input = rest;
-        } else if let Some(rest) = consume_literal(after_ws, b"nonordered") {
-            input = rest;
-        } else {
-            // No modifier here: leave the whitespace before it unconsumed, as `preceded` did.
-            return Ok((input, result));
-        }
-    }
+    };
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(prior.modifiers, input)?;
+    Ok((
+        input,
+        FeatureModifiers {
+            multiplicity,
+            modifiers,
+        },
+    ))
 }
 
 #[derive(Clone, Copy)]
@@ -242,7 +249,9 @@ enum MetadataBindingPrefix {
 
 fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
@@ -268,7 +277,7 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         // `datatype` bodies via `class_def`, whose members are feature members (`feature x :
         // Natural[1];`, `member`/`derived`/`composite`/`portion`/`var` prefixed, `step`/`expr`/
         // `bool` kinds), invariants, connectors, and nested class definitions.
-        map(crate::parser::constraint::kerml_feature_member, |n| {
+        map(crate::parser::constraint::kerml_feature, |n| {
             AttributeBodyElement::KermlFeature(Box::new(n))
         }),
         map(crate::parser::constraint::kerml_invariant_member, |n| {
@@ -277,12 +286,8 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::constraint::kerml_connector_member, |n| {
             AttributeBodyElement::KermlConnector(Box::new(n))
         }),
-        map(crate::parser::package::class_def, |n| {
-            AttributeBodyElement::ClassDef(Box::new(n))
-        }),
-        // The rest of the KerML classifier-keyword family (`struct`, `classifier`, `datatype`,
-        // `assoc`, `behavior`, ...) nested in a type body (spec42 Gap 38); `class` stays on the
-        // `class_def` arm above.
+        // The KerML classifier-keyword family (`class`, `struct`, `classifier`, `datatype`,
+        // `assoc`, `behavior`, ...) nested in a type body (spec42 Gap 38).
         map(crate::parser::package::kerml_classifier_structured, |n| {
             AttributeBodyElement::KermlClassifier(Box::new(n))
         }),
@@ -431,12 +436,11 @@ pub(crate) fn attribute_feature_binding(
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods1.merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
@@ -484,8 +488,7 @@ pub(crate) fn attribute_feature_binding(
                 redefines_span: None,
                 direction: None,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived: false,
                 usage_prefix: None,
                 is_constant: false,
@@ -766,7 +769,15 @@ pub(crate) fn attribute_def(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `AttributeDefinition = DefinitionPrefix 'attribute' 'def' Definition` (SysML BNF 510; Pilot
+    // `SysML.xtext` 746), and `DefinitionPrefix` (BNF 225) reaches `BasicDefinitionPrefix` (BNF
+    // 219). This used to consume `abstract` and drop it on the floor, and refuse `variation`
+    // outright.
+    let (input, definition_prefix) =
+        crate::parser::definition_prefix::parse_basic_definition_prefix(
+            input,
+            crate::parser::definition_prefix::BasicPrefixSlot::Basic,
+        )?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
@@ -795,7 +806,7 @@ pub(crate) fn attribute_def(
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
@@ -828,8 +839,7 @@ pub(crate) fn attribute_def(
     let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
     let value_span = value.as_ref().map(|node| node.span.clone());
     let (input, _) = specialization_clauses(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods1.merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -837,6 +847,7 @@ pub(crate) fn attribute_def(
             start,
             input,
             AttributeDef {
+                definition_prefix,
                 name: name_str,
                 short_name,
                 typing,
@@ -846,8 +857,7 @@ pub(crate) fn attribute_def(
                 name_span,
                 typing_span,
                 value_span,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 membership: Membership::owning(visibility, visibility_span),
             },
         ),
@@ -1032,8 +1042,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
@@ -1056,8 +1065,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
@@ -1083,8 +1091,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
@@ -1112,8 +1119,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
                 })
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 Some(name_span),
@@ -1130,7 +1136,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         }
     };
     let (input, leading_clauses) = specialization_clauses(input)?;
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers_after(mods0, input)?;
     let leading_subsets_value = leading_clauses
         .subsets
         .as_ref()
@@ -1140,8 +1146,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods0.merge(mods1).merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let redefines = trailing_clauses
         .redefines
         .or(leading_clauses.redefines)
@@ -1183,8 +1188,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 // with the direction it consumed itself, which is the same value.
                 direction: prefix_direction,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived,
                 usage_prefix,
                 is_constant,
@@ -1294,8 +1298,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 redefines_span: None,
                 direction: None,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived: false,
                 usage_prefix: None,
                 is_constant: false,
@@ -1311,7 +1314,9 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
 
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
@@ -1695,8 +1700,8 @@ mod attribute_body_tests {
         let text = "attribute readings: Real[0..*] ordered;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
-        assert!(!node.value.nonunique);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
+        assert!(node.value.multiplicity_modifiers.is_unique());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
         assert!(matches!(
             multiplicity.value.lower.as_deref().map(|node| &node.value),
@@ -1710,8 +1715,8 @@ mod attribute_body_tests {
         let text = "attribute tags: String[0..*] nonunique;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.nonunique);
-        assert!(!node.value.ordered);
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
         assert!(matches!(
             multiplicity.value.lower.as_deref().map(|node| &node.value),
@@ -1725,7 +1730,7 @@ mod attribute_body_tests {
         let text = "attribute a [0..1] ordered;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
         assert!(matches!(
             multiplicity.value.lower.as_deref().map(|node| &node.value),
@@ -1742,8 +1747,8 @@ mod attribute_body_tests {
         let text = "attribute def Samples :> Real[0..*] ordered nonunique;";
         let (rest, node) = attribute_def(input(text), false).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
-        assert!(node.value.nonunique);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
+        assert!(!node.value.multiplicity_modifiers.is_unique());
     }
 
     #[test]
@@ -1772,8 +1777,8 @@ mod attribute_body_tests {
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.multiplicity.is_none());
-        assert!(!node.value.ordered);
-        assert!(!node.value.nonunique);
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
+        assert!(node.value.multiplicity_modifiers.is_unique());
         assert!(!node.value.is_derived);
         assert!(!node.value.is_constant);
     }

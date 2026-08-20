@@ -31,7 +31,7 @@ package Classes {
 # FORMAT
 ~~~sysml
 package Classes {
-    class def A {
+    class A {
         feature innerSpaceDimension : Natural[1];
         member feature x : B;
         composite feature engine :> carParts;
@@ -41,7 +41,7 @@ package Classes {
             x > 1;
         }
         connector from a references a.x to b;
-        class def Inner {
+        class Inner {
             feature y : Integer;
         }
     }
@@ -58,6 +58,6 @@ package Classes {
 (parsed-document
   (references
   )
-  (root (package (name "Classes") (body brace (class-def) (kerml-classifier (keyword behavior) (abstract false) (name "B2") (specializes none) (body brace (in-out-declaration))) (package (name "Q") (body brace (kerml-connector))))))
+  (root (package (name "Classes") (body brace (kerml-classifier (keyword class) (abstract false) (name "A") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (invariant) (connector) (kerml-classifier (keyword class) (abstract false) (name "Inner") (specializes none) (body brace (kerml-feature))))) (kerml-classifier (keyword behavior) (abstract false) (name "B2") (specializes none) (body brace (in-out-declaration))) (package (name "Q") (body brace (kerml-connector))))))
 )
 ~~~

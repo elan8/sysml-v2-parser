@@ -104,6 +104,22 @@ where
     result
 }
 
+/// Run a lookahead that only inspects the input, discarding whatever it allocated.
+///
+/// [`reference_transaction`] rolls back on failure, which is what a production wants. A dispatch
+/// guard is different: it parses ahead purely to decide which arm to take, then the chosen arm
+/// parses the same bytes again. Keeping the probe's entries would leave every reference in the
+/// lookahead region allocated twice.
+pub(crate) fn reference_probe<'a, T, F>(input: Input<'a>, probe: F) -> T
+where
+    F: FnOnce(Input<'a>) -> T,
+{
+    let checkpoint = input.extra.reference_checkpoint();
+    let result = probe(input);
+    input.extra.rollback_references(checkpoint);
+    result
+}
+
 /// Test-only convenience for the many focused parser unit tests that need an arena context.
 #[cfg(test)]
 pub(crate) fn test_input(text: &str) -> Input<'_> {

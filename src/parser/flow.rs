@@ -38,9 +38,7 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
             start,
             input,
             FlowDef {
-                definition_prefix: prefix
-                    .is_abstract
-                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

@@ -52,6 +52,6 @@ package AnnotatingTypeBody {
 (parsed-document
   (references
   )
-  (root (package (name "AnnotatingTypeBody") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "Vehicle") (specializes none) (body brace (doc) (comment (keyword (span (offset 96) (line 4) (column 9) (len 7))) (name none) (about) (locale none)) (textual-rep) (kerml-feature))))))
+  (root (package (name "AnnotatingTypeBody") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "Vehicle") (specializes none) (body brace (doc (name none) (locale none) (body (span (offset 68) (line 3) (column 15) (len 17)) (normalized "classifier body "))) (comment (keyword (span (offset 96) (line 4) (column 9) (len 7))) (name none) (about) (locale none) (body (span (offset 106) (line 4) (column 19) (len 18)) (normalized "classifier aside "))) (textual-rep (name "classifierRep") (language "text") (body (span (offset 171) (line 5) (column 45) (len 22)) (normalized "classifier rendering "))) (kerml-feature))))))
 )
 ~~~

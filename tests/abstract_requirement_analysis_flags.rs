@@ -1,8 +1,20 @@
-//! Regression coverage: `abstract` prefix on requirement/analysis/verification/use-case
-//! definitions and usages is captured as `is_abstract` on the AST node.
+//! Regression coverage: the `abstract` prefix on requirement/analysis/verification/use-case
+//! definitions and usages reaches the AST node.
+//!
+//! The definition kinds carry `BasicDefinitionPrefix` as one spanned slot with two alternatives,
+//! so these read the authored spelling rather than a boolean; the usage kinds still carry
+//! `is_abstract` from `RefPrefix` and are read as such.
 
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{DefinitionPrefix, Node, PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse;
+
+/// Whether an authored `BasicDefinitionPrefix` slot spells `abstract`.
+fn spells_abstract(slot: Option<&Node<DefinitionPrefix>>) -> bool {
+    matches!(
+        slot.map(|prefix| prefix.value),
+        Some(DefinitionPrefix::Abstract)
+    )
+}
 
 fn package_elements(source: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement>> {
     let result = parse(source).expect("parse should succeed");
@@ -33,7 +45,7 @@ fn abstract_requirement_def_sets_is_abstract() {
             PackageBodyElement::RequirementDef(n)
                 if n.value.identification.name.as_deref() == Some(name) =>
             {
-                Some(n.value.is_abstract)
+                Some(spells_abstract(n.value.definition_prefix.as_ref()))
             }
             _ => None,
         });
@@ -85,7 +97,7 @@ fn abstract_analysis_and_verification_and_use_case_def_sets_is_abstract() {
         PackageBodyElement::AnalysisCaseDef(n)
             if n.value.identification.name.as_deref() == Some("AbstractAnalysis") =>
         {
-            Some(n.value.is_abstract)
+            Some(spells_abstract(n.value.definition_prefix.as_ref()))
         }
         _ => None,
     });
@@ -94,7 +106,7 @@ fn abstract_analysis_and_verification_and_use_case_def_sets_is_abstract() {
         PackageBodyElement::AnalysisCaseDef(n)
             if n.value.identification.name.as_deref() == Some("ConcreteAnalysis") =>
         {
-            Some(n.value.is_abstract)
+            Some(spells_abstract(n.value.definition_prefix.as_ref()))
         }
         _ => None,
     });
@@ -104,7 +116,7 @@ fn abstract_analysis_and_verification_and_use_case_def_sets_is_abstract() {
         PackageBodyElement::VerificationCaseDef(n)
             if n.value.identification.name.as_deref() == Some("AbstractVerification") =>
         {
-            Some(n.value.is_abstract)
+            Some(spells_abstract(n.value.definition_prefix.as_ref()))
         }
         _ => None,
     });
@@ -114,7 +126,7 @@ fn abstract_analysis_and_verification_and_use_case_def_sets_is_abstract() {
         PackageBodyElement::UseCaseDef(n)
             if n.value.identification.name.as_deref() == Some("AbstractUseCase") =>
         {
-            Some(n.value.is_abstract)
+            Some(spells_abstract(n.value.definition_prefix.as_ref()))
         }
         _ => None,
     });
@@ -123,7 +135,7 @@ fn abstract_analysis_and_verification_and_use_case_def_sets_is_abstract() {
         PackageBodyElement::UseCaseDef(n)
             if n.value.identification.name.as_deref() == Some("ConcreteUseCase") =>
         {
-            Some(n.value.is_abstract)
+            Some(spells_abstract(n.value.definition_prefix.as_ref()))
         }
         _ => None,
     });

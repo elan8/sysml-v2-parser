@@ -9,6 +9,287 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **KerML's `FeaturePrefix` is modelled as the choice the grammar writes, not as eight independent
+  booleans.** Audit and evidence: `planning/kerml-feature-prefix-matrix.md`.
+  **AST version 179 -> 184.**
+
+  The merged node is `KermlFeature` (was `KermlFeatureMember`), named for the production it models
+  rather than the membership that carries it; `PackageBodyElement::KermlFeatureMember` becomes
+  `::KermlFeature`, matching the three sibling body enums that already spelled it that way.
+
+  `KermlFeatureMember` carried `is_derived`, `is_abstract`, `is_composite`, `is_portion`, `is_var`,
+  `is_const` and `is_end` as seven separately settable flags, plus `kind` beside a
+  `has_kind_keyword` bool that could disagree with it. The pinned grammar writes one production:
+  `FeaturePrefix = ( EndFeaturePrefix ( OwnedCrossFeatureMember )? | BasicFeaturePrefix )
+  ( PrefixMetadataMember )*` (KerML BNF 584). The new `crate::ast::FeaturePrefix` component models
+  it, alongside `BasicFeaturePrefix` (577), `EndFeaturePrefix` (573), `OwnedCrossFeature` (595) and
+  the two one-slot alternations `FeaturePortionKind` (581) and `FeatureVariability` (582).
+
+  What this makes unrepresentable rather than merely unparsed:
+
+  - **`var const feature b;` was accepted**, setting `is_var` *and* `is_const`. `var` and `const`
+    are two alternatives of one slot, so the merged model has one field and the spelling is gone.
+  - **`in end feature x;`** cannot be built: `direction` lives only in `BasicFeaturePrefix`, and
+    `EndFeaturePrefix` is the *other* alternative of the choice.
+    `tests/snapshots/spec42/end_prefix_recovery.md` already pinned that conclusion for the parser;
+    it is now a property of the type.
+  - **`composite portion`** likewise collapses to one slot.
+
+  Each independent modifier is an `Option<Span>` carrying the authored keyword's exact position, so
+  emission writes a keyword because the author did rather than because a flag says so, and `kind`
+  becomes `Option<Node<KermlFeatureKind>>` — presence *is* "the keyword was authored".
+
+  One behaviour change follows from sharing the prefix: a directed feature now parses in every
+  scope that already accepted the undirected spelling, so `in newX : Real;` at namespace level is a
+  `Feature` (`BasicFeaturePrefix` direction slot, then `FeatureDeclaration`) instead of a second
+  recovery diagnostic. `tests/snapshots/spec42/empty_member_after_package.md` records it.
+
+- **The three nodes that spelled one KerML `Feature` production are one node.**
+  `TypedParameterMember`, `KermlParameterKind` and `KermlEndMember` are deleted, and
+  `CalcDefBodyElement` loses `TypedParameter` and `EndMember`.
+
+  The split was discriminated by *optional slots*, not by grammar. `feature a;` and `in feature b;`
+  are the same production with one `?` taken, and the directed node modelled only `direction` plus
+  `abstract` — so every other legal combination was refused outright. These four now parse instead
+  of reaching `recovered_calc_body_element`, pinned in
+  `tests/snapshots/spec42/kerml_feature_prefix_slots.md`:
+
+  ```
+  in derived feature q;      in composite feature o;
+  in var feature p;          in portion feature s;
+  ```
+
+  `KermlEndMember` wrapped a `KermlFeatureMember` while the wrapped node carried its own `is_end`
+  and `is_const`, so end-ness was representable twice on one member. It becomes
+  `FeaturePrefixHead::End`, and its owned cross feature (`OwnedCrossFeature`, KerML BNF 592/595)
+  gains what the wrapper could not hold: its own `BasicFeaturePrefix` and the `MultiplicityPart`
+  keyword slots.
+
+  **`FeaturePrefix`'s metadata tail is parsed where the feature parser owns the input.**
+  `PrefixMetadataMember*` trails the choice in BNF 584, so `derived #Tag feature z3;` and
+  `in var #Tag #Tag2 feature z4;` are legal — and were refused outright, because the feature parser
+  stopped dead at the `#`. They now carry their keywords in `FeaturePrefix::metadata_keywords` and
+  re-emit them. A `#`-*led* member is unchanged: the owning scopes dispatch their metadata arm
+  first, and `feature_prefix` deliberately refuses a run that no kind keyword follows, so
+  `#Tag feature z1;` stays a prefix member plus a feature and `#service port def Authorisation
+  { … }` keeps parsing as before. `planning/kerml-feature-prefix-matrix.md` §11 records the
+  remainder as a metadata-seam change rather than a prefix one.
+
+  **One production leaves rather than merging.** `in calc scenario : NominalScenario;`
+  (validation `10c-Fuel Economy Analysis`) is SysML's `CalculationUsage = OccurrenceUsagePrefix
+  'calc' …` (SysML BNF 1355) — not a KerML `Feature`, and not `FeaturePrefix`. It reached the
+  directed-parameter node only because the direction dispatch arm ran ahead of the `calc` arm.
+  `CalcUsage` already models direction, `abstract` and `ref` through `RefPrefix`, so it routes
+  there and `KermlParameterKind::Calc` is deleted.
+
+- **`BasicDefinitionPrefix` reaches every definition kind whose production spells it, and the two
+  that spell something else are modelled as such.** Audit and evidence:
+  `planning/spec42-upstream-gap-audit.md`. **AST version 178 -> 179.**
+
+  A previous slice gave the six connection-like and part definitions the spanned
+  `Option<Node<DefinitionPrefix>>` slot but left `variation` refused everywhere else, because the
+  other definition nodes stored this slot as a bare `is_abstract` bool that could not hold the
+  second alternative. Seventeen nodes now carry the typed slot:
+
+  - **Nine converted from `is_abstract: bool`** -- `RequirementDef`, `CaseDef`, `AnalysisCaseDef`,
+    `VerificationCaseDef`, `UseCaseDef`, `ConstraintDef`, `ViewDef`, `RenderingDef`,
+    `OccurrenceDef` -- so `variation requirement def V;` and its siblings parse instead of falling
+    through to the unimplemented extended-library declaration.
+  - **Eight had no field at all and were silently discarding `abstract`** -- `AttributeDef`,
+    `ItemDef`, `StateDef`, `ActionDef`, `CalcDef`, `ViewpointDef`, `PortDef`, `IndividualDef`. The
+    pinned library itself was losing the keyword on a round trip: `abstract attribute def
+    ScalarMeasurementReference`, `abstract calc def Calculation`, `abstract attribute def
+    MeasurementUnit` and a dozen more re-emitted without it.
+
+  `DefinitionPrefixOptions`' two loosely-coupled booleans (`abstract_allowed`, `variation_allowed`)
+  become one `BasicPrefixSlot` enum naming what each production actually spells, so
+  "`variation` but not `abstract`" is unrepresentable, and the `slot_is_abstract` bridging helper
+  is deleted.
+
+  **Two productions genuinely differ, and are not forced into uniformity.**
+  `EnumerationDefinition` (SysML BNF 518; Pilot `SysML.xtext` 767) reaches neither
+  `DefinitionPrefix` nor `OccurrenceDefinitionPrefix`, so it spells no prefix at all.
+  `MetadataDefinition` (BNF 1652; Pilot 121) inlines `isAbstract ?= 'abstract'` with no `variation`
+  alternative, so its `is_abstract` bool is the accurate shape. Both refuse what they do not spell,
+  pinned by `tests/snapshots/sysml/definition_prefix_refusals.md`.
+
+  `IndividualDefinition` (BNF 551) reaches the slot directly and was refusing both keywords; it now
+  accepts them.
+
+- **`MultiplicityPart` admits one keyword per slot, and the excess reaches recovery instead of
+  being swallowed.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`.
+
+  `MultiplicityPart` (SysML BNF 495-496, KerML BNF 639-640) is an alternation over two *distinct*
+  slots: at most one ordering keyword, at most one uniqueness keyword, either order, preceded by at
+  most one multiplicity range. The OMG Pilot matches it as an Xtext fragment exactly once, so the
+  token after it is a syntax error there.
+
+  This parser looped instead, and every excess spelling was dropped with **no diagnostic and a
+  silently different document**: `Real[0..*] ordered ordered` re-emitted as `Real[0..*] ordered`,
+  and `[1] ordered [2] nonunique` re-emitted as `[1] ordered nonunique` -- the `[2]` vanished.
+  That is the permissive fallback `AGENTS.md` forbids.
+
+  Each slot now fills at most once and any excess is left unconsumed, so the enclosing declaration
+  fails at that token and the scope's member recovery captures the whole member by source span with
+  a stable code, an exact span, and the valid sibling after it intact.
+
+  - **The cardinality is per declaration, not per parse position.** `FeatureSpecializationPart`
+    (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations, so
+    the parsers offer the position twice and used to fold the two groups first-wins -- which is how
+    `ordered ordered` survived the narrowing, one slot per position. The value is now threaded
+    through both positions as an accumulator, so a filled field is what stops the next position
+    from consuming. `MultiplicityModifiers::merge` and the first-wins `set_ordering`/`set_uniqueness`
+    setters are deleted: that fallback was living in the owning API.
+  - **No new diagnostic code.** Every scope that owns member recovery already produces the exact
+    contract for this input -- stable code, precise span, `found` equal to the authored slice,
+    recovered emission reproducing it verbatim, surviving sibling. A `MultiplicityPart`-specific
+    code would duplicate it.
+
+  Corpus evidence for the narrowing being safe: across the pinned release the only authored
+  sequences are `nonunique` (440), `ordered` (203), `ordered nonunique` (82) and `nonunique
+  ordered` (5) -- all four legal, with no repetition, interleaving or adjacent range anywhere.
+  Neither `unique` nor `nonordered` appears in either Pilot grammar; both remain accepted and
+  retained here, now subject to the same cardinality as the spellings the production does list.
+
+- **A bare `/* ... */` is a `Comment`, not trivia, and every annotating body keeps its raw span
+  and one normalization policy.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`
+  (spec42 Gap 55). **AST version 177 -> 178.**
+
+  The pinned grammar defines three lexical forms and only two of them are notes:
+
+  ```text
+  SINGLE_LINE_NOTE = '//' LINE_TEXT
+  MULTILINE_NOTE   = '//*' COMMENT_TEXT '*/'
+  REGULAR_COMMENT  = '/*'  COMMENT_TEXT '*/'
+  ```
+
+  (KerML BNF 32-39.) Every group before the body in `Comment = ( 'comment' Identification
+  ( 'about' ... )? )? ( 'locale' ... )? body = REGULAR_COMMENT` (BNF 199) is optional, and
+  `Comment` is an `AnnotatingElement` (BNF 188), so a bare `/* ... */` at a member position is
+  syntax. `/** ... */` is not a separate production: it is a `Comment` whose body happens to begin
+  with `*`.
+
+  - **Legal members were deleted.** Both spellings were consumed as lexer trivia and were
+    unreachable from any AST node, so `package P { /* why this exists */ part def A; }` re-emitted
+    without the comment. They now reach `CommentAnnotation` with `keyword_span: None` -- the state
+    that field has documented since it was introduced and no parser had ever produced. Member
+    boundaries skip whitespace and notes only (`lex::ws_and_notes`); every other position keeps
+    skipping block comments, because the grammar has no member between the tokens of a declaration
+    for a comment there to be. A scope whose member set cannot yet hold an annotating element
+    still treats one as trivia rather than reporting it, so no previously-parsing document becomes
+    a recovered one.
+  - **Every consumer had to invent its own normalization.** `DocComment::text` was the raw slice
+    between `/*` and `*/` with no leading-`*` stripping and no dedent. The authored bytes still
+    live there -- that is what lets the formatter reproduce them -- and `normalize_comment_body`
+    now implements the pinned processing rules (KerML BNF 214 note 1, extended to
+    `TextualRepresentation` by BNF 231 note 1) once, exposed as `normalized_text()` on all three
+    types.
+  - **The body had no provenance.** `DocComment`, `CommentAnnotation` and `TextualRepresentation`
+    each gained `body_span`, the exact source span of the authored body text.
+
+  The semantic projection for `doc` and `rep` grows from a bare marker to the name, locale or
+  language, the body span, and the normalized text.
+
+- **`class` joins the other KerML classifier keywords; the bespoke `ClassDef` node is deleted.**
+  Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 59).
+  **AST version 176 -> 177.**
+
+  `class` was the one keyword in `KERML_CLASSIFIER_KEYWORDS` routed to its own `ClassDef` node
+  with an attribute body, ahead of the shared `KermlClassifierDecl` that `type`, `struct`,
+  `behavior`, `datatype` and the rest reach. Three things followed from that:
+
+  - **A legal member was refused.** `BasicFeaturePrefix` opens with `( direction =
+    FeatureDirection )?` (KerML BNF 582), and the Kernel Semantic Library authors `in feature`,
+    `out feature` and `inout feature` throughout, but the attribute body has no directed-parameter
+    member, so `class C { in feature x : T; }` reached recovery while `struct C { ... }` and
+    `behavior C { ... }` accepted the same line.
+  - **The formatter invented a keyword.** No production spells `class def`, yet `class C { ... }`
+    was re-emitted as `class def C { ... }`.
+  - **`abstract` was refused**, because `class_def` was configured `.no_abstract()`.
+
+  The semantic projection also improves from the bare `(class-def)` marker to the full classifier
+  declaration with its keyword, abstractness, specialization and body members. `class` and
+  `association` are added to the nested-classifier keyword set inside a type body, so
+  `class Inner { ... }` nests as its siblings already did.
+
+  This is the reachable half of spec42's Gap 59. The other half -- a direction beside `end` -- is
+  unauthorable in the pinned grammar and is pinned as recovery instead; see the audit.
+
+- **`ref`, `subject`, `actor` and namespace-level `calc` reach the declaration surface their
+  production gives them.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap
+  53). **AST version 175 -> 176.**
+
+  `UsageDeclaration = Identification FeatureSpecializationPart?` and
+  `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` (SysML BNF 42/308), so every
+  usage may carry a short name. Four declarations refused theirs and reached recovery instead:
+
+  - `part_ref_usage` -- the `ReferenceUsage` parser for namespace and part-definition bodies --
+    went straight to the declared name, so `ref <rd> rd : T;` was reported as an unrecognized
+    declaration even though `connector::ref_decl`, which owns the same production in the
+    definition-body scopes, already read it. It also discarded the multiplicity and the
+    `ordered`/`nonunique` slots, which the same `FeatureSpecializationPart` admits.
+  - `subject`, `actor` in a requirement body, and `actor` in a use-case body all rejected
+    `<shortName>`. `SubjectDecl`, `RequirementActorDecl` and `ActorUsage` now carry `short_name`,
+    and the use-case actor's multiplicity -- parsed but never projected -- is visible.
+
+  `CalculationUsage` is a `BehaviorUsageElement` and therefore a legal `PackageMember`, but no
+  namespace scope dispatched it: `calc estimate [1];` fell through to the unimplemented
+  extended-library declaration. `PackageBodyElement::CalcUsage` dispatches it *after* `calc_def`,
+  which stays `def`-optional for the bare definitions the Systems Library authors, so this arm
+  catches only what that grammar refuses.
+
+- **`BasicDefinitionPrefix` keeps its authored span, and `variation` reaches the connection-like
+  definitions.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 58).
+  **AST version 174 -> 175.**
+
+  `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'` (SysML BNF 219)
+  is one slot with two alternatives. `PartDef`, `ExtendedDefinition`, `ConnectionDef`, `FlowDef`,
+  `AllocationDef` and `InterfaceDef` stored it as a spanless `Option<DefinitionPrefix>`; all six
+  now carry `Option<Node<DefinitionPrefix>>`, so a consumer can point at the keyword instead of
+  searching the source for it. The semantic projection shows the authored span alongside the
+  spelling.
+
+  - **`variation` was refused on every connection-like definition.**
+    `OccurrenceDefinitionPrefix` (SysML BNF 541) opens with `BasicDefinitionPrefix?`, so
+    `variation connection def V;` is legal, but it fell through to the unimplemented
+    extended-library declaration production. `connection`, `flow`, `allocation` and `interface`
+    definitions now accept it in the same slot as `abstract`, with the same span.
+  - **Three hand-rolled copies of the slot are now one.** `part_def` and
+    `extended_definition_inner` each re-spelled the `abstract`/`variation` alternation; both call
+    the shared parser, which is where the span is captured once.
+
+  `variation` remains refused on the definition kinds that still store this slot as a bare
+  `is_abstract` bool, because accepting it there would consume the keyword and drop it. That
+  narrowing, and the list of nodes it applies to, is recorded in the audit.
+
+- **`MultiplicityPart`'s ordering and uniqueness keywords are retained with their authored spans;
+  `unique` and `nonordered` stop being swallowed.** Audit and evidence:
+  `planning/spec42-upstream-gap-audit.md` (spec42 Gap 52). **AST version 173 -> 174.**
+
+  `MultiplicityPart` (SysML BNF 495, KerML BNF 639) spells two independent keyword slots after the
+  multiplicity range. Thirteen nodes modelled them as an `ordered: bool` + `nonunique: bool` pair;
+  all thirteen now carry one `multiplicity_modifiers: MultiplicityModifiers`, whose slots are
+  `Option<Node<MultiplicityOrdering>>` and `Option<Node<MultiplicityUniqueness>>`.
+
+  - **An authored keyword was consumed and recorded nowhere.** `unique` and `nonordered` -- the
+    explicit spellings of the two metamodel defaults -- were "recognized and consumed, but not
+    recorded", so `attribute a : Real[0..*] unique;` re-emitted as `attribute a : Real[0..*];`.
+    Both spellings now reach a field, so an authored default is distinguishable from omission and
+    the formatter reproduces the document it was given.
+  - **A boolean pair could not carry a span.** Presence is now the authored fact and each slot
+    keeps the keyword's exact span, so a consumer highlighting or reporting on `nonunique` no
+    longer has to find it in the source itself.
+  - **Emission imposed its own order on the source.** The two slots are independent, so
+    `ordered nonunique` and `nonunique ordered` are both legal; the emitter always wrote `ordered`
+    first. It now orders by the authored spans, and `nonunique ordered` survives a round trip.
+  - **Modifier keywords matched without a token boundary.** `attribute a : Real[0..*] orderedBy;`
+    consumed `ordered` and left `By` behind. Keywords now match on a token boundary.
+
+  `readonly` and SysML `variable`, requested by the same gap, are spelled by no production in the
+  2026-04 pin and occur nowhere in its corpus; they continue to reach recovery with a stable
+  diagnostic and an exact span, now pinned by
+  `tests/snapshots/spec42/multiplicity_modifier_slots.md`.
+
 - **`PortUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`, and `port def` stops
   claiming port usages.** Audit and evidence: `planning/port-usage-prefix-matrix.md`.
   **AST version 172 -> 173.**

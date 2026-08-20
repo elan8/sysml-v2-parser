@@ -116,9 +116,9 @@ fn every_owner_projects_the_same_ref_body() {
     // Guard against the assertion passing because the projection is a bare marker: it has to show
     // the members, or it cannot detect a difference in them.
     assert!(
-        first.contains("(doc)")
+        first.contains("(doc (name ")
             && first.contains("(comment (keyword ")
-            && first.contains("(textual-rep)")
+            && first.contains("(textual-rep (name ")
             && first.contains("(attribute-usage")
             && first.contains("(ref (name \"nested\")"),
         "the ref projection must show its members, got: {first}"

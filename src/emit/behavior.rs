@@ -3,8 +3,8 @@
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::emit_identification;
 use super::structure::{
-    self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_subsetting_clause,
-    emit_typing_clause,
+    self, emit_definition_prefix, emit_definition_prefix_value, emit_direction, emit_multiplicity,
+    emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
 };
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -45,12 +45,7 @@ pub(crate) fn emit_inout_decl(
     if let Some(multiplicity) = &decl.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if decl.ordered {
-        w.push_str(" ordered");
-    }
-    if decl.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &decl.multiplicity_modifiers);
     if !leading_redefinition {
         if let Some(redefines) = &decl.redefines {
             w.push_char(' ');
@@ -98,6 +93,7 @@ pub(crate) fn emit_action_def(
     def: &ActionDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -508,7 +504,7 @@ pub(crate) fn emit_perform(
     path: &str,
     perform: &Perform,
 ) -> Result<(), EmitError> {
-    emit_definition_prefix(w, perform.usage_prefix.as_ref());
+    emit_definition_prefix_value(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
     if let Some(action_reference) = perform.action_reference {
         w.push_qualified_reference(path, action_reference)?;
@@ -598,6 +594,7 @@ pub(crate) fn emit_state_def(
     def: &StateDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -1317,9 +1314,7 @@ pub(crate) fn emit_occurrence_def(
     def: &crate::ast::OccurrenceDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }

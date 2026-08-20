@@ -5,7 +5,8 @@ use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
+    AttributeBody, AttributeDef, AttributeUsage, DefinitionPrefix, MetadataKeywordUsage,
+    VariantUsage,
 };
 use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
@@ -20,8 +21,11 @@ pub struct RequirementDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("UserRequirement") for `requirement def Need :> UserRequirement`.
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract requirement def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `RequirementDefinition` (SysML BNF 1400) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: RequirementDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::OwningMembership`]. Genuine new grammar coverage (not just
@@ -136,6 +140,9 @@ impl PartialEq for PurposeMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
     pub name: String,
+    /// `Identification`'s `( '<' declaredShortName '>' )?`, reached through `UsageDeclaration`
+    /// (SysML BNF 42/308). See `crate::ast::AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>>`/`redefines` redefinition clause (`subject subj :>> Case::subj;`, or the type-less
     /// anonymous form `subject :>> vehicle = vehicle_large;`; spec42 Gap 35).
@@ -152,6 +159,8 @@ pub struct SubjectDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RequirementActorDecl {
     pub name: String,
+    /// `Identification`'s `( '<' declaredShortName '>' )?`. See [`SubjectDecl::short_name`].
+    pub short_name: Option<String>,
     pub type_name: QualifiedReferenceId,
     pub multiplicity: Option<Node<Multiplicity>>,
 }
@@ -255,10 +264,9 @@ pub struct SatisfyRequirementUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// `MultiplicityPart`'s `OwnedMultiplicity`, e.g. `[1]`.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `MultiplicityPart`'s `isOrdered ?= 'ordered'`.
-    pub ordered: bool,
-    /// `MultiplicityPart`'s `'nonunique'`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `FeatureSpecialization`'s `Subsettings` clause (`:>` / `subsets`).
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// `FeatureSpecialization`'s `Redefinitions` clause (`:>>` / `redefines`).
@@ -401,11 +409,9 @@ pub struct ItemUsage {
     /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`. Previously skipped and discarded.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart` (`Item[0..*] nonunique`, Systems Library
-    /// `Items.sysml`). See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
@@ -494,8 +500,11 @@ pub struct ConcernUsage {
 pub struct CaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract case def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `CaseDefinition` (SysML BNF 1499) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `case_def`.
     pub membership: Membership,
@@ -527,8 +536,11 @@ pub struct CaseUsage {
 pub struct AnalysisCaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract analysis def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `AnalysisCaseDefinition` (SysML BNF 1529) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual analysis def FuelEconomyAnalysis_1 :> FuelEconomyAnalysis;` (GH-90.1,
     /// `Individuals Examples/AnalysisIndividualExample.sysml:76`).
     pub is_individual: bool,
@@ -563,8 +575,11 @@ pub struct AnalysisCaseUsage {
 pub struct VerificationCaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract verification def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `VerificationCaseDefinition` (SysML BNF 1539) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `verification_case_def`.
     pub membership: Membership,
@@ -629,8 +644,11 @@ pub struct ActorDecl {
 pub struct UseCaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract use case def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `UseCaseDefinition` (SysML BNF 1560) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `use_case_def`.
     pub membership: Membership,
@@ -836,6 +854,10 @@ pub enum UseCaseDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorUsage {
     pub name: String,
+    /// `Identification`'s `( '<' declaredShortName '>' )?`. `ActorUsage : PartUsage =
+    /// 'actor' Usage` (SysML BNF 1512) reaches it through `UsageDeclaration`, so
+    /// `actor <a> operator : Person;` is legal; it previously reached recovery.
+    pub short_name: Option<String>,
     /// `None` for the bare untyped form `actor environment;` / `actor passenger [0..4];`
     /// (OMG spec Annex A; spec42 Gap 46).
     pub type_name: Option<QualifiedReferenceId>,

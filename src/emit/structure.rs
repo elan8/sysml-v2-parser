@@ -81,12 +81,7 @@ pub(crate) fn emit_part_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -104,12 +99,7 @@ pub(crate) fn emit_part_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some(value) = &usage.value {
         // Avoid double-emitting when subsets already carried `= expr`.
@@ -131,6 +121,7 @@ pub(crate) fn emit_attribute_def(
     def: &AttributeDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("attribute def ");
     if let Some(short) = &def.short_name {
         w.push_char('<');
@@ -144,12 +135,7 @@ pub(crate) fn emit_attribute_def(
     if let Some(multiplicity) = &def.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if def.ordered {
-        w.push_str(" ordered");
-    }
-    if def.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &def.multiplicity_modifiers);
     if let Some(value) = &def.value {
         emit_feature_value(w, value)?;
     }
@@ -211,12 +197,7 @@ pub(crate) fn emit_attribute_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -234,12 +215,7 @@ pub(crate) fn emit_attribute_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some(crosses) = &usage.crosses {
         emit_subsetting_clause(w, &crosses.value)?;
@@ -585,16 +561,13 @@ fn emit_attribute_body_element(
         AttributeBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
-        AttributeBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
-        }
+        AttributeBodyElement::KermlFeature(n) => super::view::emit_kerml_feature(w, path, &n.value),
         AttributeBodyElement::Invariant(n) => {
             super::view::emit_kerml_invariant_member(w, path, &n.value)
         }
         AttributeBodyElement::KermlConnector(n) => {
             super::view::emit_kerml_connector_member(w, path, &n.value)
         }
-        AttributeBodyElement::ClassDef(n) => emit_class_def(w, path, &n.value),
         AttributeBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
@@ -631,6 +604,7 @@ pub(crate) fn emit_port_def(
     def: &PortDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("port def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -675,12 +649,7 @@ pub(crate) fn emit_port_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
         if let Some(expr) = subset_value {
@@ -1001,7 +970,7 @@ pub(crate) fn emit_relationship_body_element_local(
             super::root::emit_annotating_member(w, path, member)
         }
         RelationshipBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
+            super::view::emit_kerml_feature(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
     }
@@ -1197,12 +1166,7 @@ pub(crate) fn emit_ref_decl(
     if let Some(multiplicity) = &decl.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if decl.ordered {
-        w.push_str(" ordered");
-    }
-    if decl.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &decl.multiplicity_modifiers);
     if let Some(redefines) = &decl.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -1322,13 +1286,25 @@ pub(crate) fn emit_ref_prefix(
     if is_derived {
         w.push_str("derived ");
     }
-    emit_definition_prefix(w, usage_prefix);
+    emit_definition_prefix_value(w, usage_prefix);
     if is_constant {
         w.push_str("constant ");
     }
 }
 
-pub(crate) fn emit_definition_prefix(w: &mut EmitWriter<'_>, prefix: Option<&DefinitionPrefix>) {
+pub(crate) fn emit_definition_prefix(
+    w: &mut EmitWriter<'_>,
+    prefix: Option<&Node<DefinitionPrefix>>,
+) {
+    emit_definition_prefix_value(w, prefix.map(|prefix| &prefix.value));
+}
+
+/// The same slot where it is stored without a node wrapper -- `RefPrefix`'s `variance` reached
+/// through the spanless `usage_prefix` fields that have not yet migrated onto it.
+pub(crate) fn emit_definition_prefix_value(
+    w: &mut EmitWriter<'_>,
+    prefix: Option<&DefinitionPrefix>,
+) {
     match prefix {
         Some(DefinitionPrefix::Abstract) => w.push_str("abstract "),
         Some(DefinitionPrefix::Variation) => w.push_str("variation "),
@@ -1452,6 +1428,33 @@ pub(crate) fn emit_multiplicity(
     Ok(())
 }
 
+/// Emit `MultiplicityPart`'s ordering and uniqueness keyword slots in the order the author
+/// wrote them.
+///
+/// The two slots are independent, so the grammar admits `ordered nonunique` and
+/// `nonunique ordered` alike. Ordering by the authored spans reproduces whichever was written
+/// instead of imposing this emitter's own field order on the source.
+pub(crate) fn emit_multiplicity_modifiers(
+    w: &mut EmitWriter<'_>,
+    modifiers: &crate::ast::MultiplicityModifiers,
+) {
+    let mut slots: [Option<(usize, &'static str)>; 2] = [
+        modifiers
+            .ordering
+            .as_ref()
+            .map(|slot| (slot.span.offset, slot.value.keyword())),
+        modifiers
+            .uniqueness
+            .as_ref()
+            .map(|slot| (slot.span.offset, slot.value.keyword())),
+    ];
+    slots.sort_by_key(|slot| slot.map(|(offset, _)| offset));
+    for (_, keyword) in slots.into_iter().flatten() {
+        w.push_char(' ');
+        w.push_str(keyword);
+    }
+}
+
 fn emit_bound(
     w: &mut EmitWriter<'_>,
     bound: &Option<Box<Node<crate::ast::Expression>>>,
@@ -1523,6 +1526,7 @@ pub(crate) fn emit_item_def(
     def: &crate::ast::ItemDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -1540,21 +1544,8 @@ pub(crate) fn emit_individual_def(
     def: &crate::ast::IndividualDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("individual def ");
-    emit_identification(w, &def.identification);
-    if let Some(spec) = &def.specializes {
-        emit_typing_clause(w, &spec.value)?;
-    }
-    emit_attribute_body(w, path, &def.body)
-}
-
-pub(crate) fn emit_class_def(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    def: &crate::ast::ClassDef,
-) -> Result<(), EmitError> {
-    emit_visibility(w, def.membership.visibility);
-    w.push_str("class def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
@@ -1628,6 +1619,8 @@ pub(crate) fn emit_metadata_def(
     def: &crate::ast::MetadataDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    // `MetadataDefinition` inlines `( isAbstract ?= 'abstract' )?` and has no `variation`
+    // alternative (SysML BNF 1652), so this is the one definition kind with a genuine bool here.
     if def.is_abstract {
         w.push_str("abstract ");
     }

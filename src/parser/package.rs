@@ -188,7 +188,7 @@ fn namespace_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDe
 /// Dedicated variants for package / namespace / import keep existing consumers stable; all other
 /// legal package-body members (e.g. `part def` at file root) become [`RootElement::Member`].
 pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
         map(import_, |import| RootElement::Import(Box::new(import))).parse(input)
@@ -239,6 +239,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ConstraintDef(_)
         | PackageBodyElement::ConstraintUsage(_)
         | PackageBodyElement::CalcDef(_)
+        | PackageBodyElement::CalcUsage(_)
         | PackageBodyElement::ViewDef(_)
         | PackageBodyElement::ViewpointDef(_)
         | PackageBodyElement::RenderingDef(_)
@@ -272,7 +273,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::KermlConnector(_)
         | PackageBodyElement::KermlRelationship(_)
         | PackageBodyElement::KermlInvariant(_)
-        | PackageBodyElement::KermlFeatureMember(_)
+        | PackageBodyElement::KermlFeature(_)
         | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
@@ -288,7 +289,6 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::AssertConstraint(_)
         | PackageBodyElement::PerformUsage(_)
         | PackageBodyElement::BindingConnectorUsage(_)
-        | PackageBodyElement::ClassDef(_)
         | PackageBodyElement::Succession(_)
         | PackageBodyElement::ExhibitState(_)
         | PackageBodyElement::IncludeUseCase(_)
@@ -1069,36 +1069,6 @@ fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
     ))
 }
 
-/// KerML `class` classifier definition: `class` Identification (`:>`|`specializes`) type? body.
-/// Mirrors `individual_def` exactly (same `def`-optional, `no_abstract`, captured-visibility
-/// shape) -- see `crate::ast::ClassDef`'s doc comment.
-pub(crate) fn class_def(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ClassDef>> {
-    let start = input;
-    let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
-        input,
-        crate::parser::definition_prefix::DefinitionPrefixOptions::new(b"class")
-            .no_abstract()
-            .with_captured_visibility(),
-    )?;
-    let (input, body) = crate::parser::attribute::attribute_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::ClassDef {
-                identification: prefix.identification,
-                specializes: prefix.specializes,
-                body,
-                membership: crate::ast::Membership::owning(
-                    prefix.visibility,
-                    prefix.visibility_span,
-                ),
-            },
-        ),
-    ))
-}
-
 fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -1116,7 +1086,7 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
 }
 
 // The bare-`feature` package member (`feature x : Integer;`, `feature f { expr s { ... } }`)
-// now parses through `kerml_feature_member` -- one typed representation for every
+// now parses through `kerml_feature` -- one typed representation for every
 // `feature`-keyword-led member across package and type-body scopes (spec42 gap 14). The
 // previous `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
 // `FeatureBodyElement::Expr`/`ExprMember` body machinery were removed with it; `expr s { ... }`
@@ -1173,7 +1143,9 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // See `crate::parser::body::parse_structured_brace_members_inner`: a bare `/* ... */` at
+        // a member boundary is the `Comment` production, not trivia.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().is_empty() {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -1774,16 +1746,6 @@ fn try_package_body_behavior<'a>(
         individual_def,
         PackageBodyElement::IndividualDef
     );
-    // KerML `class` classifier definition (e.g. `class B :> A { }`), previously only reachable
-    // through the opaque `classifier_decl` fallback -- see `class_def`'s doc comment.
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Class,
-        class_def,
-        PackageBodyElement::ClassDef
-    );
     // KerML bare `feature` usage declaration (e.g. `feature x;`, `feature x : Type;`, `feature x
     // :> Target;`), previously only reachable through the opaque `kerml_feature_decl` fallback --
     // see `feature_usage_member`'s doc comment.
@@ -1792,8 +1754,8 @@ fn try_package_body_behavior<'a>(
         start,
         starter,
         Feature,
-        crate::parser::constraint::kerml_feature_member,
-        |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
+        crate::parser::constraint::kerml_feature,
+        |n| { PackageBodyElement::KermlFeature(Box::new(n)) }
     );
     try_package_body_dispatch!(
         input,
@@ -1818,6 +1780,19 @@ fn try_package_body_behavior<'a>(
         Calculation,
         calc_def,
         PackageBodyElement::CalcDef
+    );
+    // After `calc_def`, never before it: `calc_def` is deliberately `def`-optional here (see
+    // `definition_prefix`'s module doc) because the Systems Library authors bare `calc Name : T;`
+    // definitions at namespace level. This arm catches only what that grammar refuses -- a
+    // `CalculationUsage`'s multiplicity, `ordered`/`nonunique` and value clauses -- which
+    // previously fell through to the unimplemented extended-library declaration.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Calculation,
+        crate::parser::constraint::calc_usage,
+        PackageBodyElement::CalcUsage
     );
     // Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
     // process;`, OMG spec Annex `4a-Fundamental Activities.sysml`-style shorthand form).
@@ -2045,8 +2020,8 @@ fn try_package_body_view<'a>(
     try_package_body_dispatch!(
         input,
         start,
-        crate::parser::constraint::kerml_feature_member,
-        |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
+        crate::parser::constraint::kerml_feature,
+        |n| { PackageBodyElement::KermlFeature(Box::new(n)) }
     );
     // Bare forward declarations for the keywords the structured productions above do not
     // cover (`inv x;`, `occurrence o;`, `succession s;`, ...).
@@ -2172,7 +2147,22 @@ fn package_bare_binding_inner(
 pub(crate) fn package_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Box<Node<PackageBodyElement>>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // The keyword-less `Comment` spelling, ahead of the starter lookup: `/*` selects no
+    // production keyword, so the lookup would classify the member as unrecognized.
+    if input.fragment().starts_with(b"/*") {
+        let start = input;
+        if let Ok((rest, member)) = crate::parser::requirement::bare_comment(input) {
+            return Ok((
+                rest,
+                Box::new(node_from_to(
+                    start,
+                    rest,
+                    PackageBodyElement::Annotating(crate::ast::AnnotatingMember::Comment(member)),
+                )),
+            ));
+        }
+    }
     let start = input;
     // One lookup selects the production this element can be: every alternative belonging to a
     // different production is then skipped rather than parsed and rolled back. A prefix-only or
@@ -2362,8 +2352,12 @@ pub(crate) fn package_body_element(
 
 /// Root: (package | namespace)*
 pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespace> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, elements) = many0(preceded(ws_and_comments, root_element)).parse(input)?;
+    // `ws_and_notes` at every member boundary, matching the editor entry point's own loop: a bare
+    // `/* ... */` between root members is the `Comment` production, and skipping it here would
+    // make strict and editor parsing disagree about the document.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    let (input, elements) =
+        many0(preceded(crate::parser::lex::ws_and_notes, root_element)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     Ok((input, RootNamespace { elements }))
 }

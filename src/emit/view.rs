@@ -3,7 +3,10 @@
 use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::emit_identification;
-use super::structure::{emit_multiplicity, emit_subsetting_clause, emit_typing_clause};
+use super::structure::{
+    emit_definition_prefix, emit_multiplicity, emit_multiplicity_modifiers, emit_subsetting_clause,
+    emit_typing_clause,
+};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -17,9 +20,7 @@ pub(crate) fn emit_constraint_def(
     def: &ConstraintDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("constraint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -143,6 +144,7 @@ pub(crate) fn emit_calc_def(
     def: &CalcDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("calc def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -249,8 +251,7 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
-        CalcDefBodyElement::TypedParameter(p) => emit_typed_parameter(w, path, &p.value),
-        CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature_member(w, path, &f.value),
+        CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature(w, path, &f.value),
         CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),
         CalcDefBodyElement::Connector(c) => emit_kerml_connector_member(w, path, &c.value),
         CalcDefBodyElement::AssertConstraint(a) => emit_assert_constraint(w, path, &a.value),
@@ -259,7 +260,6 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::Binding(b) => emit_kerml_binding_member(w, path, &b.value),
         CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
-        CalcDefBodyElement::EndMember(e) => emit_kerml_end_member(w, path, &e.value),
         CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
         CalcDefBodyElement::AttributeUsage(a) => {
             super::structure::emit_attribute_usage(w, path, &a.value)
@@ -278,39 +278,111 @@ fn emit_calc_body_element(
     }
 }
 
-pub(crate) fn emit_kerml_feature_member(
+/// `BasicFeaturePrefix` (KerML BNF 577) as authored keywords, in the production's order.
+///
+/// Appends rather than writing, so callers that must not emit a trailing space can join.
+fn push_basic_feature_prefix(head: &mut Vec<&str>, prefix: &crate::ast::BasicFeaturePrefix) {
+    if let Some(direction) = &prefix.direction {
+        head.push(match direction.value {
+            crate::ast::InOut::In => "in",
+            crate::ast::InOut::Out => "out",
+            crate::ast::InOut::InOut => "inout",
+        });
+    }
+    if prefix.derived_span.is_some() {
+        head.push("derived");
+    }
+    if prefix.abstract_span.is_some() {
+        head.push("abstract");
+    }
+    if let Some(portioning) = &prefix.portioning {
+        head.push(portioning.value.keyword());
+    }
+    if let Some(variability) = &prefix.variability {
+        head.push(variability.value.keyword());
+    }
+}
+
+/// `OwnedCrossFeature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), the cross feature
+/// between `end` and the feature keyword. Ends with a trailing space so the keyword follows.
+fn emit_owned_cross_feature(
+    w: &mut EmitWriter<'_>,
+    cross: &crate::ast::OwnedCrossFeature,
+) -> Result<(), EmitError> {
+    let mut head: Vec<&str> = Vec::new();
+    push_basic_feature_prefix(&mut head, &cross.prefix);
+    let name = format_name(&cross.name);
+    if !cross.name.is_empty() {
+        head.push(&name);
+    }
+    if !head.is_empty() {
+        w.push_str(&head.join(" "));
+        w.push_char(' ');
+    }
+    if let Some(multiplicity) = &cross.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    emit_multiplicity_modifiers(w, &cross.multiplicity_modifiers);
+    if let Some(subsets) = &cross.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_feature(
     w: &mut EmitWriter<'_>,
     path: &str,
-    feature: &crate::ast::KermlFeatureMember,
+    feature: &crate::ast::KermlFeature,
 ) -> Result<(), EmitError> {
     emit_visibility(w, feature.membership.visibility);
     let mut head: Vec<&str> = Vec::new();
     if feature.is_member {
         head.push("member");
     }
-    if feature.is_derived {
-        head.push("derived");
+    // `FeaturePrefix` (KerML BNF 584), in the production's own order. Keywords go through `head`
+    // rather than straight to the writer so an unkeyworded member (`portion redefines
+    // portionOfLife = ...;`) cannot leave a trailing space before its `redefines` clause.
+    let cross = match &feature.prefix.head {
+        crate::ast::FeaturePrefixHead::End { prefix, cross } => {
+            if prefix.constant_span.is_some() {
+                head.push("const");
+            }
+            head.push("end");
+            cross.as_ref()
+        }
+        crate::ast::FeaturePrefixHead::Basic(basic) => {
+            push_basic_feature_prefix(&mut head, basic);
+            None
+        }
+    };
+    // The owned cross feature is a declaration, not a keyword, so the prefix words flush first.
+    if let Some(cross) = cross {
+        w.push_str(&head.join(" "));
+        w.push_char(' ');
+        head.clear();
+        emit_owned_cross_feature(w, &cross.value)?;
     }
-    if feature.is_abstract {
-        head.push("abstract");
+    // `( ownedRelationship += PrefixMetadataMember )*` trails the choice (KerML BNF 584). Each is
+    // a reference, not a keyword, so these flush too.
+    if !feature.prefix.metadata_keywords.is_empty() {
+        if !head.is_empty() {
+            w.push_str(&head.join(" "));
+            w.push_char(' ');
+            head.clear();
+        }
+        for (index, keyword) in feature.prefix.metadata_keywords.iter().enumerate() {
+            w.push_char('#');
+            w.push_qualified_reference(
+                &format!("{path}/prefix/metadata[{index}]"),
+                keyword.value.annotation,
+            )?;
+            w.push_char(' ');
+        }
     }
-    if feature.is_composite {
-        head.push("composite");
-    }
-    if feature.is_portion {
-        head.push("portion");
-    }
-    if feature.is_var {
-        head.push("var");
-    }
-    if feature.is_const {
-        head.push("const");
-    }
-    if feature.is_end {
-        head.push("end");
-    }
-    if feature.has_kind_keyword {
-        head.push(feature.kind.as_str());
+    if let Some(kind) = &feature.kind {
+        head.push(kind.value.as_str());
     }
     if feature.is_all {
         head.push("all");
@@ -326,12 +398,7 @@ pub(crate) fn emit_kerml_feature_member(
     if let Some(multiplicity) = &feature.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if feature.ordered {
-        w.push_str(" ordered");
-    }
-    if feature.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
     if let Some(redefines) = &feature.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -487,67 +554,6 @@ pub(crate) fn emit_kerml_succession_member(
     Ok(())
 }
 
-pub(crate) fn emit_kerml_end_member(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    end: &crate::ast::KermlEndMember,
-) -> Result<(), EmitError> {
-    emit_visibility(w, end.membership.visibility);
-    if end.is_const {
-        w.push_str("const ");
-    }
-    w.push_str("end ");
-    if !end.name.is_empty() {
-        w.push_str(&format_name(&end.name));
-        w.push_char(' ');
-    }
-    if let Some(multiplicity) = &end.multiplicity {
-        emit_multiplicity(w, &multiplicity.value)?;
-        w.push_char(' ');
-    }
-    if let Some(subsets) = &end.subsets {
-        super::structure::emit_subsetting_clause(w, &subsets.value)?;
-        w.push_char(' ');
-    }
-    emit_kerml_feature_member(w, path, &end.feature.value)
-}
-
-pub(crate) fn emit_typed_parameter(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    param: &crate::ast::TypedParameterMember,
-) -> Result<(), EmitError> {
-    super::structure::emit_direction(w, param.direction);
-    if param.is_abstract {
-        w.push_str("abstract ");
-    }
-    w.push_str(param.kind.as_str());
-    if !param.name.is_empty() {
-        w.push_char(' ');
-        w.push_str(&format_name(&param.name));
-    }
-    if let Some(ty) = param.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), ty)?;
-    }
-    if let Some(multiplicity) = &param.multiplicity {
-        emit_multiplicity(w, &multiplicity.value)?;
-    }
-    if param.ordered {
-        w.push_str(" ordered");
-    }
-    if param.nonunique {
-        w.push_str(" nonunique");
-    }
-    if let Some(redefines) = &param.redefines {
-        super::structure::emit_subsetting_clause(w, &redefines.value)?;
-    }
-    if let Some(value) = &param.value {
-        emit_feature_value(w, value)?;
-    }
-    emit_calc_body(w, path, &param.body)
-}
-
 pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
     w.push_str("return ");
     if ret.is_redefine {
@@ -576,12 +582,7 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
     if let Some(multiplicity) = &ret.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if ret.ordered {
-        w.push_str(" ordered");
-    }
-    if ret.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &ret.multiplicity_modifiers);
     if let Some(value) = &ret.value {
         emit_feature_value(w, value)?;
     }
@@ -626,9 +627,7 @@ pub(crate) fn emit_view_def(
     def: &crate::ast::ViewDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("view def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -707,12 +706,7 @@ pub(crate) fn emit_view_usage(
         if let Some(mult) = &usage.multiplicity {
             super::structure::emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     } else {
         if let Some(ty) = &usage.type_name {
             w.push_str(" : ");
@@ -721,12 +715,7 @@ pub(crate) fn emit_view_usage(
         if let Some(mult) = &usage.multiplicity {
             super::structure::emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
         if let Some(redefines) = &usage.redefines {
             emit_typing_clause_as_subset(w, &redefines.value)?;
         }
@@ -851,6 +840,7 @@ pub(crate) fn emit_viewpoint_def(
     def: &crate::ast::ViewpointDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("viewpoint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -886,9 +876,7 @@ pub(crate) fn emit_rendering_def(
     def: &crate::ast::RenderingDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("rendering def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -954,12 +942,7 @@ pub(crate) fn emit_rendering_usage(
     if let Some(multiplicity) = &usage.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }

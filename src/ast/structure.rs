@@ -20,7 +20,7 @@ use crate::ast::QualifiedReferenceId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartDef {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix).
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// Whether this is an `individual part def`.
     pub is_individual: bool,
     pub identification: Identification,
@@ -53,7 +53,7 @@ pub struct ExtendedDefinition {
     pub prefix_keywords: Vec<Node<MetadataKeywordUsage>>,
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
     /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// Whether the `def` keyword was authored: `true` for the `ExtendedDefinition` form
     /// (`#situation def Failure;`), `false` for the bare extended-usage shorthand
     /// (`#clouddd ArrowheadCore { ... }`, spec42 Gap 39).
@@ -283,6 +283,11 @@ pub struct ExhibitState {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `AttributeDefinition` (SysML BNF 510) reaches it through
+    /// `DefinitionPrefix` (SysML BNF 225).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub name: String,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
     pub short_name: Option<String>,
@@ -300,11 +305,9 @@ pub struct AttributeDef {
     pub typing_span: Option<Span>,
     /// Span of the default/binding expression value, when present.
     pub value_span: Option<Span>,
-    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6). Legal on a feature
-    /// declaration generally; previously consumed and discarded by `ignored_feature_modifiers`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
     /// [`crate::ast::MembershipKind::OwningMembership`] for a `*Def` -- a nested attribute definition becomes
     /// a new named member of its owning namespace, not a feature of it. `visibility` captures an
@@ -324,8 +327,7 @@ impl PartialEq for AttributeDef {
             && self.multiplicity == other.multiplicity
             && self.value == other.value
             && self.body == other.body
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.membership == other.membership
     }
 }
@@ -375,17 +377,14 @@ pub enum AttributeBodyElement {
     /// KerML feature member (`feature x : Natural[1];`, `member feature ...`, `composite
     /// feature ...`, `portion feature all ...`, `var x : Integer;`, `step s : S;`, `expr e
     /// { ... }`) nested in a KerML `class`/`struct`/`datatype` body, which shares this body
-    /// grammar via `class_def`; see [`crate::ast::KermlFeatureMember`].
-    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// grammar via `class_def`; see [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     /// KerML invariant member (`inv checkIt { ... }`) nested in a KerML type body; see
     /// [`crate::ast::KermlInvariantMember`].
     Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
     /// KerML connector member (`connector a ::> a.x to b;`) nested in a KerML type body; see
     /// [`crate::ast::KermlConnectorMember`].
     KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),
-    /// Nested KerML `class` definition (`class Outer { class Inner { ... } }`); see
-    /// [`ClassDef`].
-    ClassDef(Box<Node<ClassDef>>),
     /// Nested KerML classifier declaration for the rest of the keyword family (`struct`,
     /// `classifier`, `datatype`, `assoc`, `behavior`, ...; spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].
@@ -412,6 +411,11 @@ pub enum AttributeBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ItemDefinition` (SysML BNF 611) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual item def John :> Person { ... }` (GH-90.1, `Individuals Examples/
     /// JohnIndividualExample.sysml:19`).
     pub is_individual: bool,
@@ -429,19 +433,11 @@ pub struct ItemDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndividualDef {
-    pub identification: Identification,
-    pub specializes: Option<Node<TypingRelationship>>,
-    pub body: AttributeBody,
-    pub membership: Membership,
-}
-
-/// KerML `class` classifier definition: `class` Identification (`:>` | `specializes`) type? body,
-/// e.g. `class B :> A { }`. Mirrors `IndividualDef` (same `def`-optional, `:>`-specialized,
-/// `AttributeBody`-bodied shape) -- previously only reachable through the opaque
-/// `classifier_decl` KerML fallback alongside `classifier`/`struct`/`structure`/`subclassifier`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ClassDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `IndividualDefinition` (SysML BNF 551;
+    /// Pilot `SysML.xtext` 817) spells it directly, ahead of the mandatory `individual`.
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
@@ -483,8 +479,9 @@ pub struct PartUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
-    pub ordered: bool,
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` feature and value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
@@ -511,8 +508,7 @@ impl PartialEq for PartUsage {
             && self.short_name == other.short_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.value == other.value
@@ -929,10 +925,9 @@ pub struct AttributeUsage {
     pub direction: Option<InOut>,
     /// Structured multiplicity range from `MultiplicityPart` (e.g. `[0..1]`), when present.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `derived` keyword from `RefPrefix` (BNF §8.2.2.6.2) -- usage-only, no `Definition`
     /// equivalent (`AttributeDefinition` uses `DefinitionPrefix`, which has no `derived`).
     pub is_derived: bool,
@@ -974,8 +969,7 @@ impl PartialEq for AttributeUsage {
             && self.body == other.body
             && self.direction == other.direction
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.is_derived == other.is_derived
             && self.is_constant == other.is_constant
             && self.is_end == other.is_end
@@ -1063,6 +1057,11 @@ pub enum FeatureBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `PortDefinition` (SysML BNF 628) reaches it through
+    /// `DefinitionPrefix` (SysML BNF 225).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
     pub specializes: Option<Node<TypingRelationship>>,
@@ -1129,14 +1128,9 @@ pub struct PortUsage {
     /// Structured, multi-target typing clause after `:` / `typed by` / `defined by`.
     pub typing: Option<Node<TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `MultiplicityPart`'s `isOrdered ?= 'ordered'` (BNF §8.2.2.6.2), e.g. `port ports :
-    /// Port[0..*] nonunique ordered;`. Reachable through `Usage -> UsageDeclaration ->
-    /// FeatureSpecializationPart -> MultiplicityPart`, like `PartUsage::ordered`.
-    pub ordered: bool,
-    /// `MultiplicityPart`'s `isNonunique ?= 'nonunique'`; see [`PortUsage::ordered`]. Written on
-    /// the keyword-less package-scope declarations of `Systems Library/Ports.sysml`, which the
-    /// `def`-optional port-definition parser used to claim and discard.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Subsets feature and optional value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -1170,8 +1164,7 @@ impl PartialEq for PortUsage {
             && self.short_name == other.short_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.references == other.references
@@ -1242,7 +1235,7 @@ pub struct ConnectStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterfaceDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
@@ -1414,10 +1407,9 @@ pub struct RefDecl {
     /// otherParticipants : Port [1..*] nonunique :> ...`, Systems Library `Interfaces.sysml`).
     /// Previously parsed and discarded by `connector::ref_decl`.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`. See `multiplicity`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `multiplicity`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
@@ -1443,8 +1435,7 @@ impl PartialEq for RefDecl {
             && self.redefines == other.redefines
             && self.subsets == other.subsets
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.value == other.value
             && self.body == other.body
             && self.membership == other.membership
@@ -1527,8 +1518,8 @@ pub enum RelationshipBodyElement {
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     /// Owned feature member (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s
-    /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeatureMember`].
-    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     Error(Node<ParseErrorNode>),
 }
 
@@ -1547,7 +1538,7 @@ pub enum DerivationConnectionRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual connection def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix
     /// `isIndividual`, GH-90.1), mirroring `ActionDef::is_individual`.
     pub is_individual: bool,
@@ -1688,7 +1679,11 @@ pub struct EnumeratedValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `OccurrenceDefinition` (SysML BNF 548) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual occurrence def IO2 { ... }` (GH-90.1, `Simple Tests/IndividualTest.sysml:3`).
     pub is_individual: bool,
     pub identification: Identification,

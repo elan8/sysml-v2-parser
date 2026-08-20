@@ -5,7 +5,7 @@ use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
-use super::structure::MetadataKeywordUsage;
+use super::structure::{DefinitionPrefix, MetadataKeywordUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
 };
@@ -15,17 +15,11 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintDef {
-    /// `abstract` from `OccurrenceDefinitionPrefix -> BasicDefinitionPrefix` (SysML BNF 1378,
-    /// 541). The parser has always consumed it and had nowhere to put it, so `abstract
-    /// constraint def ConstraintCheck :> BooleanEvaluation` (Systems Library `Constraints.sysml`)
-    /// came back out of a round trip as a plain `constraint def`.
-    ///
-    /// A `bool` rather than the two-alternative `DefinitionPrefix` enum because the shared
-    /// `parse_definition_prefix` helper -- which every definition family in this crate routes
-    /// through -- recognizes only `abstract`; `variation` on a *definition* prefix is part of the
-    /// still-unbuilt `OccurrenceDefinitionPrefix` component, not of this slice. See
-    /// `planning/constraint-usage-prefix-matrix.md` §5.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ConstraintDefinition` (SysML BNF 1378) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConstraintDefBody,
@@ -125,6 +119,11 @@ pub enum ConstraintBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `CalculationDefinition` (SysML BNF 1351) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     /// Supertype(s) after `:>`, e.g. `Some(..)` for `calc def X :> Y { }`. Mirrors
     /// `PartDef::specializes`/`ActionDef::specializes`.
@@ -190,14 +189,10 @@ pub enum CalcDefBodyElement {
     /// element enums is Phase-4 work; this variant does not make that debt worse.
     ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
     InOutDecl(Box<Node<InOutDecl>>),
-    /// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
-    /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
-    /// Libraries).
-    TypedParameter(Box<Node<crate::ast::TypedParameterMember>>),
     /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
     /// s: Occurrence subsets a inverse of b { ... }`); see
-    /// [`crate::ast::KermlFeatureMember`].
-    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     /// KerML invariant member (`inv name? { expr }`); see
     /// [`crate::ast::KermlInvariantMember`].
     Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
@@ -207,8 +202,6 @@ pub enum CalcDefBodyElement {
     Binding(Box<Node<crate::ast::KermlBindingMember>>),
     /// KerML succession member; see [`crate::ast::KermlSuccessionMember`].
     Succession(Box<Node<crate::ast::KermlSuccessionMember>>),
-    /// KerML end member with an owned cross feature; see [`crate::ast::KermlEndMember`].
-    EndMember(Box<Node<crate::ast::KermlEndMember>>),
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
@@ -257,11 +250,9 @@ pub struct ReturnDecl {
     /// Multiplicity clause after the type, e.g. `return : Real[1] = x;` (Kernel Function
     /// Library). Previously unparseable.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`return : Anything[0..*] ordered nonunique;`,
-    /// Kernel Function Library `BaseFunctions.kerml`).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Trailing redefinition targets; repeated `redefines` clauses merge their targets
     /// (`return resultValues : Anything [*] nonunique redefines result redefines values;`,
     /// Kernel Semantic Library `FeatureReferencingPerformances.kerml`).
@@ -305,10 +296,11 @@ impl ReturnKindKeyword {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewDef {
     pub identification: Identification,
-    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
-    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
-    /// nowhere to put it, so emission dropped the keyword.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ViewDefinition` (SysML BNF 1580) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
     pub membership: Membership,
@@ -390,6 +382,11 @@ pub enum RenderingUsageBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointDef {
     pub identification: Identification,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ViewpointDefinition` (SysML BNF 1632) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RequirementDefBody,
     pub membership: Membership,
@@ -400,10 +397,11 @@ pub struct ViewpointDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingDef {
     pub identification: Identification,
-    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
-    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
-    /// nowhere to put it, so emission dropped the keyword.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `RenderingDefinition` (SysML BNF 1642) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
     pub membership: Membership,
@@ -454,11 +452,9 @@ pub struct ViewUsage {
     /// columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`). Previously captured
     /// only by the anonymous redefinition form and discarded on the named path.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`view columnView[0..*] ordered { ... }`).
-    /// Previously skipped and discarded.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     pub body: ViewBody,
     pub membership: Membership,
 }
@@ -532,12 +528,9 @@ pub struct RenderingUsage {
     /// GraphicalRendering[1]` (Systems Library `Views.sysml`). Previously parsed and discarded
     /// inside the shared usage header.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`abstract rendering renderings :
-    /// Rendering[0..*] nonunique :> parts`, Systems Library `Views.sysml`). Previously skipped
-    /// inside the shared usage header.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `:>` subsets clause, e.g. `: GraphicalRendering[1] :> renderings`. Previously parsed and
     /// discarded.
     pub subsets: Option<Node<SubsettingRelationship>>,

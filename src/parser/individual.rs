@@ -14,7 +14,6 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
         input,
         DefinitionPrefixOptions::new(b"individual")
             .def_required()
-            .no_abstract()
             .with_captured_visibility(),
     )?;
     let (input, body) = attribute_body(input)?;
@@ -24,6 +23,7 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
             start,
             input,
             IndividualDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
