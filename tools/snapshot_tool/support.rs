@@ -393,7 +393,9 @@ fn comparison_projection(
 /// A pin that is no longer *needed* is as much a defect as a missing one: it claims debt the
 /// formatter has already paid off, and — because a stale fingerprint is indistinguishable from a
 /// repaired path — it hides whether the exemption is still doing anything.
-/// [`every_pinned_debt_entry_is_live_and_invalidated_by_change`] checks every entry both ways.
+/// The `every_pinned_debt_entry_is_live_and_invalidated_by_change` test below checks every entry
+/// both ways. It is not an intra-doc link: it lives in this file's `#[cfg(test)]` module, which
+/// rustdoc cannot resolve from a non-test build.
 const CANONICAL_OUTPUT_DEBT: &[(&str, u64)] = &[
     // Containment references change semantic shape after emission.
     (

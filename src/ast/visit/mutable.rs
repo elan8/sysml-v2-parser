@@ -13,7 +13,7 @@ use crate::ast::*;
 
 ast_traversal!(
     /// Mutably borrowing visitor over every AST node reachable from
-    /// [`RootNamespace`](crate::ast::RootNamespace).
+    /// [`RootNamespace`].
     ///
     /// Mirrors [`Visitor`](super::Visitor) method for method; only the borrow is different.
     VisitorMut,
