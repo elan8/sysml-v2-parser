@@ -2061,9 +2061,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Succession(_member) => {
                             self.write_marker(&mut first, "succession")?;
                         }
-                        super::CalcDefBodyElement::EndMember(_member) => {
-                            self.write_marker(&mut first, "end-member")?;
-                        }
                         super::CalcDefBodyElement::Import(_member) => {
                             self.write_marker(&mut first, "import")?;
                         }

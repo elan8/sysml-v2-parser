@@ -938,66 +938,6 @@ fn kerml_succession_member_inner(
 /// redefines targetOccurrence;`, Kernel Semantic Library `Occurrences.kerml`). Plain
 /// `end feature ...` stays on [`kerml_feature_member`] (its name parse fails on `feature`
 /// here, so dispatch order tries that first).
-pub(crate) fn kerml_end_member(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlEndMember>> {
-    crate::parser::span::reference_transaction(input, kerml_end_member_inner)
-}
-
-fn kerml_end_member_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlEndMember>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    // `const end [1] feature a;` (KerML `associations` fixture; spec42 Gap 36).
-    let (input, is_const) = opt(preceded(tag(&b"const"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"end"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    // The end name is optional: `end [1] feature transferSource references source;`
-    // (`Transfers.kerml`).
-    let (input, name_str) = if starts_with_keyword(input.fragment(), b"feature")
-        || input.fragment().starts_with(b"[")
-    {
-        (input, String::new())
-    } else {
-        let (input, n) = name(input)?;
-        (input, n)
-    };
-    let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::multiplicity_node,
-    ))
-    .parse(input)?;
-    let (input, subsets) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
-    let subsets = subsets.map(|(target, _value)| target);
-    // The owned cross feature, starting at its `feature` keyword.
-    let (peek, _) = ws_and_comments(input)?;
-    if !starts_with_keyword(peek.fragment(), b"feature") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (input, feature) = kerml_feature_member(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::KermlEndMember {
-                is_const: is_const.is_some(),
-                name: name_str,
-                multiplicity,
-                subsets,
-                feature: Box::new(feature),
-                membership: Membership::feature(visibility, visibility_span),
-            },
-        ),
-    ))
-}
-
 /// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
 /// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
 /// else 0;`, `private thisClock : Clock :>> self;` (Kernel Semantic Library
@@ -1118,6 +1058,81 @@ fn feature_kind_keyword(
     (input, None)
 }
 
+/// `OwnedCrossFeature : Feature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), carried
+/// by `OwnedCrossFeatureMember` (592) between `end` and the feature's own kind keyword:
+/// `end guardedLink [0..1] feature constrainedHBLink: HappensBefore;`
+/// (`Kernel Semantic Library/TransitionPerformances.kerml:61`).
+///
+/// Fails -- so the caller keeps its input -- unless a kind keyword actually follows. That check is
+/// the whole disambiguation, and it is forced by `Feature` (562) having a *keyword-less* second
+/// alternative: `end x;` is `EndFeaturePrefix FeatureDeclaration`, a feature named `x` with no
+/// cross, while `end x feature y;` is `FeaturePrefix 'feature' FeatureDeclaration` with `x` as the
+/// cross. Only the trailing keyword tells them apart. Callers wrap this in
+/// [`crate::parser::span::reference_transaction`] so a refused attempt rolls its arena entries
+/// back.
+fn owned_cross_feature(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::OwnedCrossFeature>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let (input, prefix) = crate::parser::feature_prefix::basic_feature_prefix(input);
+    // `FeatureIdentification` is optional here: `end [1] feature transferSource references
+    // source;` (`Transfers.kerml`) crosses a multiplicity with no name.
+    let (input, name_str) = if input.fragment().starts_with(b"[") {
+        (input, String::new())
+    } else {
+        let (input, parsed) = name(input)?;
+        (input, parsed)
+    };
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
+    if name_str.is_empty()
+        && multiplicity.is_none()
+        && subsets.is_none()
+        && !prefix.is_authored()
+        && !multiplicity_modifiers.is_authored()
+    {
+        // Nothing stands between `end` and the keyword, so there is no cross feature to own.
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // The cross feature ends where the owning feature's kind keyword begins, so the trivia between
+    // them is consumed here: every slot parser downstream takes trivia-free input.
+    let (rest, _) = ws_and_comments(input)?;
+    if !starts_with_any_keyword(
+        rest.fragment(),
+        &[&b"feature"[..], b"step", b"expr", b"bool"],
+    ) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((
+        rest,
+        node_from_to(
+            start,
+            input,
+            crate::ast::OwnedCrossFeature {
+                prefix,
+                name: name_str,
+                multiplicity,
+                multiplicity_modifiers,
+                subsets,
+            },
+        ),
+    ))
+}
+
 pub(crate) fn kerml_feature_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
@@ -1134,7 +1149,20 @@ fn kerml_feature_member_inner(
     // `FeaturePrefix` (KerML BNF 584). `member` is not part of it -- `TypeFeatureMember` (523)
     // puts that keyword on the membership, ahead of the whole prefix.
     let (input, _) = ws_and_comments(input)?;
-    let (input, prefix) = crate::parser::feature_prefix::feature_prefix(input);
+    let (input, mut prefix) = crate::parser::feature_prefix::feature_prefix(input);
+    // `OwnedCrossFeatureMember` (592) hangs off the `end` alternative only, and needs the
+    // declaration parsers this scope already has, so the choice is filled in here.
+    let input = if let crate::ast::FeaturePrefixHead::End { cross, .. } = &mut prefix.head {
+        match crate::parser::span::reference_transaction(input, owned_cross_feature) {
+            Ok((rest, parsed)) => {
+                *cross = Some(Box::new(parsed));
+                rest
+            }
+            Err(_) => input,
+        }
+    } else {
+        input
+    };
     let had_prefix = is_member.is_some() || prefix.is_authored();
     // The kind keyword is optional when a prefix already marks this as a feature member:
     // `portion redefines portionOfLife = (that as Occurrence).portionOfLife;`
@@ -1456,17 +1484,6 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     {
         map(kerml_feature_member, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
-        })
-        .parse(input)?
-    } else if starts_with_keyword(after_visibility, b"end")
-        // `const end [1] feature a;` / `const end feature b;` (KerML `associations` fixture;
-        // spec42 Gap 36): `const` prefixes the end/feature member, so it must not fall through
-        // to the bare-expression fallback as a dangling `const` feature reference.
-        || (starts_with_keyword(after_visibility, b"const")
-            && kerml_end_member(input).is_ok())
-    {
-        map(kerml_end_member, |n| {
-            CalcDefBodyElement::EndMember(Box::new(n))
         })
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"inv") {
@@ -1817,15 +1834,25 @@ mod const_prefix_tests {
         crate::parser::span::test_input(text)
     }
 
-    /// Spec42 Gap 36: `const end [1] feature a;` attaches `const` to the end member instead of
-    /// misparsing it as a dangling feature reference (KerML `associations` fixture).
+    /// Spec42 Gap 36: `const end [1] feature a;` attaches `const` to the end prefix and the
+    /// `[1]` to the owned cross feature (KerML BNF 573/592/595), rather than to a second node
+    /// wrapping a feature that offered `end` and `const` all over again.
     #[test]
     fn const_prefix_is_retained_on_end_members() {
         let (rest, node) =
-            kerml_end_member(input("const end [1] feature a;")).expect("const end member");
+            kerml_feature_member(input("const end [1] feature a;")).expect("const end member");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_const);
-        assert_eq!(node.value.feature.value.name, "a");
+        let crate::ast::FeaturePrefixHead::End { prefix, cross } = &node.value.prefix.head else {
+            panic!("expected the end alternative of FeaturePrefix");
+        };
+        assert!(prefix.constant_span.is_some(), "const span");
+        let cross = cross.as_ref().expect("owned cross feature");
+        assert!(cross.value.name.is_empty(), "the cross feature is unnamed");
+        assert!(
+            cross.value.multiplicity.is_some(),
+            "[1] is the cross feature's"
+        );
+        assert_eq!(node.value.name, "a");
     }
 
     /// `const end feature b;` takes `FeaturePrefix`'s `EndFeaturePrefix` alternative (KerML BNF

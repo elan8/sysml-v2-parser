@@ -340,9 +340,6 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
             CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
-            CalcDefBodyElement::EndMember(n) => {
-                walk_calc_def_body(report, &p, &n.value.feature.value.body)
-            }
             CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             CalcDefBodyElement::Binding(_)
             | CalcDefBodyElement::Succession(_)

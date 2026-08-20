@@ -206,8 +206,6 @@ pub enum CalcDefBodyElement {
     Binding(Box<Node<crate::ast::KermlBindingMember>>),
     /// KerML succession member; see [`crate::ast::KermlSuccessionMember`].
     Succession(Box<Node<crate::ast::KermlSuccessionMember>>),
-    /// KerML end member with an owned cross feature; see [`crate::ast::KermlEndMember`].
-    EndMember(Box<Node<crate::ast::KermlEndMember>>),
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),

@@ -449,28 +449,6 @@ pub struct KermlSuccessionMember {
     pub membership: crate::ast::Membership,
 }
 
-/// KerML end member with an owned cross feature: `end` name? multiplicity? (`subsets` targets)?
-/// `feature` feature-member, e.g. `end happensDuring [1..*] feature longerOccurrence:
-/// Occurrence redefines targetOccurrence;` (Kernel Semantic Library `Occurrences.kerml`).
-/// Distinct from a plain `end feature ...` member, which stays on [`KermlFeatureMember`] with
-/// `is_end` -- here the end itself is named/constrained and owns the nested feature.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KermlEndMember {
-    /// `const` prefix (`const end [1] feature a;`, KerML `associations` fixture; spec42
-    /// Gap 36).
-    pub is_const: bool,
-    /// End name; empty when the end is anonymous (`end guardedLink [0..1] feature ...` has a
-    /// name; none of the library ends are anonymous, but the grammar permits it).
-    pub name: String,
-    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
-    /// `subsets` clause on the end itself.
-    pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// The owned cross feature.
-    pub feature: Box<Node<KermlFeatureMember>>,
-    pub membership: crate::ast::Membership,
-}
-
 /// KerML explicit relationship declaration (BNF §8.2.4: `Specialization`,
 /// `Subclassification`, `FeatureTyping`, `Subsetting`, `Redefinition`, `Disjoining`,
 /// `FeatureInverting`, `TypeFeaturing`), e.g. `specialization S subclassifier A specializes

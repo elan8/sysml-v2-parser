@@ -1462,11 +1462,6 @@ macro_rules! ast_traversal {
                 walk_kerml_succession_member(self, node)
             }
 
-            /// Visits [`KermlEndMember`]; the default implementation walks its children.
-            fn visit_kerml_end_member(&mut self, node: &$($mutability)? Node<KermlEndMember>) {
-                walk_kerml_end_member(self, node)
-            }
-
             /// Visits [`KermlRelationshipDecl`]; the default implementation walks its children.
             fn visit_kerml_relationship_decl(&mut self, node: &$($mutability)? Node<KermlRelationshipDecl>) {
                 walk_kerml_relationship_decl(self, node)
@@ -6843,9 +6838,6 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::Succession(field_0) => {
                     visitor.visit_kerml_succession_member(&$($mutability)? **field_0);
                 }
-                CalcDefBodyElement::EndMember(field_0) => {
-                    visitor.visit_kerml_end_member(&$($mutability)? **field_0);
-                }
                 CalcDefBodyElement::Import(field_0) => {
                     visitor.visit_import(&$($mutability)? **field_0);
                 }
@@ -7514,23 +7506,6 @@ macro_rules! ast_traversal {
             }
             visitor.visit_kerml_connector_end(first);
             visitor.visit_kerml_connector_end(then);
-            visitor.visit_membership(membership);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_kerml_end_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlEndMember>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let KermlEndMember { is_const, name, multiplicity, subsets, feature, membership } = &$($mutability)? node.value;
-            let _ = is_const;
-            visitor.visit_text(name);
-            if let Some(inner) = multiplicity {
-                visitor.visit_multiplicity(inner);
-            }
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            visitor.visit_kerml_feature_member(&$($mutability)? **feature);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }

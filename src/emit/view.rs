@@ -261,7 +261,6 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::Binding(b) => emit_kerml_binding_member(w, path, &b.value),
         CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
-        CalcDefBodyElement::EndMember(e) => emit_kerml_end_member(w, path, &e.value),
         CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
         CalcDefBodyElement::AttributeUsage(a) => {
             super::structure::emit_attribute_usage(w, path, &a.value)
@@ -537,31 +536,6 @@ pub(crate) fn emit_kerml_succession_member(
     emit_kerml_connector_end(w, &format!("{path}/then"), &succession.then.value)?;
     w.push_char(';');
     Ok(())
-}
-
-pub(crate) fn emit_kerml_end_member(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    end: &crate::ast::KermlEndMember,
-) -> Result<(), EmitError> {
-    emit_visibility(w, end.membership.visibility);
-    if end.is_const {
-        w.push_str("const ");
-    }
-    w.push_str("end ");
-    if !end.name.is_empty() {
-        w.push_str(&format_name(&end.name));
-        w.push_char(' ');
-    }
-    if let Some(multiplicity) = &end.multiplicity {
-        emit_multiplicity(w, &multiplicity.value)?;
-        w.push_char(' ');
-    }
-    if let Some(subsets) = &end.subsets {
-        super::structure::emit_subsetting_clause(w, &subsets.value)?;
-        w.push_char(' ');
-    }
-    emit_kerml_feature_member(w, path, &end.feature.value)
 }
 
 pub(crate) fn emit_typed_parameter(
