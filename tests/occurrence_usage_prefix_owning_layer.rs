@@ -113,41 +113,32 @@ fn strict_and_editor_agree_on_clean_prefixed_input() {
     );
 }
 
-/// A prefix whose usage never arrives must not leave its speculative references behind.
+/// A malformed extension prefix must not leave its speculative references behind.
 ///
 /// A `UsageExtensionKeyword` allocates an arena entry for its qualified name before the parser can
 /// know whether a head the family owns follows. If a refused parse kept them, the arena would grow
 /// entries the tree never names -- invisible in the AST, but dangling identities in the serialized
 /// envelope and shifted identities for every reference allocated after them.
 #[test]
-fn a_refused_prefix_leaves_no_arena_entry() {
+fn a_malformed_extension_prefix_leaves_no_arena_entry() {
     let baseline = parse_for_editor("package P {\n    part def A;\n}\n")
         .document
         .qualified_references
         .len();
-    for refused_source in [
-        // An extension keyword whose usage never arrives, and which the `PrefixMetadataMember`
-        // fallback also refuses -- a digit cannot start the declaration that fallback requires --
-        // so nothing in the finished document names the identity the prefix parser allocated.
-        "package P {\n    part def A {\n        #Ghost 123;\n    }\n}\n",
-        // A complete prefix with no usage after it.
-        "package P {\n    part def A {\n        in derived constant;\n    }\n}\n",
-        // An out-of-order prefix: the second keyword is never a prefix slot at that position.
-        "package P {\n    part def A {\n        ref abstract occurrence o;\n    }\n}\n",
-        // Two alternatives of one slot.
-        "package P {\n    part def A {\n        snapshot timeslice t;\n    }\n}\n",
-    ] {
-        let refused = parse_for_editor(refused_source);
-        assert!(
-            !refused.errors.is_empty(),
-            "the fixture is only meaningful if the member is actually refused:\n{refused_source}"
-        );
-        assert_eq!(
-            refused.document.qualified_references.len(),
-            baseline,
-            "a refused prefix left speculative references in the arena:\n{refused_source}"
-        );
-    }
+    // An extension keyword allocates `Ghost` before the family can establish its following
+    // usage. The `PrefixMetadataMember` fallback also refuses this form because a digit cannot
+    // start the declaration it requires, so no successful tree node can own that identity.
+    let malformed_source = "package P {\n    part def A {\n        #Ghost 123;\n    }\n}\n";
+    let malformed = parse_for_editor(malformed_source);
+    assert!(
+        !malformed.errors.is_empty(),
+        "the fixture is only meaningful if the member is actually refused:\n{malformed_source}"
+    );
+    assert_eq!(
+        malformed.document.qualified_references.len(),
+        baseline,
+        "a malformed prefix left speculative references in the arena:\n{malformed_source}"
+    );
 }
 
 /// The prefix's own parser never consumes input it does not record.

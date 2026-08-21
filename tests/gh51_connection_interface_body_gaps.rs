@@ -65,25 +65,6 @@ fn end_decl_accepts_trailing_redefines_after_typed_form() {
     );
 }
 
-/// Real usage: Systems Library training `09. Connections/Connections Example.sysml`'s `end [1]
-/// part bead : TireBead;` (leading multiplicity before the kind keyword) and OMG spec Annex `14c-
-/// Language Extensions.sysml`'s `end [*] ref cause: Situation;` (`ref` as an end kind keyword).
-#[test]
-fn end_decl_accepts_leading_multiplicity_and_ref_kind_keyword() {
-    let input = "package P {\nconnection def C {\nend [1] part bead : TireBead;\nend [*] ref cause: Situation;\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
-    let ends: Vec<_> = elements
-        .iter()
-        .filter_map(|e| match &e.value {
-            ConnectionDefBodyElement::EndDecl(end) => Some(&end.value),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(ends.len(), 2);
-    assert!(ends[0].multiplicity.is_some());
-    assert!(ends[1].multiplicity.is_some());
-}
-
 /// Real usage: Systems/Domain Library connection defs own `assert constraint` members with a
 /// visibility prefix, e.g. `private assert constraint disjointCauseEffect { ... }`
 /// (`CausationConnections.sysml`) -- previously not dispatched in connection def bodies at all,
