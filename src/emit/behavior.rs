@@ -1287,7 +1287,7 @@ pub(crate) fn emit_flow_usage(
                     emit_multiplicity(w, &mult.value)?;
                 }
             }
-            if let Some(endpoints) = endpoints {
+            if let Some(endpoints) = &**endpoints {
                 w.push_str(" from ");
                 super::view::emit_kerml_connector_end(w, path, &endpoints.from.value)?;
                 w.push_str(" to ");

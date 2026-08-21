@@ -556,10 +556,16 @@ pub struct PayloadFeature {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FlowDeclaration {
     Declared {
-        declaration: Node<UsageDeclaration>,
+        /// Boxed to keep this grammar alternative proportional to the endpoint-only form.
+        /// `Box` is serialization-transparent, so the public wire shape remains the declared
+        /// `UsageDeclaration` rather than an allocation detail.
+        declaration: Box<Node<UsageDeclaration>>,
         value: Option<Node<FeatureValue>>,
         payload: Option<Node<PayloadFeature>>,
-        endpoints: Option<FlowEndpoints>,
+        /// Optional endpoints belong only to the declaration-led grammar alternative.
+        /// Boxing this optional pair keeps the enum's endpoint-only alternative compact without
+        /// changing its serialized representation.
+        endpoints: Box<Option<FlowEndpoints>>,
     },
     EndpointOnly {
         endpoints: FlowEndpoints,

@@ -112,7 +112,7 @@ pub enum PartDefBodyElement {
     InterfaceDef(Node<InterfaceDef>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     /// `connection` usage member inside a part definition body.
     Connection(Node<ConnectionUsageMember>),
     Perform(Node<Perform>),
@@ -734,7 +734,7 @@ pub enum PartUsageBodyElement {
     Ref(Node<RefDecl>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     Perform(Node<Perform>),
     /// `succession` (name)? (`: Type`)? multiplicity? `first` ... `then` ...`;` (GH-92.3, BNF
     /// `SuccessionAsUsage`), e.g. `succession : HappensJustBefore first vehicle1_t0 then
@@ -1345,7 +1345,7 @@ pub enum InterfaceDefBodyElement {
     /// GH-85: bare `flow <a> to <b>;` shorthand connecting two of this interface's own ends, e.g.
     /// `flow p1.torque to p2.torque;` (OMG spec Annex `Vehicle Example/SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml`). Previously unmodeled -- this body had no flow arm at all.
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     /// `constraint` usage through `InterfaceBodyItem -> InterfaceOccurrenceUsageMember ->
     /// InterfaceOccurrenceUsageElement -> BehaviorUsageElement -> ConstraintUsage` (SysML BNF
     /// 727-750, 374-389, 1382-1395). The existing source-backed ConstraintUsage owns its

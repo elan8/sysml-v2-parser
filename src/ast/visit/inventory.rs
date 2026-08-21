@@ -5477,7 +5477,7 @@ macro_rules! ast_traversal {
                     visitor.visit_usage_declaration(declaration);
                     if let Some(inner) = value { visitor.visit_feature_value(inner); }
                     if let Some(inner) = payload { visitor.visit_payload_feature(inner); }
-                    if let Some(endpoints) = endpoints {
+                    if let Some(endpoints) = &$($mutability)? **endpoints {
                         visitor.visit_kerml_connector_end(&$($mutability)? endpoints.from);
                         visitor.visit_kerml_connector_end(&$($mutability)? endpoints.to);
                     }

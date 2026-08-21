@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Flow AST alternatives use proportional indirection.** `FlowDeclaration` boxes only its
+  declaration-bearing alternative and the largest FlowUsage-owning package/part/interface body
+  variants now box their nodes. This preserves the grammar's discriminated shapes and serde wire
+  representation while preventing the endpoint-only and unrelated body alternatives from paying
+  for a full flow declaration. **AST version 223.**
+
 - **KerML directed keyword-less Features retain their own production.** In KerML type/classifier/
   function bodies, `in value : T;`, `out result;`, and `in :>> inherited;` now route through the
   existing source-backed `KermlFeature` parser (`BasicFeaturePrefix FeatureDeclaration`) rather

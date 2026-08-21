@@ -3082,7 +3082,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.writer.write_str("none")?;
                 }
                 self.writer.write_str(") (endpoints ")?;
-                if let Some(endpoints) = endpoints {
+                if let Some(endpoints) = &**endpoints {
                     self.write_flow_endpoints(endpoints)?;
                 } else {
                     self.writer.write_str("none")?;

@@ -196,10 +196,10 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
         FlowUsage {
             kind: FlowUsageKind::Flow, // overwritten by caller
             declaration: FlowDeclaration::Declared {
-                declaration,
+                declaration: Box::new(declaration),
                 value,
                 payload,
-                endpoints,
+                endpoints: Box::new(endpoints),
             },
             body,
             membership: Membership::feature(None, crate::ast::Span::dummy()), // overwritten by caller

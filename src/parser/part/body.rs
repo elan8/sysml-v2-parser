@@ -278,10 +278,9 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // the latter has no guard against a bare `def` keyword being consumed as a flow
             // usage's name, which misparses `flow def DataFlow;` as `FlowUsage { name: "def" }`.
             map(flow_def, PartDefBodyElement::FlowDef),
-            map(
-                crate::parser::flow::flow_usage_member,
-                PartDefBodyElement::FlowUsage,
-            ),
+            map(crate::parser::flow::flow_usage_member, |usage| {
+                PartDefBodyElement::FlowUsage(Box::new(usage))
+            }),
             map(part_def, PartDefBodyElement::PartDef),
             // Nested KerML classifier declarations (`struct`/`classifier`/`datatype`/...,
             // spec42 Gap 38), keyword-gated so no other member shape is affected.

@@ -1675,22 +1675,12 @@ fn try_package_body_structure<'a>(
         flow_def,
         PackageBodyElement::FlowDef
     );
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Flow,
-        flow_usage,
-        PackageBodyElement::FlowUsage
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Message,
-        flow_usage,
-        PackageBodyElement::FlowUsage
-    );
+    try_package_body_dispatch!(input, start, starter, Flow, flow_usage, |usage| {
+        PackageBodyElement::FlowUsage(Box::new(usage))
+    });
+    try_package_body_dispatch!(input, start, starter, Message, flow_usage, |usage| {
+        PackageBodyElement::FlowUsage(Box::new(usage))
+    });
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,

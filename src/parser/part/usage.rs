@@ -1625,10 +1625,9 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // `flow_def` must be tried before `flow_usage_member`: the latter has no guard
             // against a bare `def` keyword either (see comment above).
             map(flow_def, PartUsageBodyElement::FlowDef),
-            map(
-                crate::parser::flow::flow_usage_member,
-                PartUsageBodyElement::FlowUsage,
-            ),
+            map(crate::parser::flow::flow_usage_member, |usage| {
+                PartUsageBodyElement::FlowUsage(Box::new(usage))
+            }),
             // §6 G25: `item` members were reachable from part *definition* bodies only.
             // `item_def_required` first, for the same bare-`def` reason as `constraint_def`.
             map(item_def_required, PartUsageBodyElement::ItemDef),
