@@ -104,6 +104,9 @@ pub(crate) fn emit_constraint_body_element(
         ConstraintDefBodyElement::MetadataKeywordUsage(usage) => {
             super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
         }
+        ConstraintDefBodyElement::AliasDef(alias) => {
+            super::structure::emit_alias_def(w, path, &alias.value)
+        }
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ConstraintDefBodyElement::Expression(e) => {
             emit_expression(w, &e.value)?;

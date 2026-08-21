@@ -234,6 +234,17 @@ pub(crate) fn constraint_def_body_element(
             ),
         ))
         .parse(input)?
+    } else if starts_with_keyword(after_visibility.fragment(), b"alias") {
+        // Both ConstraintDefinition and ConstraintUsage own CalculationBody, whose
+        // CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem production admits an
+        // AliasMember (SysML BNF 1359-1368, 1378-1382, and 901-917). Reuse AliasDef's
+        // source-backed identification/target/body rather than letting expression fallback
+        // split the member into unrelated expressions.
+        map(
+            crate::parser::alias::alias_def,
+            ConstraintDefBodyElement::AliasDef,
+        )
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
         || starts_with_keyword(input.fragment(), b"inout")

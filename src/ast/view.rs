@@ -80,6 +80,10 @@ pub enum ConstraintDefBodyElement {
     /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
     /// but modelled neither, so a `#` member was reported unsupported here.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `AliasMember`, reached through `CalculationBodyItem -> ActionBodyItem ->
+    /// NonBehaviorBodyItem`. The shared source-backed [`crate::ast::AliasDef`] owns its
+    /// identification, target, relationship body, and membership.
+    AliasDef(Node<crate::ast::AliasDef>),
     InOutDecl(Box<Node<InOutDecl>>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems

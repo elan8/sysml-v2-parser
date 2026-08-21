@@ -304,6 +304,9 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
+            ConstraintDefBodyElement::AliasDef(n) => {
+                walk_relationship_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
@@ -1454,6 +1457,9 @@ fn walk_constraint_body_elements(
             }
             ConstraintDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
+            }
+            ConstraintDefBodyElement::AliasDef(n) => {
+                walk_relationship_body(report, &p, &n.value.body)
             }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {

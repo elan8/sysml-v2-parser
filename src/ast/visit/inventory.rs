@@ -6798,6 +6798,9 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                ConstraintDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 ConstraintDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
                 }

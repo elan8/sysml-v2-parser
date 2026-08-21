@@ -365,6 +365,9 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"out",
     b"inout",
     b"constraint",
+    // `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem` admits AliasMember.
+    // Keep recovery from swallowing a valid alias after malformed constraint-body content.
+    b"alias",
     // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1366, 1370), and
     // a constraint body is a `CalculationBody`, so `return` starts a member here too.
     b"return",

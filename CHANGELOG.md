@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Constraint calculation bodies retain aliases.** `ConstraintDefinition` and
+  `ConstraintUsage` both own `CalculationBody`, whose `CalculationBodyItem -> ActionBodyItem ->
+  NonBehaviorBodyItem` alternative includes `AliasMember` (SysML textual BNF 1359-1368,
+  1378-1382, and 901-917; pinned Pilot `SysML.xtext` agrees). The separate
+  `ConstraintDefBodyElement` now owns the existing source-backed `AliasDef` for both constraint
+  definitions and usages, with exhaustive emission, semantic projection, traversal, opacity
+  inspection, and recovery synchronization. Focused semantic and recovery snapshots cover the
+  body owners. **AST version 205.**
+
 - **KerML type and SysML calculation bodies retain aliases.** KerML `TypeBodyElement` admits
   `AliasMember` directly (textual BNF 431-438; pinned Pilot `KerML.xtext` 363-370 agrees), and
   SysML `CalculationBody` reaches the same member through `CalculationBodyItem -> ActionBodyItem
