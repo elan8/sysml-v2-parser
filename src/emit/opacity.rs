@@ -1692,9 +1692,11 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
     for (i, element) in elements.iter().enumerate() {
         let p = format!("{path}/body[{i}]");
         match &element.value {
+            InterfaceUsageBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             InterfaceUsageBodyElement::RefRedef { body, .. } => walk_ref_body(report, &p, body),
             InterfaceUsageBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
             InterfaceUsageBodyElement::FlowUsage(flow) => walk_flow_usage(report, &p, &flow.value),
+            InterfaceUsageBodyElement::Perform(perform) => walk_perform(report, &p, &perform.value),
             InterfaceUsageBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }

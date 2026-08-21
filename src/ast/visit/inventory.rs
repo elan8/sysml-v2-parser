@@ -4773,6 +4773,9 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                InterfaceUsageBodyElement::Error(field_0) => {
+                    visitor.visit_parse_error_node(field_0);
+                }
                 InterfaceUsageBodyElement::RefRedef { target, value, body } => {
                     visitor.visit_qualified_reference(target);
                     visitor.visit_expression(value);
@@ -4786,6 +4789,9 @@ macro_rules! ast_traversal {
                 }
                 InterfaceUsageBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
+                }
+                InterfaceUsageBodyElement::Perform(field_0) => {
+                    visitor.visit_perform(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);

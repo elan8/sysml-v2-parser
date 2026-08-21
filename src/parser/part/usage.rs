@@ -770,8 +770,8 @@ fn connection_end_with_multiplicity(
     )
 }
 
-/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end` member
-/// (GH-85), or `doc`.
+/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end`, the
+/// existing flow/message/succession-flow production, or `PerformActionUsage`.
 fn interface_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
@@ -789,7 +789,24 @@ fn interface_usage_body_element(
 fn interface_usage_other_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
-    alt((interface_usage_flow, interface_usage_annotating)).parse(input)
+    // `perform action ...` has the common `perform` prefix with the supported reference form,
+    // so the declaration alternative must own it before `perform <qualified-reference>`.
+    alt((
+        interface_usage_perform,
+        interface_usage_flow,
+        interface_usage_annotating,
+    ))
+    .parse(input)
+}
+
+fn interface_usage_perform(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    map(alt((perform_action_decl, perform_usage)), |perform| {
+        let span = perform.span.clone();
+        Node::new(span, InterfaceUsageBodyElement::Perform(Box::new(perform)))
+    })
+    .parse(input)
 }
 
 fn interface_usage_flow(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
@@ -855,37 +872,34 @@ fn interface_usage_body(
     if input.fragment().starts_with(b";") {
         return crate::parser::body::semicolon_body(input);
     }
-    let (open_start, _) = ws_and_comments(input)?;
-    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
-    let open_span = crate::parser::span::span_from_to(open_start, input);
-    let mut elements = Vec::new();
-    loop {
-        // A bare `/* ... */` is an `AnnotatingElement` at this member boundary, not trivia.
-        // Leave it for `interface_usage_body_element`; its final annotating arm owns it.
-        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let close_start = input;
-            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-            return Ok((
-                input,
-                crate::ast::Body::Brace {
-                    open_span,
-                    elements,
-                    close_span: crate::parser::span::span_from_to(close_start, input),
-                },
-            ));
-        }
-        let (next, element) = interface_usage_body_element(input)?;
-        if next.location_offset() == input.location_offset() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Many0,
-            )));
-        }
-        elements.push(element);
-        input = next;
-    }
+    let (input, members) = parse_structured_brace_members_with_skip(
+        input,
+        INTERFACE_USAGE_BODY_STARTERS,
+        "interface usage body",
+        "recovered_interface_usage_body_element",
+        interface_usage_body_element,
+        interface_usage_body_recovery,
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, members.into_body()))
+}
+
+fn interface_usage_body_recovery(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<InterfaceUsageBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        INTERFACE_USAGE_BODY_STARTERS,
+        "interface usage body",
+        "recovered_interface_usage_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        InterfaceUsageBodyElement::Error(node_from_to(start, end, recovery)),
+    )
 }
 
 /// The grammar-owned `InterfaceEnd`, not an arbitrary path expression.

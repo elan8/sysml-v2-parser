@@ -33,7 +33,8 @@ pub(crate) use crate::parser::interface::interface_def_required;
 pub(crate) use crate::parser::item::{item_def_required, item_usage};
 pub(crate) use crate::parser::lex::{
     identification, name, qualified_reference, reference_path, short_name_prefix,
-    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
+    INTERFACE_USAGE_BODY_STARTERS, PART_BODY_STARTERS,
 };
 pub(crate) use crate::parser::metadata::{metadata_def, metadata_usage};
 pub(crate) use crate::parser::node_from_to;

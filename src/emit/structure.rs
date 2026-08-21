@@ -1,6 +1,6 @@
 //! Structure emission: part / attribute (and shared helpers).
 
-use super::behavior::emit_flow_usage;
+use super::behavior::{emit_flow_usage, emit_perform};
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
@@ -1262,6 +1262,7 @@ fn emit_interface_usage_body_element(
     el: &InterfaceUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        InterfaceUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         InterfaceUsageBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
@@ -1278,6 +1279,7 @@ fn emit_interface_usage_body_element(
         }
         InterfaceUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         InterfaceUsageBodyElement::FlowUsage(flow) => emit_flow_usage(w, path, &flow.value),
+        InterfaceUsageBodyElement::Perform(perform) => emit_perform(w, path, &perform.value),
     }
 }
 

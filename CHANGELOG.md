@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Interface usage bodies retain perform members and local recovery.** `InterfaceUsage` now
+  owns the existing source-backed `PerformActionUsage` node alongside its already typed flow
+  member, and malformed members recover inside the body without discarding the enclosing
+  interface or valid later siblings. The recovery boundary rolls back speculative references and
+  preserves the malformed source span. Emission, semantic projection, visitors, opacity
+  inspection, provenance validation, and serde cover both variants (SysML textual BNF 724-759,
+  374-390; pinned Pilot `SysML.xtext` 1109-1144). Flashlight plus semantic and recovery fixtures
+  cover the boundary. **AST version 219.**
+
 - **Then successions retain inline conditional action nodes.** `ThenTarget::If` now owns the
   existing typed `IfStmt`, including its condition and braced or shorthand branches, rather than
   recovering `then if ...` as an unrecognized action-body element. The parser dispatches the

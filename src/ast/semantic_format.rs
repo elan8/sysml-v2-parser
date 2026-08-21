@@ -4765,6 +4765,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::InterfaceUsageBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
                         super::InterfaceUsageBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
@@ -4790,6 +4794,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::FlowUsage(flow) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&flow.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::Perform(perform) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_perform(&perform.value)?;
                         }
                     }
                 }

@@ -2143,6 +2143,8 @@ pub enum InterfaceUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsageBodyElement {
+    /// A malformed member recovered within an interface usage body.
+    Error(Node<ParseErrorNode>),
     /// `ref` `:>>` name `=` value body.
     RefRedef {
         target: QualifiedReferenceId,
@@ -2158,6 +2160,9 @@ pub enum InterfaceUsageBodyElement {
     /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
     /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.
     FlowUsage(Box<Node<FlowUsage>>),
+    /// `PerformActionUsage`, retained as the grammar-owned perform production rather than a
+    /// reference-shaped interface-body special case.
+    Perform(Box<Node<Perform>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.
