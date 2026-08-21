@@ -2134,7 +2134,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         let Some(declaration) = declaration.value.declaration.as_ref() else {
             return self.writer.write_str("bare)");
         };
-        let declaration = &declaration.value;
+        self.write_usage_declaration(&declaration.value)?;
+        self.writer.write_char(')')
+    }
+
+    /// Semantic projection for the grammar-owned `UsageDeclaration` header shared by action
+    /// nodes and the declared-action branch of `PerformActionUsageDeclaration`.
+    fn write_usage_declaration(&mut self, declaration: &super::UsageDeclaration) -> io::Result<()> {
         self.writer.write_str("(name ")?;
         write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
         self.writer.write_str(") (short-name ")?;
@@ -2172,8 +2178,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
         self.writer.write_char(' ')?;
-        self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
-        self.writer.write_char(')')
+        self.write_optional_subsetting("intersects", declaration.intersects.as_ref())
     }
 
     fn write_for_variable_declaration(
@@ -4760,25 +4765,28 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
-        self.writer.write_str("(perform (declaration ")?;
-        write_quoted(self.writer, &perform.action_name)?;
-        self.writer.write_str(") (action ")?;
-        if let Some(reference) = perform.action_reference {
-            self.write_reference(reference)?;
-        } else {
-            self.writer.write_str("none")?;
+        self.writer.write_str("(perform (target ")?;
+        match &perform.target {
+            super::PerformActionTarget::Action(declaration) => {
+                self.writer.write_str("(action ")?;
+                self.write_usage_declaration(&declaration.value)?;
+                self.writer.write_char(')')?;
+            }
+            super::PerformActionTarget::Reference { action, redefines } => {
+                self.writer.write_str("(reference (action ")?;
+                self.write_reference(*action)?;
+                self.writer.write_str(") ")?;
+                self.write_optional_subsetting("redefines", redefines.as_ref())?;
+                self.writer.write_char(')')?;
+            }
         }
-        self.writer.write_str(") (typing ")?;
-        if let Some(typing) = &perform.typing {
-            self.write_typing(&typing.value)?;
+        self.writer.write_str(") (value ")?;
+        if let Some(value) = &perform.value {
+            self.write_feature_value(&value.value)?;
         } else {
             self.writer.write_str("none")?;
         }
         self.writer.write_str(") ")?;
-        self.write_optional_subsetting("subsets", perform.subsets.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("redefines", perform.redefines.as_ref())?;
-        self.writer.write_char(' ')?;
         self.write_perform_body(&perform.body)?;
         self.writer.write_char(')')
     }

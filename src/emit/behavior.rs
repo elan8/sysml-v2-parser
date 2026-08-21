@@ -10,9 +10,9 @@ use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, Allocate, AssignStmt, ExhibitState, InOutDecl, Perform, PerformBody,
-    PerformBodyElement, PerformInOutBinding, StateDef, StateDefBody, StateDefBodyElement,
-    StateUsage, ThenAction, ThenTarget,
+    ActionUsageBodyElement, Allocate, AssignStmt, ExhibitState, InOutDecl, Perform,
+    PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, StateDef,
+    StateDefBody, StateDefBodyElement, StateUsage, ThenAction, ThenTarget, UsageDeclaration,
 };
 
 pub(crate) fn emit_inout_decl(
@@ -134,11 +134,19 @@ fn emit_action_node_usage_declaration(
     let Some(declaration) = declaration.declaration.as_ref() else {
         return Ok(());
     };
-    let declaration = &declaration.value;
+    emit_usage_declaration(w, path, &declaration.value)
+}
+
+/// Stream the grammar-owned declaration shared by action-node and perform-action forms.
+fn emit_usage_declaration(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    declaration: &UsageDeclaration,
+) -> Result<(), EmitError> {
     if declaration.identification_span.len != 0 {
         w.push_char(' ');
         w.push_authored_name(
-            &format!("{path}/action-declaration/identification"),
+            &format!("{path}/declaration/identification"),
             &declaration.identification_span,
         )?;
     }
@@ -673,25 +681,17 @@ pub(crate) fn emit_perform(
 ) -> Result<(), EmitError> {
     emit_definition_prefix_value(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
-    if let Some(action_reference) = perform.action_reference {
-        w.push_qualified_reference(path, action_reference)?;
-    } else {
-        w.push_str("action ");
-        if !perform.action_name.is_empty() {
-            w.push_str(&format_name(&perform.action_name));
+    match &perform.target {
+        PerformActionTarget::Action(declaration) => {
+            w.push_str("action");
+            emit_usage_declaration(w, path, &declaration.value)?;
         }
-    }
-    if let Some(mult) = &perform.multiplicity {
-        emit_multiplicity(w, &mult.value)?;
-    }
-    if let Some(redef) = &perform.redefines {
-        emit_subsetting_clause(w, &redef.value)?;
-    }
-    if let Some(subsets) = &perform.subsets {
-        emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(typing) = &perform.typing {
-        emit_typing_clause(w, &typing.value)?;
+        PerformActionTarget::Reference { action, redefines } => {
+            w.push_qualified_reference(path, *action)?;
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+        }
     }
     if let Some(value) = &perform.value {
         emit_feature_value(w, value)?;

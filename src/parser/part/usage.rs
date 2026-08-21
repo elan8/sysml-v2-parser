@@ -514,6 +514,10 @@ fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody
 /// Perform usage: (`abstract`|`variation`)? `perform` action_path (`:>>` target)? (`=` value)?
 /// (`;` or `{ }` body).
 pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+    crate::parser::span::reference_transaction(input, perform_usage_inner)
+}
+
+fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
@@ -537,12 +541,10 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
             input,
             Perform {
                 usage_prefix,
-                action_name: String::new(),
-                action_reference: Some(action_reference),
-                typing: None,
-                multiplicity: None,
-                redefines,
-                subsets: None,
+                target: PerformActionTarget::Reference {
+                    action: action_reference,
+                    redefines,
+                },
                 value,
                 body,
             },
@@ -550,58 +552,24 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
     ))
 }
 
-/// Perform action declaration: (`abstract`|`variation`)? `perform action` name? (`:>>` target)?
-/// (`:` type_name)? (`=` value)? (`;` or body).
+/// The `action UsageDeclaration?` alternative of `PerformActionUsageDeclaration`.
 ///
-/// §6 G20: the name is optional -- `perform action { ... }` and `perform action :>> doXorY = doX;`
-/// are both real OMG spec Annex usage (`3c-Function-based Behavior-structure mod-2.sysml`,
-/// `7a1-Variant Configuration - General Concept-a.sysml`) that previously fell through to opaque
-/// recovery because `name(input)` was mandatory here.
+/// The shared declaration parser deliberately produces a zero-width, anonymous
+/// [`UsageDeclaration`] when no identification is authored. That is the grammar's optional
+/// declaration, not a sentinel action name.
 pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+    crate::parser::span::reference_transaction(input, perform_action_decl_inner)
+}
+
+fn perform_action_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, action_name) = if is_anonymous_perform_action(input) {
-        (input, String::new())
-    } else {
-        name(input)?
-    };
-    // GH-89: multiplicity after the name, e.g. `takePicture[*] :> PictureTaking::takePicture;`
-    // (Camera Example/Camera.sysml:4).
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, with_span(qualified_reference)),
-    ))
-    .parse(input)?;
-    let redefines = redefines.map(|(span, target)| {
-        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
-    });
-    // GH-89: `:>` subsets clause, tried only when `:>>` redefines didn't match -- the two are
-    // mutually exclusive specialization keywords at this position.
-    let (input, subsets) = if redefines.is_none() {
-        opt(preceded(
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, with_span(qualified_reference)),
-        ))
-        .parse(input)?
-    } else {
-        (input, None)
-    };
-    let subsets = subsets.map(|(span, target)| {
-        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
-    });
-    let (input, type_reference) = opt(preceded(
-        preceded(ws_and_comments, typing_colon),
-        preceded(ws_and_comments, with_span(qualified_reference)),
-    ))
-    .parse(input)?;
-    let typing = type_reference
-        .map(|(span, target)| crate::parser::usage::single_target_typing(span, target));
+    let (input, _) = ws_and_comments(input)?;
+    let (input, declaration) = crate::parser::usage::usage_declaration(input)?;
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
@@ -611,42 +579,12 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
             input,
             Perform {
                 usage_prefix,
-                action_name,
-                action_reference: None,
-                typing,
-                multiplicity,
-                redefines,
-                subsets,
+                target: PerformActionTarget::Action(Box::new(declaration)),
                 value,
                 body,
             },
         ),
     ))
-}
-
-/// True when a `perform action` declaration has no name of its own -- the next token already
-/// begins the redefinition clause, the typing clause, the body, or the terminator.
-fn is_anonymous_perform_action(input: Input<'_>) -> bool {
-    let Ok((peek, _)) = ws_and_comments(input) else {
-        return false;
-    };
-    let frag = peek.fragment();
-    frag.starts_with(b"{")
-        || frag.starts_with(b";")
-        || frag.starts_with(b":>>")
-        || frag.starts_with(b"=")
-        || (frag.starts_with(b":") && !frag.starts_with(b":>"))
-}
-
-/// `:` that is not the start of `:>` / `:>>`.
-fn typing_colon(input: Input<'_>) -> IResult<Input<'_>, Input<'_>> {
-    if input.fragment().starts_with(b":>") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    tag(&b":"[..]).parse(input)
 }
 
 /// Allocate: `allocate` source `to` target body.
@@ -2044,77 +1982,6 @@ mod perform_semicolon_and_redefine_tests {
             panic!("expected Perform, got {:?}", node.value);
         };
         perform
-    }
-
-    #[test]
-    fn perform_plain_name_accepts_semicolon_body() {
-        let node = perform("perform vehicleMassTest;");
-        assert!(node.value.action_name.is_empty());
-        assert!(node.value.action_reference.is_some());
-        assert_eq!(node.value.redefines, None);
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_dotted_name_accepts_semicolon_body() {
-        let node = perform("perform providePower.generateTorque;");
-        assert!(node.value.action_name.is_empty());
-        assert!(node.value.action_reference.is_some());
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_quoted_name_accepts_semicolon_body() {
-        let node = perform("perform 'provide power';");
-        assert!(node.value.action_name.is_empty());
-        assert!(node.value.action_reference.is_some());
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_accepts_redefine_clause_with_semicolon_body() {
-        let node = perform("perform providePower.generateTorque :>> generateTorque;");
-        assert!(node.value.action_reference.is_some());
-        assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|relationship| relationship.value.target.len()),
-            Some(1)
-        );
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_accepts_redefine_clause_with_brace_body() {
-        let node = perform("perform 'provide power' :>> VehicleA::'provide power' { }");
-        assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|relationship| relationship.value.target.len()),
-            Some(1)
-        );
-        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
-    }
-
-    #[test]
-    fn perform_plain_brace_body_still_works() {
-        let node = perform("perform vehicleMassTest { }");
-        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
-    }
-
-    #[test]
-    fn perform_action_declaration_form_is_unaffected() {
-        let (rest, node) = part_usage_body_element(input("perform action 'assemble vehicle' { }"))
-            .expect("perform action parses");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PartUsageBodyElement::Perform(perform) = node.value else {
-            panic!("expected Perform, got {:?}", node.value);
-        };
-        assert_eq!(perform.value.action_name, "assemble vehicle");
-        assert!(perform.value.action_reference.is_none());
-        assert_eq!(perform.value.redefines, None);
     }
 
     /// §6 G6: directed `part`/`item` usages inside a perform body.

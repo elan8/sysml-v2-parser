@@ -895,31 +895,36 @@ pub enum VariantTypedUsage {
     Requirement(Box<Node<crate::ast::RequirementUsage>>),
 }
 
-/// Enacted performance: `perform` action_path `{` body `}` inside a part usage.
+/// Enacted performance: `perform` [`PerformActionTarget`] value/body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Perform {
     /// Optional `abstract` / `variation` prefix (§6 G5). `variation perform action doXorY { ... }`
     /// is real usage in the OMG spec Annex `7a1-Variant Configuration - General Concept-a.sysml`.
     pub usage_prefix: Option<DefinitionPrefix>,
-    /// Declaration label in the explicit `perform action name ...` form.
-    pub action_name: String,
-    /// Referenced action path in the shorthand `perform path` form.
-    pub action_reference: Option<QualifiedReferenceId>,
-    /// Structured type after `:` in `perform action name : Type`.
-    pub typing: Option<Node<TypingRelationship>>,
-    /// Multiplicity after the name (GH-89), e.g. `[*]` in `perform action takePicture[*] :>
-    /// PictureTaking::takePicture;` (Camera Example/Camera.sysml:4).
-    pub multiplicity: Option<Node<Multiplicity>>,
-    /// Redefinition target after `:>>`, e.g. `doXorY` in `perform action :>> doXorY = doX;`.
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    /// Subsetting target after `:>` (GH-89), e.g. `PictureTaking::takePicture` in `perform action
-    /// takePicture[*] :> PictureTaking::takePicture;` (Camera Example/Camera.sysml:4). Mutually
-    /// exclusive with `redefines` (whichever specialization keyword is present).
-    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// The grammar-owned `PerformActionUsageDeclaration` alternative.
+    pub target: PerformActionTarget,
     /// Bound value after `=`, e.g. `doX` in `perform action :>> doXorY = doX;`.
     pub value: Option<Node<FeatureValue>>,
     pub body: PerformBody,
+}
+
+/// `PerformActionUsageDeclaration` before its shared `ValuePart?` and action body.
+///
+/// The alternatives must remain distinct: a declared action owns a complete
+/// [`crate::ast::UsageDeclaration`], while the currently supported shorthand is a referenced
+/// action plus its reference-subsetting tail. Neither is a string mirror of the other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PerformActionTarget {
+    /// `'action' UsageDeclaration?`, including the zero-width anonymous declaration.
+    Action(Box<Node<crate::ast::UsageDeclaration>>),
+    /// `OwnedReferenceSubsetting FeatureSpecializationPart?` as currently supported: a
+    /// source-backed action reference with an optional `:>>` redefinition target.
+    Reference {
+        action: QualifiedReferenceId,
+        redefines: Option<Node<SubsettingRelationship>>,
+    },
 }
 
 /// Body of a perform: `;` or `{` PerformBodyElement* `}`.

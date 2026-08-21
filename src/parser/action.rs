@@ -2447,26 +2447,6 @@ mod control_node_gap_tests {
     }
 
     #[test]
-    fn then_succession_accepts_perform_target() {
-        let source = input("then perform body;");
-        let (rest, node) = then_action(source).expect("then perform");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        match node.value.target {
-            ThenTarget::Perform(p) => {
-                assert!(p.value.action_name.is_empty());
-                assert_eq!(
-                    p.value
-                        .action_reference
-                        .and_then(|id| crate::parser::usage::reference_text(source, id))
-                        .as_deref(),
-                    Some("body")
-                );
-            }
-            other => panic!("expected Perform target, got {other:?}"),
-        }
-    }
-
-    #[test]
     fn action_body_accepts_then_perform() {
         let (rest, node) =
             action_def_body_element(input("then perform body;")).expect("then perform body");

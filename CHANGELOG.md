@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Perform action usage declarations retain their grammatical alternative.**
+  `PerformActionUsageDeclaration` now distinguishes a declared `action` with its shared,
+  source-backed `UsageDeclaration` (including an anonymous declaration) from the supported
+  reference-subsetting shorthand. This removes the invalid action-name/reference mirror, retains
+  typing, multiplicity, modifiers, relationships, value, and body through emission, semantic
+  projection, visitors, opacity inspection, provenance validation, and serde. The parser admits
+  either branch transactionally without expanding other owners or interface-body dispatch (SysML
+  textual BNF 944-952; pinned Pilot `SysML.xtext` 1411-1418). Training 18, retained perform
+  corpus examples, and semantic and malformed-recovery snapshots cover both alternatives.
+  **AST version 217.**
+
 - **Interface usage parts retain distinct named endpoints.** `InterfacePart` now owns the
   binary and n-ary alternatives from `InterfaceUsageDeclaration`, with source-backed endpoint
   multiplicities, optional declared names, `::>`/`references` operator spans, and ordered dotted

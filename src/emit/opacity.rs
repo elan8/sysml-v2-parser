@@ -7,13 +7,14 @@ use crate::ast::{
     DefinitionBodyElement, EndDeclIntroducer, EndNestedUsage, FirstMergeBody, InterfaceDefBody,
     InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, LibraryPackage,
     OccurrenceBodyElement, OccurrenceUsageBody, Package, PackageBody, PackageBodyElement,
-    PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement, PerformBody,
-    PerformBodyElement, PortBody, PortBodyElement, PortDefBody, PortDefBodyElement, RefBody,
-    RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement, RenderingUsageBody,
-    RenderingUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, ReturnRefBody,
-    ReturnRefBodyElement, RootElement, RootNamespace, StateDefBody, StateDefBodyElement,
-    ThenTarget, UseCaseDefBody, UseCaseDefBodyElement, VariantTypedUsage, VariantUsage,
-    VariantUsageForm, ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement, Perform,
+    PerformActionTarget, PerformBody, PerformBodyElement, PortBody, PortBodyElement, PortDefBody,
+    PortDefBodyElement, RefBody, RelationshipBodyElement, RenderingDefBody,
+    RenderingDefBodyElement, RenderingUsageBody, RenderingUsageBodyElement, RequirementDefBody,
+    RequirementDefBodyElement, ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace,
+    StateDefBody, StateDefBodyElement, ThenTarget, UseCaseDefBody, UseCaseDefBodyElement,
+    VariantTypedUsage, VariantUsage, VariantUsageForm, ViewBody, ViewBodyElement, ViewDefBody,
+    ViewDefBodyElement,
 };
 
 /// Kind of opaque or recovery content found in an AST.
@@ -203,7 +204,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::AssertConstraint(a) => {
             walk_constraint_def_body(report, path, &a.value.body)
         }
-        PackageBodyElement::PerformUsage(p) => walk_perform_body(report, path, &p.value.body),
+        PackageBodyElement::PerformUsage(p) => walk_perform(report, path, &p.value),
         PackageBodyElement::BindingConnectorUsage(b) => walk_ref_body(report, path, &b.value.body),
         PackageBodyElement::Succession(first) => {
             walk_first_merge_body(report, path, &first.value.body)
@@ -529,7 +530,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::Connection(n) => {
                 walk_connection_def_body(report, &p, &n.value.body)
             }
-            PartDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
+            PartDefBodyElement::Perform(n) => walk_perform(report, &p, &n.value),
             PartDefBodyElement::Allocate(n) => walk_ref_body(report, &p, &n.value.body),
             PartDefBodyElement::ExhibitState(n) => walk_state_def_body(report, &p, &n.value.body),
             PartDefBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
@@ -659,7 +660,7 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
             PartUsageBodyElement::InterfaceUsage(n) => walk_interface_usage(report, &p, &n.value),
             PartUsageBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
-            PartUsageBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
+            PartUsageBodyElement::Perform(n) => walk_perform(report, &p, &n.value),
             PartUsageBodyElement::SuccessionUsage(n) => walk_ref_body(report, &p, &n.value.body),
             PartUsageBodyElement::Allocate(n) => walk_ref_body(report, &p, &n.value.body),
             PartUsageBodyElement::Satisfy(n) => walk_satisfy(report, &p, &n.value),
@@ -1023,7 +1024,7 @@ fn walk_action_def_body_elements(
             }
             ActionDefBodyElement::MetadataUsage(n) => walk_metadata_body(report, &p, &n.value.body),
             ActionDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
-            ActionDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
+            ActionDefBodyElement::Perform(n) => walk_perform(report, &p, &n.value),
             ActionDefBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             ActionDefBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             ActionDefBodyElement::GuardedSuccession(n) => {
@@ -1264,7 +1265,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::SuccessionUsage(n) => {
                 walk_ref_body(report, &p, &n.value.body)
             }
-            RequirementDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
+            RequirementDefBodyElement::Perform(n) => walk_perform(report, &p, &n.value),
             RequirementDefBodyElement::StateUsage(n) => {
                 walk_state_def_body(report, &p, &n.value.body)
             }
@@ -1753,9 +1754,17 @@ fn walk_variant_usage(report: &mut OpacityReport, path: &str, variant: &VariantU
             walk_requirement_def_body(report, path, &requirement.value.body)
         }
         VariantUsageForm::Typed(VariantTypedUsage::Perform(perform)) => {
-            walk_perform_body(report, path, &perform.value.body)
+            walk_perform(report, path, &perform.value)
         }
     }
+}
+
+fn walk_perform(report: &mut OpacityReport, path: &str, perform: &Perform) {
+    match &perform.target {
+        PerformActionTarget::Action(_) => {}
+        PerformActionTarget::Reference { .. } => {}
+    }
+    walk_perform_body(report, path, &perform.body)
 }
 
 fn walk_perform_body(report: &mut OpacityReport, path: &str, body: &PerformBody) {
@@ -1789,7 +1798,7 @@ fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget)
         ThenTarget::Action(action) => {
             walk_optional_action_usage_body(report, path, &action.value.body)
         }
-        ThenTarget::Perform(perform) => walk_perform_body(report, path, &perform.value.body),
+        ThenTarget::Perform(perform) => walk_perform(report, path, &perform.value),
         ThenTarget::Merge(merge) => walk_first_merge_body(report, path, &merge.value.body),
         ThenTarget::Fork(fork) => walk_first_merge_body(report, path, &fork.value.body),
         ThenTarget::Decide(decision) => walk_first_merge_body(report, path, &decision.value.body),

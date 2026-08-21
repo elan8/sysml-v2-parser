@@ -418,6 +418,11 @@ macro_rules! ast_traversal {
                 walk_perform(self, node)
             }
 
+            /// Visits [`PerformActionTarget`]; the default implementation walks its children.
+            fn visit_perform_action_target(&mut self, node: &$($mutability)? PerformActionTarget) {
+                walk_perform_action_target(self, node)
+            }
+
             /// Visits [`PerformBody`]; the default implementation walks its children.
             fn visit_perform_body(&mut self, node: &$($mutability)? PerformBody) {
                 walk_perform_body(self, node)
@@ -3378,31 +3383,28 @@ macro_rules! ast_traversal {
         pub fn walk_perform<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Perform>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Perform { usage_prefix, action_name, action_reference, typing, multiplicity, redefines, subsets, value, body } = &$($mutability)? node.value;
+            let Perform { usage_prefix, target, value, body } = &$($mutability)? node.value;
             if let Some(inner) = usage_prefix {
                 visitor.visit_definition_prefix_value(inner);
             }
-            visitor.visit_text(action_name);
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
-            }
-            if let Some(inner) = multiplicity {
-                visitor.visit_multiplicity(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
+            visitor.visit_perform_action_target(target);
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
             visitor.visit_perform_body(body);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_perform_action_target<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PerformActionTarget) {
+            match node {
+                PerformActionTarget::Action(declaration) => visitor.visit_usage_declaration(declaration),
+                PerformActionTarget::Reference { action, redefines } => {
+                    visitor.visit_qualified_reference(action);
+                    if let Some(redefines) = redefines {
+                        visitor.visit_subsetting_relationship(redefines);
+                    }
+                }
+            }
         }
 
         pub fn walk_perform_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PerformBody) {

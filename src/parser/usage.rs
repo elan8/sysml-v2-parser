@@ -323,6 +323,7 @@ pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<Ty
     let fragment = peek.fragment();
     if (fragment.starts_with(b":")
         && !fragment.starts_with(b":>")
+        && !fragment.starts_with(b"::>")
         && !fragment.starts_with(b":>>")
         && !fragment.starts_with(b":="))
         || starts_with_keyword(fragment, b"defined")
