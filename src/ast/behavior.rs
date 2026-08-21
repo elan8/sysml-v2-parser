@@ -283,8 +283,8 @@ impl PartialEq for PayloadClause {
 /// Publish(someTopic, somePublication);`, Interaction Sequencing Examples/
 /// ServerSequenceOutsideRealization-2.sysml). BNF `SendNode`'s payload is `NodeParameterMember`
 /// (`FeatureBinding = OwnedExpression`) -- a general expression -- unlike `accept`'s
-/// `PayloadParameter`, which stays typed-name-only (kept as [`PayloadClause`] on
-/// [`ActionUsage::accept`]).
+/// `PayloadParameter`, whose typed and source-backed shorthand alternatives are retained by
+/// [`TransitionAccept`] on [`ActionUsage::accept`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SendPayload {
@@ -390,14 +390,16 @@ pub struct ActionUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// For `action ... accept param : Type` form.
-    pub accept: Option<PayloadClause>,
+    /// For `action ... accept param : Type` or the pin-valid bare payload shorthand
+    /// `action ... accept Type via port`. The `via` target belongs to this grammar-owned accept
+    /// parameter part, not to [`Self::via`], which is reserved for `send`.
+    pub accept: Option<TransitionAccept>,
     /// For standalone `send` control-node statements: `send param : Type` or a general
     /// expression payload (`send new Publish(x, y)`, GH-86).
     pub send: Option<SendPayload>,
-    /// Optional `via <expr>` targeting clause on a standalone `accept`/`send` control-node
-    /// statement (BNF `AcceptParameterPart`/`SenderReceiverPart`, GH-86), e.g. `send new
-    /// Publish(someTopic, somePublication) via publicationPort;`.
+    /// Optional `via <expr>` targeting clause on a `send` control-node statement (BNF
+    /// `SenderReceiverPart`, GH-86), e.g. `send new Publish(someTopic, somePublication) via
+    /// publicationPort;`. Accept `via` targets are retained inside [`Self::accept`].
     pub via: Option<Node<Expression>>,
     /// Optional trailing `to <expr>` clause on a standalone `send` statement (BNF
     /// `SenderReceiverPart`, GH-86), e.g. `then send new S() to b;` (Simple Tests/ActionTest.sysml).

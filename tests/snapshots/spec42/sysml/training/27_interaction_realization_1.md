@@ -65,8 +65,6 @@ package 'Interaction Realization-1' {
 (fixture-diagnostics
   (document "27_interaction_realization_1.md"
     (diagnostics
-      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 335) (line 13) (column 28) (len 35)) (message "unexpected token in action body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 335) (line 13) (column 28) (len 35)) (message "suppressed 2 cascading recovered diagnostics after earlier recovery errors"))
     )
   )
 )
@@ -83,10 +81,8 @@ package 'Interaction Realization-1' {
     part vehicle_a : Vehicle {
         part cruiseController_a : CruiseController {
             action controllerBehavior {
-                action receiveSetSpeed
-                accept SetSpeed via vehicle_a;
-                then action receiveSensedSpeed
-                accept SensedSpeed via cruiseController_a;
+                action receiveSetSpeed accept SetSpeed via vehicle_a;
+                then action receiveSensedSpeed accept SensedSpeed via cruiseController_a;
                 then action sendFuelCommand send new FuelCommand() to engine_a;
             }
         }
@@ -97,8 +93,7 @@ package 'Interaction Realization-1' {
         }
         part engine_a : Engine {
             action engineBehavior {
-                action receiveFuelCommand
-                accept FuelCommand via engine_a;
+                action receiveFuelCommand accept FuelCommand via engine_a;
             }
         }
     }

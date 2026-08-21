@@ -287,15 +287,17 @@ pub(crate) fn emit_action_usage(
         w.push_str(kw);
         if let Some(accept) = &usage.accept {
             w.push_char(' ');
-            emit_payload_clause(w, path, accept)?;
+            emit_transition_accept(w, path, accept)?;
         }
         if let Some(send) = &usage.send {
             w.push_char(' ');
             emit_send_payload(w, path, send)?;
         }
-        if let Some(via) = &usage.via {
-            w.push_str(" via ");
-            emit_expression(w, &via.value)?;
+        if !is_standalone_accept {
+            if let Some(via) = &usage.via {
+                w.push_str(" via ");
+                emit_expression(w, &via.value)?;
+            }
         }
         if let Some(to) = &usage.to {
             w.push_str(" to ");
@@ -339,15 +341,17 @@ pub(crate) fn emit_action_usage(
     }
     if let Some(accept) = &usage.accept {
         w.push_str(" accept ");
-        emit_payload_clause(w, path, accept)?;
+        emit_transition_accept(w, path, accept)?;
     }
     if let Some(send) = &usage.send {
         w.push_str(" send ");
         emit_send_payload(w, path, send)?;
     }
-    if let Some(via) = &usage.via {
-        w.push_str(" via ");
-        emit_expression(w, &via.value)?;
+    if usage.accept.is_none() {
+        if let Some(via) = &usage.via {
+            w.push_str(" via ");
+            emit_expression(w, &via.value)?;
+        }
     }
     if let Some(to) = &usage.to {
         w.push_str(" to ");

@@ -1946,7 +1946,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
     let (input, accept) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"accept"[..])),
-        preceded(ws1, crate::parser::payload::typed_payload_clause),
+        crate::parser::payload::action_accept_parameter,
     ))
     .parse(input)?;
     // `action <name> send ...` (GH-86, e.g. `action publish send new Publish(someTopic,
@@ -1993,13 +1993,21 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     };
     let type_ref_span = accept
         .as_ref()
-        .and_then(|p| p.type_span.clone())
+        .and_then(|accept| match accept {
+            crate::ast::TransitionAccept::Payload(payload, _) => payload.type_span.clone(),
+            crate::ast::TransitionAccept::Shorthand(_, _)
+            | crate::ast::TransitionAccept::TimeTrigger(_, _) => None,
+        })
         .or(type_ref_span);
-    let (input, via) = nom::combinator::opt(preceded(
-        preceded(ws_and_comments, tag(&b"via"[..])),
-        preceded(ws1, expression),
-    ))
-    .parse(input)?;
+    let (input, via) = if saw_send_keyword {
+        nom::combinator::opt(preceded(
+            preceded(ws_and_comments, tag(&b"via"[..])),
+            preceded(ws1, expression),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, to) = if saw_send_keyword {
         nom::combinator::opt(preceded(
             preceded(ws_and_comments, tag(&b"to"[..])),

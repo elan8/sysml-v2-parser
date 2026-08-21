@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Action usages retain the complete accept parameter alternative.** `ActionUsage::accept` now
+  uses the existing structured `TransitionAccept` shape, preserving either a typed payload or a
+  source-backed bare payload reference and keeping `via` inside the accept parameter rather than
+  duplicating it in the send-only action field. Direct accept action nodes and inline `then action`
+  usages share one transactional payload boundary; emission, semantic projection, visitors,
+  opacity inspection, provenance validation, and serde retain every accepted alternative (SysML
+  textual BNF 954-965 and 1002-1020; pinned Pilot `SysML.xtext` 1438-1451). Focused and upstream
+  Training 27/ServerSequence snapshots cover typed and bare payloads plus recovery.
+  **AST version 220.**
+
 - **Interface usage bodies retain perform members and local recovery.** `InterfaceUsage` now
   owns the existing source-backed `PerformActionUsage` node alongside its already typed flow
   member, and malformed members recover inside the body without discarding the enclosing

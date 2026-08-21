@@ -5278,7 +5278,7 @@ macro_rules! ast_traversal {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = accept {
-                visitor.visit_payload_clause(inner);
+                visitor.visit_transition_accept_value(inner);
             }
             if let Some(inner) = send {
                 visitor.visit_send_payload(inner);

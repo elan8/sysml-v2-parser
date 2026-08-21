@@ -2096,8 +2096,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             // Retain the established compact projection for unrelated alternatives while matching
             // them explicitly: a new target variant must decide whether it is a control node.
-            super::ThenTarget::Action(_)
-            | super::ThenTarget::Perform(_)
+            super::ThenTarget::Action(action) => {
+                if action.value.accept.is_some() {
+                    self.writer.write_str("(then-action ")?;
+                    self.write_action_usage(&action.value)?;
+                    self.writer.write_char(')')
+                } else {
+                    self.writer.write_str("(then-action)")
+                }
+            }
+            super::ThenTarget::Perform(_)
             | super::ThenTarget::Accept(_)
             | super::ThenTarget::Send(_)
             | super::ThenTarget::Feature(_) => self.writer.write_str("(then-action)"),
@@ -3477,6 +3485,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
+        if let Some(accept) = &usage.accept {
+            self.writer.write_str("(accept ")?;
+            self.write_transition_accept(accept)?;
+            self.writer.write_str(") ")?;
+        }
         match &usage.body {
             Some(body) => self.write_action_usage_body(body)?,
             None => self.writer.write_str("(body absent)")?,
