@@ -110,7 +110,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
 fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
     use crate::parser::expr::expression;
     use crate::parser::usage::{
-        optional_typings, single_target_redefines, single_target_typing,
+        optional_redefinition, optional_typings, single_target_typing,
         typing_reference_fields_from_result,
     };
 
@@ -142,15 +142,13 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     .parse(input)?;
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
-    // Optional `:>>` redefines clause: `ref NAME :>> TARGET`.
-    let (input, redefines_target) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, with_span(qualified_reference)),
-    ))
-    .parse(input)?;
-    let redefines = redefines_target.map(|(span, target)| single_target_redefines(span, target));
+    // `ReferenceUsage` owns the same `Redefinitions` production as the other feature usages
+    // (SysML BNF 335, KerML BNF 472). Keep its complete typed target list rather than manually
+    // recognizing only one `:>> target` spelling. The clause may precede typing, as in the
+    // Systems Library's `ref sentMessage :>> sentTransfer: MessageTransfer, MessageAction`.
+    let (input, leading_redefines) = optional_redefinition(input)?;
 
-    let (input, type_ref_span, typing) = if redefines.is_some() {
+    let (input, type_ref_span, typing) = if leading_redefines.is_some() {
         // After `:>> target`, an optional `:` typing clause (possibly multi-target) may follow.
         let (input, typing_result) = optional_typings(input)?;
         let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
@@ -172,6 +170,17 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             (input, type_ref_span, typing)
         }
     };
+
+    // The ordinary `Usage` ordering also permits the redefinition after the typing clause:
+    // `ref message : Message :>> priorMessage`. Do not parse a second independent clause --
+    // `RefDecl` has one authoritative relationship field -- but retain the complete clause in
+    // either legal position.
+    let (input, trailing_redefines) = if leading_redefines.is_none() {
+        optional_redefinition(input)?
+    } else {
+        (input, None)
+    };
+    let redefines = leading_redefines.or(trailing_redefines);
 
     // `:>` subsets, independent of the `:>>` redefinition above: `derived ref action deferred :
     // ActionUsage :> Metadata::metadataItems;`. Without this the clause reached the

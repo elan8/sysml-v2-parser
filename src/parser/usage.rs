@@ -10,7 +10,7 @@ use crate::parser::lex::{
     starts_with_keyword, subset_operator, typed_by_operator, ws1, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
-use nom::bytes::complete::{tag, take_until};
+use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::multi::many0;
 use nom::sequence::preceded;
@@ -95,18 +95,6 @@ pub(crate) struct UsageHeader {
     /// `MultiplicityPart`'s ordering and uniqueness keyword slots (BNF §8.2.2.6.6), with the
     /// authored spellings and their exact spans.
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
-}
-
-/// Multiplicity part: '[' ... ']'.
-pub(crate) fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"["[..]).parse(input)?;
-    let (input, content) = take_until(&b"]"[..]).parse(input)?;
-    let (input, _) = tag(&b"]"[..]).parse(input)?;
-    Ok((
-        input,
-        format!("[{}]", String::from_utf8_lossy(content.fragment()).trim()),
-    ))
 }
 
 /// Byte offset of the `]` that closes multiplicity content starting at `frag` (the `[` is
@@ -385,15 +373,6 @@ pub(crate) fn single_target_typing(
     )
 }
 
-/// Build a single-target `redefines`/`:>>` relationship from an already-parsed arena identity,
-/// mirroring [`single_target_typing`] for the same ad hoc `ref`-declaration call sites.
-pub(crate) fn single_target_redefines(
-    span: Span,
-    target: QualifiedReferenceId,
-) -> Node<SubsettingRelationship> {
-    single_target_subsetting(span, SubsettingKind::Redefines, target)
-}
-
 /// Single-target convenience over [`subsetting_relationship_node`] for ad hoc `:>`/`:>>`-family
 /// shapes parsed directly outside `specialization_targets` (a bare, unqualified feature name --
 /// these ad hoc shapes never parse a qualified `::`/`.`-segmented target). Shared by
@@ -460,6 +439,24 @@ pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<Subsetti
         input,
         subsetting_relationship_node(target, SubsettingKind::Redefines, span),
     ))
+}
+
+/// Parse an optional `Redefinitions` clause without hiding a malformed one.
+///
+/// `nom::combinator::opt(redefinition)` would turn `:>> ;` into an absent relationship and let
+/// the caller's permissive tail skip discard the authored operator. Once the concrete starter is
+/// present, the clause is mandatory; callers therefore recover the invalid declaration at their
+/// owning body boundary instead.
+pub(crate) fn optional_redefinition(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Node<SubsettingRelationship>>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if peek.fragment().starts_with(b":>>") || starts_with_keyword(peek.fragment(), b"redefines") {
+        let (input, relationship) = redefinition(input)?;
+        Ok((input, Some(relationship)))
+    } else {
+        Ok((input, None))
+    }
 }
 
 /// Prefix redefinition: `:>>` / `redefines` qualified_name (for usage heads).

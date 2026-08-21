@@ -2937,6 +2937,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_str("none")?;
         }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &declaration.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
         self.writer.write_str(") ")?;
         self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
         self.writer.write_char(' ')?;

@@ -306,6 +306,10 @@ pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"out",
     b"inout",
     b"return",
+    // SysML `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem` owns
+    // `ReferenceUsage` (SysML BNF 1366/1367, 901/902, 335). Keep recovery from consuming a
+    // valid generic `ref` declaration after malformed calculation-body content.
+    b"ref",
     b"calc",
     b"part",
     // KerML `TypeBodyElement` owns `AliasMember` directly (textual BNF 431-438), while a
@@ -356,6 +360,9 @@ pub(crate) const CALCULATION_ACTION_STARTERS: &[&[u8]] = &[
     // (spec42 Gap 61). `Message` is a SysML-only production; KerML `FeatureElement` does not
     // reach it, so `calc_def_body_element` deliberately has no `message` arm of its own.
     b"message",
+    // Route generic `ReferenceUsage` through the action-body parser before calculation's
+    // keyword-less binding fallback can interpret `ref` as a feature name.
+    b"ref",
 ];
 
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[

@@ -524,15 +524,23 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) {
         let start = input;
-        if let Ok((next, member)) = crate::parser::action::action_def_body_element(peek) {
-            return Ok((
-                next,
-                node_from_to(
-                    start,
+        match crate::parser::action::action_def_body_element(peek) {
+            Ok((next, member)) => {
+                return Ok((
                     next,
-                    CalcDefBodyElement::ActionMember(Box::new(member)),
-                ),
-            ));
+                    node_from_to(
+                        start,
+                        next,
+                        CalcDefBodyElement::ActionMember(Box::new(member)),
+                    ),
+                ));
+            }
+            // `ref` is unambiguously an ActionBodyItem in this owner. If its typed parser has
+            // begun and rejected a malformed relationship, preserve the error for calculation
+            // body recovery instead of letting the keyword-less feature fallback shred it into
+            // separate `ref` and name expressions.
+            Err(error) if starts_with_keyword(peek.fragment(), b"ref") => return Err(error),
+            Err(_) => {}
         }
     }
     calc_def_body_element(input)

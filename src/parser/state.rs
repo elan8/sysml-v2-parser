@@ -16,7 +16,6 @@ use crate::parser::metadata_annotation::{metadata_keyword_prefix, metadata_keywo
 use crate::parser::node_from_to;
 use crate::parser::payload::transition_accept;
 use crate::parser::requirement::requirement_usage;
-use crate::parser::usage::multiplicity;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -286,8 +285,21 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     ))
 }
 
-/// Ref in state body: `ref` (`state`)? name (`:` type)? (`:>>` / `:>` redeclarations)? body
+/// Reference usage in a state body.
+///
+/// `ReferenceUsage` reaches a state body through `ActionBodyItem` (SysML BNF 335, 1359 and
+/// 1455). Its `FeatureSpecializationPart` permits a complete `Redefinitions` clause on either
+/// side of typing. Keep that clause in the existing `RefDecl` relationship field instead of
+/// skipping it as opaque shorthand.
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+    crate::parser::span::reference_transaction(input, state_ref_inner)
+}
+
+fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+    use crate::parser::usage::{
+        optional_redefinition, optional_typings, subsetting, typing_reference_fields_from_result,
+    };
+
     let start = input;
     // `BasicUsagePrefix = RefPrefix ('ref')?` -- see `connector::ref_decl`.
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
@@ -295,30 +307,48 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, parsed_name) = opt(with_span(name)).parse(input)?;
-    let (input, _multiplicity) = opt(multiplicity).parse(input)?;
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, leading_multiplicity_modifiers) = if leading_multiplicity.is_some() {
+        crate::parser::usage::multiplicity_modifier_slots(input)?
+    } else {
+        (input, crate::ast::MultiplicityModifiers::default())
+    };
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
-    let (input, uses_shift) = preceded(
-        ws_and_comments,
-        alt((
-            map(tag(&b":>>"[..]), |_| true),
-            map(tag(&b":>"[..]), |_| false),
-            map(tag(&b":"[..]), |_| false),
-        )),
-    )
-    .parse(input)?;
-    let (input, type_target) = if uses_shift {
-        (input, None)
+    let (input, leading_redefines) = optional_redefinition(input)?;
+    let (input, typing_result) = optional_typings(input)?;
+    let (type_ref_span, _type_reference, typing) =
+        typing_reference_fields_from_result(typing_result);
+    // Canonical emission places multiplicity after typing, while the grammar also admits the
+    // leading position parsed above. Accept both positions but keep one authoritative slot.
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
     } else {
-        let (input, target) =
-            preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
-        (input, Some(target))
+        (input, None)
     };
-    let type_ref_span = type_target
-        .as_ref()
-        .map(|(span, _)| span.clone())
-        .unwrap_or_else(crate::ast::Span::dummy);
-    let typing = type_target.map(|(span, id)| crate::parser::usage::single_target_typing(span, id));
+    let (input, multiplicity_modifiers) = if trailing_multiplicity.is_some() {
+        crate::parser::usage::multiplicity_modifier_slots(input)?
+    } else {
+        (input, leading_multiplicity_modifiers)
+    };
+    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
+    let (input, trailing_redefines) = if leading_redefines.is_none() {
+        optional_redefinition(input)?
+    } else {
+        (input, None)
+    };
+    let redefines = leading_redefines.or(trailing_redefines);
+    let (input, subsets) = opt(preceded(ws_and_comments, subsetting))
+        .parse(input)
+        .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
 
     let (input, _) = ws_and_comments(input)?;
     let (mut input, value) = opt(preceded(
@@ -351,14 +381,14 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 kind_keyword: None,
                 name: name_str,
                 typing,
-                redefines: None,
-                subsets: None,
-                multiplicity: None,
-                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
+                redefines,
+                subsets,
+                multiplicity,
+                multiplicity_modifiers,
                 value,
                 body,
                 name_span: Some(name_span),
-                type_ref_span: Some(type_ref_span),
+                type_ref_span,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
