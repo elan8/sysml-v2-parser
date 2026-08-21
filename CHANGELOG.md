@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Metadata bodies retain keyword-less reference usages.** `MetadataAnnotation` and
+  `MetadataUsage` now own a distinct, recursive `MetadataBody` whose typed
+  `MetadataBodyUsage` members retain the optional authored `ref`, `:>>`/`redefines` operator,
+  required redefinition target, value, and nested body. This replaces the incorrect
+  `AttributeBody` projection that treated `totalRisk { probability = 0.3; }` as an attribute
+  declaration, while leaving unsupported MetadataBody alternatives explicit recovery. Emission,
+  semantic projection, visitors, opacity inspection, provenance validation, and serde traverse
+  the new source-backed shape (SysML textual BNF 1678-1693; pinned Pilot `KerML.xtext`
+  1098-1115). Retained RiskMetadata and extracted SimpleVehicle fixtures, plus malformed-body
+  recovery, cover the boundary. **AST version 215.**
+
 - **Action bodies retain guarded successions as their own production.** The pinned
   `GuardedSuccession = ('succession' UsageDeclaration)? 'first' FeatureChainMember
   GuardExpressionMember 'then' TransitionSuccessionMember UsageBody` now has a distinct,

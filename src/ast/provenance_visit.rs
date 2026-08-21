@@ -9,8 +9,8 @@
 
 use super::visit::{
     walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_metadata_annotation,
-    walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
-    walk_usage_extension_keyword, Visitor,
+    walk_metadata_body_usage, walk_metadata_keyword_usage, walk_occurrence_usage_prefix,
+    walk_satisfy_requirement_usage, walk_usage_extension_keyword, Visitor,
 };
 use super::*;
 
@@ -281,6 +281,23 @@ impl Visitor for ProvenanceValidator<'_> {
             }
         }
         walk_metadata_annotation(self, node);
+    }
+
+    fn visit_metadata_body_usage(&mut self, node: &Node<MetadataBodyUsage>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Some(span) = &node.value.ref_span {
+            self.check(self.delimiter(span, "ref", "metadata body reference keyword"));
+        }
+        if let Some(operator) = &node.value.operator {
+            let (span, token) = match operator {
+                MetadataBodyRedefinitionOperator::ColonGreaterGreater { span } => (span, ":>>"),
+                MetadataBodyRedefinitionOperator::Redefines { span } => (span, "redefines"),
+            };
+            self.check(self.delimiter(span, token, "metadata body redefinition operator"));
+        }
+        walk_metadata_body_usage(self, node);
     }
 
     /// `SatisfyRequirementUsage` records every keyword whose presence is a grammatical choice.

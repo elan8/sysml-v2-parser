@@ -188,7 +188,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::CalcDef(c) => walk_calc_def_body(report, path, &c.value.body),
         PackageBodyElement::CalcUsage(c) => walk_calc_def_body(report, path, &c.value.body),
         PackageBodyElement::MetadataDef(m) => walk_attribute_body(report, path, &m.value.body),
-        PackageBodyElement::MetadataUsage(m) => walk_attribute_body(report, path, &m.value.body),
+        PackageBodyElement::MetadataUsage(m) => walk_metadata_body(report, path, &m.value.body),
         PackageBodyElement::ConcernUsage(c) => {
             walk_requirement_def_body(report, path, &c.value.body)
         }
@@ -550,7 +550,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             PartDefBodyElement::StateDef(n) => walk_state_def_body(report, &p, &n.value.body),
             PartDefBodyElement::MetadataDef(n) => walk_attribute_body(report, &p, &n.value.body),
-            PartDefBodyElement::MetadataUsage(n) => walk_attribute_body(report, &p, &n.value.body),
+            PartDefBodyElement::MetadataUsage(n) => walk_metadata_body(report, &p, &n.value.body),
             PartDefBodyElement::FlowDef(n) => walk_definition_body(report, &p, &n.value.body),
             PartDefBodyElement::RequirementDef(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
@@ -714,9 +714,7 @@ fn walk_part_usage_body_elements(
             }
             PartUsageBodyElement::ItemDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PartUsageBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
-            PartUsageBodyElement::MetadataUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            PartUsageBodyElement::MetadataUsage(n) => walk_metadata_body(report, &p, &n.value.body),
             PartUsageBodyElement::AnalysisCaseDef(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body)
             }
@@ -808,6 +806,26 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             AttributeBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+        }
+    }
+}
+
+fn walk_metadata_body(report: &mut OpacityReport, path: &str, body: &crate::ast::MetadataBody) {
+    let crate::ast::MetadataBody::Brace { elements, .. } = body else {
+        return;
+    };
+    for (index, element) in elements.iter().enumerate() {
+        let member_path = format!("{path}/metadata-body[{index}]");
+        match &element.value {
+            crate::ast::MetadataBodyElement::Error(_) => {
+                hit(report, &member_path, OpacityKind::ParseError)
+            }
+            crate::ast::MetadataBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &member_path, member)
+            }
+            crate::ast::MetadataBodyElement::Usage(usage) => {
+                walk_metadata_body(report, &member_path, &usage.value.body)
+            }
         }
     }
 }
@@ -1003,9 +1021,7 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::Dependency(n) => {
                 walk_relationship_body(report, &p, &n.value.body)
             }
-            ActionDefBodyElement::MetadataUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            ActionDefBodyElement::MetadataUsage(n) => walk_metadata_body(report, &p, &n.value.body),
             ActionDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ActionDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
             ActionDefBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
@@ -1119,7 +1135,7 @@ fn walk_action_usage_body_elements(
                 walk_relationship_body(report, &p, &n.value.body)
             }
             ActionUsageBodyElement::MetadataUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_metadata_body(report, &p, &n.value.body)
             }
             ActionUsageBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
@@ -1621,7 +1637,7 @@ fn walk_annotating_member(
 ) {
     match member {
         crate::ast::AnnotatingMember::MetadataAnnotation(metadata) => {
-            walk_attribute_body(report, path, &metadata.value.body)
+            walk_metadata_body(report, path, &metadata.value.body)
         }
         crate::ast::AnnotatingMember::Doc(_)
         | crate::ast::AnnotatingMember::Comment(_)

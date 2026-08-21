@@ -348,6 +348,21 @@ macro_rules! ast_traversal {
                 walk_attribute_body_element(self, node)
             }
 
+            /// Visits [`MetadataBody`]; the default implementation walks its children.
+            fn visit_metadata_body(&mut self, node: &$($mutability)? MetadataBody) {
+                walk_metadata_body(self, node)
+            }
+
+            /// Visits [`MetadataBodyElement`]; the default implementation walks its children.
+            fn visit_metadata_body_element(&mut self, node: &$($mutability)? Node<MetadataBodyElement>) {
+                walk_metadata_body_element(self, node)
+            }
+
+            /// Visits [`MetadataBodyUsage`]; the default implementation walks its children.
+            fn visit_metadata_body_usage(&mut self, node: &$($mutability)? Node<MetadataBodyUsage>) {
+                walk_metadata_body_usage(self, node)
+            }
+
             /// Visits [`ItemDef`]; the default implementation walks its children.
             fn visit_item_def(&mut self, node: &$($mutability)? Node<ItemDef>) {
                 walk_item_def(self, node)
@@ -3060,7 +3075,52 @@ macro_rules! ast_traversal {
             for inner in about_targets {
                 visitor.visit_qualified_reference(inner);
             }
-            visitor.visit_attribute_body(body);
+            visitor.visit_metadata_body(body);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_metadata_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? MetadataBody) {
+            match node {
+                MetadataBody::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                MetadataBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_metadata_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
+            }
+        }
+
+        pub fn walk_metadata_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MetadataBodyElement>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            match &$($mutability)? node.value {
+                MetadataBodyElement::Error(error) => visitor.visit_parse_error_node(error),
+                MetadataBodyElement::Annotating(member) => visitor.visit_annotating_member(member),
+                MetadataBodyElement::Usage(usage) => visitor.visit_metadata_body_usage(usage),
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_metadata_body_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MetadataBodyUsage>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let MetadataBodyUsage { ref_span, operator, target, value, body } = &$($mutability)? node.value;
+            if let Some(span) = ref_span { visitor.visit_span(span); }
+            if let Some(operator) = operator {
+                match operator {
+                    MetadataBodyRedefinitionOperator::ColonGreaterGreater { span }
+                    | MetadataBodyRedefinitionOperator::Redefines { span } => visitor.visit_span(span),
+                }
+            }
+            visitor.visit_qualified_reference(target);
+            if let Some(value) = value { visitor.visit_feature_value(value); }
+            visitor.visit_metadata_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -4075,7 +4135,7 @@ macro_rules! ast_traversal {
             for inner in about_targets {
                 visitor.visit_qualified_reference(inner);
             }
-            visitor.visit_attribute_body(body);
+            visitor.visit_metadata_body(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }

@@ -42,6 +42,7 @@ mod item;
 pub(crate) mod lex;
 mod metadata;
 mod metadata_annotation;
+mod metadata_body;
 mod occurrence;
 mod occurrence_body;
 mod occurrence_prefix;

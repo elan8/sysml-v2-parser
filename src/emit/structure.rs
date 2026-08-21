@@ -8,7 +8,8 @@ use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
     ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
     EndDeclIntroducer, EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody,
-    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node,
+    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, MetadataBody,
+    MetadataBodyElement, MetadataBodyRedefinitionOperator, MetadataBodyUsage, Multiplicity, Node,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
     RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
@@ -232,6 +233,67 @@ pub(crate) fn emit_attribute_usage(
         emit_feature_value(w, value)?;
     }
     emit_attribute_body(w, path, &usage.body)
+}
+
+pub(crate) fn emit_metadata_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &MetadataBody,
+) -> Result<(), EmitError> {
+    match body {
+        MetadataBody::Semicolon { .. } => {
+            w.push_char(';');
+            Ok(())
+        }
+        MetadataBody::Brace { elements, .. } => {
+            if elements.is_empty() {
+                w.push_str(" {}");
+                return Ok(());
+            }
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (index, element) in elements.iter().enumerate() {
+                let member_path = format!("{path}/metadata-body[{index}]");
+                match &element.value {
+                    MetadataBodyElement::Error(error) => {
+                        w.push_recovery_span(&member_path, &error.span)?
+                    }
+                    MetadataBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, &member_path, member)?
+                    }
+                    MetadataBodyElement::Usage(usage) => {
+                        emit_metadata_body_usage(w, &member_path, &usage.value)?
+                    }
+                }
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+fn emit_metadata_body_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &MetadataBodyUsage,
+) -> Result<(), EmitError> {
+    if usage.ref_span.is_some() {
+        w.push_str("ref ");
+    }
+    if let Some(operator) = &usage.operator {
+        match operator {
+            MetadataBodyRedefinitionOperator::ColonGreaterGreater { .. } => w.push_str(":>> "),
+            MetadataBodyRedefinitionOperator::Redefines { .. } => w.push_str("redefines "),
+        }
+    }
+    w.push_qualified_reference(&format!("{path}/target"), usage.target)?;
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_metadata_body(w, path, &usage.body)
 }
 
 fn emit_part_def_body(
@@ -1699,7 +1761,7 @@ pub(crate) fn emit_metadata_usage(
             w.push_qualified_reference("metadata about target", *target)?;
         }
     }
-    emit_attribute_body(w, path, &usage.body)
+    emit_metadata_body(w, path, &usage.body)
 }
 
 pub(crate) fn emit_enum_def(
@@ -1864,7 +1926,7 @@ pub(crate) fn emit_metadata_annotation(
             w.push_qualified_reference("metadata annotation about target", *target)?;
         }
     }
-    emit_attribute_body(w, path, &ann.body)
+    emit_metadata_body(w, path, &ann.body)
 }
 
 pub(crate) fn emit_metadata_keyword_usage(

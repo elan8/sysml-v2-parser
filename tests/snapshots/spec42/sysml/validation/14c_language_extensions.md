@@ -342,7 +342,7 @@ package '14c-Language-Extensions' {
         #fmeaspec
         requirement req3 : RequirementWithSIL {
             @StatusHolder {
-                attribute status = Status::Approved;
+                status = Status::Approved;
             }
             doc
             /* Alarm when battery has sank */

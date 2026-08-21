@@ -573,7 +573,48 @@ pub struct MetadataAnnotation {
     /// `'about' Annotation ( ',' Annotation )*`, where `Annotation = [QualifiedName]`.
     pub about_targets: Vec<QualifiedReferenceId>,
     /// `MetadataBody`.
-    pub body: AttributeBody,
+    pub body: MetadataBody,
+}
+
+/// `MetadataBody = ';' | '{' MetadataBodyElement* '}'`.
+///
+/// This body is deliberately not an [`AttributeBody`]. Its keyword-less members are reference
+/// redefinitions, not attributes with declaration labels, so sharing the old body would make
+/// `totalRisk { probability = 0.3; }` look like nested attribute declarations.
+pub type MetadataBody = Body<MetadataBodyElement>;
+
+/// One member of a metadata body (SysML textual BNF 1678-1693; KerML 1423-1438).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// The complete `AnnotatingElement` production.
+    Annotating(AnnotatingMember),
+    /// `MetadataBodyUsage`, a reference redefinition owned by the metadata type.
+    Usage(Node<MetadataBodyUsage>),
+}
+
+/// The optional authored redefinition introducer before a metadata-body target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataBodyRedefinitionOperator {
+    ColonGreaterGreater { span: Span },
+    Redefines { span: Span },
+}
+
+/// `MetadataBodyUsage`: a reference redefinition and its recursive metadata body.
+///
+/// `target` is the grammar's required `OwnedRedefinition`, not a declaration name. The optional
+/// `ref` and redefinition operator retain their own source spans so emission never reconstructs
+/// spelling from a string or makes an implicit relationship look explicit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MetadataBodyUsage {
+    pub ref_span: Option<Span>,
+    pub operator: Option<MetadataBodyRedefinitionOperator>,
+    pub target: QualifiedReferenceId,
+    pub value: Option<Node<FeatureValue>>,
+    pub body: MetadataBody,
 }
 
 impl PartialEq for MetadataAnnotation {
@@ -1663,7 +1704,7 @@ pub struct MetadataUsage {
     pub name: String,
     pub type_reference: Option<QualifiedReferenceId>,
     pub about_targets: Vec<QualifiedReferenceId>,
-    pub body: AttributeBody,
+    pub body: MetadataBody,
     pub membership: Membership,
 }
 

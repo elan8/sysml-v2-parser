@@ -4190,8 +4190,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// `MetadataUsage = ( '@' | 'metadata' ) MetadataUsageDeclaration ( 'about' … )?
     /// MetadataBody` (SysML BNF 1673).
     ///
-    /// Its body is an `AttributeBody`, so it owns the same members every other one does; the
-    /// marker it used to be hid them.
+    /// Its body has its own metadata-reference member grammar; it is not an `AttributeBody`.
     fn write_metadata_usage(&mut self, usage: &super::MetadataUsage) -> io::Result<()> {
         self.writer
             .write_str("(metadata-usage (declaration-name ")?;
@@ -4207,7 +4206,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.write_reference(*target)?;
         }
         self.writer.write_str(") ")?;
-        self.write_attribute_body(&usage.body)?;
+        self.write_metadata_body(&usage.body)?;
         self.writer.write_char(')')
     }
 
@@ -4239,9 +4238,61 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    /// `MetadataBody` is an `AttributeBody`, and projects like every other one.
-    fn write_metadata_body(&mut self, body: &super::AttributeBody) -> io::Result<()> {
-        self.write_attribute_body(body)
+    /// `MetadataBody` owns keyword-less reference redefinitions, not attribute declarations.
+    fn write_metadata_body(&mut self, body: &super::MetadataBody) -> io::Result<()> {
+        match body {
+            super::MetadataBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::MetadataBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::MetadataBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::MetadataBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::MetadataBodyElement::Usage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_body_usage(&usage.value)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_metadata_body_usage(&mut self, usage: &super::MetadataBodyUsage) -> io::Result<()> {
+        self.writer.write_str("(metadata-body-usage (reference ")?;
+        self.writer.write_str(if usage.ref_span.is_some() {
+            "true"
+        } else {
+            "false"
+        })?;
+        self.writer.write_str(") (redefinition-operator ")?;
+        match &usage.operator {
+            Some(super::MetadataBodyRedefinitionOperator::ColonGreaterGreater { .. }) => {
+                self.writer.write_str("colon-greater-greater")?
+            }
+            Some(super::MetadataBodyRedefinitionOperator::Redefines { .. }) => {
+                self.writer.write_str("redefines")?
+            }
+            None => self.writer.write_str("implicit")?,
+        }
+        self.writer.write_str(") (target ")?;
+        self.write_reference(usage.target)?;
+        self.writer.write_str(") (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_metadata_body(&usage.body)?;
+        self.writer.write_char(')')
     }
 
     /// One projection for the `#` spelling of a metadata reference, shared by every scope that
@@ -4259,7 +4310,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_reference(usage.reference)?;
         self.writer.write_str(") ")?;
         match &usage.body {
-            Some(body) => self.write_metadata_body(body)?,
+            Some(body) => self.write_attribute_body(body)?,
             None => self.writer.write_str("(body none)")?,
         }
         self.writer.write_char(')')
