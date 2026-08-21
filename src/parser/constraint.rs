@@ -1594,6 +1594,15 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             |n| CalcDefBodyElement::DefaultReferenceUsage(Box::new(n)),
         )
         .parse(input)?
+    } else if crate::parser::package::starts_abstract_kerml_classifier(input) {
+        // `abstract` is both BasicFeaturePrefix's third slot (KerML BNF 577) and an optional
+        // classifier modifier. Resolve that FIRST-set overlap before the feature arm: an
+        // `abstract struct/class/...` must remain a classifier, while an `abstract end feature`
+        // chain below is malformed FeaturePrefix input and belongs to recovery.
+        map(crate::parser::package::kerml_classifier_structured, |n| {
+            CalcDefBodyElement::KermlClassifier(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_any_keyword(
         after_visibility,
         &[
@@ -1608,7 +1617,8 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"expr",
         ],
     ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end", b"const"])
-        && kerml_feature(input).is_ok())
+        && (kerml_feature(input).is_ok()
+            || malformed_feature_prefix_continuation(after_visibility_input)))
     {
         map(kerml_feature, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
@@ -1732,6 +1742,59 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// Whether a reserved `FeaturePrefix` head is immediately followed by a token which makes its
+/// ordered production malformed.
+///
+/// `FeaturePrefix`'s `BasicFeaturePrefix` accepts `abstract`, but its ordered slot sequence does
+/// not allow the earlier `derived`/direction slots or the separate `EndFeaturePrefix` afterward.
+/// Conversely, `EndFeaturePrefix` spells only optional `const` *before* its required `end`, so a
+/// BasicFeaturePrefix slot after `end` is invalid. If either chain is not dispatched to
+/// [`kerml_feature`], the terminal expression fallback fabricates a feature reference for its
+/// first keyword and parses the rest as a second member. This lookahead is intentionally lexical:
+/// it never allocates or accepts syntax; the owning, transactional feature parser still decides
+/// whether the complete production is valid.
+fn malformed_feature_prefix_continuation(input: Input<'_>) -> bool {
+    if let Some((input, _)) = crate::parser::occurrence_prefix::slot_keyword(input, b"abstract") {
+        return starts_with_any_keyword(
+            input.fragment(),
+            &[
+                b"member",
+                b"in",
+                b"out",
+                b"inout",
+                b"derived",
+                b"abstract",
+                b"composite",
+                b"portion",
+                b"var",
+                b"const",
+                b"end",
+                b"feature",
+                b"step",
+                b"expr",
+                b"bool",
+            ],
+        );
+    }
+    if let Some((input, _)) = crate::parser::occurrence_prefix::slot_keyword(input, b"end") {
+        return starts_with_any_keyword(
+            input.fragment(),
+            &[
+                b"in",
+                b"out",
+                b"inout",
+                b"derived",
+                b"abstract",
+                b"composite",
+                b"portion",
+                b"var",
+                b"const",
+            ],
+        );
+    }
+    false
 }
 
 fn named_in_out_missing_type(input: Input<'_>) -> bool {

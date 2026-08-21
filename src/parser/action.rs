@@ -1521,7 +1521,35 @@ pub(crate) fn action_usage_body_element(
             ));
         }
     }
-    let (input, elem) = alt((
+    let (input, elem) = action_usage_body_dispatched_element(input)?;
+    Ok((input, node_from_to(start, input, elem)))
+}
+
+/// The remaining `ActionUsageBodyElement` alternatives in their grammar priority order.
+///
+/// Keep the groups small even though all alternatives have the same input/output types. In a
+/// debug build, one `nom::alt` tuple stores every closure's parser state in its `Choice` frame.
+/// A nested `for`/`perform action` body can then retain several such frames at once and overflow
+/// a 2 MiB worker stack. Function-item groups preserve every probe and its ordering while keeping
+/// a single combinator frame bounded (Gap 68).
+fn action_usage_body_dispatched_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
+        action_usage_body_leading_element,
+        action_usage_body_declaration_element,
+        action_usage_body_relationship_element,
+        action_usage_body_behavior_element,
+        action_usage_body_control_element,
+        action_usage_body_fallback_element,
+    ))
+    .parse(input)
+}
+
+fn action_usage_body_leading_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
         map(
             crate::parser::import::import_,
             ActionUsageBodyElement::Import,
@@ -1529,20 +1557,34 @@ pub(crate) fn action_usage_body_element(
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
         map(then_action, ActionUsageBodyElement::ThenAction),
-        // Gap 33: typed dispatch replacing the retired opaque `ActionBodyDecl`; see the
-        // matching branch in `action_def_body_element`.
-        nom::branch::alt((
-            map(crate::parser::attribute::attribute_usage, |a| {
-                ActionUsageBodyElement::AttributeUsage(Box::new(a))
-            }),
-            map(crate::parser::constraint::calc_usage, |c| {
-                ActionUsageBodyElement::CalcUsage(Box::new(c))
-            }),
-            map(crate::parser::occurrence_body::occurrence_usage, |n| {
-                ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-        )),
+    ))
+    .parse(input)
+}
+
+fn action_usage_body_declaration_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    // Gap 33: typed dispatch replacing the retired opaque `ActionBodyDecl`; see the matching
+    // branch in `action_def_body_element`.
+    alt((
+        map(crate::parser::attribute::attribute_usage, |a| {
+            ActionUsageBodyElement::AttributeUsage(Box::new(a))
+        }),
+        map(crate::parser::constraint::calc_usage, |c| {
+            ActionUsageBodyElement::CalcUsage(Box::new(c))
+        }),
+        map(crate::parser::occurrence_body::occurrence_usage, |n| {
+            ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
+        }),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
+    ))
+    .parse(input)
+}
+
+fn action_usage_body_relationship_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
         map(annotating_member_stmt, ActionUsageBodyElement::Annotating),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
@@ -1562,69 +1604,98 @@ pub(crate) fn action_usage_body_element(
             crate::parser::flow::flow_usage_member,
             ActionUsageBodyElement::FlowUsage,
         ),
+    ))
+    .parse(input)
+}
+
+fn action_usage_body_behavior_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
         map(decision_stmt, ActionUsageBodyElement::DecisionStmt),
         map(join_stmt, ActionUsageBodyElement::JoinStmt),
         map(fork_stmt, ActionUsageBodyElement::ForkStmt),
-        map(state_usage, ActionUsageBodyElement::StateUsage),
-        // nom's alt() caps out at 21 branches; nest the newer control nodes plus the
-        // remaining fallbacks in a sub-alt() to stay under that limit.
-        nom::branch::alt((
-            map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
-            map(while_stmt, ActionUsageBodyElement::WhileStmt),
-            map(loop_stmt, ActionUsageBodyElement::LoopStmt),
-            map(if_stmt, ActionUsageBodyElement::IfStmt),
-            // Literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`,
-            // GH-86), e.g. `metadata ToolExecution { ... }`. Previously only dispatched at
-            // package-body scope even though `crate::parser::metadata::metadata_usage` already
-            // implements it fully (including rejecting `metadata def ...`).
-            map(
-                crate::parser::metadata::metadata_usage,
-                ActionUsageBodyElement::MetadataUsage,
-            ),
-            map(action_def, |d| {
-                ActionUsageBodyElement::ActionDef(Box::new(d))
-            }),
-            map(control_node_action_usage, |a| {
-                ActionUsageBodyElement::ActionUsage(Box::new(a))
-            }),
-            map(visibility_action_usage, |a| {
-                ActionUsageBodyElement::ActionUsage(Box::new(a))
-            }),
-            // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
-            // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
-            // Directed `in item`/`in part` reach here after `in_out_decl` rejects those keywords.
-            nom::branch::alt((
-                map(crate::parser::part::part_usage, |p| {
-                    ActionUsageBodyElement::PartUsage(Box::new(p))
-                }),
-                map(
-                    crate::parser::item::item_usage,
-                    ActionUsageBodyElement::ItemUsage,
-                ),
-                map(
-                    crate::parser::occurrence_body::assert_constraint_member,
-                    ActionUsageBodyElement::AssertConstraint,
-                ),
-            )),
-            // GH-89.7: `variant name;` referencing a sibling variation action's variant, e.g.
-            // `variant generateTorque4Cyl;` (Variability Examples/VehicleVariabilityModel.sysml:128).
-            // Before the keyword-less fallback below since `variant` is a real keyword.
-            map(
-                crate::parser::part::variant_usage,
-                ActionUsageBodyElement::VariantUsage,
-            ),
-            // §6 G26: last, so every keyword-led member above keeps priority over the
-            // keyword-less `name = expr;` binding.
-            map(
-                crate::parser::attribute::default_reference_value_binding,
-                ActionUsageBodyElement::DefaultReferenceUsage,
-            ),
-        )),
+        map(
+            crate::parser::state::state_usage,
+            ActionUsageBodyElement::StateUsage,
+        ),
     ))
-    .parse(input)?;
-    Ok((input, node_from_to(start, input, elem)))
+    .parse(input)
+}
+
+fn action_usage_body_control_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
+        map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
+        map(while_stmt, ActionUsageBodyElement::WhileStmt),
+        map(loop_stmt, ActionUsageBodyElement::LoopStmt),
+        map(if_stmt, ActionUsageBodyElement::IfStmt),
+        // Literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`,
+        // GH-86), e.g. `metadata ToolExecution { ... }`. Previously only dispatched at
+        // package-body scope even though `crate::parser::metadata::metadata_usage` already
+        // implements it fully (including rejecting `metadata def ...`).
+        map(
+            crate::parser::metadata::metadata_usage,
+            ActionUsageBodyElement::MetadataUsage,
+        ),
+        map(action_def, |d| {
+            ActionUsageBodyElement::ActionDef(Box::new(d))
+        }),
+        map(control_node_action_usage, |a| {
+            ActionUsageBodyElement::ActionUsage(Box::new(a))
+        }),
+        map(visibility_action_usage, |a| {
+            ActionUsageBodyElement::ActionUsage(Box::new(a))
+        }),
+    ))
+    .parse(input)
+}
+
+fn action_usage_body_fallback_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
+        // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
+        // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
+        // Directed `in item`/`in part` reach here after `in_out_decl` rejects those keywords.
+        action_usage_body_structure_member,
+        // GH-89.7: `variant name;` referencing a sibling variation action's variant, e.g.
+        // `variant generateTorque4Cyl;` (Variability Examples/VehicleVariabilityModel.sysml:128).
+        // Before the keyword-less fallback below since `variant` is a real keyword.
+        map(
+            crate::parser::part::variant_usage,
+            ActionUsageBodyElement::VariantUsage,
+        ),
+        // §6 G26: last, so every keyword-led member above keeps priority over the keyword-less
+        // `name = expr;` binding.
+        map(
+            crate::parser::attribute::default_reference_value_binding,
+            ActionUsageBodyElement::DefaultReferenceUsage,
+        ),
+    ))
+    .parse(input)
+}
+
+fn action_usage_body_structure_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionUsageBodyElement> {
+    alt((
+        map(crate::parser::part::part_usage, |p| {
+            ActionUsageBodyElement::PartUsage(Box::new(p))
+        }),
+        map(
+            crate::parser::item::item_usage,
+            ActionUsageBodyElement::ItemUsage,
+        ),
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            ActionUsageBodyElement::AssertConstraint,
+        ),
+    ))
+    .parse(input)
 }
 
 fn visibility_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
