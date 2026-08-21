@@ -1,11 +1,12 @@
 //! Metadata definition and usage parsing (BNF MetadataDefinition / MetadataUsage).
 
 use crate::ast::{Membership, MetadataDef, MetadataUsage, Node};
-use crate::parser::attribute::metadata_body;
+use crate::parser::attribute::metadata_body as attribute_metadata_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::parse_about_targets;
+use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -29,7 +30,7 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
             .abstract_only_prefix()
             .with_captured_visibility(),
     )?;
-    let (input, body) = metadata_body(input)?;
+    let (input, body) = attribute_metadata_body(input)?;
     Ok((
         input,
         node_from_to(

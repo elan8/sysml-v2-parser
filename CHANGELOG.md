@@ -7,7 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Flow AST alternatives use proportional indirection.** `FlowDeclaration` boxes only its
+  declaration-bearing alternative and the largest FlowUsage-owning package/part/interface body
+  variants now box their nodes. This preserves the grammar's discriminated shapes and serde wire
+  representation while preventing the endpoint-only and unrelated body alternatives from paying
+  for a full flow declaration. **AST version 223.**
+
+- **KerML directed keyword-less Features retain their own production.** In KerML type/classifier/
+  function bodies, `in value : T;`, `out result;`, and `in :>> inherited;` now route through the
+  existing source-backed `KermlFeature` parser (`BasicFeaturePrefix FeatureDeclaration`) rather
+  than the SysML-only `InOutDecl` state. `CalcDefBodyElement::InOutDecl` is removed; the separate
+  SysML `CalculationBody` action dispatcher retains it. Semantic snapshots now expose the complete
+  KerML feature prefix, declaration typing/multiplicity, relationship clauses, and value/body.
+  **AST version 222.**
+
+- **KerML TypeBody packages retain their owning membership.** `CalcDefBodyElement` now has
+  distinct source-backed `Package` and `LibraryPackage` members, each carrying the authored
+  `MemberPrefix` visibility beside its typed package node. This admits nested packages in KerML
+  type/classifier/function bodies without treating `private package` as expressions. **AST version
+  221.**
+
 ### Fixed
+
+- **Occurrence usages stop at their grammar-owned body.** `OccurrenceUsage` no longer consumes
+  a following anonymous `:>>` feature binding as a post-body specialization; `UsageCompletion`
+  ends with its body, so that binding remains the enclosing occurrence body's next member.
+  Recovery now also synchronizes on the complete typed anonymous-binding prefix set. This retains
+  the nested decimal snapshot binding and later outer binding in TimeVaryingAttribute without a
+  `done`-specific parser path (SysML textual BNF 305-315, 572-586; pinned Pilot
+  `SysML.xtext` 845-858). No AST schema change.
+
+- **Action usages retain the complete accept parameter alternative.** `ActionUsage::accept` now
+  uses the existing structured `TransitionAccept` shape, preserving either a typed payload or a
+  source-backed bare payload reference and keeping `via` inside the accept parameter rather than
+  duplicating it in the send-only action field. Direct accept action nodes and inline `then action`
+  usages share one transactional payload boundary; emission, semantic projection, visitors,
+  opacity inspection, provenance validation, and serde retain every accepted alternative (SysML
+  textual BNF 954-965 and 1002-1020; pinned Pilot `SysML.xtext` 1438-1451). Focused and upstream
+  Training 27/ServerSequence snapshots cover typed and bare payloads plus recovery.
+  **AST version 220.**
+
+- **Interface usage bodies retain perform members and local recovery.** `InterfaceUsage` now
+  owns the existing source-backed `PerformActionUsage` node alongside its already typed flow
+  member, and malformed members recover inside the body without discarding the enclosing
+  interface or valid later siblings. The recovery boundary rolls back speculative references and
+  preserves the malformed source span. Emission, semantic projection, visitors, opacity
+  inspection, provenance validation, and serde cover both variants (SysML textual BNF 724-759,
+  374-390; pinned Pilot `SysML.xtext` 1109-1144). Flashlight plus semantic and recovery fixtures
+  cover the boundary. **AST version 219.**
+
+- **Then successions retain inline conditional action nodes.** `ThenTarget::If` now owns the
+  existing typed `IfStmt`, including its condition and braced or shorthand branches, rather than
+  recovering `then if ...` as an unrecognized action-body element. The parser dispatches the
+  pinned `IfNode` alternative before the feature fallback; emission, semantic projection,
+  visitors, opacity inspection, provenance validation, and serde traverse it exhaustively (SysML
+  textual BNF 954-965 and 1123-1141; pinned Pilot `SysML.xtext` 1438-1439 and 1596-1612).
+  Focused semantic/recovery snapshots and Training 17 cover the source succession boundary.
+  **AST version 218.**
+
+- **Perform action usage declarations retain their grammatical alternative.**
+  `PerformActionUsageDeclaration` now distinguishes a declared `action` with its shared,
+  source-backed `UsageDeclaration` (including an anonymous declaration) from the supported
+  reference-subsetting shorthand. This removes the invalid action-name/reference mirror, retains
+  typing, multiplicity, modifiers, relationships, value, and body through emission, semantic
+  projection, visitors, opacity inspection, provenance validation, and serde. The parser admits
+  either branch transactionally without expanding other owners or interface-body dispatch (SysML
+  textual BNF 944-952; pinned Pilot `SysML.xtext` 1411-1418). Training 18, retained perform
+  corpus examples, and semantic and malformed-recovery snapshots cover both alternatives.
+  **AST version 217.**
+
+- **Interface usage parts retain distinct named endpoints.** `InterfacePart` now owns the
+  binary and n-ary alternatives from `InterfaceUsageDeclaration`, with source-backed endpoint
+  multiplicities, optional declared names, `::>`/`references` operator spans, and ordered dotted
+  or qualified reference targets. Both declared-`connect` and bare-interface-part forms parse
+  transactionally; formatter, semantic projection, visitors, provenance validation, opacity, and
+  serde exhaustively retain the result without reusing `KermlConnectorEnd` or generic `connect`
+  expression endpoints. Interface bodies also retain their grammar-valid nested flow usages, so
+  VehicleUsages' named `driveShaft` interface no longer recovers as one opaque member (SysML
+  textual BNF 727-784; pinned Pilot `SysML.xtext` 1120-1186). VehicleUsages, Training 11/13,
+  semantic, and malformed-recovery snapshots cover binary, n-ary, and named-end boundaries.
+  **AST version 216.**
+
+- **Metadata bodies retain keyword-less reference usages.** `MetadataAnnotation` and
+  `MetadataUsage` now own a distinct, recursive `MetadataBody` whose typed
+  `MetadataBodyUsage` members retain the optional authored `ref`, `:>>`/`redefines` operator,
+  required redefinition target, value, and nested body. This replaces the incorrect
+  `AttributeBody` projection that treated `totalRisk { probability = 0.3; }` as an attribute
+  declaration, while leaving unsupported MetadataBody alternatives explicit recovery. Emission,
+  semantic projection, visitors, opacity inspection, provenance validation, and serde traverse
+  the new source-backed shape (SysML textual BNF 1678-1693; pinned Pilot `KerML.xtext`
+  1098-1115). Retained RiskMetadata and extracted SimpleVehicle fixtures, plus malformed-body
+  recovery, cover the boundary. **AST version 215.**
+
+- **Action bodies retain guarded successions as their own production.** The pinned
+  `GuardedSuccession = ('succession' UsageDeclaration)? 'first' FeatureChainMember
+  GuardExpressionMember 'then' TransitionSuccessionMember UsageBody` now has a distinct,
+  source-backed AST node in action definition and action usage bodies. It retains the optional
+  succession declaration, feature-chain reference, authored `if`/`then` spans, guard expression,
+  typed connector-end target, and definition body rather than collapsing them into `FirstStmt`.
+  Transactional dispatch precedes that legacy alternative; emission, semantic projection,
+  visitors, opacity inspection, recovery, and serde cover the complete shape (SysML textual BNF
+  1180-1185; pinned Pilot `SysML.xtext` 1719-1725). **AST version 214.**
+
+- **Collection-operator parameters retain their full usage declaration.** Body-expression
+  parameters now carry source-backed feature specialization, including `:>` subsetting, rather
+  than a second name-and-typing-only header. **AST version 213.**
+
+- **Usage declarations are source-backed shared grammar.** Action-node declarations, for-loop
+  variables, and flow/message usages now embed one typed `UsageDeclaration`, retaining complete
+  feature-specialization relationships rather than owner-specific field mirrors. **AST version
+  212.**
 
 - **For action nodes retain their complete pinned grammar structure.** `ForLoopNode` now shares
   `ActionNodePrefix` with its loop/while siblings, owns a source-backed typed

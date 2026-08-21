@@ -1,6 +1,6 @@
 use super::behavior::{
-    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, InOut, InOutDecl, StateDefBody,
-    StateUsage,
+    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, FlowUsage, InOut, InOutDecl,
+    StateDefBody, StateUsage,
 };
 use super::body::Body;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
@@ -112,7 +112,7 @@ pub enum PartDefBodyElement {
     InterfaceDef(Node<InterfaceDef>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     /// `connection` usage member inside a part definition body.
     Connection(Node<ConnectionUsageMember>),
     Perform(Node<Perform>),
@@ -573,7 +573,48 @@ pub struct MetadataAnnotation {
     /// `'about' Annotation ( ',' Annotation )*`, where `Annotation = [QualifiedName]`.
     pub about_targets: Vec<QualifiedReferenceId>,
     /// `MetadataBody`.
-    pub body: AttributeBody,
+    pub body: MetadataBody,
+}
+
+/// `MetadataBody = ';' | '{' MetadataBodyElement* '}'`.
+///
+/// This body is deliberately not an [`AttributeBody`]. Its keyword-less members are reference
+/// redefinitions, not attributes with declaration labels, so sharing the old body would make
+/// `totalRisk { probability = 0.3; }` look like nested attribute declarations.
+pub type MetadataBody = Body<MetadataBodyElement>;
+
+/// One member of a metadata body (SysML textual BNF 1678-1693; KerML 1423-1438).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// The complete `AnnotatingElement` production.
+    Annotating(AnnotatingMember),
+    /// `MetadataBodyUsage`, a reference redefinition owned by the metadata type.
+    Usage(Node<MetadataBodyUsage>),
+}
+
+/// The optional authored redefinition introducer before a metadata-body target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataBodyRedefinitionOperator {
+    ColonGreaterGreater { span: Span },
+    Redefines { span: Span },
+}
+
+/// `MetadataBodyUsage`: a reference redefinition and its recursive metadata body.
+///
+/// `target` is the grammar's required `OwnedRedefinition`, not a declaration name. The optional
+/// `ref` and redefinition operator retain their own source spans so emission never reconstructs
+/// spelling from a string or makes an implicit relationship look explicit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MetadataBodyUsage {
+    pub ref_span: Option<Span>,
+    pub operator: Option<MetadataBodyRedefinitionOperator>,
+    pub target: QualifiedReferenceId,
+    pub value: Option<Node<FeatureValue>>,
+    pub body: MetadataBody,
 }
 
 impl PartialEq for MetadataAnnotation {
@@ -693,7 +734,7 @@ pub enum PartUsageBodyElement {
     Ref(Node<RefDecl>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     Perform(Node<Perform>),
     /// `succession` (name)? (`: Type`)? multiplicity? `first` ... `then` ...`;` (GH-92.3, BNF
     /// `SuccessionAsUsage`), e.g. `succession : HappensJustBefore first vehicle1_t0 then
@@ -854,31 +895,36 @@ pub enum VariantTypedUsage {
     Requirement(Box<Node<crate::ast::RequirementUsage>>),
 }
 
-/// Enacted performance: `perform` action_path `{` body `}` inside a part usage.
+/// Enacted performance: `perform` [`PerformActionTarget`] value/body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Perform {
     /// Optional `abstract` / `variation` prefix (§6 G5). `variation perform action doXorY { ... }`
     /// is real usage in the OMG spec Annex `7a1-Variant Configuration - General Concept-a.sysml`.
     pub usage_prefix: Option<DefinitionPrefix>,
-    /// Declaration label in the explicit `perform action name ...` form.
-    pub action_name: String,
-    /// Referenced action path in the shorthand `perform path` form.
-    pub action_reference: Option<QualifiedReferenceId>,
-    /// Structured type after `:` in `perform action name : Type`.
-    pub typing: Option<Node<TypingRelationship>>,
-    /// Multiplicity after the name (GH-89), e.g. `[*]` in `perform action takePicture[*] :>
-    /// PictureTaking::takePicture;` (Camera Example/Camera.sysml:4).
-    pub multiplicity: Option<Node<Multiplicity>>,
-    /// Redefinition target after `:>>`, e.g. `doXorY` in `perform action :>> doXorY = doX;`.
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    /// Subsetting target after `:>` (GH-89), e.g. `PictureTaking::takePicture` in `perform action
-    /// takePicture[*] :> PictureTaking::takePicture;` (Camera Example/Camera.sysml:4). Mutually
-    /// exclusive with `redefines` (whichever specialization keyword is present).
-    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// The grammar-owned `PerformActionUsageDeclaration` alternative.
+    pub target: PerformActionTarget,
     /// Bound value after `=`, e.g. `doX` in `perform action :>> doXorY = doX;`.
     pub value: Option<Node<FeatureValue>>,
     pub body: PerformBody,
+}
+
+/// `PerformActionUsageDeclaration` before its shared `ValuePart?` and action body.
+///
+/// The alternatives must remain distinct: a declared action owns a complete
+/// [`crate::ast::UsageDeclaration`], while the currently supported shorthand is a referenced
+/// action plus its reference-subsetting tail. Neither is a string mirror of the other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PerformActionTarget {
+    /// `'action' UsageDeclaration?`, including the zero-width anonymous declaration.
+    Action(Box<Node<crate::ast::UsageDeclaration>>),
+    /// `OwnedReferenceSubsetting FeatureSpecializationPart?` as currently supported: a
+    /// source-backed action reference with an optional `:>>` redefinition target.
+    Reference {
+        action: QualifiedReferenceId,
+        redefines: Option<Node<SubsettingRelationship>>,
+    },
 }
 
 /// Body of a perform: `;` or `{` PerformBodyElement* `}`.
@@ -1299,7 +1345,7 @@ pub enum InterfaceDefBodyElement {
     /// GH-85: bare `flow <a> to <b>;` shorthand connecting two of this interface's own ends, e.g.
     /// `flow p1.torque to p2.torque;` (OMG spec Annex `Vehicle Example/SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml`). Previously unmodeled -- this body had no flow arm at all.
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     /// `constraint` usage through `InterfaceBodyItem -> InterfaceOccurrenceUsageMember ->
     /// InterfaceOccurrenceUsageElement -> BehaviorUsageElement -> ConstraintUsage` (SysML BNF
     /// 727-750, 374-389, 1382-1395). The existing source-backed ConstraintUsage owns its
@@ -1663,7 +1709,7 @@ pub struct MetadataUsage {
     pub name: String,
     pub type_reference: Option<QualifiedReferenceId>,
     pub about_targets: Vec<QualifiedReferenceId>,
-    pub body: AttributeBody,
+    pub body: MetadataBody,
     pub membership: Membership,
 }
 
@@ -1990,6 +2036,64 @@ pub struct Bind {
 }
 
 /// Interface usage: typed+connect or connection form.
+///
+/// `InterfacePart` is intentionally separate from expression-based [`ConnectionEnd`]. The
+/// pinned `InterfaceEnd` production owns an optional declaration name plus a reference
+/// subsetting, so treating it as a path expression loses `left ::> port`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfacePart {
+    Binary {
+        from: Node<InterfaceEnd>,
+        to_span: Span,
+        to: Box<Node<InterfaceEnd>>,
+    },
+    Nary {
+        open_span: Span,
+        ends: Vec<InterfaceEndMember>,
+        close_span: Span,
+    },
+}
+
+/// One ordered endpoint in the parenthesized `NaryInterfacePart` form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InterfaceEndMember {
+    /// `None` only for the first endpoint; every later member owns its preceding comma.
+    pub comma_span: Option<Span>,
+    pub end: Node<InterfaceEnd>,
+}
+
+/// A source-backed `InterfaceEnd` (SysML textual BNF 778-784).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InterfaceEnd {
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub target: InterfaceEndTarget,
+}
+
+/// `InterfaceEnd`'s required reference subsetting, with its optional declaration label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfaceEndTarget {
+    Direct(QualifiedReferenceId),
+    Named {
+        /// Decoded `NAME`, retaining the authored token in the enclosing node.
+        name: Node<String>,
+        operator: InterfaceEndReferenceOperator,
+        target: QualifiedReferenceId,
+    },
+}
+
+/// The authored `REFERENCES` spelling joining an interface-end label to its target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfaceEndReferenceOperator {
+    Symbol { span: Span },
+    Keyword { span: Span },
+}
+
+/// Interface usage: typed+connect or connection form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsage {
@@ -2003,8 +2107,7 @@ pub enum InterfaceUsage {
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
-        from: Node<Expression>,
-        to: Node<Expression>,
+        part: Node<InterfacePart>,
         /// The `InterfaceBody`, delimiters included. Was a `ConnectBody` marker beside a separate
         /// element list -- one body fact in two fields, with no span for either brace.
         body: Body<InterfaceUsageBodyElement>,
@@ -2013,8 +2116,7 @@ pub enum InterfaceUsage {
     Connection {
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
-        from: Node<Expression>,
-        to: Node<Expression>,
+        part: Node<InterfacePart>,
         /// See [`InterfaceUsage::TypedConnect`]'s body. This variant kept only an element list
         /// that was always empty -- the parser discarded the body outright -- so the `;`/`{}`
         /// distinction and every member were lost.
@@ -2041,6 +2143,8 @@ pub enum InterfaceUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsageBodyElement {
+    /// A malformed member recovered within an interface usage body.
+    Error(Node<ParseErrorNode>),
     /// `ref` `:>>` name `=` value body.
     RefRedef {
         target: QualifiedReferenceId,
@@ -2052,6 +2156,13 @@ pub enum InterfaceUsageBodyElement {
     /// `end` member inside a typed, non-`connect` interface usage's body. Boxed: `EndDecl` is
     /// much larger than `RefRedef`, the other variant here.
     EndDecl(Box<Node<EndDecl>>),
+    /// A behavior occurrence usage in an interface body. `InterfaceOccurrenceUsageElement`
+    /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
+    /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.
+    FlowUsage(Box<Node<FlowUsage>>),
+    /// `PerformActionUsage`, retained as the grammar-owned perform production rather than a
+    /// reference-shaped interface-body special case.
+    Perform(Box<Node<Perform>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.

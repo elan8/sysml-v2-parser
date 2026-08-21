@@ -46,21 +46,38 @@ fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
     .parse(input)
 }
 
-/// After `accept` keyword: `name : Type` or shorthand expression, with an optional trailing
-/// `via <port>` clause (e.g. `accept TurnOn via commPort`).
+/// Transition-level `accept` trigger. Unlike an action-node accept parameter, this additionally
+/// admits the three `TriggerKind` alternatives.
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     crate::parser::span::reference_transaction(input, transition_accept_inner)
 }
 
 fn transition_accept_inner(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
+    accept_parameter_part(input, true)
+}
+
+/// `AcceptParameterPart` after its authored `accept` keyword. Both a direct `accept` action
+/// node and an inline `then action ... accept ...` use this boundary, so a bare payload reference
+/// stays a source-backed expression rather than becoming a decoded name string. `TriggerKind` is
+/// transition-only; action nodes admit only payload parameters (SysML textual BNF 1002-1020).
+pub(crate) fn action_accept_parameter(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
+    crate::parser::span::reference_transaction(input, |input| accept_parameter_part(input, false))
+}
+
+fn accept_parameter_part(
+    input: Input<'_>,
+    allow_trigger_kind: bool,
+) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = ws1(input)?;
     // §6 G8: a `TriggerKind` keyword replaces the payload entirely. Checked before `expression`,
     // which would otherwise take the keyword itself as a feature reference and leave the real
     // trigger expression to be misread as the transition's effect.
-    if let Ok((input, kind)) = trigger_kind(input) {
-        let (input, expr_node) = expression(input)?;
-        return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
+    if allow_trigger_kind {
+        if let Ok((input, kind)) = trigger_kind(input) {
+            let (input, expr_node) = expression(input)?;
+            return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
+        }
     }
     let payload_name = name(input).ok().map(|(_, value)| value);
     let (input, expr_node) = expression(input)?;
@@ -111,10 +128,10 @@ fn control_node_payload_stmt<'a>(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(keyword).parse(input)?;
-    let (input, _) = ws1(input)?;
     let is_send = keyword == b"send";
 
     let (input, name_span, type_ref_span, accept, send) = if is_send {
+        let (input, _) = ws1(input)?;
         // Peek for `via`/`to` first: neither is reserved in `name`/`expression`, so an empty
         // payload (BNF `EmptyParameterMember`) would otherwise be greedily consumed as a bare
         // feature reference instead of being left for the `via`/`to` clauses below.
@@ -140,17 +157,29 @@ fn control_node_payload_stmt<'a>(
         };
         (input, name_span, type_ref_span, None, payload)
     } else {
-        let (input, payload) = typed_payload_clause(input)?;
-        let name_span = payload.name_span.clone();
-        let type_ref_span = payload.type_span.clone();
-        (input, name_span, type_ref_span, Some(payload), None)
+        let (input, accept) = action_accept_parameter(input)?;
+        let (name_span, type_ref_span) = match &accept {
+            TransitionAccept::Payload(payload, _) => {
+                (payload.name_span.clone(), payload.type_span.clone())
+            }
+            TransitionAccept::Shorthand(expression, _) => (expression.span.clone(), None),
+            // `action_accept_parameter` deliberately rejects transition-only time triggers.
+            TransitionAccept::TimeTrigger(_, _) => {
+                unreachable!("action accept cannot be a time trigger")
+            }
+        };
+        (input, name_span, type_ref_span, Some(accept), None)
     };
 
-    let (input, via) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"via"[..])),
-        preceded(ws1, expression),
-    ))
-    .parse(input)?;
+    let (input, via) = if is_send {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b"via"[..])),
+            preceded(ws1, expression),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, to) = if is_send {
         opt(preceded(
             preceded(ws_and_comments, tag(&b"to"[..])),

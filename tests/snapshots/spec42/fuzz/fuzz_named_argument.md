@@ -33,7 +33,8 @@ package P {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 36) (line 2) (column 25) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 36) (line 2) (column 25) (len 1)))))
   )
-  (root (package (name "P") (body brace (calc-def (name "F") (modifiers) (body brace (in-out-declaration))) (attribute-usage) (attribute-usage))))
+  (root (package (name "P") (body brace (calc-def (name "F") (modifiers) (body brace (in-out (direction in) (reference false) (declaration "p") (subsets none) (type (ref r0)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (redefines none) (value none) (span (offset 29) (line 2) (column 18) (len 9))))) (attribute-usage) (attribute-usage))))
 )
 ~~~

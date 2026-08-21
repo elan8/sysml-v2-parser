@@ -4,10 +4,11 @@ use crate::ast::{
     ExtendedDefinition, MetadataAnnotation, MetadataDeclaredName, MetadataFeatureIntroducer,
     MetadataKeywordUsage, MetadataTypedBy, Node,
 };
-use crate::parser::attribute::metadata_body;
+use crate::parser::attribute::metadata_body as attribute_metadata_body;
 use crate::parser::lex::{
     identification, qualified_reference, starts_with_keyword, ws1, ws_and_comments,
 };
+use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
 use crate::parser::package::package_body;
 use crate::parser::specialization::parse_optional_definition_specialization;
@@ -186,7 +187,7 @@ fn metadata_keyword_usage_inner(
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, body) = metadata_body(input)?;
+    let (input, body) = attribute_metadata_body(input)?;
     Ok((
         input,
         node_from_to(

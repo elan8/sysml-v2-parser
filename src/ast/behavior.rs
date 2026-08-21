@@ -71,6 +71,9 @@ pub enum ActionDefBodyElement {
     Perform(Node<Perform>),
     Bind(Node<Bind>),
     FlowUsage(Node<FlowUsage>),
+    /// `first <feature-chain> if <guard> then <connector-end>`, the action-only
+    /// `GuardedSuccession` production (SysML BNF 1180-1185).
+    GuardedSuccession(Node<GuardedSuccession>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
     DecisionStmt(Node<DecisionStmt>),
@@ -125,13 +128,14 @@ pub struct AssignStmt {
     pub rhs: Node<Expression>,
 }
 
-/// `ForVariableDeclarationMember`'s typed `UsageDeclaration`.
+/// Grammar-owned `UsageDeclaration = Identification FeatureSpecializationPart?`.
 ///
 /// This is a declaration label and feature-specialization header, not a string reconstructed from
-/// the `for` text. The aggregate identification span preserves authored names for emission.
+/// a particular owning usage. The aggregate identification span preserves authored names for
+/// emission. Action nodes, for variables, and flow/message usages embed this exact production.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ForVariableDeclaration {
+pub struct UsageDeclaration {
     pub identification: Identification,
     pub identification_span: Span,
     pub typing: Option<Node<TypingRelationship>>,
@@ -143,6 +147,9 @@ pub struct ForVariableDeclaration {
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
 }
+
+/// `ForVariableDeclarationMember = UsageDeclaration`.
+pub type ForVariableDeclaration = UsageDeclaration;
 
 /// The `in` node parameter of `ForLoopNode`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -198,6 +205,10 @@ pub enum ThenTarget {
     /// ActionTest.sysml). Carries the same `ActionUsage` shape (with `send`/`via`/`to`
     /// clauses) the standalone `send ...;` statement produces.
     Send(Box<Node<ActionUsage>>),
+    /// `then if condition { ... }` — an inline conditional action node. `IfNode` owns its
+    /// condition and either braced or shorthand branches, so it cannot be represented as a
+    /// feature succession without losing the action-body grammar (SysML textual BNF 1123-1141).
+    If(Node<IfStmt>),
     /// `then continue;` — a reference to an already-declared node.
     Feature(Node<Expression>),
 }
@@ -272,8 +283,8 @@ impl PartialEq for PayloadClause {
 /// Publish(someTopic, somePublication);`, Interaction Sequencing Examples/
 /// ServerSequenceOutsideRealization-2.sysml). BNF `SendNode`'s payload is `NodeParameterMember`
 /// (`FeatureBinding = OwnedExpression`) -- a general expression -- unlike `accept`'s
-/// `PayloadParameter`, which stays typed-name-only (kept as [`PayloadClause`] on
-/// [`ActionUsage::accept`]).
+/// `PayloadParameter`, whose typed and source-backed shorthand alternatives are retained by
+/// [`TransitionAccept`] on [`ActionUsage::accept`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SendPayload {
@@ -379,14 +390,16 @@ pub struct ActionUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// For `action ... accept param : Type` form.
-    pub accept: Option<PayloadClause>,
+    /// For `action ... accept param : Type` or the pin-valid bare payload shorthand
+    /// `action ... accept Type via port`. The `via` target belongs to this grammar-owned accept
+    /// parameter part, not to [`Self::via`], which is reserved for `send`.
+    pub accept: Option<TransitionAccept>,
     /// For standalone `send` control-node statements: `send param : Type` or a general
     /// expression payload (`send new Publish(x, y)`, GH-86).
     pub send: Option<SendPayload>,
-    /// Optional `via <expr>` targeting clause on a standalone `accept`/`send` control-node
-    /// statement (BNF `AcceptParameterPart`/`SenderReceiverPart`, GH-86), e.g. `send new
-    /// Publish(someTopic, somePublication) via publicationPort;`.
+    /// Optional `via <expr>` targeting clause on a `send` control-node statement (BNF
+    /// `SenderReceiverPart`, GH-86), e.g. `send new Publish(someTopic, somePublication) via
+    /// publicationPort;`. Accept `via` targets are retained inside [`Self::accept`].
     pub via: Option<Node<Expression>>,
     /// Optional trailing `to <expr>` clause on a standalone `send` statement (BNF
     /// `SenderReceiverPart`, GH-86), e.g. `then send new S() to b;` (Simple Tests/ActionTest.sysml).
@@ -455,6 +468,8 @@ pub enum ActionUsageBodyElement {
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),
     FlowUsage(Node<FlowUsage>),
+    /// See [`ActionDefBodyElement::GuardedSuccession`].
+    GuardedSuccession(Node<GuardedSuccession>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
     DecisionStmt(Node<DecisionStmt>),
@@ -531,25 +546,46 @@ pub struct PayloadFeature {
     pub multiplicity: Option<Node<Multiplicity>>,
 }
 
-/// Flow usage: `flow` | `message` | `succession flow` with optional name, payload, and endpoints.
+/// The two grammar-owned alternatives of `FlowDeclaration` / `MessageDeclaration`.
+///
+/// The declaration-led form owns a `UsageDeclaration`, optional `FeatureValue`, optional payload,
+/// and optional endpoint pair. The endpoint-only form owns the required pair directly. Keeping
+/// these alternatives distinct makes it impossible to fabricate an empty declaration for
+/// `flow source to target;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FlowDeclaration {
+    Declared {
+        /// Boxed to keep this grammar alternative proportional to the endpoint-only form.
+        /// `Box` is serialization-transparent, so the public wire shape remains the declared
+        /// `UsageDeclaration` rather than an allocation detail.
+        declaration: Box<Node<UsageDeclaration>>,
+        value: Option<Node<FeatureValue>>,
+        payload: Option<Node<PayloadFeature>>,
+        /// Optional endpoints belong only to the declaration-led grammar alternative.
+        /// Boxing this optional pair keeps the enum's endpoint-only alternative compact without
+        /// changing its serialized representation.
+        endpoints: Box<Option<FlowEndpoints>>,
+    },
+    EndpointOnly {
+        endpoints: FlowEndpoints,
+    },
+}
+
+/// The coupled `from <end> to <end>` / `<end> to <end>` pair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FlowEndpoints {
+    pub from: Node<crate::ast::KermlConnectorEnd>,
+    pub to: Node<crate::ast::KermlConnectorEnd>,
+}
+
+/// Flow usage: `flow` | `message` | `succession flow` with a grammar-owned declaration form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowUsage {
     pub kind: FlowUsageKind,
-    pub name: Option<String>,
-    pub type_name: Option<QualifiedReferenceId>,
-    pub type_is_conjugated: bool,
-    /// `:>` subsets clause (spec42 gap 28), previously parsed by the shared usage header and
-    /// discarded.
-    pub subsets: Option<Node<SubsettingRelationship>>,
-    /// `:>>` redefines clause. See `subsets`.
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    pub payload: Option<Node<PayloadFeature>>,
-    /// Typed `from <end> to <end>` ends (spec42 gap 28), the same connector-end shape
-    /// `AllocationUsage` and the KerML connector members use -- previously opaque `Expression`
-    /// nodes.
-    pub from: Option<Node<crate::ast::KermlConnectorEnd>>,
-    pub to: Option<Node<crate::ast::KermlConnectorEnd>>,
+    pub declaration: FlowDeclaration,
     pub body: DefinitionBody,
     pub membership: Membership,
 }
@@ -579,6 +615,36 @@ pub struct FirstStmt {
     /// Multiplicity on the `then` end, e.g. `then [0..1] self`.
     pub then_multiplicity: Option<Node<Multiplicity>>,
     pub body: FirstMergeBody,
+}
+
+/// The optional `succession` declaration owned by a [`GuardedSuccession`].
+///
+/// This remains distinct from the `SuccessionAsUsage` prefix on [`FirstStmt`]: the guarded
+/// production owns an actual `UsageDeclaration`, while the older node predates that shared
+/// source-backed component and has its own endpoint grammar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GuardedSuccessionDeclaration {
+    pub keyword_span: Span,
+    pub declaration: Node<UsageDeclaration>,
+}
+
+/// Action-only guarded succession.
+///
+/// `('succession' UsageDeclaration)? 'first' FeatureChainMember 'if' OwnedExpression 'then'
+/// TransitionSuccessionMember UsageBody` (SysML BNF 1180-1185; Pilot `SysML.xtext` 1719-1725).
+/// The reference-chain source and connector-end target are deliberately not expressions: those
+/// are the exact grammar-owned member productions and retain their arena-backed identities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GuardedSuccession {
+    pub succession: Option<GuardedSuccessionDeclaration>,
+    pub first: QualifiedReferenceId,
+    pub if_span: Span,
+    pub guard: Node<Expression>,
+    pub then_span: Span,
+    pub target: Node<crate::ast::KermlConnectorEnd>,
+    pub body: DefinitionBody,
 }
 
 /// The optional declaration following a control-node keyword.
@@ -774,16 +840,7 @@ pub struct ActionNodePrefix {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionNodeUsageDeclaration {
     pub action_span: Span,
-    pub identification: Identification,
-    pub identification_span: Span,
-    pub typing: Option<Node<TypingRelationship>>,
-    pub multiplicity: Option<Node<Multiplicity>>,
-    pub multiplicity_modifiers: MultiplicityModifiers,
-    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    pub references: Option<Node<SubsettingRelationship>>,
-    pub crosses: Option<Node<SubsettingRelationship>>,
-    pub intersects: Option<Node<SubsettingRelationship>>,
+    pub declaration: Option<Node<UsageDeclaration>>,
 }
 
 /// The optional `until` parameter tail of a `WhileLoopNode`.

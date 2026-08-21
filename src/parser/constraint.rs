@@ -1,5 +1,6 @@
 use crate::ast::{
-    CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef, ConstraintDefBody,
+    CalcDef, CalcDefBody, CalcDefBodyElement, CalcDefBodyLibraryPackageMember,
+    CalcDefBodyPackageMember, CalcUsage, ConstraintDef, ConstraintDefBody,
     ConstraintDefBodyElement, ConstraintUsage, Expression, Membership, Node, ParseErrorNode,
     ReturnDecl,
 };
@@ -467,6 +468,39 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
     node_from_to(start, end, CalcDefBodyElement::Error(node))
 }
 
+/// KerML `TypeBodyElement -> NonFeatureMember -> MemberPrefix Package|LibraryPackage`.
+///
+/// `Package` itself has no membership slot: visibility belongs to the containing type-body
+/// member. Parse the prefix once, then invoke the existing source-backed package parser from the
+/// exact remainder. The enclosing transaction makes a refused library/package alternative leave
+/// no qualified-reference arena entries behind.
+fn calc_def_body_package_member(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
+    crate::parser::span::reference_transaction(input, |input| {
+        let (input, _) = ws_and_comments(input)?;
+        let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+        let membership = Membership::owning(visibility, visibility_span);
+        if starts_with_keyword(input.fragment(), b"package") {
+            let (input, package) = crate::parser::package::package_(input)?;
+            Ok((
+                input,
+                CalcDefBodyElement::Package(CalcDefBodyPackageMember {
+                    membership,
+                    package,
+                }),
+            ))
+        } else {
+            let (input, package) = crate::parser::package::library_package_(input)?;
+            Ok((
+                input,
+                CalcDefBodyElement::LibraryPackage(CalcDefBodyLibraryPackageMember {
+                    membership,
+                    package,
+                }),
+            ))
+        }
+    })
+}
+
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
     calc_body_with_element_parser(input, calc_def_body_element)
 }
@@ -519,8 +553,15 @@ where
 /// with no diagnostic at all, and formatted back that way.
 fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let (peek, _) = ws_and_comments(input)?;
+    // `MemberPrefix` is outside `StructureUsageMember` (SysML BNF 130-131, 262-264), so the
+    // action-family gate must look through it to recognize `private message …`.  Keep parsing
+    // from `peek`, rather than this lookahead remainder: `action_def_body_element` owns the
+    // prefix and records its source-backed visibility in the resulting membership.
+    let action_peek = visibility_prefix(peek)
+        .map(|(rest, _)| rest)
+        .unwrap_or(peek);
     if crate::parser::lex::starts_with_any_keyword(
-        peek.fragment(),
+        action_peek.fragment(),
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) {
         let start = input;
@@ -539,9 +580,63 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
             // begun and rejected a malformed relationship, preserve the error for calculation
             // body recovery instead of letting the keyword-less feature fallback shred it into
             // separate `ref` and name expressions.
-            Err(error) if starts_with_keyword(peek.fragment(), b"ref") => return Err(error),
+            Err(error) if starts_with_keyword(action_peek.fragment(), b"ref") => return Err(error),
             Err(_) => {}
         }
+    }
+    if starts_with_keyword(peek.fragment(), b"in")
+        || starts_with_keyword(peek.fragment(), b"out")
+        || starts_with_keyword(peek.fragment(), b"inout")
+    {
+        // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` keeps the directed
+        // parameter spelling in its SysML action-owned production. Do this before the KerML
+        // TypeBody fallback below: `calc def F { in p : T; }` must remain `InOutDecl`, whereas
+        // `behavior B { in p : T; }` reaches `calc_def_body_element` and is a keyword-less
+        // `Feature` (SysML BNF 1359-1370; KerML BNF 519-527, 562-608).
+        // A direction may instead belong to a full occurrence usage. Preserve the pre-existing
+        // `in calc …` / `in part …` action-body routes before testing the bare parameter
+        // declaration; an `InOutDecl` parser is intentionally not allowed to treat either kind
+        // keyword as a parameter name.
+        if let Ok((next, usage)) = calc_usage(input) {
+            let member = node_from_to(
+                input,
+                next,
+                crate::ast::ActionDefBodyElement::CalcUsage(Box::new(usage)),
+            );
+            return Ok((
+                next,
+                node_from_to(
+                    input,
+                    next,
+                    CalcDefBodyElement::ActionMember(Box::new(member)),
+                ),
+            ));
+        }
+        if let Ok((next, usage)) = crate::parser::part::part_usage(input) {
+            return Ok((
+                next,
+                node_from_to(input, next, CalcDefBodyElement::PartUsage(Box::new(usage))),
+            ));
+        }
+        let start = input;
+        // Do not call the whole action dispatcher here: its directed `calc` usage probe may
+        // accept the `calc` prefix of an ordinary parameter name before this production gets a
+        // chance to retain the declaration. The grammar-owned parameter parser is already
+        // transactional and supplies the exact `ActionDefBodyElement` alternative directly.
+        let (next, declaration) = in_out_decl(input)?;
+        let member = node_from_to(
+            start,
+            next,
+            crate::ast::ActionDefBodyElement::InOutDecl(declaration),
+        );
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                CalcDefBodyElement::ActionMember(Box::new(member)),
+            ),
+        ));
     }
     calc_def_body_element(input)
 }
@@ -1488,6 +1583,12 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
                 annotation,
             )),
         )
+    } else if starts_with_keyword(after_visibility, b"package")
+        || starts_with_keyword(after_visibility, b"library")
+        || starts_with_keyword(after_visibility, b"standard")
+    {
+        let (next, member) = calc_def_body_package_member(input)?;
+        (next, member)
     } else if starts_with_keyword(input.fragment(), b"doc")
         || starts_with_keyword(input.fragment(), b"comment")
         || starts_with_keyword(input.fragment(), b"rep")
@@ -1594,6 +1695,15 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             |n| CalcDefBodyElement::DefaultReferenceUsage(Box::new(n)),
         )
         .parse(input)?
+    } else if crate::parser::package::starts_abstract_kerml_classifier(input) {
+        // `abstract` is both BasicFeaturePrefix's third slot (KerML BNF 577) and an optional
+        // classifier modifier. Resolve that FIRST-set overlap before the feature arm: an
+        // `abstract struct/class/...` must remain a classifier, while an `abstract end feature`
+        // chain below is malformed FeaturePrefix input and belongs to recovery.
+        map(crate::parser::package::kerml_classifier_structured, |n| {
+            CalcDefBodyElement::KermlClassifier(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_any_keyword(
         after_visibility,
         &[
@@ -1608,7 +1718,8 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"expr",
         ],
     ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end", b"const"])
-        && kerml_feature(input).is_ok())
+        && (kerml_feature(input).is_ok()
+            || malformed_feature_prefix_continuation(after_visibility_input)))
     {
         map(kerml_feature, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
@@ -1671,21 +1782,22 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             }
             // `in expr …` / `in bool …` / `in feature …` / `in step …` are `FeaturePrefix`'s
             // direction slot in front of the same four productions the undirected spelling uses
-            // (KerML BNF 577/562/863/895/908), so they are the same node. Ahead of plain
-            // `InOutDecl`, which would misread the kind keyword as the parameter name.
+            // (KerML BNF 577/562/863/895/908), so they are the same node.
             Some(_) => map(kerml_feature, |n| {
                 CalcDefBodyElement::KermlFeature(Box::new(n))
             })
             .parse(input)?,
-            None if named_in_out_missing_type(input) => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-            None => {
-                map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
-            }
+            // The keyword-less `Feature` alternative is the remaining production under this
+            // KerML TypeBody dispatcher: `in value : T;`, `out result;`, and `in :>> inherited;`
+            // are `BasicFeaturePrefix FeatureDeclaration` (KerML BNF 562-569, 577-608), not the
+            // SysML action-body parameter shorthand. Re-parse from the original input through
+            // the transactional feature parser so every prefix/declaration clause owns its
+            // source-backed span. `calculation_body` keeps its separate ActionBody dispatch and
+            // therefore retains `InOutDecl` for SysML calculation members.
+            None => map(kerml_feature, |n| {
+                CalcDefBodyElement::KermlFeature(Box::new(n))
+            })
+            .parse(input)?,
         }
     } else if calc_def_follows_visibility(input) {
         // Nested `(private|protected|public)? calc def Name { ... }` rollup helper (Domain
@@ -1718,6 +1830,16 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             )?;
             (next, CalcDefBodyElement::Error(node))
         }
+    // `Message` is a SysML `StructureUsageElement` (SysML BNF 805), not a KerML
+    // `FeatureElement`.  A CalculationBody reaches it through ActionBodyItem above, but a
+    // KerML TypeBody must reject it before the keyword-less expression fallback can shred its
+    // declaration into `message`, name, `of`, and type expressions.  Use the original input so
+    // recovery retains a single exact source span, including a leading MemberPrefix.
+    } else if starts_with_keyword(after_visibility, b"message") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     } else if let Ok((next, binding)) = calc_named_binding(input) {
         // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
         // `private thisClock : Clock :>> self;`) -- tried before the bare-expression arm,
@@ -1732,6 +1854,59 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// Whether a reserved `FeaturePrefix` head is immediately followed by a token which makes its
+/// ordered production malformed.
+///
+/// `FeaturePrefix`'s `BasicFeaturePrefix` accepts `abstract`, but its ordered slot sequence does
+/// not allow the earlier `derived`/direction slots or the separate `EndFeaturePrefix` afterward.
+/// Conversely, `EndFeaturePrefix` spells only optional `const` *before* its required `end`, so a
+/// BasicFeaturePrefix slot after `end` is invalid. If either chain is not dispatched to
+/// [`kerml_feature`], the terminal expression fallback fabricates a feature reference for its
+/// first keyword and parses the rest as a second member. This lookahead is intentionally lexical:
+/// it never allocates or accepts syntax; the owning, transactional feature parser still decides
+/// whether the complete production is valid.
+fn malformed_feature_prefix_continuation(input: Input<'_>) -> bool {
+    if let Some((input, _)) = crate::parser::occurrence_prefix::slot_keyword(input, b"abstract") {
+        return starts_with_any_keyword(
+            input.fragment(),
+            &[
+                b"member",
+                b"in",
+                b"out",
+                b"inout",
+                b"derived",
+                b"abstract",
+                b"composite",
+                b"portion",
+                b"var",
+                b"const",
+                b"end",
+                b"feature",
+                b"step",
+                b"expr",
+                b"bool",
+            ],
+        );
+    }
+    if let Some((input, _)) = crate::parser::occurrence_prefix::slot_keyword(input, b"end") {
+        return starts_with_any_keyword(
+            input.fragment(),
+            &[
+                b"in",
+                b"out",
+                b"inout",
+                b"derived",
+                b"abstract",
+                b"composite",
+                b"portion",
+                b"var",
+                b"const",
+            ],
+        );
+    }
+    false
 }
 
 fn named_in_out_missing_type(input: Input<'_>) -> bool {

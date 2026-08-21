@@ -28,7 +28,8 @@ in newX : Real;
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 29) (line 1) (column 30) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 29) (line 1) (column 30) (len 4)))))
   )
-  (root (package (name "MyPkg") (body brace)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (kerml-feature (name "newX") (relationships) (value none) (body semicolon)))
+  (root (package (name "MyPkg") (body brace)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction in) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind none) (member false) (all false) (name "newX") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (relationships) (value none) (body semicolon)))
 )
 ~~~

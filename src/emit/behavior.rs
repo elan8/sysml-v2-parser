@@ -10,9 +10,9 @@ use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, Allocate, AssignStmt, ExhibitState, InOutDecl, Perform, PerformBody,
-    PerformBodyElement, PerformInOutBinding, StateDef, StateDefBody, StateDefBodyElement,
-    StateUsage, ThenAction, ThenTarget,
+    ActionUsageBodyElement, Allocate, AssignStmt, ExhibitState, InOutDecl, Perform,
+    PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, StateDef,
+    StateDefBody, StateDefBodyElement, StateUsage, ThenAction, ThenTarget, UsageDeclaration,
 };
 
 pub(crate) fn emit_inout_decl(
@@ -131,10 +131,22 @@ fn emit_action_node_usage_declaration(
     declaration: &crate::ast::ActionNodeUsageDeclaration,
 ) -> Result<(), EmitError> {
     w.push_str("action");
+    let Some(declaration) = declaration.declaration.as_ref() else {
+        return Ok(());
+    };
+    emit_usage_declaration(w, path, &declaration.value)
+}
+
+/// Stream the grammar-owned declaration shared by action-node and perform-action forms.
+fn emit_usage_declaration(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    declaration: &UsageDeclaration,
+) -> Result<(), EmitError> {
     if declaration.identification_span.len != 0 {
         w.push_char(' ');
         w.push_authored_name(
-            &format!("{path}/action-declaration/identification"),
+            &format!("{path}/declaration/identification"),
             &declaration.identification_span,
         )?;
     }
@@ -275,15 +287,17 @@ pub(crate) fn emit_action_usage(
         w.push_str(kw);
         if let Some(accept) = &usage.accept {
             w.push_char(' ');
-            emit_payload_clause(w, path, accept)?;
+            emit_transition_accept(w, path, accept)?;
         }
         if let Some(send) = &usage.send {
             w.push_char(' ');
             emit_send_payload(w, path, send)?;
         }
-        if let Some(via) = &usage.via {
-            w.push_str(" via ");
-            emit_expression(w, &via.value)?;
+        if !is_standalone_accept {
+            if let Some(via) = &usage.via {
+                w.push_str(" via ");
+                emit_expression(w, &via.value)?;
+            }
         }
         if let Some(to) = &usage.to {
             w.push_str(" to ");
@@ -327,15 +341,17 @@ pub(crate) fn emit_action_usage(
     }
     if let Some(accept) = &usage.accept {
         w.push_str(" accept ");
-        emit_payload_clause(w, path, accept)?;
+        emit_transition_accept(w, path, accept)?;
     }
     if let Some(send) = &usage.send {
         w.push_str(" send ");
         emit_send_payload(w, path, send)?;
     }
-    if let Some(via) = &usage.via {
-        w.push_str(" via ");
-        emit_expression(w, &via.value)?;
+    if usage.accept.is_none() {
+        if let Some(via) = &usage.via {
+            w.push_str(" via ");
+            emit_expression(w, &via.value)?;
+        }
     }
     if let Some(to) = &usage.to {
         w.push_str(" to ");
@@ -447,6 +463,9 @@ pub(crate) fn emit_action_def_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         ActionDefBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
+        ActionDefBodyElement::GuardedSuccession(succession) => {
+            emit_guarded_succession(w, path, &succession.value)
+        }
         ActionDefBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
         ActionDefBodyElement::MergeStmt(m) => emit_merge_stmt(w, path, &m.value),
         ActionDefBodyElement::DecisionStmt(d) => emit_decision_stmt(w, path, &d.value),
@@ -547,6 +566,9 @@ pub(crate) fn emit_action_usage_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         ActionUsageBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
+        ActionUsageBodyElement::GuardedSuccession(succession) => {
+            emit_guarded_succession(w, path, &succession.value)
+        }
         ActionUsageBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
         ActionUsageBodyElement::MergeStmt(m) => emit_merge_stmt(w, path, &m.value),
         ActionUsageBodyElement::DecisionStmt(d) => emit_decision_stmt(w, path, &d.value),
@@ -648,6 +670,16 @@ pub(crate) fn emit_then_action_pub(
             Ok(())
         }
         ThenTarget::Send(a) => emit_action_usage(w, path, &a.value),
+        ThenTarget::If(i) => {
+            w.push_str("if ");
+            emit_expression(w, &i.value.condition.value)?;
+            emit_action_branch_body(w, path, &i.value.then_body)?;
+            if let Some(else_body) = &i.value.else_body {
+                w.push_str(" else");
+                emit_action_branch_body(w, path, else_body)?;
+            }
+            Ok(())
+        }
         ThenTarget::Feature(f) => {
             emit_expression(w, &f.value)?;
             w.push_char(';');
@@ -663,25 +695,17 @@ pub(crate) fn emit_perform(
 ) -> Result<(), EmitError> {
     emit_definition_prefix_value(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
-    if let Some(action_reference) = perform.action_reference {
-        w.push_qualified_reference(path, action_reference)?;
-    } else {
-        w.push_str("action ");
-        if !perform.action_name.is_empty() {
-            w.push_str(&format_name(&perform.action_name));
+    match &perform.target {
+        PerformActionTarget::Action(declaration) => {
+            w.push_str("action");
+            emit_usage_declaration(w, path, &declaration.value)?;
         }
-    }
-    if let Some(mult) = &perform.multiplicity {
-        emit_multiplicity(w, &mult.value)?;
-    }
-    if let Some(redef) = &perform.redefines {
-        emit_subsetting_clause(w, &redef.value)?;
-    }
-    if let Some(subsets) = &perform.subsets {
-        emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(typing) = &perform.typing {
-        emit_typing_clause(w, &typing.value)?;
+        PerformActionTarget::Reference { action, redefines } => {
+            w.push_qualified_reference(path, *action)?;
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+        }
     }
     if let Some(value) = &perform.value {
         emit_feature_value(w, value)?;
@@ -1198,57 +1222,84 @@ pub(crate) fn emit_flow_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, flow.membership.visibility);
     match flow.kind {
-        crate::ast::FlowUsageKind::Flow => w.push_str("flow "),
-        crate::ast::FlowUsageKind::Message => w.push_str("message "),
-        crate::ast::FlowUsageKind::SuccessionFlow => w.push_str("succession flow "),
+        crate::ast::FlowUsageKind::Flow => w.push_str("flow"),
+        crate::ast::FlowUsageKind::Message => w.push_str("message"),
+        crate::ast::FlowUsageKind::SuccessionFlow => w.push_str("succession flow"),
     }
-    if let Some(name) = &flow.name {
-        w.push_str(&format_name(name));
-    }
-    if let Some(ty) = flow.type_name {
-        w.push_str(" : ");
-        if flow.type_is_conjugated {
-            w.push_char('~');
-        }
-        w.push_qualified_reference(path, ty)?;
-    }
-    if let Some(payload) = &flow.payload {
-        // The kind keyword already ends with a space when nothing was emitted since.
-        if flow.name.is_some() || flow.type_name.is_some() {
-            w.push_str(" of ");
-        } else {
-            w.push_str("of ");
-        }
-        if let Some(n) = &payload.value.name {
-            w.push_str(&format_name(n));
-            if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
-                w.push_str(" : ");
+    match &flow.declaration {
+        crate::ast::FlowDeclaration::Declared {
+            declaration,
+            value,
+            payload,
+            endpoints,
+        } => {
+            let declaration = &declaration.value;
+            if declaration.identification_span.len != 0 {
+                w.push_char(' ');
+                w.push_authored_name(
+                    &format!("{path}/declaration/identification"),
+                    &declaration.identification_span,
+                )?;
+            }
+            if let Some(typing) = &declaration.typing {
+                emit_typing_clause(w, &typing.value)?;
+            }
+            if let Some(multiplicity) = &declaration.multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+            if let Some((subsets, value)) = &declaration.subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+                if let Some(value) = value {
+                    w.push_str(" = ");
+                    emit_expression(w, &value.value)?;
+                }
+            }
+            for relationship in [
+                declaration.redefines.as_ref(),
+                declaration.references.as_ref(),
+                declaration.crosses.as_ref(),
+                declaration.intersects.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                emit_subsetting_clause(w, &relationship.value)?;
+            }
+            if let Some(value) = value {
+                emit_feature_value(w, value)?;
+            }
+            if let Some(payload) = payload {
+                w.push_str(" of ");
+                if let Some(n) = &payload.value.name {
+                    w.push_str(&format_name(n));
+                    if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
+                        w.push_str(" : ");
+                    }
+                }
+                if let Some(ty) = payload.value.type_name {
+                    if payload.value.type_is_conjugated {
+                        w.push_char('~');
+                    }
+                    w.push_qualified_reference(path, ty)?;
+                }
+                if let Some(mult) = &payload.value.multiplicity {
+                    emit_multiplicity(w, &mult.value)?;
+                }
+            }
+            if let Some(endpoints) = &**endpoints {
+                w.push_str(" from ");
+                super::view::emit_kerml_connector_end(w, path, &endpoints.from.value)?;
+                w.push_str(" to ");
+                super::view::emit_kerml_connector_end(w, path, &endpoints.to.value)?;
             }
         }
-        if let Some(ty) = payload.value.type_name {
-            if payload.value.type_is_conjugated {
-                w.push_char('~');
-            }
-            w.push_qualified_reference(path, ty)?;
-        }
-        if let Some(mult) = &payload.value.multiplicity {
-            emit_multiplicity(w, &mult.value)?;
-        }
-    }
-    if let Some(from) = &flow.from {
-        // Anonymous flows keep the canonical `flow from <a> to <b>` keyword spelling: the
-        // parser recognizes `from` as the endpoint keyword rather than a declared name
-        // (spec42 Gap 47).
-        if flow.name.is_some() || flow.payload.is_some() || flow.type_name.is_some() {
+        crate::ast::FlowDeclaration::EndpointOnly { endpoints } => {
             w.push_str(" from ");
-        } else {
-            w.push_str("from ");
+            super::view::emit_kerml_connector_end(w, path, &endpoints.from.value)?;
+            w.push_str(" to ");
+            super::view::emit_kerml_connector_end(w, path, &endpoints.to.value)?;
         }
-        super::view::emit_kerml_connector_end(w, path, &from.value)?;
-    }
-    if let Some(to) = &flow.to {
-        w.push_str(" to ");
-        super::view::emit_kerml_connector_end(w, path, &to.value)?;
     }
     emit_definition_body(w, path, &flow.body)
 }
@@ -1411,6 +1462,61 @@ pub(crate) fn emit_first_stmt(
         emit_expression(w, &then.value)?;
     }
     emit_first_merge_body(w, path, &first.body)
+}
+
+/// Emit the action-only `GuardedSuccession` production from its grammar-owned parts.
+///
+/// This deliberately does not reuse `FirstStmt`: its source is an arena-backed feature-chain
+/// reference and its target is a typed connector end, not expression placeholders.
+pub(crate) fn emit_guarded_succession(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    succession: &crate::ast::GuardedSuccession,
+) -> Result<(), EmitError> {
+    if let Some(declaration) = &succession.succession {
+        w.push_str("succession");
+        let declaration = &declaration.declaration.value;
+        if declaration.identification_span.len != 0 {
+            w.push_char(' ');
+            w.push_authored_name(
+                &format!("{path}/succession-declaration/identification"),
+                &declaration.identification_span,
+            )?;
+        }
+        if let Some(typing) = &declaration.typing {
+            emit_typing_clause(w, &typing.value)?;
+        }
+        if let Some(multiplicity) = &declaration.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+        emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+        if let Some((subsets, value)) = &declaration.subsets {
+            emit_subsetting_clause(w, &subsets.value)?;
+            if let Some(value) = value {
+                w.push_str(" = ");
+                emit_expression(w, &value.value)?;
+            }
+        }
+        for relationship in [
+            declaration.redefines.as_ref(),
+            declaration.references.as_ref(),
+            declaration.crosses.as_ref(),
+            declaration.intersects.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            emit_subsetting_clause(w, &relationship.value)?;
+        }
+        w.push_char(' ');
+    }
+    w.push_str("first ");
+    w.push_qualified_reference(&format!("{path}/first"), succession.first)?;
+    w.push_str(" if ");
+    emit_expression(w, &succession.guard.value)?;
+    w.push_str(" then ");
+    super::view::emit_kerml_connector_end(w, &format!("{path}/target"), &succession.target.value)?;
+    emit_definition_body(w, path, &succession.body)
 }
 
 fn emit_first_merge_body(

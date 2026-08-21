@@ -252,10 +252,17 @@ fn emit_calc_body_element(
         CalcDefBodyElement::MetadataKeywordUsage(usage) => {
             super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
         }
+        CalcDefBodyElement::Package(member) => {
+            emit_visibility(w, member.membership.visibility);
+            super::root::emit_package(w, path, &member.package.value)
+        }
+        CalcDefBodyElement::LibraryPackage(member) => {
+            emit_visibility(w, member.membership.visibility);
+            super::root::emit_library_package(w, path, &member.package.value)
+        }
         CalcDefBodyElement::ActionMember(n) => {
             super::behavior::emit_action_def_body_element(w, path, &n.value)
         }
-        CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature(w, path, &f.value),
         CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),

@@ -39,27 +39,28 @@ pub use ast::{
     AliasDef, AllocationDef, AllocationUsage, AnalysisCaseDef, AnalysisCaseUsage, Argument,
     AstNode, AttributeBody, AttributeDef, AttributeUsage, BasicUsagePrefix, Bind, CaseDef,
     CaseUsage, CollectionOperator, CollectionOperatorBody, CollectionOperatorParameter,
-    CollectionOperatorParameterTyping, CommentAnnotation, Connect, ConnectStmt, ConnectionDef,
-    ConnectionDefBody, ConnectionDefBodyElement, DeclarationName, Dependency,
-    DerivationConnectionRole, DerivationEndRole, DocComment, EndDecl, EndDeclIntroducer,
-    EndIdentity, Expression, FilterMember, FilterPackageMember, FirstMergeBody,
-    FirstMergeBodyElement, FirstStmt, FlowDef, FlowUsage, FlowUsageKind, ForLoop,
-    ForLoopInParameter, ForVariableDeclaration, Identification, Import, ImportShape,
-    ImportSuffixSpans, ImportTarget, InOut, InOutDecl, InlineRequirementDeclaration, InterfaceDef,
-    InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement,
-    ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement,
-    OccurrencePortionKind, OccurrenceUsage, OccurrenceUsageBody, OccurrenceUsagePrefix, Package,
-    PackageBody, PackageBodyElement, ParseErrorNode, ParsedDocument, PartDef, PartDefBody,
-    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform,
-    PerformBody, PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef,
-    PortDefBody, PortDefBodyElement, PortUsage, QualifiedDeclarationName, QualifiedIdentification,
+    CommentAnnotation, Connect, ConnectStmt, ConnectionDef, ConnectionDefBody,
+    ConnectionDefBodyElement, DeclarationName, Dependency, DerivationConnectionRole,
+    DerivationEndRole, DocComment, EndDecl, EndDeclIntroducer, EndIdentity, Expression,
+    FilterMember, FilterPackageMember, FirstMergeBody, FirstMergeBodyElement, FirstStmt, FlowDef,
+    FlowUsage, FlowUsageKind, ForLoop, ForLoopInParameter, ForVariableDeclaration, Identification,
+    Import, ImportShape, ImportSuffixSpans, ImportTarget, InOut, InOutDecl,
+    InlineRequirementDeclaration, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceEnd, InterfaceEndMember, InterfaceEndReferenceOperator, InterfaceEndTarget,
+    InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, ItemUsage, LoopStmt, MergeStmt,
+    NamespaceDecl, Node, OccurrenceBodyElement, OccurrencePortionKind, OccurrenceUsage,
+    OccurrenceUsageBody, OccurrenceUsagePrefix, Package, PackageBody, PackageBodyElement,
+    ParseErrorNode, ParsedDocument, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
+    PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform, PerformActionTarget, PerformBody,
+    PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef, PortDefBody,
+    PortDefBodyElement, PortUsage, QualifiedDeclarationName, QualifiedIdentification,
     QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceMetadata,
     QualifiedReferenceValidationError, QualifiedReferenceView, RefBody, RefDecl, RefPrefix,
     ReferenceSegment, ReferenceSeparator, RelationshipBodyElement, RequireConstraint,
     RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef,
     ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace, SatisfactionSubject,
     SatisfiedRequirement, SatisfyRequirementUsage, SegmentRange, SourceStorage, Span,
-    TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, UntilParameter,
+    TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, UntilParameter, UsageDeclaration,
     UsageExtensionKeyword, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use emit::{
@@ -70,7 +71,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 211;
+pub const PARSE_AST_VERSION: u32 = 223;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

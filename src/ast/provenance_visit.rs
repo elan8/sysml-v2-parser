@@ -8,7 +8,8 @@
 //! traversal knows about it -- there is no separate list here to keep in step.
 
 use super::visit::{
-    walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_metadata_annotation,
+    walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_interface_end,
+    walk_interface_part, walk_metadata_annotation, walk_metadata_body_usage,
     walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
     walk_usage_extension_keyword, Visitor,
 };
@@ -126,6 +127,50 @@ impl Visitor for ProvenanceValidator<'_> {
                 .to_string(),
             );
         }
+    }
+
+    fn visit_interface_part(&mut self, node: &Node<InterfacePart>) {
+        if self.error.is_some() {
+            return;
+        }
+        match &node.value {
+            InterfacePart::Binary { to_span, .. } => {
+                self.check(self.delimiter(to_span, "to", "interface-part to keyword"));
+            }
+            InterfacePart::Nary {
+                open_span,
+                ends,
+                close_span,
+            } => {
+                self.check(self.delimiter(open_span, "(", "interface-part open parenthesis"));
+                self.check(self.delimiter(close_span, ")", "interface-part close parenthesis"));
+                for member in ends.iter().skip(1) {
+                    if let Some(comma_span) = &member.comma_span {
+                        self.check(self.delimiter(comma_span, ",", "interface-part comma"));
+                    } else {
+                        self.error =
+                            Some("non-first interface endpoint has no comma span".to_owned());
+                        return;
+                    }
+                }
+            }
+        }
+        walk_interface_part(self, node);
+    }
+
+    fn visit_interface_end(&mut self, node: &Node<InterfaceEnd>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let InterfaceEndTarget::Named { name, operator, .. } = &node.value.target {
+            self.check(sigil_within(&name.span, &node.span, "interface end name"));
+            let (span, token) = match operator {
+                InterfaceEndReferenceOperator::Symbol { span } => (span, "::>"),
+                InterfaceEndReferenceOperator::Keyword { span } => (span, "references"),
+            };
+            self.check(self.delimiter(span, token, "interface end reference operator"));
+        }
+        walk_interface_end(self, node);
     }
 
     fn enter_node(&mut self, span: &Span) {
@@ -281,6 +326,23 @@ impl Visitor for ProvenanceValidator<'_> {
             }
         }
         walk_metadata_annotation(self, node);
+    }
+
+    fn visit_metadata_body_usage(&mut self, node: &Node<MetadataBodyUsage>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Some(span) = &node.value.ref_span {
+            self.check(self.delimiter(span, "ref", "metadata body reference keyword"));
+        }
+        if let Some(operator) = &node.value.operator {
+            let (span, token) = match operator {
+                MetadataBodyRedefinitionOperator::ColonGreaterGreater { span } => (span, ":>>"),
+                MetadataBodyRedefinitionOperator::Redefines { span } => (span, "redefines"),
+            };
+            self.check(self.delimiter(span, token, "metadata body redefinition operator"));
+        }
+        walk_metadata_body_usage(self, node);
     }
 
     /// `SatisfyRequirementUsage` records every keyword whose presence is a grammatical choice.

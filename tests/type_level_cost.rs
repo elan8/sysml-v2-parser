@@ -92,6 +92,30 @@ fn nested_source(depth: usize) -> String {
     source
 }
 
+/// The narrow debug-stack budget for the largest currently supported action-body dispatch.
+///
+/// This is a resource contract, not an AST-shape assertion: a nested `for` / `perform action`
+/// chain used to retain several wide `nom::Choice` frames and abort a 2 MiB worker stack in debug
+/// builds. The public strict entry point must return normally on the same budget that a Rayon-like
+/// worker commonly provides.
+#[test]
+fn nested_action_body_dispatch_fits_a_two_mib_worker_stack() {
+    const PROBE: &str = "package P { action def A { for x in seq { perform action doStuff : DoStuff { for y in items { } } } } }";
+
+    let worker = std::thread::Builder::new()
+        .name("gap68-2mib".to_owned())
+        .stack_size(2 * 1024 * 1024)
+        // The resource contract only needs the worker to complete a strict parse. Keep the
+        // public parse error on the worker stack rather than making the thread's transport type
+        // carry its large diagnostic payload.
+        .spawn(|| parse(PROBE).is_ok())
+        .expect("spawn two-MiB parser worker");
+    assert!(
+        worker.join().expect("two-MiB parser worker must not panic"),
+        "Gap 68 probe must parse cleanly"
+    );
+}
+
 /// Parsing, walking and dropping a document nested to the supported depth is stack-safe at the
 /// default limit, and exceeding that depth is a diagnostic rather than an overflow.
 #[test]

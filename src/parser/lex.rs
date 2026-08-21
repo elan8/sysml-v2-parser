@@ -532,6 +532,31 @@ pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"public",
 ];
 
+/// Starters for the currently typed members of `InterfaceUsage`'s `InterfaceBody`.
+///
+/// This deliberately differs from [`INTERFACE_DEF_BODY_STARTERS`]: the two grammar productions
+/// share `InterfaceBody`, but their AST owners support different member sets. In particular,
+/// `perform` is a `BehaviorUsageElement` here, while `message` and `succession flow` travel
+/// through the existing `FlowUsage` owner. Every accepted prefix is listed so recovery resumes
+/// before a valid later member instead of absorbing it into the preceding malformed span.
+pub(crate) const INTERFACE_USAGE_BODY_STARTERS: &[&[u8]] = &[
+    b"ref",
+    b"end",
+    b"flow",
+    b"message",
+    b"succession",
+    b"perform",
+    b"doc",
+    b"comment",
+    b"rep",
+    b"@",
+    b"abstract",
+    b"variation",
+    b"private",
+    b"protected",
+    b"public",
+];
+
 /// Skip optional whitespace (space, tab, newline).
 pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) =

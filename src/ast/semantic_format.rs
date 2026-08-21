@@ -454,20 +454,46 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             } else {
                 self.writer.write_str("none")?;
             }
-            self.writer.write_str(") (name ")?;
-            write_quoted(self.writer, &parameter.value.name)?;
-            self.writer.write_char(' ')?;
-            write_span(self.writer, &parameter.value.name_span)?;
+            let declaration = &parameter.value.declaration.value;
+            self.writer.write_str(") (declaration (name ")?;
+            write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+            self.writer.write_str(") (short-name ")?;
+            write_optional_quoted(
+                self.writer,
+                declaration.identification.short_name.as_deref(),
+            )?;
             self.writer.write_str(") (typing ")?;
-            if let Some(typing) = &parameter.value.typing {
-                self.writer.write_str("(typed (separator ")?;
-                write_span(self.writer, &typing.separator_span)?;
-                self.writer.write_str(") (target ")?;
-                self.write_reference(typing.target)?;
-                self.writer.write_str("))")?;
+            if let Some(typing) = &declaration.typing {
+                self.write_typing(&typing.value)?;
             } else {
                 self.writer.write_str("none")?;
             }
+            self.writer.write_str(") (multiplicity ")?;
+            self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+            self.writer.write_str(") ")?;
+            self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+            self.writer.write_str(" (subsets ")?;
+            if let Some((relationship, value)) = &declaration.subsets {
+                self.write_subsetting(&relationship.value)?;
+                self.writer.write_str(" (value ")?;
+                if let Some(value) = value {
+                    self.write_expression(value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_char(')')?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") ")?;
+            self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("references", declaration.references.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
+            self.writer.write_char(')')?;
             self.writer.write_str(") (terminator ")?;
             match &parameter.value.terminator {
                 crate::ast::CollectionOperatorParameterTerminator::Semicolon { span } => {
@@ -1254,8 +1280,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_expression(expression)?;
                         }
-                        UseCaseDefBodyElement::FlowUsage(_usage) => {
-                            self.write_marker(&mut first, "flow-usage")?;
+                        UseCaseDefBodyElement::FlowUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&usage.value)?;
                         }
                     }
                 }
@@ -1679,8 +1706,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_connect(&connect.value)?;
                         }
-                        PartDefBodyElement::FlowUsage(_usage) => {
-                            self.write_marker(&mut first, "flow-usage")?;
+                        PartDefBodyElement::FlowUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&usage.value)?;
                         }
                         PartDefBodyElement::Connection(_connection) => {
                             self.write_marker(&mut first, "connection")?;
@@ -1937,6 +1965,75 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// Semantic projection of the action-only `GuardedSuccession` production. The optional
+    /// declaration, feature-chain source, guard, and connector-end target remain distinct so
+    /// snapshots cannot confuse this production with the older expression-based `FirstStmt`.
+    fn write_guarded_succession(
+        &mut self,
+        succession: &super::GuardedSuccession,
+    ) -> io::Result<()> {
+        self.writer.write_str("(guarded-succession (succession ")?;
+        if let Some(succession_declaration) = &succession.succession {
+            let declaration = &succession_declaration.declaration.value;
+            self.writer.write_str("(keyword ")?;
+            write_span(self.writer, &succession_declaration.keyword_span)?;
+            self.writer.write_str(") (declaration (name ")?;
+            write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+            self.writer.write_str(") (short-name ")?;
+            write_optional_quoted(
+                self.writer,
+                declaration.identification.short_name.as_deref(),
+            )?;
+            self.writer.write_str(") (typing ")?;
+            if let Some(typing) = &declaration.typing {
+                self.write_typing(&typing.value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") (multiplicity ")?;
+            self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+            self.writer.write_str(") ")?;
+            self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+            self.writer.write_str(" (subsets ")?;
+            if let Some((relationship, value)) = &declaration.subsets {
+                self.write_subsetting(&relationship.value)?;
+                self.writer.write_str(" (value ")?;
+                if let Some(value) = value {
+                    self.write_expression(value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_char(')')?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") ")?;
+            self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("references", declaration.references.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (first ")?;
+        self.write_reference(succession.first)?;
+        self.writer.write_str(") (if ")?;
+        write_span(self.writer, &succession.if_span)?;
+        self.writer.write_str(") (guard ")?;
+        self.write_expression(&succession.guard)?;
+        self.writer.write_str(") (then ")?;
+        write_span(self.writer, &succession.then_span)?;
+        self.writer.write_str(") (target ")?;
+        self.write_kerml_connector_end(&succession.target.value)?;
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&succession.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_control_node_declaration(
         &mut self,
         declaration: &super::ControlNodeDeclaration,
@@ -1992,13 +2089,54 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_control_node("join", &join.value.declaration, &join.value.body)?;
                 self.writer.write_char(')')
             }
+            super::ThenTarget::If(if_stmt) => {
+                self.writer.write_str("(then-if ")?;
+                self.write_if_stmt(&if_stmt.value)?;
+                self.writer.write_char(')')
+            }
             // Retain the established compact projection for unrelated alternatives while matching
             // them explicitly: a new target variant must decide whether it is a control node.
-            super::ThenTarget::Action(_)
-            | super::ThenTarget::Perform(_)
+            super::ThenTarget::Action(action) => {
+                if action.value.accept.is_some() {
+                    self.writer.write_str("(then-action ")?;
+                    self.write_action_usage(&action.value)?;
+                    self.writer.write_char(')')
+                } else {
+                    self.writer.write_str("(then-action)")
+                }
+            }
+            super::ThenTarget::Perform(_)
             | super::ThenTarget::Accept(_)
             | super::ThenTarget::Send(_)
             | super::ThenTarget::Feature(_) => self.writer.write_str("(then-action)"),
+        }
+    }
+
+    /// The complete semantic shape of `IfNode`, including the two distinct grammatical branch
+    /// spellings. A `then if` succession owns this same node, so this writer is shared rather than
+    /// maintaining a compact target-specific marker that would hide its condition or members.
+    fn write_if_stmt(&mut self, if_stmt: &super::IfStmt) -> io::Result<()> {
+        self.writer.write_str("(if (condition ")?;
+        self.write_expression(&if_stmt.condition)?;
+        self.writer.write_str(") (then ")?;
+        self.write_action_branch_body(&if_stmt.then_body)?;
+        self.writer.write_str(") (else ")?;
+        if let Some(else_body) = &if_stmt.else_body {
+            self.write_action_branch_body(else_body)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
+    }
+
+    fn write_action_branch_body(&mut self, branch: &super::ActionBranchBody) -> io::Result<()> {
+        match branch {
+            super::ActionBranchBody::Braced(body) => self.write_action_body(body),
+            super::ActionBranchBody::Shorthand(member) => {
+                self.writer.write_str("(body shorthand ")?;
+                self.write_first_merge_member(&member.value, &member.span)?;
+                self.writer.write_char(')')
+            }
         }
     }
 
@@ -2034,7 +2172,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         let Some(declaration) = declaration else {
             return self.writer.write_str("none)");
         };
-        let declaration = &declaration.value;
+        let Some(declaration) = declaration.value.declaration.as_ref() else {
+            return self.writer.write_str("bare)");
+        };
+        self.write_usage_declaration(&declaration.value)?;
+        self.writer.write_char(')')
+    }
+
+    /// Semantic projection for the grammar-owned `UsageDeclaration` header shared by action
+    /// nodes and the declared-action branch of `PerformActionUsageDeclaration`.
+    fn write_usage_declaration(&mut self, declaration: &super::UsageDeclaration) -> io::Result<()> {
         self.writer.write_str("(name ")?;
         write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
         self.writer.write_str(") (short-name ")?;
@@ -2072,8 +2219,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
         self.writer.write_char(' ')?;
-        self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
-        self.writer.write_char(')')
+        self.write_optional_subsetting("intersects", declaration.intersects.as_ref())
     }
 
     fn write_for_variable_declaration(
@@ -2318,9 +2464,37 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// This names each relationship alternative and streams targets in source
     /// order, making repeated and interleaved parts observable in snapshots.
     fn write_kerml_feature(&mut self, feature: &super::KermlFeature) -> io::Result<()> {
-        self.writer.write_str("(kerml-feature (name ")?;
+        self.writer.write_str("(kerml-feature ")?;
+        self.write_kerml_feature_prefix(&feature.prefix)?;
+        self.writer.write_str(" (kind ")?;
+        match &feature.kind {
+            Some(kind) => self.writer.write_str(kind.value.as_str())?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (member {}) (all {}) (name ",
+            feature.is_member, feature.is_all
+        )?;
         self.write_usage_declaration_name(&feature.name)?;
-        self.writer.write_str(") (relationships")?;
+        self.writer.write_str(") (typing ")?;
+        match &feature.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", feature.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", feature.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", feature.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", feature.crosses.as_ref())?;
+        self.writer.write_str(" (relationships")?;
         for part in &feature.relationship_parts {
             self.writer.write_char(' ')?;
             match &part.value {
@@ -2363,6 +2537,57 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&feature.body)?;
         self.writer.write_char(')')
+    }
+
+    /// The complete KerML `FeaturePrefix` in its grammar-owned shape. This makes a directed
+    /// keyword-less Feature distinct from the SysML-only `InOutDecl` surface, while preserving
+    /// every mutually-exclusive prefix slot in semantic snapshots.
+    fn write_kerml_feature_prefix(&mut self, prefix: &super::FeaturePrefix) -> io::Result<()> {
+        self.writer.write_str("(prefix (head ")?;
+        match &prefix.head {
+            super::FeaturePrefixHead::Basic(basic) => {
+                self.writer.write_str("basic) (direction ")?;
+                self.write_direction(basic.direction.as_ref().map(|direction| direction.value))?;
+                write!(
+                    self.writer,
+                    ") (derived {}) (abstract {}) (portion ",
+                    basic.derived_span.is_some(),
+                    basic.abstract_span.is_some()
+                )?;
+                match basic.portioning.as_ref().map(|portion| portion.value) {
+                    Some(super::FeaturePortionKind::Composite) => {
+                        self.writer.write_str("composite")?
+                    }
+                    Some(super::FeaturePortionKind::Portion) => self.writer.write_str("portion")?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (variability ")?;
+                match basic
+                    .variability
+                    .as_ref()
+                    .map(|variability| variability.value)
+                {
+                    Some(super::FeatureVariability::Var) => self.writer.write_str("var")?,
+                    Some(super::FeatureVariability::Const) => self.writer.write_str("const")?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_char(')')?;
+            }
+            super::FeaturePrefixHead::End { prefix, cross } => {
+                write!(
+                    self.writer,
+                    "end) (constant {}) (cross {})",
+                    prefix.constant_span.is_some(),
+                    if cross.is_some() { "present" } else { "none" }
+                )?;
+            }
+        }
+        self.writer.write_str(" (metadata")?;
+        for keyword in &prefix.metadata_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str("))")
     }
 
     /// `ConstraintDefBody`, with its members.
@@ -2540,12 +2765,29 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
                         }
+                        super::CalcDefBodyElement::Package(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            write!(
+                                self.writer,
+                                "(package-member (visibility {}) ",
+                                visibility_name(member.membership.visibility)
+                            )?;
+                            self.write_package(&member.package.value)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::CalcDefBodyElement::LibraryPackage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            write!(
+                                self.writer,
+                                "(library-package-member (visibility {}) ",
+                                visibility_name(member.membership.visibility)
+                            )?;
+                            self.write_library_package(&member.package.value)?;
+                            self.writer.write_char(')')?;
+                        }
                         super::CalcDefBodyElement::ActionMember(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_first_merge_member(&member.value, &member.span)?;
-                        }
-                        super::CalcDefBodyElement::InOutDecl(_declaration) => {
-                            self.write_marker(&mut first, "in-out-declaration")?;
                         }
                         super::CalcDefBodyElement::KermlFeature(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -2564,8 +2806,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Succession(_member) => {
                             self.write_marker(&mut first, "succession")?;
                         }
-                        super::CalcDefBodyElement::FlowUsage(_member) => {
-                            self.write_marker(&mut first, "flow-usage")?;
+                        super::CalcDefBodyElement::FlowUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&member.value)?;
                         }
                         super::CalcDefBodyElement::Import(_member) => {
                             self.write_marker(&mut first, "import")?;
@@ -2710,7 +2953,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             ActionDefBodyElement::Perform(perform) => self.write_perform(&perform.value),
             ActionDefBodyElement::Bind(_bind) => self.writer.write_str("(bind)"),
-            ActionDefBodyElement::FlowUsage(_flow) => self.writer.write_str("(flow-usage)"),
+            ActionDefBodyElement::FlowUsage(flow) => self.write_flow_usage(&flow.value),
+            ActionDefBodyElement::GuardedSuccession(succession) => {
+                self.write_guarded_succession(&succession.value)
+            }
             ActionDefBodyElement::FirstStmt(first) => self.write_first_statement(&first.value),
             ActionDefBodyElement::MergeStmt(merge) => {
                 self.write_control_node("merge", &merge.value.declaration, &merge.value.body)
@@ -2741,7 +2987,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 &loop_stmt.value.body,
                 loop_stmt.value.until.as_ref(),
             ),
-            ActionDefBodyElement::IfStmt(_if) => self.writer.write_str("(if)"),
+            ActionDefBodyElement::IfStmt(if_stmt) => self.write_if_stmt(&if_stmt.value),
             ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
             ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
             ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
@@ -2767,6 +3013,133 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             ActionDefBodyElement::VariantUsage(usage) => self.write_variant_usage(&usage.value),
         }
+    }
+
+    fn write_flow_usage(&mut self, flow: &super::FlowUsage) -> io::Result<()> {
+        self.writer.write_str("(flow-usage (kind ")?;
+        self.writer.write_str(match flow.kind {
+            super::FlowUsageKind::Flow => "flow",
+            super::FlowUsageKind::Message => "message",
+            super::FlowUsageKind::SuccessionFlow => "succession-flow",
+        })?;
+        self.writer.write_str(") (visibility ")?;
+        self.writer
+            .write_str(visibility_name(flow.membership.visibility))?;
+        self.writer.write_str(") (declaration ")?;
+        match &flow.declaration {
+            super::FlowDeclaration::Declared {
+                declaration,
+                value,
+                payload,
+                endpoints,
+            } => {
+                let d = &declaration.value;
+                self.writer.write_str("(declared (name ")?;
+                write_optional_quoted(self.writer, d.identification.name.as_deref())?;
+                self.writer.write_str(") (short-name ")?;
+                write_optional_quoted(self.writer, d.identification.short_name.as_deref())?;
+                self.writer.write_str(") (typing ")?;
+                if let Some(typing) = &d.typing {
+                    self.write_typing(&typing.value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (multiplicity ")?;
+                self.write_multiplicity_clause(d.multiplicity.as_ref())?;
+                self.writer.write_str(") ")?;
+                self.write_multiplicity_modifiers(&d.multiplicity_modifiers)?;
+                self.writer.write_str(" (subsets ")?;
+                if let Some((relationship, value)) = &d.subsets {
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_str(" (value ")?;
+                    if let Some(value) = value {
+                        self.write_expression(value)?;
+                    } else {
+                        self.writer.write_str("none")?;
+                    }
+                    self.writer.write_char(')')?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") ")?;
+                self.write_optional_subsetting("redefines", d.redefines.as_ref())?;
+                self.writer.write_char(' ')?;
+                self.write_optional_subsetting("references", d.references.as_ref())?;
+                self.writer.write_char(' ')?;
+                self.write_optional_subsetting("crosses", d.crosses.as_ref())?;
+                self.writer.write_char(' ')?;
+                self.write_optional_subsetting("intersects", d.intersects.as_ref())?;
+                self.writer.write_str(") (value ")?;
+                if let Some(value) = value {
+                    self.write_feature_value(&value.value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (payload ")?;
+                if let Some(payload) = payload {
+                    self.write_payload_feature(&payload.value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (endpoints ")?;
+                if let Some(endpoints) = &**endpoints {
+                    self.write_flow_endpoints(endpoints)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")?;
+            }
+            super::FlowDeclaration::EndpointOnly { endpoints } => {
+                self.writer.write_str("(endpoint-only ")?;
+                self.write_flow_endpoints(endpoints)?;
+                self.writer.write_char(')')?;
+            }
+        }
+        self.writer.write_str(") (body ")?;
+        self.write_definition_body(&flow.body)?;
+        self.writer.write_str("))")
+    }
+
+    fn write_payload_feature(&mut self, payload: &super::PayloadFeature) -> io::Result<()> {
+        self.writer.write_str("(name ")?;
+        write_optional_quoted(self.writer, payload.name.as_deref())?;
+        self.writer.write_str(") (type ")?;
+        if let Some(ty) = payload.type_name {
+            self.write_reference(ty)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (conjugated ")?;
+        self.writer.write_str(if payload.type_is_conjugated {
+            "true"
+        } else {
+            "false"
+        })?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(payload.multiplicity.as_ref())?;
+        self.writer.write_char(')')
+    }
+
+    fn write_flow_endpoints(&mut self, endpoints: &super::FlowEndpoints) -> io::Result<()> {
+        self.writer.write_str("(from ")?;
+        self.write_kerml_connector_end(&endpoints.from.value)?;
+        self.writer.write_str(") (to ")?;
+        self.write_kerml_connector_end(&endpoints.to.value)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_kerml_connector_end(&mut self, end: &super::KermlConnectorEnd) -> io::Result<()> {
+        self.writer.write_str("(connector-end (multiplicity ")?;
+        self.write_multiplicity_clause(end.multiplicity.as_ref())?;
+        self.writer.write_str(") (target ")?;
+        self.write_reference(end.target)?;
+        self.writer.write_str(") (references ")?;
+        if let Some(reference) = end.references {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
     }
 
     fn write_alias_definition(&mut self, definition: &super::AliasDef) -> io::Result<()> {
@@ -2964,8 +3337,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
-                        InterfaceDefBodyElement::FlowUsage(_usage) => {
-                            self.write_marker(&mut first, "flow-usage")?;
+                        InterfaceDefBodyElement::FlowUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&usage.value)?;
                         }
                         InterfaceDefBodyElement::ConstraintUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -3207,6 +3581,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
+        if let Some(accept) = &usage.accept {
+            self.writer.write_str("(accept ")?;
+            self.write_transition_accept(accept)?;
+            self.writer.write_str(") ")?;
+        }
         match &usage.body {
             Some(body) => self.write_action_usage_body(body)?,
             None => self.writer.write_str("(body absent)")?,
@@ -3319,8 +3698,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::Bind(_member) => {
                             self.write_marker(&mut first, "bind")?;
                         }
-                        super::ActionUsageBodyElement::FlowUsage(_member) => {
-                            self.write_marker(&mut first, "flow-usage")?;
+                        super::ActionUsageBodyElement::FlowUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::GuardedSuccession(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_guarded_succession(&member.value)?;
                         }
                         super::ActionUsageBodyElement::FirstStmt(_member) => {
                             self.write_marker(&mut first, "first")?;
@@ -3381,8 +3765,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 member.value.until.as_ref(),
                             )?;
                         }
-                        super::ActionUsageBodyElement::IfStmt(_member) => {
-                            self.write_marker(&mut first, "if")?;
+                        super::ActionUsageBodyElement::IfStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_if_stmt(&member.value)?;
                         }
                         super::ActionUsageBodyElement::StateUsage(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -3490,8 +3875,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::Connect(_member) => {
                             self.write_marker(&mut first, "connect")?;
                         }
-                        super::PartUsageBodyElement::FlowUsage(_member) => {
-                            self.write_marker(&mut first, "flow-usage")?;
+                        super::PartUsageBodyElement::FlowUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::Perform(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -3955,8 +4341,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// `MetadataUsage = ( '@' | 'metadata' ) MetadataUsageDeclaration ( 'about' … )?
     /// MetadataBody` (SysML BNF 1673).
     ///
-    /// Its body is an `AttributeBody`, so it owns the same members every other one does; the
-    /// marker it used to be hid them.
+    /// Its body has its own metadata-reference member grammar; it is not an `AttributeBody`.
     fn write_metadata_usage(&mut self, usage: &super::MetadataUsage) -> io::Result<()> {
         self.writer
             .write_str("(metadata-usage (declaration-name ")?;
@@ -3972,7 +4357,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.write_reference(*target)?;
         }
         self.writer.write_str(") ")?;
-        self.write_attribute_body(&usage.body)?;
+        self.write_metadata_body(&usage.body)?;
         self.writer.write_char(')')
     }
 
@@ -4004,9 +4389,61 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    /// `MetadataBody` is an `AttributeBody`, and projects like every other one.
-    fn write_metadata_body(&mut self, body: &super::AttributeBody) -> io::Result<()> {
-        self.write_attribute_body(body)
+    /// `MetadataBody` owns keyword-less reference redefinitions, not attribute declarations.
+    fn write_metadata_body(&mut self, body: &super::MetadataBody) -> io::Result<()> {
+        match body {
+            super::MetadataBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::MetadataBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::MetadataBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::MetadataBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::MetadataBodyElement::Usage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_body_usage(&usage.value)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_metadata_body_usage(&mut self, usage: &super::MetadataBodyUsage) -> io::Result<()> {
+        self.writer.write_str("(metadata-body-usage (reference ")?;
+        self.writer.write_str(if usage.ref_span.is_some() {
+            "true"
+        } else {
+            "false"
+        })?;
+        self.writer.write_str(") (redefinition-operator ")?;
+        match &usage.operator {
+            Some(super::MetadataBodyRedefinitionOperator::ColonGreaterGreater { .. }) => {
+                self.writer.write_str("colon-greater-greater")?
+            }
+            Some(super::MetadataBodyRedefinitionOperator::Redefines { .. }) => {
+                self.writer.write_str("redefines")?
+            }
+            None => self.writer.write_str("implicit")?,
+        }
+        self.writer.write_str(") (target ")?;
+        self.write_reference(usage.target)?;
+        self.writer.write_str(") (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_metadata_body(&usage.body)?;
+        self.writer.write_char(')')
     }
 
     /// One projection for the `#` spelling of a metadata reference, shared by every scope that
@@ -4024,7 +4461,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_reference(usage.reference)?;
         self.writer.write_str(") ")?;
         match &usage.body {
-            Some(body) => self.write_metadata_body(body)?,
+            Some(body) => self.write_attribute_body(body)?,
             None => self.writer.write_str("(body none)")?,
         }
         self.writer.write_char(')')
@@ -4352,23 +4789,79 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// Project the form and typed body so a regular comment cannot be invisible in a snapshot.
     fn write_interface_usage(&mut self, usage: &super::InterfaceUsage) -> io::Result<()> {
         self.writer.write_str("(interface-usage (form ")?;
-        let body = match usage {
-            super::InterfaceUsage::TypedConnect { body, .. } => {
+        let (part, body) = match usage {
+            super::InterfaceUsage::TypedConnect { part, body, .. } => {
                 self.writer.write_str("typed-connect")?;
-                body
+                (Some(part), body)
             }
-            super::InterfaceUsage::Connection { body, .. } => {
+            super::InterfaceUsage::Connection { part, body, .. } => {
                 self.writer.write_str("connection")?;
-                body
+                (Some(part), body)
             }
             super::InterfaceUsage::Declaration { body, .. } => {
                 self.writer.write_str("declaration")?;
-                body
+                (None, body)
             }
         };
+        self.writer.write_str(") (part ")?;
+        if let Some(part) = part {
+            self.write_interface_part(&part.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
         self.writer.write_str(") ")?;
         self.write_interface_usage_body(body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_interface_part(&mut self, part: &super::InterfacePart) -> io::Result<()> {
+        match part {
+            super::InterfacePart::Binary { from, to, .. } => {
+                self.writer.write_str("(binary (from ")?;
+                self.write_interface_end(&from.value)?;
+                self.writer.write_str(") (to ")?;
+                self.write_interface_end(&to.value)?;
+                self.writer.write_str("))")
+            }
+            super::InterfacePart::Nary { ends, .. } => {
+                self.writer.write_str("(nary")?;
+                for member in ends {
+                    self.writer.write_str(" ")?;
+                    self.write_interface_end(&member.end.value)?;
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_interface_end(&mut self, end: &super::InterfaceEnd) -> io::Result<()> {
+        self.writer.write_str("(interface-end (multiplicity ")?;
+        self.write_multiplicity_clause(end.multiplicity.as_ref())?;
+        self.writer.write_str(") (target ")?;
+        match &end.target {
+            super::InterfaceEndTarget::Direct(target) => self.write_reference(*target)?,
+            super::InterfaceEndTarget::Named {
+                name,
+                operator,
+                target,
+            } => {
+                self.writer.write_str("(named (name ")?;
+                write_quoted(self.writer, &name.value)?;
+                self.writer.write_str(") (references ")?;
+                match operator {
+                    super::InterfaceEndReferenceOperator::Symbol { .. } => {
+                        self.writer.write_str("symbol")?
+                    }
+                    super::InterfaceEndReferenceOperator::Keyword { .. } => {
+                        self.writer.write_str("keyword")?
+                    }
+                }
+                self.writer.write_str(") (target ")?;
+                self.write_reference(*target)?;
+                self.writer.write_str("))")?;
+            }
+        }
+        self.writer.write_str("))")
     }
 
     fn write_interface_usage_body(
@@ -4381,6 +4874,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::InterfaceUsageBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
                         super::InterfaceUsageBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
@@ -4403,6 +4900,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
                         }
+                        super::InterfaceUsageBodyElement::FlowUsage(flow) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&flow.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::Perform(perform) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_perform(&perform.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -4411,25 +4916,28 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
-        self.writer.write_str("(perform (declaration ")?;
-        write_quoted(self.writer, &perform.action_name)?;
-        self.writer.write_str(") (action ")?;
-        if let Some(reference) = perform.action_reference {
-            self.write_reference(reference)?;
-        } else {
-            self.writer.write_str("none")?;
+        self.writer.write_str("(perform (target ")?;
+        match &perform.target {
+            super::PerformActionTarget::Action(declaration) => {
+                self.writer.write_str("(action ")?;
+                self.write_usage_declaration(&declaration.value)?;
+                self.writer.write_char(')')?;
+            }
+            super::PerformActionTarget::Reference { action, redefines } => {
+                self.writer.write_str("(reference (action ")?;
+                self.write_reference(*action)?;
+                self.writer.write_str(") ")?;
+                self.write_optional_subsetting("redefines", redefines.as_ref())?;
+                self.writer.write_char(')')?;
+            }
         }
-        self.writer.write_str(") (typing ")?;
-        if let Some(typing) = &perform.typing {
-            self.write_typing(&typing.value)?;
+        self.writer.write_str(") (value ")?;
+        if let Some(value) = &perform.value {
+            self.write_feature_value(&value.value)?;
         } else {
             self.writer.write_str("none")?;
         }
         self.writer.write_str(") ")?;
-        self.write_optional_subsetting("subsets", perform.subsets.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("redefines", perform.redefines.as_ref())?;
-        self.writer.write_char(' ')?;
         self.write_perform_body(&perform.body)?;
         self.writer.write_char(')')
     }
@@ -4574,7 +5082,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::OccurrenceBodyElement::AssertConstraint(_) => {
                 self.write_marker(first, "assert-constraint")
             }
-            super::OccurrenceBodyElement::FlowUsage(_) => self.write_marker(first, "flow-usage"),
+            super::OccurrenceBodyElement::FlowUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_flow_usage(&usage.value)
+            }
             super::OccurrenceBodyElement::Bind(_) => self.write_marker(first, "bind"),
             super::OccurrenceBodyElement::SuccessionUsage(_) => {
                 self.write_marker(first, "succession-usage")
@@ -5563,7 +6074,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_flow_definition(&definition.value)
             }
-            PackageBodyElement::FlowUsage(_usage) => self.write_marker(first, "flow-usage"),
+            PackageBodyElement::FlowUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_flow_usage(&usage.value)
+            }
             PackageBodyElement::ConcernUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_concern_usage(&usage.value)

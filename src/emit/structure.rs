@@ -1,5 +1,6 @@
 //! Structure emission: part / attribute (and shared helpers).
 
+use super::behavior::{emit_flow_usage, emit_perform};
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
@@ -8,10 +9,12 @@ use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
     ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
     EndDeclIntroducer, EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody,
-    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node,
-    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
-    RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
+    InterfaceDefBodyElement, InterfaceEnd, InterfaceEndReferenceOperator, InterfaceEndTarget,
+    InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, MetadataBody, MetadataBodyElement,
+    MetadataBodyRedefinitionOperator, MetadataBodyUsage, Multiplicity, Node, PartDef, PartDefBody,
+    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement,
+    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
+    SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -232,6 +235,67 @@ pub(crate) fn emit_attribute_usage(
         emit_feature_value(w, value)?;
     }
     emit_attribute_body(w, path, &usage.body)
+}
+
+pub(crate) fn emit_metadata_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &MetadataBody,
+) -> Result<(), EmitError> {
+    match body {
+        MetadataBody::Semicolon { .. } => {
+            w.push_char(';');
+            Ok(())
+        }
+        MetadataBody::Brace { elements, .. } => {
+            if elements.is_empty() {
+                w.push_str(" {}");
+                return Ok(());
+            }
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (index, element) in elements.iter().enumerate() {
+                let member_path = format!("{path}/metadata-body[{index}]");
+                match &element.value {
+                    MetadataBodyElement::Error(error) => {
+                        w.push_recovery_span(&member_path, &error.span)?
+                    }
+                    MetadataBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, &member_path, member)?
+                    }
+                    MetadataBodyElement::Usage(usage) => {
+                        emit_metadata_body_usage(w, &member_path, &usage.value)?
+                    }
+                }
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+fn emit_metadata_body_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &MetadataBodyUsage,
+) -> Result<(), EmitError> {
+    if usage.ref_span.is_some() {
+        w.push_str("ref ");
+    }
+    if let Some(operator) = &usage.operator {
+        match operator {
+            MetadataBodyRedefinitionOperator::ColonGreaterGreater { .. } => w.push_str(":>> "),
+            MetadataBodyRedefinitionOperator::Redefines { .. } => w.push_str("redefines "),
+        }
+    }
+    w.push_qualified_reference(&format!("{path}/target"), usage.target)?;
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_metadata_body(w, path, &usage.body)
 }
 
 fn emit_part_def_body(
@@ -1038,8 +1102,7 @@ pub(crate) fn emit_interface_usage(
             interface_type,
             subsets,
             redefines,
-            from,
-            to,
+            part,
             body,
         } => {
             w.push_str("interface");
@@ -1059,16 +1122,13 @@ pub(crate) fn emit_interface_usage(
             }
             w.push_char(' ');
             w.push_str("connect ");
-            emit_expression(w, &from.value)?;
-            w.push_str(" to ");
-            emit_expression(w, &to.value)?;
+            emit_interface_part(w, path, &part.value)?;
             emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Connection {
             subsets,
             redefines,
-            from,
-            to,
+            part,
             body,
         } => {
             w.push_str("interface");
@@ -1079,9 +1139,7 @@ pub(crate) fn emit_interface_usage(
                 emit_subsetting_clause(w, &redefines.value)?;
             }
             w.push_char(' ');
-            emit_expression(w, &from.value)?;
-            w.push_str(" to ");
-            emit_expression(w, &to.value)?;
+            emit_interface_part(w, path, &part.value)?;
             emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Declaration {
@@ -1114,6 +1172,57 @@ pub(crate) fn emit_interface_usage(
                 w.push_char(' ');
             }
             emit_interface_usage_body(w, path, body)
+        }
+    }
+}
+
+fn emit_interface_part(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    part: &InterfacePart,
+) -> Result<(), EmitError> {
+    match part {
+        InterfacePart::Binary { from, to, .. } => {
+            emit_interface_end(w, &format!("{path}/from"), &from.value)?;
+            w.push_str(" to ");
+            emit_interface_end(w, &format!("{path}/to"), &to.value)
+        }
+        InterfacePart::Nary { ends, .. } => {
+            w.push_char('(');
+            for (index, member) in ends.iter().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                emit_interface_end(w, &format!("{path}/end[{index}]"), &member.end.value)?;
+            }
+            w.push_char(')');
+            Ok(())
+        }
+    }
+}
+
+fn emit_interface_end(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    end: &InterfaceEnd,
+) -> Result<(), EmitError> {
+    if let Some(multiplicity) = &end.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    match &end.target {
+        InterfaceEndTarget::Direct(target) => w.push_qualified_reference(path, *target),
+        InterfaceEndTarget::Named {
+            name,
+            operator,
+            target,
+        } => {
+            w.push_str(&format_name(&name.value));
+            match operator {
+                InterfaceEndReferenceOperator::Symbol { .. } => w.push_str(" ::> "),
+                InterfaceEndReferenceOperator::Keyword { .. } => w.push_str(" references "),
+            }
+            w.push_qualified_reference(&format!("{path}/target"), *target)
         }
     }
 }
@@ -1153,6 +1262,7 @@ fn emit_interface_usage_body_element(
     el: &InterfaceUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        InterfaceUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         InterfaceUsageBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
@@ -1168,6 +1278,8 @@ fn emit_interface_usage_body_element(
             emit_ref_body(w, path, body)
         }
         InterfaceUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
+        InterfaceUsageBodyElement::FlowUsage(flow) => emit_flow_usage(w, path, &flow.value),
+        InterfaceUsageBodyElement::Perform(perform) => emit_perform(w, path, &perform.value),
     }
 }
 
@@ -1699,7 +1811,7 @@ pub(crate) fn emit_metadata_usage(
             w.push_qualified_reference("metadata about target", *target)?;
         }
     }
-    emit_attribute_body(w, path, &usage.body)
+    emit_metadata_body(w, path, &usage.body)
 }
 
 pub(crate) fn emit_enum_def(
@@ -1864,7 +1976,7 @@ pub(crate) fn emit_metadata_annotation(
             w.push_qualified_reference("metadata annotation about target", *target)?;
         }
     }
-    emit_attribute_body(w, path, &ann.body)
+    emit_metadata_body(w, path, &ann.body)
 }
 
 pub(crate) fn emit_metadata_keyword_usage(

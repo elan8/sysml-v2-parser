@@ -870,6 +870,30 @@ const KERML_CLASSIFIER_KEYWORDS: &[(&[u8], crate::ast::KermlClassifierKeyword)] 
     (b"class", crate::ast::KermlClassifierKeyword::Class),
 ];
 
+/// Whether this member starts the `abstract`-prefixed spelling of one of this parser's KerML
+/// classifier declarations.
+///
+/// This is a dispatch-only lookahead: it consumes no input and allocates no references. A KerML
+/// `BasicFeaturePrefix` also owns `abstract`, so body parsers that route malformed feature-prefix
+/// chains to recovery must make this distinction before they try the feature arm. Keep the
+/// keyword list here beside the parser that owns the classifier production rather than giving
+/// every body scope a second copy of its FIRST set.
+pub(crate) fn starts_abstract_kerml_classifier(input: Input<'_>) -> bool {
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    let Ok((input, _)) = crate::parser::lex::visibility_prefix(input) else {
+        return false;
+    };
+    let Some((input, _)) = crate::parser::occurrence_prefix::slot_keyword(input, b"abstract")
+    else {
+        return false;
+    };
+    KERML_CLASSIFIER_KEYWORDS
+        .iter()
+        .any(|(keyword, _)| starts_with_keyword(input.fragment(), keyword))
+}
+
 /// Zero or more KerML type relationship clauses following a classifier header: `disjoint from
 /// A, B`, `unions A, B`, `intersects A, B` (any order, repeatable).
 pub(crate) fn kerml_type_relationship_clauses(
@@ -1651,22 +1675,12 @@ fn try_package_body_structure<'a>(
         flow_def,
         PackageBodyElement::FlowDef
     );
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Flow,
-        flow_usage,
-        PackageBodyElement::FlowUsage
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Message,
-        flow_usage,
-        PackageBodyElement::FlowUsage
-    );
+    try_package_body_dispatch!(input, start, starter, Flow, flow_usage, |usage| {
+        PackageBodyElement::FlowUsage(Box::new(usage))
+    });
+    try_package_body_dispatch!(input, start, starter, Message, flow_usage, |usage| {
+        PackageBodyElement::FlowUsage(Box::new(usage))
+    });
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,

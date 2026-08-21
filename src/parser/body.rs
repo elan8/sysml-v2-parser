@@ -2,8 +2,8 @@
 
 use crate::ast::{AnnotatingMember, DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
 use crate::parser::lex::{
-    recover_body_element, skip_statement_or_block, skip_until_brace_end, ws_and_comments,
-    RELATIONSHIP_BODY_STARTERS,
+    recover_body_element, skip_statement_or_block, skip_until_brace_end, starts_with_keyword,
+    ws_and_comments, RELATIONSHIP_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::metadata_annotation;
 use crate::parser::occurrence_body::occurrence_definition_body;
@@ -133,6 +133,22 @@ pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, Annotati
         return Ok(parsed);
     }
     map(textual_representation, AnnotatingMember::TextualRep).parse(input)
+}
+
+/// AttributeBody's literal `metadata` spelling of [`MetadataFeature`](metadata_annotation).
+///
+/// Other owners retain their own `metadata` dispatch (notably `MetadataUsage` in action/package
+/// bodies). AttributeBody owns the item/default-reference form used by ExternalShapeRef, so it
+/// opts into the same typed [`AnnotatingMember::MetadataAnnotation`] without changing those
+/// sibling productions.
+pub(crate) fn attribute_annotating_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, AnnotatingMember> {
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    if starts_with_keyword(input.fragment(), b"metadata") {
+        return map(metadata_annotation, AnnotatingMember::MetadataAnnotation).parse(input);
+    }
+    annotating_member(input)
 }
 
 pub(crate) fn relationship_body_element(

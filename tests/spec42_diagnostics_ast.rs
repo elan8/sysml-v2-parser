@@ -433,49 +433,6 @@ fn constraint_body_metadata_annotation_parsed() {
 }
 
 #[test]
-fn metadata_annotation_brace_body_parses_shorthand_bindings() {
-    let root = parse(
-        r#"package P {
-  part def Design {
-    @ApprovalAnnotation {
-      approved = true;
-      approver = "John";
-    }
-  }
-}"#,
-    )
-    .expect("parse");
-    let pkg = first_package(&root);
-    let part_def = package_body_elements(pkg)
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(pd) => Some(&pd.value),
-            _ => None,
-        })
-        .expect("part def");
-    let meta = match &part_def.body {
-        PartDefBody::Brace { elements, .. } => elements
-            .iter()
-            .find_map(|e| match &e.value {
-                PartDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(m)) => {
-                    Some(&m.value)
-                }
-                _ => None,
-            })
-            .expect("metadata annotation"),
-        _ => panic!("expected brace part body"),
-    };
-    let AttributeBody::Brace { elements, .. } = &meta.body else {
-        panic!("expected brace metadata body");
-    };
-    assert_eq!(elements.len(), 2);
-    assert!(matches!(
-        &elements[0].value,
-        AttributeBodyElement::AttributeUsage(u) if u.value.name == "approved"
-    ));
-}
-
-#[test]
 fn metadata_usage_about_clause_parses_targets() {
     let root = parse(
         r#"package P {

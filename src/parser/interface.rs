@@ -71,10 +71,9 @@ fn interface_def_body_element(
         }),
         // GH-85: bare `flow <a> to <b>;` connecting two of this interface's own ends (OMG spec
         // Annex `Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml`).
-        map(
-            crate::parser::flow::flow_usage_member,
-            InterfaceDefBodyElement::FlowUsage,
-        ),
+        map(crate::parser::flow::flow_usage_member, |usage| {
+            InterfaceDefBodyElement::FlowUsage(Box::new(usage))
+        }),
         // `InterfaceOccurrenceUsageElement` includes `BehaviorUsageElement`, whose
         // `ConstraintUsage` alternative retains its own complete occurrence-prefix and
         // calculation-body grammar (SysML BNF 727-750, 374-389, 1382-1395). This owner adds no

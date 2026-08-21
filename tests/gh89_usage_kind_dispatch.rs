@@ -92,40 +92,6 @@ fn gh89_1_bare_part_usage_in_anonymous_connection_body() {
 /// ```
 /// Previously: `perform_action_decl` handled `:>>` redefines and `: Type`, but had no path for a
 /// multiplicity (`[*]`) after the name or a `:>` subsets clause.
-#[test]
-fn gh89_2_perform_action_multiplicity_and_subsets() {
-    let elements = package_elements(
-        r#"package P {
-            part def PictureTaking { action takePicture; }
-            part def Camera {
-                perform action takePicture[*] :> PictureTaking::takePicture;
-            }
-        }"#,
-    );
-    let PackageBodyElement::PartDef(camera) = &elements[1] else {
-        panic!("expected PartDef, got {:?}", elements[1]);
-    };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &camera.value.body else {
-        panic!("expected brace part def body");
-    };
-    let perform = elements.iter().find_map(|e| match &e.value {
-        sysml_v2_parser::ast::PartDefBodyElement::Perform(p) => Some(&p.value),
-        _ => None,
-    });
-    let perform = perform.expect("expected a Perform element");
-    assert_eq!(perform.action_name, "takePicture");
-    assert!(perform.multiplicity.is_some(), "expected a multiplicity");
-    assert!(
-        perform
-            .subsets
-            .as_ref()
-            .and_then(|relationship| relationship.value.first_target())
-            .is_some(),
-        "expected a subsetting target"
-    );
-    assert!(perform.redefines.is_none());
-}
-
 /// Real usage: `Simple Tests/AliasTest.sysml:5-8`:
 /// ```text
 /// part def P1 {

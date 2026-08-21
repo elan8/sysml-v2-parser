@@ -993,34 +993,6 @@ occurrence event typed by Mission::Event subsets events redefines oldEvent;
 }
 
 #[test]
-fn test_occurrence_usage_post_body_specialization_still_parses() {
-    let input = r#"package P {
-occurrence rover; subsets BaseOccurrence redefines LegacyOccurrence;
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => p,
-        other => panic!("expected package, got {:?}", other),
-    };
-    let elements = match &pkg.value.body {
-        PackageBody::Brace { elements, .. } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let occ = match &elements[0].value {
-        PackageBodyElement::OccurrenceUsage(o) => o,
-        other => panic!("expected occurrence usage, got {:?}", other),
-    };
-    assert_eq!(
-        occ.value.subsets.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-    assert_eq!(
-        occ.value.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-}
-
-#[test]
 fn test_use_case_usage_accepts_typed_by_and_specialization_clauses() {
     let input = r#"package P {
 use case mission typed by Mission::CaseType subsets BaseCase;

@@ -157,7 +157,7 @@ pub enum PackageBodyElement {
     AllocationDef(Node<AllocationDef>),
     AllocationUsage(Node<AllocationUsage>),
     FlowDef(Node<FlowDef>),
-    FlowUsage(Node<FlowUsage>),
+    FlowUsage(Box<Node<FlowUsage>>),
     ConcernUsage(Node<ConcernUsage>),
     CaseDef(Node<CaseDef>),
     CaseUsage(Node<CaseUsage>),

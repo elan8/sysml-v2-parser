@@ -4,6 +4,7 @@ use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::package::{LibraryPackage, Package};
 use super::requirement::RequirementDefBody;
 use super::structure::{DefinitionPrefix, MetadataKeywordUsage};
 use crate::ast::core::{
@@ -187,6 +188,26 @@ pub struct CalcUsage {
 
 pub type CalcDefBody = Body<CalcDefBodyElement>;
 
+/// A `Package` admitted through KerML `TypeBodyElement -> NonFeatureMember`.
+///
+/// The membership belongs to this occurrence in the containing type body, while the package
+/// node owns only its declaration and body. Keeping them together here preserves an authored
+/// visibility prefix without making every package declaration carry a context-dependent field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CalcDefBodyPackageMember {
+    pub membership: Membership,
+    pub package: Node<Package>,
+}
+
+/// A `LibraryPackage` admitted through KerML `TypeBodyElement -> NonFeatureMember`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CalcDefBodyLibraryPackageMember {
+    pub membership: Membership,
+    pub package: Node<LibraryPackage>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
@@ -199,6 +220,10 @@ pub enum CalcDefBodyElement {
     /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
     /// but modelled neither, so a `#` member was reported unsupported here.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `MemberPrefix Package` in a KerML type/function/classifier body.
+    Package(CalcDefBodyPackageMember),
+    /// `MemberPrefix LibraryPackage` in a KerML type/function/classifier body.
+    LibraryPackage(CalcDefBodyLibraryPackageMember),
     /// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML 8.2.2.19), so a
     /// calculation body owns every action-body member as well as its own `return`. They arrive
     /// through the action dispatcher rather than as fifteen restated variants, the way
@@ -209,7 +234,6 @@ pub enum CalcDefBodyElement {
     /// entry point is the only one that dispatches it. Splitting the two scopes into their own
     /// element enums is Phase-4 work; this variant does not make that debt worse.
     ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
-    InOutDecl(Box<Node<InOutDecl>>),
     /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
     /// s: Occurrence subsets a inverse of b { ... }`); see
     /// [`crate::ast::KermlFeature`].

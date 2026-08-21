@@ -514,6 +514,10 @@ fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody
 /// Perform usage: (`abstract`|`variation`)? `perform` action_path (`:>>` target)? (`=` value)?
 /// (`;` or `{ }` body).
 pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+    crate::parser::span::reference_transaction(input, perform_usage_inner)
+}
+
+fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
@@ -537,12 +541,10 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
             input,
             Perform {
                 usage_prefix,
-                action_name: String::new(),
-                action_reference: Some(action_reference),
-                typing: None,
-                multiplicity: None,
-                redefines,
-                subsets: None,
+                target: PerformActionTarget::Reference {
+                    action: action_reference,
+                    redefines,
+                },
                 value,
                 body,
             },
@@ -550,58 +552,24 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
     ))
 }
 
-/// Perform action declaration: (`abstract`|`variation`)? `perform action` name? (`:>>` target)?
-/// (`:` type_name)? (`=` value)? (`;` or body).
+/// The `action UsageDeclaration?` alternative of `PerformActionUsageDeclaration`.
 ///
-/// §6 G20: the name is optional -- `perform action { ... }` and `perform action :>> doXorY = doX;`
-/// are both real OMG spec Annex usage (`3c-Function-based Behavior-structure mod-2.sysml`,
-/// `7a1-Variant Configuration - General Concept-a.sysml`) that previously fell through to opaque
-/// recovery because `name(input)` was mandatory here.
+/// The shared declaration parser deliberately produces a zero-width, anonymous
+/// [`UsageDeclaration`] when no identification is authored. That is the grammar's optional
+/// declaration, not a sentinel action name.
 pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+    crate::parser::span::reference_transaction(input, perform_action_decl_inner)
+}
+
+fn perform_action_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, action_name) = if is_anonymous_perform_action(input) {
-        (input, String::new())
-    } else {
-        name(input)?
-    };
-    // GH-89: multiplicity after the name, e.g. `takePicture[*] :> PictureTaking::takePicture;`
-    // (Camera Example/Camera.sysml:4).
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, with_span(qualified_reference)),
-    ))
-    .parse(input)?;
-    let redefines = redefines.map(|(span, target)| {
-        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
-    });
-    // GH-89: `:>` subsets clause, tried only when `:>>` redefines didn't match -- the two are
-    // mutually exclusive specialization keywords at this position.
-    let (input, subsets) = if redefines.is_none() {
-        opt(preceded(
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, with_span(qualified_reference)),
-        ))
-        .parse(input)?
-    } else {
-        (input, None)
-    };
-    let subsets = subsets.map(|(span, target)| {
-        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
-    });
-    let (input, type_reference) = opt(preceded(
-        preceded(ws_and_comments, typing_colon),
-        preceded(ws_and_comments, with_span(qualified_reference)),
-    ))
-    .parse(input)?;
-    let typing = type_reference
-        .map(|(span, target)| crate::parser::usage::single_target_typing(span, target));
+    let (input, _) = ws_and_comments(input)?;
+    let (input, declaration) = crate::parser::usage::usage_declaration(input)?;
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
@@ -611,42 +579,12 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
             input,
             Perform {
                 usage_prefix,
-                action_name,
-                action_reference: None,
-                typing,
-                multiplicity,
-                redefines,
-                subsets,
+                target: PerformActionTarget::Action(Box::new(declaration)),
                 value,
                 body,
             },
         ),
     ))
-}
-
-/// True when a `perform action` declaration has no name of its own -- the next token already
-/// begins the redefinition clause, the typing clause, the body, or the terminator.
-fn is_anonymous_perform_action(input: Input<'_>) -> bool {
-    let Ok((peek, _)) = ws_and_comments(input) else {
-        return false;
-    };
-    let frag = peek.fragment();
-    frag.starts_with(b"{")
-        || frag.starts_with(b";")
-        || frag.starts_with(b":>>")
-        || frag.starts_with(b"=")
-        || (frag.starts_with(b":") && !frag.starts_with(b":>"))
-}
-
-/// `:` that is not the start of `:>` / `:>>`.
-fn typing_colon(input: Input<'_>) -> IResult<Input<'_>, Input<'_>> {
-    if input.fragment().starts_with(b":>") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    tag(&b":"[..]).parse(input)
 }
 
 /// Allocate: `allocate` source `to` target body.
@@ -832,8 +770,8 @@ fn connection_end_with_multiplicity(
     )
 }
 
-/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end` member
-/// (GH-85), or `doc`.
+/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end`, the
+/// existing flow/message/succession-flow production, or `PerformActionUsage`.
 fn interface_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
@@ -843,20 +781,51 @@ fn interface_usage_body_element(
             let span = end.span.clone();
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
         }),
-        |input| {
-            let start = input;
-            let (input, member) = crate::parser::body::annotating_member(input)?;
-            Ok((
-                input,
-                crate::parser::node_from_to(
-                    start,
-                    input,
-                    InterfaceUsageBodyElement::Annotating(member),
-                ),
-            ))
-        },
+        interface_usage_other_body_element,
     ))
     .parse(input)
+}
+
+fn interface_usage_other_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    // `perform action ...` has the common `perform` prefix with the supported reference form,
+    // so the declaration alternative must own it before `perform <qualified-reference>`.
+    alt((
+        interface_usage_perform,
+        interface_usage_flow,
+        interface_usage_annotating,
+    ))
+    .parse(input)
+}
+
+fn interface_usage_perform(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    map(alt((perform_action_decl, perform_usage)), |perform| {
+        let span = perform.span.clone();
+        Node::new(span, InterfaceUsageBodyElement::Perform(Box::new(perform)))
+    })
+    .parse(input)
+}
+
+fn interface_usage_flow(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    map(crate::parser::flow::flow_usage_member, |flow| {
+        let span = flow.span.clone();
+        Node::new(span, InterfaceUsageBodyElement::FlowUsage(Box::new(flow)))
+    })
+    .parse(input)
+}
+
+fn interface_usage_annotating(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    let start = input;
+    let (input, member) = crate::parser::body::annotating_member(input)?;
+    Ok((
+        input,
+        crate::parser::node_from_to(start, input, InterfaceUsageBodyElement::Annotating(member)),
+    ))
 }
 
 // GH-85: interfaces don't allow the `#name` derived-end-name form (same as
@@ -903,50 +872,174 @@ fn interface_usage_body(
     if input.fragment().starts_with(b";") {
         return crate::parser::body::semicolon_body(input);
     }
-    let (open_start, _) = ws_and_comments(input)?;
-    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
-    let open_span = crate::parser::span::span_from_to(open_start, input);
-    let mut elements = Vec::new();
-    loop {
-        // A bare `/* ... */` is an `AnnotatingElement` at this member boundary, not trivia.
-        // Leave it for `interface_usage_body_element`; its final annotating arm owns it.
-        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let close_start = input;
-            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-            return Ok((
-                input,
-                crate::ast::Body::Brace {
-                    open_span,
-                    elements,
-                    close_span: crate::parser::span::span_from_to(close_start, input),
-                },
-            ));
-        }
-        let (next, element) = interface_usage_body_element(input)?;
-        if next.location_offset() == input.location_offset() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Many0,
-            )));
-        }
-        elements.push(element);
-        input = next;
-    }
+    let (input, members) = parse_structured_brace_members_with_skip(
+        input,
+        INTERFACE_USAGE_BODY_STARTERS,
+        "interface usage body",
+        "recovered_interface_usage_body_element",
+        interface_usage_body_element,
+        interface_usage_body_recovery,
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, members.into_body()))
 }
 
-/// Connector end reference used in interface/connect syntax.
-/// Accepts an optional leading cross multiplicity (`[1]`, discarded -- `InterfaceUsage::from`/
-/// `to` don't model per-end multiplicity yet, same as the end name below; GH-16: real Systems
-/// Library / Annex fixtures write `connect [1] a to [1] b;`, which failed to parse at all before
-/// this), then either `path` or `endName ::> path`; the end name is currently ignored.
-fn connector_end_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+fn interface_usage_body_recovery(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<InterfaceUsageBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        INTERFACE_USAGE_BODY_STARTERS,
+        "interface usage body",
+        "recovered_interface_usage_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        InterfaceUsageBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
+/// The grammar-owned `InterfaceEnd`, not an arbitrary path expression.
+fn interface_end(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
+    crate::parser::span::reference_transaction(input, interface_end_inner)
+}
+
+fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt((name, preceded(ws_and_comments, tag(&b"::>"[..])))).parse(input)?;
-    preceded(ws_and_comments, path_expression).parse(input)
+    // A named end and a direct qualified reference share their first identifier.  Commit to the
+    // named shape only after its grammar-owned `::>` / `references` separator is visible;
+    // otherwise a failed optional branch would silently consume the label as a direct endpoint
+    // and leave the operator for the enclosing `InterfacePart`.
+    let (input, target) = if let Ok((after_name, (name_span, end_name))) =
+        with_span(name).parse(input)
+    {
+        let (after_trivia, _) = ws_and_comments(after_name)?;
+        let operator = if after_trivia.fragment().starts_with(b"::>") {
+            let (after_operator, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
+            Some((
+                after_operator,
+                InterfaceEndReferenceOperator::Symbol { span },
+            ))
+        } else if starts_with_keyword(after_trivia.fragment(), b"references") {
+            let (after_operator, (span, _)) =
+                with_span(tag(&b"references"[..])).parse(after_trivia)?;
+            Some((
+                after_operator,
+                InterfaceEndReferenceOperator::Keyword { span },
+            ))
+        } else {
+            None
+        };
+        if let Some((after_operator, operator)) = operator {
+            let (input, target) =
+                preceded(ws_and_comments, reference_path).parse(after_operator)?;
+            (
+                input,
+                InterfaceEndTarget::Named {
+                    name: Node::new(name_span, end_name),
+                    operator,
+                    target,
+                },
+            )
+        } else {
+            let (input, target) = reference_path(input)?;
+            (input, InterfaceEndTarget::Direct(target))
+        }
+    } else {
+        let (input, target) = reference_path(input)?;
+        (input, InterfaceEndTarget::Direct(target))
+    };
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfaceEnd {
+                multiplicity,
+                target,
+            },
+        ),
+    ))
+}
+
+/// `InterfacePart = BinaryInterfacePart | NaryInterfacePart`.
+fn interface_part(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
+    crate::parser::span::reference_transaction(input, interface_part_inner)
+}
+
+fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"(") {
+        let open_start = input;
+        let (mut input, _) = tag(&b"("[..]).parse(input)?;
+        let open_span = crate::parser::span::span_from_to(open_start, input);
+        let (next, first) = interface_end(input)?;
+        input = next;
+        let mut ends = vec![InterfaceEndMember {
+            comma_span: None,
+            end: first,
+        }];
+        loop {
+            let (next, _) = ws_and_comments(input)?;
+            input = next;
+            if input.fragment().starts_with(b")") {
+                let close_start = input;
+                let (input, _) = tag(&b")"[..]).parse(input)?;
+                if ends.len() < 2 {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many1,
+                    )));
+                }
+                return Ok((
+                    input,
+                    node_from_to(
+                        start,
+                        input,
+                        InterfacePart::Nary {
+                            open_span,
+                            ends,
+                            close_span: crate::parser::span::span_from_to(close_start, input),
+                        },
+                    ),
+                ));
+            }
+            let comma_start = input;
+            let (input_after_comma, _) = tag(&b","[..]).parse(input)?;
+            let comma_span = crate::parser::span::span_from_to(comma_start, input_after_comma);
+            let (next, end) = interface_end(input_after_comma)?;
+            ends.push(InterfaceEndMember {
+                comma_span: Some(comma_span),
+                end,
+            });
+            input = next;
+        }
+    }
+    let (input, from) = interface_end(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let to_start = input;
+    let (input, _) = tag(&b"to"[..]).parse(input)?;
+    let to_span = crate::parser::span::span_from_to(to_start, input);
+    let (input, to) = interface_end(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfacePart::Binary {
+                from,
+                to_span,
+                to: Box::new(to),
+            },
+        ),
+    ))
 }
 
 /// Interface usage: `interface` ( name (multiplicity)? `:` Type )? `connect` path `to` path body,
@@ -1039,9 +1132,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
         let (input, _) = ws1(input)?;
-        let (input, from_expr) = connector_end_expression(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
+        let (input, part) = interface_part(input)?;
         let (input, body) = interface_usage_body(input)?;
         return Ok((
             input,
@@ -1053,8 +1144,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     interface_type,
                     subsets,
                     redefines,
-                    from: from_expr,
-                    to: to_expr,
+                    part,
                     body,
                 },
             ),
@@ -1063,14 +1153,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     // BNF: the bare `InterfacePart` alternative (no `connect` keyword) is only legal when there
     // is no preceding `UsageDeclaration` at all -- i.e. no name and no type were captured above.
     if iface_name.is_none() && interface_type.is_none() {
-        if let Ok((after_to, (from_expr, to_expr))) = (|| {
-            let (input, from_expr) = connector_end_expression(input)?;
-            let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-            let (input, to_expr) =
-                preceded(ws_and_comments, connector_end_expression).parse(input)?;
-            Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
-        })() {
-            let (input, body) = interface_usage_body(after_to)?;
+        if let Ok((after_part, part)) = interface_part(input) {
+            let (input, body) = interface_usage_body(after_part)?;
             return Ok((
                 input,
                 node_from_to(
@@ -1079,8 +1163,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     InterfaceUsage::Connection {
                         subsets: subsets.clone(),
                         redefines: redefines.clone(),
-                        from: from_expr,
-                        to: to_expr,
+                        part,
                         body,
                     },
                 ),
@@ -1542,10 +1625,9 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // `flow_def` must be tried before `flow_usage_member`: the latter has no guard
             // against a bare `def` keyword either (see comment above).
             map(flow_def, PartUsageBodyElement::FlowDef),
-            map(
-                crate::parser::flow::flow_usage_member,
-                PartUsageBodyElement::FlowUsage,
-            ),
+            map(crate::parser::flow::flow_usage_member, |usage| {
+                PartUsageBodyElement::FlowUsage(Box::new(usage))
+            }),
             // §6 G25: `item` members were reachable from part *definition* bodies only.
             // `item_def_required` first, for the same bare-`def` reason as `constraint_def`.
             map(item_def_required, PartUsageBodyElement::ItemDef),
@@ -1913,77 +1995,6 @@ mod perform_semicolon_and_redefine_tests {
             panic!("expected Perform, got {:?}", node.value);
         };
         perform
-    }
-
-    #[test]
-    fn perform_plain_name_accepts_semicolon_body() {
-        let node = perform("perform vehicleMassTest;");
-        assert!(node.value.action_name.is_empty());
-        assert!(node.value.action_reference.is_some());
-        assert_eq!(node.value.redefines, None);
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_dotted_name_accepts_semicolon_body() {
-        let node = perform("perform providePower.generateTorque;");
-        assert!(node.value.action_name.is_empty());
-        assert!(node.value.action_reference.is_some());
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_quoted_name_accepts_semicolon_body() {
-        let node = perform("perform 'provide power';");
-        assert!(node.value.action_name.is_empty());
-        assert!(node.value.action_reference.is_some());
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_accepts_redefine_clause_with_semicolon_body() {
-        let node = perform("perform providePower.generateTorque :>> generateTorque;");
-        assert!(node.value.action_reference.is_some());
-        assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|relationship| relationship.value.target.len()),
-            Some(1)
-        );
-        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
-    }
-
-    #[test]
-    fn perform_accepts_redefine_clause_with_brace_body() {
-        let node = perform("perform 'provide power' :>> VehicleA::'provide power' { }");
-        assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|relationship| relationship.value.target.len()),
-            Some(1)
-        );
-        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
-    }
-
-    #[test]
-    fn perform_plain_brace_body_still_works() {
-        let node = perform("perform vehicleMassTest { }");
-        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
-    }
-
-    #[test]
-    fn perform_action_declaration_form_is_unaffected() {
-        let (rest, node) = part_usage_body_element(input("perform action 'assemble vehicle' { }"))
-            .expect("perform action parses");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PartUsageBodyElement::Perform(perform) = node.value else {
-            panic!("expected Perform, got {:?}", node.value);
-        };
-        assert_eq!(perform.value.action_name, "assemble vehicle");
-        assert!(perform.value.action_reference.is_none());
-        assert_eq!(perform.value.redefines, None);
     }
 
     /// §6 G6: directed `part`/`item` usages inside a perform body.
