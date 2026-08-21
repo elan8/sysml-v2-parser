@@ -12,8 +12,8 @@ use crate::ast::{
     RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement, RenderingUsageBody,
     RenderingUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, ReturnRefBody,
     ReturnRefBodyElement, RootElement, RootNamespace, StateDefBody, StateDefBodyElement,
-    ThenTarget, UseCaseDefBody, UseCaseDefBodyElement, VariantTypedUsage, VariantUsage, ViewBody,
-    ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    ThenTarget, UseCaseDefBody, UseCaseDefBodyElement, VariantTypedUsage, VariantUsage,
+    VariantUsageForm, ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
 
 /// Kind of opaque or recovery content found in an AST.
@@ -757,6 +757,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             AttributeBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
+            AttributeBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             AttributeBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
         }
     }
@@ -785,6 +786,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
             }
             PortDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PortDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+            PortDefBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
         }
     }
 }
@@ -806,6 +808,7 @@ fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
             PortBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PortBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+            PortBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
         }
     }
 }
@@ -929,6 +932,7 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::DefaultReferenceUsage(n) => {
                 walk_default_reference_usage(report, &p, &n.value)
             }
+            ActionDefBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             ActionDefBodyElement::TerminateStmt(_) | ActionDefBodyElement::Assign(_) => {}
         }
     }
@@ -1569,23 +1573,32 @@ fn walk_bind(report: &mut OpacityReport, path: &str, bind: &crate::ast::Bind) {
 }
 
 fn walk_variant_usage(report: &mut OpacityReport, path: &str, variant: &VariantUsage) {
-    if let Some(body) = &variant.body {
-        walk_part_usage_body(report, path, body);
-    }
-    match &variant.typed {
-        Some(VariantTypedUsage::Part(part)) => walk_part_usage_body(report, path, &part.value.body),
-        Some(VariantTypedUsage::Attribute(attribute)) => {
+    match &variant.form {
+        VariantUsageForm::Reference {
+            body: Some(body), ..
+        } => walk_part_usage_body(report, path, body),
+        VariantUsageForm::Reference { body: None, .. } => {}
+        VariantUsageForm::Typed(VariantTypedUsage::Part(part)) => {
+            walk_part_usage_body(report, path, &part.value.body)
+        }
+        VariantUsageForm::Typed(VariantTypedUsage::Attribute(attribute)) => {
             walk_attribute_body(report, path, &attribute.value.body)
         }
-        Some(VariantTypedUsage::Item(item)) => walk_attribute_body(report, path, &item.value.body),
-        Some(VariantTypedUsage::Port(port)) => walk_port_body(report, path, &port.value.body),
-        Some(VariantTypedUsage::Requirement(requirement)) => {
+        VariantUsageForm::Typed(VariantTypedUsage::Item(item)) => {
+            walk_attribute_body(report, path, &item.value.body)
+        }
+        VariantUsageForm::Typed(VariantTypedUsage::Port(port)) => {
+            walk_port_body(report, path, &port.value.body)
+        }
+        VariantUsageForm::Typed(VariantTypedUsage::Action(action)) => {
+            walk_optional_action_usage_body(report, path, &action.value.body)
+        }
+        VariantUsageForm::Typed(VariantTypedUsage::Requirement(requirement)) => {
             walk_requirement_def_body(report, path, &requirement.value.body)
         }
-        Some(VariantTypedUsage::Perform(perform)) => {
+        VariantUsageForm::Typed(VariantTypedUsage::Perform(perform)) => {
             walk_perform_body(report, path, &perform.value.body)
         }
-        None => {}
     }
 }
 

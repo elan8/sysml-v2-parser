@@ -107,6 +107,9 @@ pub enum ActionDefBodyElement {
     /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
     /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
     DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
+    /// `variant` member via `ActionBodyItem → NonBehaviorBodyItem → VariantUsageMember`
+    /// (SysML textual BNF 894-917; pinned Pilot `SysML.xtext` 1361-1381).
+    VariantUsage(Node<crate::ast::VariantUsage>),
 }
 
 /// Assignment statement (SysML v2 AssignmentNode/AssignmentActionUsage).

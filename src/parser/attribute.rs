@@ -82,6 +82,7 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    b"variant",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
@@ -382,6 +383,10 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::item::item_usage, |n| {
             AttributeBodyElement::ItemUsage(Box::new(n))
         }),
+        map(
+            crate::parser::part::variant_usage,
+            AttributeBodyElement::VariantUsage,
+        ),
         map(
             |i| {
                 crate::parser::recovery::unsupported_member(

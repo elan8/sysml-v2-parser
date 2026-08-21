@@ -118,6 +118,7 @@ pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    b"variant",
     // The remaining members `port_def_body_element` dispatches. A starter table is only worth
     // having if it names where a member *starts*; recovery synchronizes on it, so a missing entry
     // is a valid sibling consumed by the malformed node before it.
@@ -155,8 +156,7 @@ pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
     // `DefinitionBodyItem` admits a `VariantUsageMember` here, which `variation port :>> autoPort
     // { variant port autoPort1; }` writes (`Variability Examples/VehicleVariabilityModel.sysml:79`).
-    // The member itself is not modelled -- see `planning/port-usage-prefix-matrix.md` §10.1 -- but
-    // it is still where a member starts, so recovery must synchronize on it.
+    // This scope now owns that typed member, and recovery synchronizes at its grammar starter.
     b"variant",
     b"attribute",
     b"item",

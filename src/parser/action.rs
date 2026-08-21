@@ -54,6 +54,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"item",
     b"assert",
     b"variation",
+    b"variant",
     b"snapshot",
     b"accept",
     b"decide",
@@ -294,7 +295,8 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::Assign(_)
         | ActionDefBodyElement::ForLoop(_)
         | ActionDefBodyElement::ThenAction(_)
-        | ActionDefBodyElement::DefaultReferenceUsage(_)) => {
+        | ActionDefBodyElement::DefaultReferenceUsage(_)
+        | ActionDefBodyElement::VariantUsage(_)) => {
             FirstMergeBodyElement::Member(Box::new(Node::new(span.clone(), value)))
         }
     };
@@ -820,6 +822,10 @@ pub(crate) fn action_def_body_element(
             // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
             // Directed `in item`/`in part` reach here after `in_out_decl` rejects those keywords.
             nom::branch::alt((
+                map(
+                    crate::parser::part::variant_usage,
+                    ActionDefBodyElement::VariantUsage,
+                ),
                 map(crate::parser::part::part_usage, |p| {
                     ActionDefBodyElement::PartUsage(Box::new(p))
                 }),

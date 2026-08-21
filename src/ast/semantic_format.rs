@@ -2551,6 +2551,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::DefaultReferenceUsage(usage) => {
                 self.write_default_reference_usage(&usage.value)
             }
+            ActionDefBodyElement::VariantUsage(usage) => self.write_variant_usage(&usage.value),
         }
     }
 
@@ -3546,6 +3547,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_constraint_usage(&usage.value)?;
                         }
+                        super::AttributeBodyElement::VariantUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&usage.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -3613,30 +3618,44 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// its target nor its body.
     fn write_variant_usage(&mut self, usage: &super::VariantUsage) -> io::Result<()> {
         self.writer.write_str("(variant-usage (target ")?;
-        match usage.reference {
-            Some(reference) => self.write_reference(reference)?,
-            None => self.writer.write_str("none")?,
+        match &usage.form {
+            super::VariantUsageForm::Reference { reference, .. } => {
+                self.write_reference(*reference)?
+            }
+            super::VariantUsageForm::Typed(_) => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (usage ")?;
-        match &usage.typed {
-            Some(super::VariantTypedUsage::Part(usage)) => self.write_part_usage(&usage.value)?,
-            Some(super::VariantTypedUsage::Item(usage)) => self.write_item_usage(&usage.value)?,
-            Some(super::VariantTypedUsage::Attribute(usage)) => {
+        match &usage.form {
+            super::VariantUsageForm::Reference { .. } => self.writer.write_str("none")?,
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Part(usage)) => {
+                self.write_part_usage(&usage.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Item(usage)) => {
+                self.write_item_usage(&usage.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Attribute(usage)) => {
                 self.write_attribute_usage(&usage.value)?
             }
-            Some(super::VariantTypedUsage::Port(usage)) => self.write_port_usage(&usage.value)?,
-            Some(super::VariantTypedUsage::Perform(_usage)) => {
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Port(usage)) => {
+                self.write_port_usage(&usage.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Action(usage)) => {
+                self.write_action_usage(&usage.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Perform(_usage)) => {
                 self.writer.write_str("(perform)")?
             }
-            Some(super::VariantTypedUsage::Requirement(_usage)) => {
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Requirement(_usage)) => {
                 self.writer.write_str("(requirement-usage)")?
             }
-            None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") ")?;
-        match &usage.body {
-            Some(body) => self.write_ref_body(body)?,
-            None => self.writer.write_str("(body absent)")?,
+        match &usage.form {
+            super::VariantUsageForm::Reference {
+                body: Some(body), ..
+            } => self.write_ref_body(body)?,
+            super::VariantUsageForm::Reference { body: None, .. }
+            | super::VariantUsageForm::Typed(_) => self.writer.write_str("(body absent)")?,
         }
         self.writer.write_char(')')
     }
@@ -4851,6 +4870,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
+                        super::PortBodyElement::VariantUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&usage.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -4919,6 +4942,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PortDefBodyElement::MetadataKeywordUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
+                        }
+                        PortDefBodyElement::VariantUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&usage.value)?;
                         }
                         super::PortDefBodyElement::Unsupported(unsupported) => {
                             self.write_item_prefix(&mut first)?;

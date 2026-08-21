@@ -5,7 +5,7 @@ pub(crate) use crate::ast::{
     Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node, PartDef,
     PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform,
     PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefDecl, VariantTypedUsage,
-    VariantUsage,
+    VariantUsage, VariantUsageForm,
 };
 pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};

@@ -587,6 +587,7 @@ fn emit_attribute_body_element(
         AttributeBodyElement::ConstraintUsage(c) => {
             super::view::emit_constraint_usage(w, path, &c.value)
         }
+        AttributeBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         AttributeBodyElement::DefaultReferenceUsage(a) => {
@@ -750,6 +751,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PortDefBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }
 }
 
@@ -795,6 +797,7 @@ fn emit_port_body_element(
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
         PortBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
+        PortBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }
 }
 
@@ -1753,14 +1756,10 @@ pub(crate) fn emit_variant_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, variant.membership.visibility);
     w.push_str("variant ");
-    match &variant.typed {
-        None => {
-            let reference = variant.reference.ok_or_else(|| EmitError::Unsupported {
-                path: path.to_owned(),
-                construct: "untyped variant without a reference".to_owned(),
-            })?;
-            w.push_qualified_reference(&format!("{path}/reference"), reference)?;
-            match &variant.body {
+    match &variant.form {
+        crate::ast::VariantUsageForm::Reference { reference, body } => {
+            w.push_qualified_reference(&format!("{path}/reference"), *reference)?;
+            match body {
                 Some(body) => emit_part_usage_body(w, path, body),
                 None => {
                     w.push_char(';');
@@ -1768,18 +1767,25 @@ pub(crate) fn emit_variant_usage(
                 }
             }
         }
-        Some(crate::ast::VariantTypedUsage::Part(p)) => emit_part_usage(w, path, &p.value),
-        Some(crate::ast::VariantTypedUsage::Attribute(a)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Part(p)) => {
+            emit_part_usage(w, path, &p.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Attribute(a)) => {
             emit_attribute_usage(w, path, &a.value)
         }
-        Some(crate::ast::VariantTypedUsage::Item(i)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Item(i)) => {
             super::requirement::emit_item_usage(w, path, &i.value)
         }
-        Some(crate::ast::VariantTypedUsage::Port(p)) => emit_port_usage(w, path, &p.value),
-        Some(crate::ast::VariantTypedUsage::Perform(p)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Port(p)) => {
+            emit_port_usage(w, path, &p.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Action(a)) => {
+            super::behavior::emit_action_usage(w, path, &a.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Perform(p)) => {
             super::behavior::emit_perform(w, path, &p.value)
         }
-        Some(crate::ast::VariantTypedUsage::Requirement(r)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Requirement(r)) => {
             super::requirement::emit_requirement_usage(w, path, &r.value)
         }
     }

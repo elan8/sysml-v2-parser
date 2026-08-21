@@ -417,6 +417,10 @@ pub enum AttributeBodyElement {
     /// constraint checkedConstraints : ConstraintCheck[0..*] :> ... { ... }`, Systems Library
     /// `Items.sysml`; spec42 Gap 49a).
     ConstraintUsage(Box<Node<ConstraintUsage>>),
+    /// `variant` member via `DefinitionBodyItem → VariantUsageMember` (SysML textual BNF
+    /// 237-252; pinned Pilot `SysML.xtext` 518-531). `AttributeBody` is shared by attribute,
+    /// item, and type bodies, so this owns the member once at that grammar boundary.
+    VariantUsage(Node<VariantUsage>),
 }
 
 /// Item definition: `item def` Identification body (for events, etc.).
@@ -806,23 +810,29 @@ pub enum PartUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariantUsage {
-    /// Referenced usage in the untyped `variant path;` form. Typed variants keep their declared
-    /// name solely on the nested usage instead of duplicating it here.
-    pub reference: Option<QualifiedReferenceId>,
-    /// Present when declared with a kind keyword (`variant part ...;`); `None` for the untyped
-    /// reference form (`variant name;` / `variant name { ... }`).
-    pub typed: Option<VariantTypedUsage>,
-    /// Optional nested body on the untyped reference form, e.g. `variant q { attribute b : B
-    /// :>> a; }` (`Simple Tests/VariabilityTest.sysml:16`) or a quoted name `variant '6cylEngine'
-    /// { ... }` (`Variability Examples/VehicleVariabilityModel.sysml:78`). Always `None` when
-    /// `typed` is `Some` (the nested typed usage owns its own body).
-    pub body: Option<PartUsageBody>,
+    /// Exactly one `VariantUsageElement` alternative. This discriminant prevents invalid states
+    /// such as an untyped reference paired with an inline typed usage.
+    pub form: VariantUsageForm,
     /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
     /// [`crate::ast::MembershipKind::VariantMembership`] -- confirmed against
     /// `SysML-textual-bnf.kebnf`'s `VariantUsageMember : VariantMembership = MemberPrefix
     /// 'variant' ownedVariantUsage = VariantUsageElement`, which legally carries a visibility
     /// prefix before this increment added support for parsing one.
     pub membership: Membership,
+}
+
+/// The two non-overlapping shapes of `VariantUsageElement` retained by this parser.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum VariantUsageForm {
+    /// `variant path;` or `variant path { ... }`. The optional body belongs only to this
+    /// reference form, e.g. `variant q { attribute b : B :>> a; }`.
+    Reference {
+        reference: QualifiedReferenceId,
+        body: Option<PartUsageBody>,
+    },
+    /// An inline declared usage (`variant part ...`, `variant action ...`, etc.).
+    Typed(VariantTypedUsage),
 }
 
 /// The nested usage of a typed `variant` member (BNF `VariantUsageElement`, restricted here to
@@ -834,6 +844,9 @@ pub enum VariantTypedUsage {
     Attribute(Box<Node<AttributeUsage>>),
     Item(Box<Node<ItemUsage>>),
     Port(Box<Node<PortUsage>>),
+    /// `variant action a;` through `VariantUsageElement → BehaviorUsageElement → ActionUsage`
+    /// (SysML textual BNF 374-390 and 392-413; pinned Pilot `SysML.xtext` 679-719).
+    Action(Box<Node<ActionUsage>>),
     /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
     Perform(Box<Node<Perform>>),
     /// `variant requirement r1;` inside a `variation requirement r { ... }` body (spec42
@@ -1109,6 +1122,8 @@ pub enum PortDefBodyElement {
     /// `Ports.sysml`). This scope accepted no `ref` member at all, so every one of them was
     /// captured as unsupported grammar.
     RefDecl(Node<RefDecl>),
+    /// `variant` member via this scope's `DefinitionBodyItem` grammar.
+    VariantUsage(Node<VariantUsage>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1209,6 +1224,8 @@ pub enum PortBodyElement {
     /// `ref` member at all, which only became reachable when `port_usage` started claiming the
     /// `ref port …` declarations that own these bodies.
     RefDecl(Node<RefDecl>),
+    /// `variant` member via `UsageBody = DefinitionBody`.
+    VariantUsage(Node<VariantUsage>),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2

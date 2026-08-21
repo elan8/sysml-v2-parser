@@ -1249,9 +1249,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Part(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Part(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1264,9 +1262,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Attribute(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1279,9 +1275,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Item(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Item(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1294,9 +1288,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Port(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Port(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1311,9 +1303,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Requirement(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Requirement(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1328,9 +1318,24 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Perform(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Perform(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+
+    // `VariantUsageElement → BehaviorUsageElement → ActionUsage` (SysML textual BNF 374-390,
+    // 392-413; pinned Pilot `SysML.xtext` 679-719). `action_usage` is tried before the untyped
+    // reference branch so its declaration and optional action body stay typed.
+    if let Ok((next, usage)) = crate::parser::action::action_usage(input) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Action(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1354,9 +1359,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
             start,
             input,
             VariantUsage {
-                reference: Some(reference),
-                typed: None,
-                body,
+                form: VariantUsageForm::Reference { reference, body },
                 membership,
             },
         ),

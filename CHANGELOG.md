@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Variant usages retain every shared owning-body form.** `VariantUsageMember` owns the same
+  `VariantUsageElement` in `AttributeBody`, `ActionBody`, `PortBody`, and `PortDefBody`; that
+  element reaches `ActionUsage` through `BehaviorUsageElement` (SysML textual BNF 237-252,
+  374-413, and 894-917; pinned Pilot `SysML.xtext` 518-531, 679-719, and 1361-1381). Those
+  scopes now dispatch and recover typed variant members, while `VariantUsage` uses a discriminated
+  reference-or-typed form and adds the source-backed `variant action` alternative. Emission,
+  semantic projection, visitors, and opacity inspection are exhaustive. **AST version 202.**
+
 - **Action bodies retain direct imports.** `ActionBodyItem` admits `Import` through
   `NonBehaviorBodyItem` (SysML textual BNF 894-917; pinned Pilot `SysML.xtext` 1361-1381), and
   the same `ActionBody` is owned by both `ActionDefinition` and `ActionUsage`. Both typed action

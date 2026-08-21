@@ -43,6 +43,10 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
     // already sees `ref port q;` (`Simple Tests/PartTest.sysml:21`) and `#Tag port t;` before
     // `connector::ref_decl` and the annotating members below can claim their first token.
     let (input, elem) = alt((
+        map(
+            crate::parser::part::variant_usage,
+            PortBodyElement::VariantUsage,
+        ),
         map(port_usage, |p| PortBodyElement::PortUsage(Box::new(p))),
         // `EventOccurrenceUsage` is a `StructureUsageElement`, so a port usage body owns the
         // same typed occurrence member that part and action bodies already dispatch. Keeping it
@@ -286,6 +290,10 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         return Ok((input, node_from_to(start, input, elem)));
     }
     let (input, elem) = alt((
+        map(
+            crate::parser::part::variant_usage,
+            PortDefBodyElement::VariantUsage,
+        ),
         map(item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
         map(in_out_decl, PortDefBodyElement::InOutDecl),

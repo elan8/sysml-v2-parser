@@ -2894,6 +2894,9 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(&$($mutability)? **field_0);
                 }
+                AttributeBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
+                }
                 AttributeBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
                 }
@@ -3217,15 +3220,15 @@ macro_rules! ast_traversal {
         pub fn walk_variant_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VariantUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VariantUsage { reference, typed, body, membership } = &$($mutability)? node.value;
-            if let Some(inner) = reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = typed {
-                visitor.visit_variant_typed_usage(inner);
-            }
-            if let Some(inner) = body {
-                visitor.visit_part_usage_body(inner);
+            let VariantUsage { form, membership } = &$($mutability)? node.value;
+            match form {
+                VariantUsageForm::Reference { reference, body } => {
+                    visitor.visit_qualified_reference(reference);
+                    if let Some(inner) = body {
+                        visitor.visit_part_usage_body(inner);
+                    }
+                }
+                VariantUsageForm::Typed(inner) => visitor.visit_variant_typed_usage(inner),
             }
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
@@ -3244,6 +3247,9 @@ macro_rules! ast_traversal {
                 }
                 VariantTypedUsage::Port(field_0) => {
                     visitor.visit_port_usage(&$($mutability)? **field_0);
+                }
+                VariantTypedUsage::Action(field_0) => {
+                    visitor.visit_action_usage(&$($mutability)? **field_0);
                 }
                 VariantTypedUsage::Perform(field_0) => {
                     visitor.visit_perform(&$($mutability)? **field_0);
@@ -3512,6 +3518,9 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                PortDefBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
+                }
                 PortDefBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
                 }
@@ -3612,6 +3621,9 @@ macro_rules! ast_traversal {
                 }
                 PortBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
+                }
+                PortBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -4789,6 +4801,9 @@ macro_rules! ast_traversal {
                 }
                 ActionDefBodyElement::DefaultReferenceUsage(field_0) => {
                     visitor.visit_default_reference_usage(field_0);
+                }
+                ActionDefBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);

@@ -286,6 +286,7 @@ pub(crate) fn emit_action_def_body_element(
         }
         ActionDefBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         ActionDefBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
+        ActionDefBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
