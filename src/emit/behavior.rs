@@ -131,6 +131,10 @@ fn emit_action_node_usage_declaration(
     declaration: &crate::ast::ActionNodeUsageDeclaration,
 ) -> Result<(), EmitError> {
     w.push_str("action");
+    let Some(declaration) = declaration.declaration.as_ref() else {
+        return Ok(());
+    };
+    let declaration = &declaration.value;
     if declaration.identification_span.len != 0 {
         w.push_char(' ');
         w.push_authored_name(
@@ -1198,57 +1202,84 @@ pub(crate) fn emit_flow_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, flow.membership.visibility);
     match flow.kind {
-        crate::ast::FlowUsageKind::Flow => w.push_str("flow "),
-        crate::ast::FlowUsageKind::Message => w.push_str("message "),
-        crate::ast::FlowUsageKind::SuccessionFlow => w.push_str("succession flow "),
+        crate::ast::FlowUsageKind::Flow => w.push_str("flow"),
+        crate::ast::FlowUsageKind::Message => w.push_str("message"),
+        crate::ast::FlowUsageKind::SuccessionFlow => w.push_str("succession flow"),
     }
-    if let Some(name) = &flow.name {
-        w.push_str(&format_name(name));
-    }
-    if let Some(ty) = flow.type_name {
-        w.push_str(" : ");
-        if flow.type_is_conjugated {
-            w.push_char('~');
-        }
-        w.push_qualified_reference(path, ty)?;
-    }
-    if let Some(payload) = &flow.payload {
-        // The kind keyword already ends with a space when nothing was emitted since.
-        if flow.name.is_some() || flow.type_name.is_some() {
-            w.push_str(" of ");
-        } else {
-            w.push_str("of ");
-        }
-        if let Some(n) = &payload.value.name {
-            w.push_str(&format_name(n));
-            if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
-                w.push_str(" : ");
+    match &flow.declaration {
+        crate::ast::FlowDeclaration::Declared {
+            declaration,
+            value,
+            payload,
+            endpoints,
+        } => {
+            let declaration = &declaration.value;
+            if declaration.identification_span.len != 0 {
+                w.push_char(' ');
+                w.push_authored_name(
+                    &format!("{path}/declaration/identification"),
+                    &declaration.identification_span,
+                )?;
+            }
+            if let Some(typing) = &declaration.typing {
+                emit_typing_clause(w, &typing.value)?;
+            }
+            if let Some(multiplicity) = &declaration.multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+            if let Some((subsets, value)) = &declaration.subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+                if let Some(value) = value {
+                    w.push_str(" = ");
+                    emit_expression(w, &value.value)?;
+                }
+            }
+            for relationship in [
+                declaration.redefines.as_ref(),
+                declaration.references.as_ref(),
+                declaration.crosses.as_ref(),
+                declaration.intersects.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                emit_subsetting_clause(w, &relationship.value)?;
+            }
+            if let Some(value) = value {
+                emit_feature_value(w, value)?;
+            }
+            if let Some(payload) = payload {
+                w.push_str(" of ");
+                if let Some(n) = &payload.value.name {
+                    w.push_str(&format_name(n));
+                    if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
+                        w.push_str(" : ");
+                    }
+                }
+                if let Some(ty) = payload.value.type_name {
+                    if payload.value.type_is_conjugated {
+                        w.push_char('~');
+                    }
+                    w.push_qualified_reference(path, ty)?;
+                }
+                if let Some(mult) = &payload.value.multiplicity {
+                    emit_multiplicity(w, &mult.value)?;
+                }
+            }
+            if let Some(endpoints) = endpoints {
+                w.push_str(" from ");
+                super::view::emit_kerml_connector_end(w, path, &endpoints.from.value)?;
+                w.push_str(" to ");
+                super::view::emit_kerml_connector_end(w, path, &endpoints.to.value)?;
             }
         }
-        if let Some(ty) = payload.value.type_name {
-            if payload.value.type_is_conjugated {
-                w.push_char('~');
-            }
-            w.push_qualified_reference(path, ty)?;
-        }
-        if let Some(mult) = &payload.value.multiplicity {
-            emit_multiplicity(w, &mult.value)?;
-        }
-    }
-    if let Some(from) = &flow.from {
-        // Anonymous flows keep the canonical `flow from <a> to <b>` keyword spelling: the
-        // parser recognizes `from` as the endpoint keyword rather than a declared name
-        // (spec42 Gap 47).
-        if flow.name.is_some() || flow.payload.is_some() || flow.type_name.is_some() {
+        crate::ast::FlowDeclaration::EndpointOnly { endpoints } => {
             w.push_str(" from ");
-        } else {
-            w.push_str("from ");
+            super::view::emit_kerml_connector_end(w, path, &endpoints.from.value)?;
+            w.push_str(" to ");
+            super::view::emit_kerml_connector_end(w, path, &endpoints.to.value)?;
         }
-        super::view::emit_kerml_connector_end(w, path, &from.value)?;
-    }
-    if let Some(to) = &flow.to {
-        w.push_str(" to ");
-        super::view::emit_kerml_connector_end(w, path, &to.value)?;
     }
     emit_definition_body(w, path, &flow.body)
 }

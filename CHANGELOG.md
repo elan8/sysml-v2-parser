@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Usage declarations are source-backed shared grammar.** Action-node declarations, for-loop
+  variables, and flow/message usages now embed one typed `UsageDeclaration`, retaining complete
+  feature-specialization relationships rather than owner-specific field mirrors. **AST version
+  212.**
+
 - **For action nodes retain their complete pinned grammar structure.** `ForLoopNode` now shares
   `ActionNodePrefix` with its loop/while siblings, owns a source-backed typed
   `ForVariableDeclaration` (including the full usage header), a structured `in` node parameter,

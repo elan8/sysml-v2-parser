@@ -172,7 +172,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::AllocationDef(a) => walk_definition_body(report, path, &a.value.body),
         PackageBodyElement::AllocationUsage(a) => walk_definition_body(report, path, &a.value.body),
         PackageBodyElement::FlowDef(f) => walk_definition_body(report, path, &f.value.body),
-        PackageBodyElement::FlowUsage(f) => walk_definition_body(report, path, &f.value.body),
+        PackageBodyElement::FlowUsage(f) => walk_flow_usage(report, path, &f.value),
         PackageBodyElement::ConnectionDef(c) => {
             walk_connection_def_body(report, path, &c.value.body)
         }
@@ -308,9 +308,7 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
                 walk_ref_body(report, &p, &connect.value.body)
             }
             InterfaceDefBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
-            InterfaceDefBodyElement::FlowUsage(flow) => {
-                walk_definition_body(report, &p, &flow.value.body)
-            }
+            InterfaceDefBodyElement::FlowUsage(flow) => walk_flow_usage(report, &p, &flow.value),
             InterfaceDefBodyElement::ConstraintUsage(usage) => {
                 walk_constraint_def_body(report, &p, &usage.value.body)
             }
@@ -394,7 +392,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             }
             CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
-            CalcDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            CalcDefBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             CalcDefBodyElement::AliasDef(n) => walk_relationship_body(report, &p, &n.value.body),
             CalcDefBodyElement::DefaultReferenceUsage(n) => {
                 walk_default_reference_usage(report, &p, &n.value)
@@ -527,7 +525,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
                 walk_interface_def_body(report, &p, &n.value.body)
             }
             PartDefBodyElement::InterfaceUsage(n) => walk_interface_usage(report, &p, &n.value),
-            PartDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            PartDefBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             PartDefBodyElement::Connection(n) => {
                 walk_connection_def_body(report, &p, &n.value.body)
             }
@@ -660,7 +658,7 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             PartUsageBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
             PartUsageBodyElement::InterfaceUsage(n) => walk_interface_usage(report, &p, &n.value),
-            PartUsageBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            PartUsageBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             PartUsageBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
             PartUsageBodyElement::SuccessionUsage(n) => walk_ref_body(report, &p, &n.value.body),
             PartUsageBodyElement::Allocate(n) => walk_ref_body(report, &p, &n.value.body),
@@ -911,6 +909,16 @@ fn walk_in_out_decl(report: &mut OpacityReport, path: &str, decl: &crate::ast::I
     }
 }
 
+/// Flow/message declaration alternatives are fully typed. Keep the match exhaustive here so a
+/// future grammar alternative cannot silently bypass opacity traversal of its body.
+fn walk_flow_usage(report: &mut OpacityReport, path: &str, flow: &crate::ast::FlowUsage) {
+    match &flow.declaration {
+        crate::ast::FlowDeclaration::Declared { .. } => {}
+        crate::ast::FlowDeclaration::EndpointOnly { .. } => {}
+    }
+    walk_definition_body(report, path, &flow.body);
+}
+
 /// `ActionNodePrefix` contains only typed prefix/declaration facts (no nested body or recovery
 /// carrier), while the mandatory `ActionBody` below is where opacity can occur.
 fn walk_action_node_body(
@@ -928,16 +936,7 @@ fn walk_action_node_body(
         Some(declaration) => {
             let crate::ast::ActionNodeUsageDeclaration {
                 action_span: _,
-                identification: _,
-                identification_span: _,
-                typing: _,
-                multiplicity: _,
-                multiplicity_modifiers: _,
-                subsets: _,
-                redefines: _,
-                references: _,
-                crosses: _,
-                intersects: _,
+                declaration: _,
             } = &declaration.value;
         }
     }
@@ -948,16 +947,7 @@ fn walk_action_node_body(
     if let Some(declaration) = action_declaration {
         let crate::ast::ActionNodeUsageDeclaration {
             action_span: _,
-            identification: _,
-            identification_span: _,
-            typing: _,
-            multiplicity: _,
-            multiplicity_modifiers: _,
-            subsets: _,
-            redefines: _,
-            references: _,
-            crosses: _,
-            intersects: _,
+            declaration: _,
         } = &declaration.value;
     }
     walk_action_def_body(report, path, body);
@@ -1019,7 +1009,7 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ActionDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
             ActionDefBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
-            ActionDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            ActionDefBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             ActionDefBodyElement::WhileStmt(n) => {
                 walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
             }
@@ -1130,7 +1120,7 @@ fn walk_action_usage_body_elements(
             }
             ActionUsageBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
-            ActionUsageBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            ActionUsageBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             ActionUsageBodyElement::WhileStmt(n) => {
                 walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
             }
@@ -1340,7 +1330,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
             UseCaseDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
-            UseCaseDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            UseCaseDefBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
             UseCaseDefBodyElement::SubjectDecl(subject) => {
                 walk_definition_body(report, &p, &subject.value.body)
             }
@@ -1511,7 +1501,7 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::AssertConstraint(n) => {
             walk_constraint_def_body(report, path, &n.value.body)
         }
-        OccurrenceBodyElement::FlowUsage(n) => walk_definition_body(report, path, &n.value.body),
+        OccurrenceBodyElement::FlowUsage(n) => walk_flow_usage(report, path, &n.value),
         OccurrenceBodyElement::Bind(n) => walk_bind(report, path, &n.value),
         OccurrenceBodyElement::AttributeUsage(n) => {
             walk_attribute_body(report, path, &n.value.body)

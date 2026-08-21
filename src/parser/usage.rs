@@ -2,20 +2,80 @@
 
 use crate::ast::{
     Expression, Multiplicity, Node, QualifiedReferenceId, Span, SubsettingKind,
-    SubsettingRelationship, TypingKind, TypingRelationship,
+    SubsettingRelationship, TypingKind, TypingRelationship, UsageDeclaration,
 };
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    crosses_operator, qualified_reference, redefine_operator, reference_path, references_operator,
-    starts_with_keyword, subset_operator, typed_by_operator, ws1, ws_and_comments,
+    crosses_operator, identification, qualified_reference, redefine_operator, reference_path,
+    references_operator, starts_with_keyword, subset_operator, typed_by_operator, ws1,
+    ws_and_comments,
 };
-use crate::parser::{span_from_to, Input};
+use crate::parser::{node_from_to, span_from_to, Input};
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+/// Parse the grammar-owned `UsageDeclaration = Identification FeatureSpecializationPart?`.
+///
+/// Owners decide whether an empty identification is legal before calling this parser; the typed
+/// declaration itself has no owner-specific flags or mirrors.
+fn usage_declaration_with_identification<'a>(
+    start: Input<'a>,
+    input: Input<'a>,
+    identification: crate::ast::Identification,
+) -> IResult<Input<'a>, Node<UsageDeclaration>> {
+    let identification_span = span_from_to(start, input);
+    let (input, header) = crate::parser::definition_header::parse_feature_usage_header(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            UsageDeclaration {
+                identification,
+                identification_span,
+                typing: header.typing,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                subsets: header
+                    .subsets
+                    .map(|relationship| (relationship, header.subsetting_value)),
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
+            },
+        ),
+    ))
+}
+
+pub(crate) fn usage_declaration(input: Input<'_>) -> IResult<Input<'_>, Node<UsageDeclaration>> {
+    let start = input;
+    let (input, identification) = identification(input)?;
+    usage_declaration_with_identification(start, input, identification)
+}
+
+/// Parse the `UsageDeclaration` form whose optional `Identification` is absent.
+///
+/// This is a real, source-positioned declaration (with a zero-width identification span), not a
+/// placeholder for another grammar alternative. Only parents whose pinned production admits an
+/// omitted identification may call it; `FlowDeclaration` uses it before a leading `of` payload
+/// clause, whereas its endpoint-only alternative has no declaration at all.
+pub(crate) fn usage_declaration_without_identification(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<UsageDeclaration>> {
+    usage_declaration_with_identification(
+        input,
+        input,
+        crate::ast::Identification {
+            short_name: None,
+            name: None,
+        },
+    )
+}
 
 /// BNF `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?`
 /// (§8.2.2.6.2), the modifier chain every usage may carry ahead of its keyword.

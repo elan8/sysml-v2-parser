@@ -10,19 +10,20 @@ use crate::ast::{
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
-use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::lex::{
-    identification, name, qualified_reference, starts_with_any_keyword, starts_with_keyword,
-    take_until_terminator, ws1, ws_and_comments,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    ws1, ws_and_comments,
 };
+use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::{multiplicity_modifier_slots, multiplicity_node, redefinition};
+use crate::parser::usage::{
+    multiplicity_modifier_slots, multiplicity_node, redefinition, usage_declaration,
+};
 use crate::parser::with_span;
 use crate::parser::Input;
-use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -642,31 +643,7 @@ fn for_loop_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
 /// header is retained at this declaration boundary, rather than reducing an authored variable
 /// name to display text before the `in` node parameter is parsed.
 fn for_variable_declaration(input: Input<'_>) -> IResult<Input<'_>, Node<ForVariableDeclaration>> {
-    let start = input;
-    let (input, identification) = identification(input)?;
-    let identification_span = span_from_to(start, input);
-    let (input, header) = parse_feature_usage_header(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ForVariableDeclaration {
-                identification,
-                identification_span,
-                typing: header.typing,
-                multiplicity: header.multiplicity,
-                multiplicity_modifiers: header.multiplicity_modifiers,
-                subsets: header
-                    .subsets
-                    .map(|relationship| (relationship, header.subsetting_value)),
-                redefines: header.redefines,
-                references: header.references,
-                crosses: header.crosses,
-                intersects: header.intersects,
-            },
-        ),
-    ))
+    usage_declaration(input)
 }
 
 /// The succession target itself, shared by `then <target>;` and the `else <target>;` shorthand
@@ -1216,21 +1193,13 @@ fn action_node_usage_declaration(
     // `UsageDeclaration` is optional after `action`, and `while`/`loop`/`for` are the three
     // following ActionNode alternatives. Do not let its optional name slot claim that next
     // node keyword as an invented declaration label.
-    let identification_start = input;
-    let (input, identification) =
+    let (input, declaration) =
         if starts_with_any_keyword(input.fragment(), &[b"while", b"loop", b"for"]) {
-            (
-                input,
-                crate::ast::Identification {
-                    short_name: None,
-                    name: None,
-                },
-            )
+            (input, None)
         } else {
-            identification(input)?
+            let (input, declaration) = usage_declaration(input)?;
+            (input, Some(declaration))
         };
-    let identification_span = span_from_to(identification_start, input);
-    let (input, header) = parse_feature_usage_header(input)?;
     Ok((
         input,
         node_from_to(
@@ -1238,18 +1207,7 @@ fn action_node_usage_declaration(
             input,
             ActionNodeUsageDeclaration {
                 action_span,
-                identification,
-                identification_span,
-                typing: header.typing,
-                multiplicity: header.multiplicity,
-                multiplicity_modifiers: header.multiplicity_modifiers,
-                subsets: header
-                    .subsets
-                    .map(|relationship| (relationship, header.subsetting_value)),
-                redefines: header.redefines,
-                references: header.references,
-                crosses: header.crosses,
-                intersects: header.intersects,
+                declaration,
             },
         ),
     ))

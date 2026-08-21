@@ -125,13 +125,14 @@ pub struct AssignStmt {
     pub rhs: Node<Expression>,
 }
 
-/// `ForVariableDeclarationMember`'s typed `UsageDeclaration`.
+/// Grammar-owned `UsageDeclaration = Identification FeatureSpecializationPart?`.
 ///
 /// This is a declaration label and feature-specialization header, not a string reconstructed from
-/// the `for` text. The aggregate identification span preserves authored names for emission.
+/// a particular owning usage. The aggregate identification span preserves authored names for
+/// emission. Action nodes, for variables, and flow/message usages embed this exact production.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ForVariableDeclaration {
+pub struct UsageDeclaration {
     pub identification: Identification,
     pub identification_span: Span,
     pub typing: Option<Node<TypingRelationship>>,
@@ -143,6 +144,9 @@ pub struct ForVariableDeclaration {
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
 }
+
+/// `ForVariableDeclarationMember = UsageDeclaration`.
+pub type ForVariableDeclaration = UsageDeclaration;
 
 /// The `in` node parameter of `ForLoopNode`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -531,25 +535,40 @@ pub struct PayloadFeature {
     pub multiplicity: Option<Node<Multiplicity>>,
 }
 
-/// Flow usage: `flow` | `message` | `succession flow` with optional name, payload, and endpoints.
+/// The two grammar-owned alternatives of `FlowDeclaration` / `MessageDeclaration`.
+///
+/// The declaration-led form owns a `UsageDeclaration`, optional `FeatureValue`, optional payload,
+/// and optional endpoint pair. The endpoint-only form owns the required pair directly. Keeping
+/// these alternatives distinct makes it impossible to fabricate an empty declaration for
+/// `flow source to target;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FlowDeclaration {
+    Declared {
+        declaration: Node<UsageDeclaration>,
+        value: Option<Node<FeatureValue>>,
+        payload: Option<Node<PayloadFeature>>,
+        endpoints: Option<FlowEndpoints>,
+    },
+    EndpointOnly {
+        endpoints: FlowEndpoints,
+    },
+}
+
+/// The coupled `from <end> to <end>` / `<end> to <end>` pair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FlowEndpoints {
+    pub from: Node<crate::ast::KermlConnectorEnd>,
+    pub to: Node<crate::ast::KermlConnectorEnd>,
+}
+
+/// Flow usage: `flow` | `message` | `succession flow` with a grammar-owned declaration form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowUsage {
     pub kind: FlowUsageKind,
-    pub name: Option<String>,
-    pub type_name: Option<QualifiedReferenceId>,
-    pub type_is_conjugated: bool,
-    /// `:>` subsets clause (spec42 gap 28), previously parsed by the shared usage header and
-    /// discarded.
-    pub subsets: Option<Node<SubsettingRelationship>>,
-    /// `:>>` redefines clause. See `subsets`.
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    pub payload: Option<Node<PayloadFeature>>,
-    /// Typed `from <end> to <end>` ends (spec42 gap 28), the same connector-end shape
-    /// `AllocationUsage` and the KerML connector members use -- previously opaque `Expression`
-    /// nodes.
-    pub from: Option<Node<crate::ast::KermlConnectorEnd>>,
-    pub to: Option<Node<crate::ast::KermlConnectorEnd>>,
+    pub declaration: FlowDeclaration,
     pub body: DefinitionBody,
     pub membership: Membership,
 }
@@ -774,16 +793,7 @@ pub struct ActionNodePrefix {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionNodeUsageDeclaration {
     pub action_span: Span,
-    pub identification: Identification,
-    pub identification_span: Span,
-    pub typing: Option<Node<TypingRelationship>>,
-    pub multiplicity: Option<Node<Multiplicity>>,
-    pub multiplicity_modifiers: MultiplicityModifiers,
-    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    pub references: Option<Node<SubsettingRelationship>>,
-    pub crosses: Option<Node<SubsettingRelationship>>,
-    pub intersects: Option<Node<SubsettingRelationship>>,
+    pub declaration: Option<Node<UsageDeclaration>>,
 }
 
 /// The optional `until` parameter tail of a `WhileLoopNode`.

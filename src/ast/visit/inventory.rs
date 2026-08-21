@@ -934,6 +934,11 @@ macro_rules! ast_traversal {
                 walk_action_node_usage_declaration(self, node)
             }
 
+            /// Visits a grammar-owned [`UsageDeclaration`].
+            fn visit_usage_declaration(&mut self, node: &$($mutability)? Node<UsageDeclaration>) {
+                walk_usage_declaration(self, node)
+            }
+
             /// Visits the optional `until` parameter of a loop node.
             fn visit_until_parameter(&mut self, node: &$($mutability)? UntilParameter) {
                 walk_until_parameter(self, node)
@@ -4917,48 +4922,7 @@ macro_rules! ast_traversal {
         }
 
         pub fn walk_for_variable_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForVariableDeclaration>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let ForVariableDeclaration {
-                identification,
-                identification_span,
-                typing,
-                multiplicity,
-                multiplicity_modifiers,
-                subsets,
-                redefines,
-                references,
-                crosses,
-                intersects,
-            } = &$($mutability)? node.value;
-            visitor.visit_identification(identification);
-            visitor.visit_span(identification_span);
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
-            }
-            if let Some(inner) = multiplicity {
-                visitor.visit_multiplicity(inner);
-            }
-            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
-            if let Some((relationship, value)) = subsets {
-                visitor.visit_subsetting_relationship(relationship);
-                if let Some(value) = value {
-                    visitor.visit_expression(value);
-                }
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = references {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = crosses {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = intersects {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            visitor.leave_node(&$($mutability)? node.span);
+            walk_usage_declaration(visitor, node)
         }
 
         pub fn walk_for_loop_in_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ForLoopInParameter) {
@@ -5382,29 +5346,22 @@ macro_rules! ast_traversal {
         pub fn walk_flow_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FlowUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let FlowUsage { kind, name, type_name, type_is_conjugated, subsets, redefines, payload, from, to, body, membership } = &$($mutability)? node.value;
+            let FlowUsage { kind, declaration, body, membership } = &$($mutability)? node.value;
             visitor.visit_flow_usage_kind(kind);
-            if let Some(inner) = name {
-                visitor.visit_text(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = type_is_conjugated;
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = payload {
-                visitor.visit_payload_feature(inner);
-            }
-            if let Some(inner) = from {
-                visitor.visit_kerml_connector_end(inner);
-            }
-            if let Some(inner) = to {
-                visitor.visit_kerml_connector_end(inner);
+            match declaration {
+                FlowDeclaration::Declared { declaration, value, payload, endpoints } => {
+                    visitor.visit_usage_declaration(declaration);
+                    if let Some(inner) = value { visitor.visit_feature_value(inner); }
+                    if let Some(inner) = payload { visitor.visit_payload_feature(inner); }
+                    if let Some(endpoints) = endpoints {
+                        visitor.visit_kerml_connector_end(&$($mutability)? endpoints.from);
+                        visitor.visit_kerml_connector_end(&$($mutability)? endpoints.to);
+                    }
+                }
+                FlowDeclaration::EndpointOnly { endpoints } => {
+                    visitor.visit_kerml_connector_end(&$($mutability)? endpoints.from);
+                    visitor.visit_kerml_connector_end(&$($mutability)? endpoints.to);
+                }
             }
             visitor.visit_definition_body(body);
             visitor.visit_membership(membership);
@@ -5541,47 +5498,33 @@ macro_rules! ast_traversal {
         pub fn walk_action_node_usage_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionNodeUsageDeclaration>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActionNodeUsageDeclaration {
-                action_span,
-                identification,
-                identification_span,
-                typing,
-                multiplicity,
-                multiplicity_modifiers,
-                subsets,
-                redefines,
-                references,
-                crosses,
-                intersects,
-            } = &$($mutability)? node.value;
+            let ActionNodeUsageDeclaration { action_span, declaration } = &$($mutability)? node.value;
             visitor.visit_span(action_span);
+            let Some(declaration) = declaration else {
+                visitor.leave_node(&$($mutability)? node.span);
+                return;
+            };
+            visitor.visit_usage_declaration(declaration);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_usage_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UsageDeclaration>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let UsageDeclaration { identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             visitor.visit_span(identification_span);
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
-            }
-            if let Some(inner) = multiplicity {
-                visitor.visit_multiplicity(inner);
-            }
+            if let Some(inner) = typing { visitor.visit_typing_relationship(inner); }
+            if let Some(inner) = multiplicity { visitor.visit_multiplicity(inner); }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some((relationship, value)) = subsets {
                 visitor.visit_subsetting_relationship(relationship);
-                if let Some(value) = value {
-                    visitor.visit_expression(value);
-                }
+                if let Some(value) = value { visitor.visit_expression(value); }
             }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = references {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = crosses {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = intersects {
-                visitor.visit_subsetting_relationship(inner);
-            }
+            if let Some(inner) = redefines { visitor.visit_subsetting_relationship(inner); }
+            if let Some(inner) = references { visitor.visit_subsetting_relationship(inner); }
+            if let Some(inner) = crosses { visitor.visit_subsetting_relationship(inner); }
+            if let Some(inner) = intersects { visitor.visit_subsetting_relationship(inner); }
             visitor.leave_node(&$($mutability)? node.span);
         }
 
