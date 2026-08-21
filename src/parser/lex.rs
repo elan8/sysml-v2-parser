@@ -203,6 +203,17 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"ref",
     b"verify",
     b"variant",
+    // `RequirementBodyItem -> DefinitionBodyItem` (SysML BNF 1407, 237) admits the general usage
+    // families as well as the requirement-specific members, so these are FIRST tokens of this
+    // scope. Without them a legal `action a;` was classified `unexpected_keyword_in_scope`.
+    b"action",
+    b"succession",
+    b"perform",
+    b"state",
+    b"item",
+    b"part",
+    b"connect",
+    b"connection",
     b":>>",
     b":>",
 ];
@@ -272,7 +283,22 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
-    b"@", b"doc", b"in", b"out", b"inout", b"return", b"calc", b"part",
+    b"@",
+    b"doc",
+    b"in",
+    b"out",
+    b"inout",
+    b"return",
+    b"calc",
+    b"part",
+    // `TypeBodyElement -> FeatureMember -> OwnedFeatureMember -> FeatureElement -> Flow` (KerML
+    // BNF 434, 519, 526, 360/369, 1303): a KerML type body owns a `flow` member, so recovery
+    // resynchronizes on the keyword rather than swallowing the flow after a malformed sibling.
+    b"flow",
+    // `REDEFINES` heads a nameless `Feature` whose `FeatureDeclaration` is a bare
+    // `FeatureSpecializationPart` (KerML BNF 562, 601, 632, 663, 666). Only the word spelling is
+    // listed here; the `:>>` symbol spelling's absence predates this list's flow/redefines entries.
+    b"redefines",
 ];
 
 /// The action-node keywords a `CalculationBody` owns through `CalculationBodyItem =
@@ -299,6 +325,15 @@ pub(crate) const CALCULATION_ACTION_STARTERS: &[&[u8]] = &[
     b"state",
     b"item",
     b"flow",
+    // `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem -> StructureUsageMember ->
+    // StructureUsageElement -> Message` (SysML BNF 1366/1367, 901/902, 910/916-917, 262,
+    // 355/362/371, 805). `flow` was routed here and `message` was not, even though one parser --
+    // `flow::flow_usage_member`, keyed by `FlowUsageKind` -- owns both spellings: `message m of
+    // T;` in a calculation body fell through to `calc_def_body_element`'s bare-expression
+    // fallback and was shredded into `'message';`, `m;`, `'of';`, `T;` with no diagnostic
+    // (spec42 Gap 61). `Message` is a SysML-only production; KerML `FeatureElement` does not
+    // reach it, so `calc_def_body_element` deliberately has no `message` arm of its own.
+    b"message",
 ];
 
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
@@ -308,6 +343,9 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"out",
     b"inout",
     b"constraint",
+    // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1366, 1370), and
+    // a constraint body is a `CalculationBody`, so `return` starts a member here too.
+    b"return",
     b":>>",
     b":>",
     // `CalculationBody` reaches `StructureUsageMember -> PartUsage`, so `part` and the rest of

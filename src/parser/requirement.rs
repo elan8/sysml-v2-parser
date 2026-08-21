@@ -255,6 +255,55 @@ fn requirement_def_body_element(
                 RequirementDefBodyElement::RefDecl,
             ),
         )),
+        // The general usage families this scope inherits: `RequirementBodyItem →
+        // DefinitionBodyItem` (SysML BNF 1407, 237) admits `NonOccurrenceUsageElement` and
+        // `OccurrenceUsageElement`, not only the requirement-specific members. Each of these was
+        // rejected outright with `unexpected_keyword_in_scope`, so a legal `action a;` never
+        // reached a typed *or* a recovery node.
+        //
+        // After `ref_decl` on purpose: every parser here is keyword-gated and `ref_decl` requires
+        // its own `ref` token, so this position adds the undirected spellings without moving any
+        // `ref`-prefixed member off the node it already parses to.
+        alt((
+            // Both `PerformActionUsage` spellings, the `perform action a;` declaration and the
+            // `perform a;` reference, in the order `part_def_body_element` tries them.
+            map(
+                crate::parser::part::perform_action_decl,
+                RequirementDefBodyElement::Perform,
+            ),
+            map(
+                crate::parser::part::perform_usage,
+                RequirementDefBodyElement::Perform,
+            ),
+            map(crate::parser::action::action_usage, |usage| {
+                RequirementDefBodyElement::ActionUsage(Box::new(usage))
+            }),
+            map(
+                crate::parser::occurrence_body::succession_usage,
+                RequirementDefBodyElement::SuccessionUsage,
+            ),
+            map(
+                crate::parser::state::state_usage,
+                RequirementDefBodyElement::StateUsage,
+            ),
+            map(
+                crate::parser::item::item_usage,
+                RequirementDefBodyElement::ItemUsage,
+            ),
+            map(crate::parser::part::part_usage, |usage| {
+                RequirementDefBodyElement::PartUsage(Box::new(usage))
+            }),
+            // `connection`-led before the keyword-less `connect`: both spell `ConnectionUsage`,
+            // and `connect_` would otherwise read the `connection` declaration's own name as an
+            // end.
+            map(crate::parser::part::connection_usage_member, |usage| {
+                RequirementDefBodyElement::ConnectionUsage(Box::new(usage))
+            }),
+            map(
+                crate::parser::part::connect_,
+                RequirementDefBodyElement::Connect,
+            ),
+        )),
         other_requirement_body_element,
     ))
     .parse(input)?;

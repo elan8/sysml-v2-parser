@@ -9,6 +9,175 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A KerML type body owns the `flow` and keyword-less `redefines` members its `FeatureElement`
+  grants it, and a calculation body owns its `message` member.** Fixtures:
+  `tests/snapshots/spec42/kerml_type_body_flow_and_redefinition_members.md`,
+  `tests/snapshots/spec42/kerml_type_body_flow_and_redefinition_recovery.md`. **AST version 187.**
+
+  `TypeBodyElement = NonFeatureMember | FeatureMember | AliasMember | Import` (KerML BNF 434), and
+  `FeatureMember -> OwnedFeatureMember = MemberPrefix FeatureElement` (KerML BNF 519, 526) reaches
+  `FeatureElement` (KerML BNF 360), whose alternatives include `Flow` (KerML BNF 369, defined at
+  1303 as `FeaturePrefix 'flow' FlowDeclaration TypeBody`) and, through plain `Feature` (KerML BNF
+  361, defined at 562), the nameless redefinition spelling: a `Feature` may be nothing but its
+  `FeatureDeclaration` (601), whose second alternative is a bare `FeatureSpecializationPart` (632)
+  = `FeatureSpecialization+ MultiplicityPart?`, reaching `Redefinitions` (663) -> `Redefines` (666)
+  = `REDEFINES OwnedRedefinition`. `CalcDefBodyElement` -- the element set every KerML type body
+  uses, reached from `classifier`, `struct`, `class`, `behavior`, `datatype` and `function` -- had
+  a variant for neither.
+
+  Both therefore fell through the scope's keyword chain to its terminal bare-expression arm, which
+  reads any unclaimed keyword as an ordinary `FeatureRef`. `flow a.y to b.x1;` was silently
+  shredded into four invented members -- `'flow';`, `a.y;`, `'to';`, `b.x1;` -- and `redefines
+  predecessors [0];` into two, `'redefines';` and `predecessors ['0'];`. There was no diagnostic in
+  either case, and a round trip wrote every invented member back out, so the authored member was
+  not rejected, it was replaced.
+
+  The scope now dispatches the parsers its sibling scopes already own for these productions:
+  `flow::flow_usage_member` (the same node a `part def` body carries in) behind a `flow`-keyword
+  guard, and `attribute::redefinition_feature_binding` (the same node an `attribute` body, an
+  occurrence body and a constraint body carry in) behind a `redefines`-keyword guard. Both arms sit
+  ahead of the keyword-less `calc_named_binding` and the bare-expression fallback that had been
+  eating them, and `flow` and `redefines` join `CALC_DEF_BODY_STARTERS`, so recovery resynchronizes
+  on them instead of running past.
+
+  Only the `flow` keyword routes to `flow_usage_member` here. Its `message` spelling is
+  `Message : FlowUsage = OccurrenceUsagePrefix 'message' MessageDeclaration DefinitionBody` (SysML
+  BNF 805), a SysML-only production that no KerML `FeatureElement` alternative reaches, so a KerML
+  type body deliberately gains no `message` member. A SysML calculation body does own one --
+  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1366) -> `ActionBodyItem
+  -> NonBehaviorBodyItem` (901, 910) -> `StructureUsageMember` (917, 262) ->
+  `StructureUsageElement -> Message` (355, 362, 371) -- and it reached the same shredding, because
+  `CALCULATION_ACTION_STARTERS` routed `flow` to the action dispatcher but not `message`, even
+  though one parser keyed by `FlowUsageKind` owns both spellings. `message` joins that list, which
+  is the only place the calculation scope's extra member set is declared. The third
+  `flow_usage_member` spelling, `succession flow`, is not routed here either: `SuccessionFlow` is a
+  genuine `FeatureElement` alternative (KerML BNF 370, 1307) but the scope's `succession` arm
+  claims the keyword first and reports `unexpected_keyword_in_scope`, which is unchanged.
+
+- **A constraint body owns the `return` member its `CalculationBody` grants it.** Fixtures:
+  `tests/snapshots/sysml/constraint_body_return_member.md`,
+  `tests/snapshots/sysml/constraint_body_return_member_recovery.md`. **AST version 186.**
+
+  `ConstraintDefinition = OccurrenceDefinitionPrefix 'constraint' 'def' DefinitionDeclaration
+  CalculationBody` and `ConstraintUsage = OccurrenceUsagePrefix 'constraint'
+  ConstraintUsageDeclaration CalculationBody` (SysML BNF 1378, 1382), and `CalculationBodyItem =
+  ActionBodyItem | ReturnParameterMember` (SysML BNF 1359, 1366, 1370). A constraint body is a
+  calculation body, so a `ReturnParameterMember` is a member of it. `ConstraintDefBodyElement` had
+  no variant for one.
+
+  The member therefore fell through to the scope's terminal expression arm, which read `return` as
+  a name. `return totalMass <= massLimit;` was silently shredded into two invented members --
+  `'return';` and `totalMass <= massLimit;` -- and formatted back out that way. The library's own
+  spelling could not even do that: `return result = allTrue(assumptions()) implies
+  allTrue(constraints()) { doc /* ... */ }` (`sysml.library/Systems Library/Requirements.sysml:41`)
+  left the `=` unaccounted for after the invented pair and reported
+  `recovered_constraint_body_element` across the rest of the member, which was the last diagnostic
+  standing between the Systems Library and a clean L2 scorecard.
+
+  The constraint scope now dispatches the same three parsers the calculation scope does, in the
+  same order and behind the same named-return guard: `return_decl`, then the return-expression
+  statement, then the shared return recovery -- which grew a scope parameter so a malformed
+  `return` inside a constraint body reports `recovered_constraint_body_element` rather than
+  claiming to be a calc body member. `return` also joins `CONSTRAINT_DEF_BODY_STARTERS`, so
+  recovery resynchronizes on it. `ConstraintDefBodyElement` and `CalcDefBodyElement` model the one
+  `CalculationBody` production and are still two enums; the new variant records that, and unifying
+  them stays follow-up work, because this scope's `Constraint`, `RequireConstraint` and
+  `FeatureDecl` variants raise a separate question the coverage gap does not.
+
+- **A keyword-less `/* ... */` member is dispatched before the member set of every scope, not only
+  the scopes whose dispatch happened to reach `annotating_member`.** Fixtures:
+  `tests/snapshots/spec42/bare_comment_member_dispatch.md`,
+  `tests/snapshots/spec42/bare_comment_member_recovery.md`.
+
+  `Comment = ( 'comment' Identification ... )? ( 'locale' ... )? REGULAR_COMMENT` (KerML BNF 199)
+  makes every group before the body optional, so a bare block comment at a member position is the
+  production's shortest legal spelling. Four scopes dispatch their members by keyword lookup or by
+  an ordered `alt` whose alternatives each begin by skipping trivia, and `/*` selects no production
+  keyword: the calc-shaped body that KerML type bodies share with a SysML calculation body, an
+  action definition body, an action usage body, and a constraint body. In all four the comment fell
+  through to a sibling production, which consumed it as trivia and then read the *following*
+  member's declaration as its own.
+
+  With a KerML type-relationship tail the member then failed outright -- `/* c */ feature f : T
+  unions x;` reported `recovered_calc_body_element` on `": T unions x;"`, for all four of `unions`,
+  `intersects`, `differences` and `disjoint from`. Without one the same shredding was silent:
+  `/* c */ feature f : T [*];` became an expression statement `'feature';` plus an unrelated
+  binding named `f`, with no diagnostic at all, and formatted back out that way.
+
+  `body::starts_bare_comment` is the one place that test is written, so a scope that gains a
+  keyword-led dispatch cannot forget it.
+
+- **A requirement body owns the general usage families it inherits from `DefinitionBodyItem`.**
+  Fixtures: `tests/snapshots/sysml/requirement_body_usage_members.md`,
+  `tests/snapshots/sysml/requirement_body_usage_member_recovery.md`. **AST version 185.**
+
+  `RequirementBodyItem = DefinitionBodyItem | ...` (SysML BNF 1407) and `DefinitionBodyItem`
+  admits `NonOccurrenceUsageElement` and `OccurrenceUsageElement` (BNF 237), so a requirement
+  definition or usage body legally contains the whole usage zoo, not only the requirement-specific
+  members. `RequirementDefBodyElement` had no variant for any of them and each was rejected
+  outright with `unexpected_keyword_in_scope` -- not captured as an unsupported or recovery node,
+  so nothing downstream could see that legal syntax had been written at all.
+
+  Added, with starters, source-ordered traversal, emission and opacity walking: `ActionUsage`,
+  `SuccessionUsage`, `Perform` (both the `perform action a;` declaration and the `perform a;`
+  reference), `StateUsage`, `ItemUsage`, `PartUsage`, and both spellings of `ConnectionUsage` --
+  the keyword-less `Connect` and the `connection`-led `ConnectionUsageMember`. They are dispatched
+  after `ref_decl`, which requires its own `ref` token, so no `ref`-prefixed member moves off the
+  node it already parses to.
+
+- **An `intersects` clause on a KerML feature is no longer parsed and thrown away.** Fixture:
+  `tests/snapshots/spec42/bare_comment_member_dispatch.md`.
+
+  `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
+  `TypeRelationshipPart` alternatives (KerML BNF 408, 424), alongside `unions`, `differences` and
+  `disjoint from`. `specialization_clauses` claimed it first, because the SysML usage headers that
+  helper also serves model it as a subsetting-family clause, and `kerml_feature` then read every
+  other clause it returns and dropped this one. An authored `feature f : T intersects g;` lost the
+  whole clause: no relationship, no subsetting, no diagnostic, and nothing to emit. It now joins
+  its three siblings in `type_relationships`, positioned by its authored span so the list's
+  documented source order still holds when `intersects` is written first.
+
+- **`first`/`merge`/`decide`/`join`/`fork` bodies share `Body` instead of a body type of their
+  own, and their `;` is no longer unlocatable.** **AST version 185.**
+
+  `FirstMergeBody` was `Semicolon | Brace(Node<FirstMergeBraceBody>)`, a hand-rolled duplicate of
+  the shared `Body<E>` that cost two things. Its semicolon alternative carried no span, so `first x
+  then y;` was the one body in the AST whose terminator could not be located without re-scanning
+  the source. Its brace alternative wrapped the delimiters in a second `Node`, making the body
+  extent two representations of one fact -- which its own provenance validation then had to
+  cross-check against each other. Both are gone: `FirstMergeBody` is now
+  `Body<FirstMergeBodyElement>`, `FirstMergeBraceBody` is removed from the public API, and the
+  semantic projection reads `(body semicolon (span ...))` and `(body brace (open-brace ...)
+  (members ...) (close-brace ...))`.
+
+  The delimiter checks this scope validated for itself are the ones
+  `ProvenanceVisitor::visit_body_braces` already applies to every `Body<E>`. The stricter rules it
+  added -- ordered non-empty element spans, no unmodeled non-trivia between members, and each
+  element's span matching the member it retains -- are kept in
+  `ast::behavior::validate_first_merge_body_provenance`. Generalizing the first three to all
+  fourteen body families is worthwhile and deliberately not attempted here.
+
+### Changed
+
+- **`ParsedDocument` implements `Send` and `Sync` explicitly, so consumers stop paying to prove
+  it.** Policy: `planning/shared-grammar.md`; proof: `ast::root::send_sync_structural_proof`;
+  gate: `tests/type_level_cost.rs`.
+
+  The longest simple path through the AST type graph is over 120 distinct types -- fourteen nested
+  body levels, each costing a `Body`, an element enum, the owning declaration, and three frames of
+  `Vec`/`RawVec`/`PhantomData` plumbing. Proving `ParsedDocument: Send` structurally cost 119
+  trait-solver frames before the requirement-body work above and 134 after it, against rustc's
+  default `recursion_limit` of 128. Every consumer wanting to move a document between threads paid
+  that, and had to raise its own limit to do so.
+
+  The explicit implementations make that obligation O(1) downstream. They are not an exemption from
+  the type-level cost gate but a relocation of it: `send_sync_structural_proof` destructures
+  `ParsedDocument` exhaustively and walks the whole AST type graph structurally inside this crate,
+  which already raises `recursion_limit`. Adding a field without an assertion is an `E0027`; an
+  `Rc`, `RefCell` or raw pointer added anywhere beneath it is an `E0277` naming the offending type.
+  Both are `cargo check` errors, so no separate lint is required. `tests/type_level_cost.rs`
+  continues to compile at the default limit and so still fails if the implementations are removed.
+
 - **KerML's `FeaturePrefix` is modelled as the choice the grammar writes, not as eight independent
   booleans.** Audit and evidence: `planning/kerml-feature-prefix-matrix.md`.
   **AST version 179 -> 184.**

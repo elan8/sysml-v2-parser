@@ -105,6 +105,23 @@ pub enum ConstraintDefBodyElement {
     /// the terminal expression arm and was shredded into `'part';` and `p : T;` with no
     /// diagnostic -- input a round trip then wrote back out as two members.
     PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// `ReturnParameterMember`, the second alternative of `CalculationBodyItem = ActionBodyItem
+    /// | ReturnParameterMember` (SysML BNF 1366, 1370). `ConstraintDefinition` and
+    /// `ConstraintUsage` both end in `CalculationBody` (SysML BNF 1378, 1382, 1359), so a
+    /// constraint body owns a `return` member exactly as a calculation body does; the scope
+    /// modelled none, so `return result = allTrue(assumptions()) implies
+    /// allTrue(constraints()) { doc /* … */ }` (Systems Library `Requirements.sysml:41`) reached
+    /// the terminal expression arm, which read the keyword as a name, emitted `'return';` and
+    /// `result;` as two invented members, and then reported the remainder of the real member as
+    /// `recovered_constraint_body_element`.
+    ///
+    /// Deliberate duplication, recorded rather than hidden: this enum and
+    /// [`CalcDefBodyElement`] model the one `CalculationBody` production, and this variant is
+    /// the same node [`CalcDefBodyElement::ReturnDecl`] carries. They are not yet one enum
+    /// because this scope also carries `Constraint`, `RequireConstraint` and `FeatureDecl`,
+    /// whose membership in a calculation body is its own question. Unifying them is follow-up
+    /// work; this variant closes the member gap without deciding it.
+    ReturnDecl(Box<Node<ReturnDecl>>),
 }
 
 /// constraint body {}
@@ -202,11 +219,36 @@ pub enum CalcDefBodyElement {
     Binding(Box<Node<crate::ast::KermlBindingMember>>),
     /// KerML succession member; see [`crate::ast::KermlSuccessionMember`].
     Succession(Box<Node<crate::ast::KermlSuccessionMember>>),
+    /// KerML flow member: `flow a.y to b.x1;` inside a `classifier`/`struct`/`class`/`behavior`/
+    /// `datatype`/`function` body.
+    ///
+    /// `TypeBodyElement` (KerML BNF 434) reaches `FeatureMember` (519) -> `OwnedFeatureMember`
+    /// (526) -> `FeatureElement` (360), whose alternatives include `Flow` (369, defined at KerML
+    /// BNF 1303 as `FeaturePrefix 'flow' FlowDeclaration TypeBody`). `FlowDeclaration` (1311)
+    /// has the endpoint-only spelling `FlowEndMember 'to' FlowEndMember`, which is the one this
+    /// variant is named for.
+    ///
+    /// The scope had no arm for it at all: `flow a.y to b.x1;` fell through to the terminal
+    /// bare-expression fallback and was shredded into four unrelated members -- `'flow';`,
+    /// `a.y;`, `'to';`, `b.x1;` -- with no diagnostic, and a round trip wrote all four back out
+    /// (spec42 Gap 61). Modelled by the same [`crate::ast::FlowUsage`] node the SysML sibling
+    /// scopes already use, because `FlowUsage` (SysML BNF 825) and KerML `Flow` share this
+    /// surface syntax and its typed endpoint pair.
+    FlowUsage(Box<Node<crate::ast::FlowUsage>>),
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
     /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
     /// Systems Library `Interfaces.sysml`; previously captured opaquely).
+    ///
+    /// Also the keyword-led-but-nameless redefinition spelling `redefines predecessors [0];`,
+    /// which is a `Feature` (KerML BNF 562) whose `FeatureDeclaration` (601) is nothing but a
+    /// `FeatureSpecializationPart` (632) = `FeatureSpecialization+ MultiplicityPart?`, with the
+    /// specialization being `Redefinitions` (663) -> `Redefines` (666) = `REDEFINES
+    /// OwnedRedefinition`. The same node
+    /// [`crate::ast::OccurrenceBodyElement::AttributeUsage`] and
+    /// [`crate::ast::ConstraintDefBodyElement::AttributeUsage`] already carry it in, from the
+    /// same `redefinition_feature_binding` parser (spec42 Gap 61).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
     /// `assert constraint { ... }` member inside a type body (`ScalarValues.kerml`).
     AssertConstraint(Box<Node<crate::ast::AssertConstraintMember>>),

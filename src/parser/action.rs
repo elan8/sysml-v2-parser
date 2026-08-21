@@ -3,9 +3,8 @@
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBodyElement,
-    FirstMergeBraceBody, FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt,
-    LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget,
-    WhileStmt,
+    FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt,
+    Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -223,16 +222,12 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
 
 /// First/merge body: `;` or `{` ... `}`
 fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| FirstMergeBody::Semicolon),
-        first_merge_brace_body,
-    ))
-    .parse(input)
+    // `semicolon_body` rather than a bare `tag(";")`: the shared body keeps the terminator's span,
+    // which this scope's own body enum had no slot for.
+    alt((crate::parser::body::semicolon_body, first_merge_brace_body)).parse(input)
 }
 
 fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
-    let start = input;
     let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
@@ -251,18 +246,7 @@ fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody
             node_from_to(start, end, FirstMergeBodyElement::Error(node))
         },
     )?;
-    Ok((
-        input,
-        FirstMergeBody::Brace(node_from_to(
-            start,
-            input,
-            FirstMergeBraceBody {
-                open_brace_span: members.open_span,
-                elements: members.elements,
-                close_brace_span: members.close_span,
-            },
-        )),
-    ))
+    Ok((input, members.into_body()))
 }
 
 fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMergeBodyElement>> {
@@ -729,8 +713,18 @@ pub(crate) fn action_def_body_element(
     use crate::parser::part::perform_action_decl;
     use crate::parser::state::state_usage;
 
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's annotating
+    // member, which is the `Comment` production's keyword-less spelling. `ws_and_comments` here
+    // consumed it as trivia before any alternative could claim it.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // Ahead of the `alt` below, whose alternatives each skip `/* ... */` as trivia and then read
+    // the *following* member as their own; see `body::starts_bare_comment`.
+    if crate::parser::body::starts_bare_comment(start) {
+        let (next, member) = annotating_member_stmt(start)?;
+        let elem = ActionDefBodyElement::Annotating(member);
+        return Ok((next, node_from_to(start, next, elem)));
+    }
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
@@ -1276,6 +1270,13 @@ pub(crate) fn action_usage_body_element(
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // Ahead of every guard below, including `starts_contended_prefix`, which skips `/* ... */` as
+    // trivia before looking for its own slots; see `body::starts_bare_comment`.
+    if crate::parser::body::starts_bare_comment(start) {
+        let (next, member) = annotating_member_stmt(start)?;
+        let elem = ActionUsageBodyElement::Annotating(member);
+        return Ok((next, node_from_to(start, next, elem)));
+    }
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
@@ -1814,26 +1815,36 @@ mod control_node_gap_tests {
                 assert_eq!(f.value.succession_name.as_deref(), Some("stateSequencing"));
                 assert!(f.value.first_multiplicity.is_some());
                 assert!(f.value.then_multiplicity.is_some());
-                let FirstMergeBody::Brace(body) = f.value.body else {
+                let FirstMergeBody::Brace {
+                    open_span,
+                    elements,
+                    close_span,
+                } = f.value.body
+                else {
                     panic!("expected source-backed brace body");
                 };
+                // The delimiter spans are now the only record of the body's extent, so they are
+                // checked against the source directly rather than against a second span.
                 assert_eq!(
-                    &source[body.span.offset..body.span.offset + body.span.len],
+                    &source[open_span.offset..close_span.offset + close_span.len],
                     "{ in pin; }"
                 );
-                assert_eq!(body.value.open_brace_span.offset, body.span.offset);
-                assert_eq!(body.value.open_brace_span.len, 1);
-                assert_eq!(body.value.elements.len(), 1);
+                assert_eq!(
+                    &source[open_span.offset..open_span.offset + open_span.len],
+                    "{"
+                );
+                assert_eq!(open_span.len, 1);
+                assert_eq!(elements.len(), 1);
                 assert!(matches!(
-                    &body.value.elements[0].value,
+                    &elements[0].value,
                     FirstMergeBodyElement::Member(member)
                         if matches!(member.value, ActionDefBodyElement::InOutDecl(_))
                 ));
                 assert_eq!(
-                    body.value.close_brace_span.offset,
-                    body.span.offset + body.span.len - 1
+                    &source[close_span.offset..close_span.offset + close_span.len],
+                    "}"
                 );
-                assert_eq!(body.value.close_brace_span.len, 1);
+                assert_eq!(close_span.len, 1);
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
@@ -1851,21 +1862,18 @@ mod control_node_gap_tests {
         let ActionDefBodyElement::FirstStmt(first) = node.value else {
             panic!("expected FirstStmt");
         };
-        let FirstMergeBody::Brace(body) = first.value.body else {
+        let FirstMergeBody::Brace { elements, .. } = first.value.body else {
             panic!("expected brace body");
         };
-        assert_eq!(body.value.elements.len(), 3);
+        assert_eq!(elements.len(), 3);
         assert!(matches!(
-            &body.value.elements[0].value,
+            &elements[0].value,
             FirstMergeBodyElement::Member(member)
                 if matches!(member.value, ActionDefBodyElement::CalcUsage(_))
         ));
+        assert!(matches!(elements[1].value, FirstMergeBodyElement::Error(_)));
         assert!(matches!(
-            body.value.elements[1].value,
-            FirstMergeBodyElement::Error(_)
-        ));
-        assert!(matches!(
-            &body.value.elements[2].value,
+            &elements[2].value,
             FirstMergeBodyElement::Member(member)
                 if matches!(member.value, ActionDefBodyElement::InOutDecl(_))
         ));

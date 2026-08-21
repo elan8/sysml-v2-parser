@@ -467,7 +467,8 @@ pub struct PartUsage {
     /// `DefinitionBodyItem` and `NonBehaviorBodyItem` both spell
     /// `( SourceSuccessionMember )? …UsageMember`, so a `then` precedes the *membership* -- and
     /// therefore the visibility keyword and the whole prefix -- rather than being a prefix slot.
-    /// It is a separate field for that reason, not a member of [`OccurrenceUsagePrefix`].
+    /// It is a separate field for that reason, not a member of
+    /// [`OccurrenceUsagePrefix`](crate::ast::OccurrenceUsagePrefix).
     /// `SourceSuccession` and `SourceEndMember` below it contribute no further tokens, so the
     /// keyword's span is the whole authored fact.
     pub then_span: Option<Span>,

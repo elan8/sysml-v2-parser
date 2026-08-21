@@ -120,6 +120,9 @@ pub(crate) fn emit_constraint_body_element(
         ConstraintDefBodyElement::PartUsage(p) => {
             super::structure::emit_part_usage(w, path, &p.value)
         }
+        // The same `ReturnParameterMember` emitter the calculation scope uses; both scopes end
+        // in the one `CalculationBody`.
+        ConstraintDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
@@ -260,6 +263,7 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::Binding(b) => emit_kerml_binding_member(w, path, &b.value),
         CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
+        CalcDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
         CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
         CalcDefBodyElement::AttributeUsage(a) => {
             super::structure::emit_attribute_usage(w, path, &a.value)

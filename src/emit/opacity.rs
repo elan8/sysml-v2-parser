@@ -306,6 +306,11 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::PartUsage(pu) => {
                 walk_part_usage_body(report, &p, &pu.value.body)
             }
+            // A `ReturnParameterMember`'s own body is a `CalculationBody`, the same node the
+            // calculation scope walks for its `ReturnDecl`.
+            ConstraintDefBodyElement::ReturnDecl(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::Expression(_) => {}
         }
     }
@@ -338,6 +343,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             }
             CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
+            CalcDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
             CalcDefBodyElement::Binding(_)
             | CalcDefBodyElement::Succession(_)
             | CalcDefBodyElement::Import(_)
@@ -1040,6 +1046,29 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::AllocationUsage(n) => {
                 walk_definition_body(report, &p, &n.value.body)
             }
+            // The general usage families `RequirementBodyItem` inherits from
+            // `DefinitionBodyItem`, each descending into its own body exactly as the sibling
+            // scopes that already own it do.
+            RequirementDefBodyElement::ActionUsage(n) => {
+                walk_optional_action_usage_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::SuccessionUsage(n) => {
+                walk_ref_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
+            RequirementDefBodyElement::StateUsage(n) => {
+                walk_state_def_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::ItemUsage(n) => {
+                walk_attribute_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::PartUsage(n) => {
+                walk_part_usage_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::Connect(n) => walk_ref_body(report, &p, &n.value.body),
+            RequirementDefBodyElement::ConnectionUsage(n) => {
+                walk_connection_def_body(report, &p, &n.value.body)
+            }
             RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)
             | RequirementDefBodyElement::RequirementActorDecl(_)
@@ -1342,6 +1371,9 @@ fn walk_constraint_body_elements(
             ConstraintDefBodyElement::PartUsage(pu) => {
                 walk_part_usage_body(report, &p, &pu.value.body)
             }
+            ConstraintDefBodyElement::ReturnDecl(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::Expression(_) => {}
         }
     }
@@ -1515,9 +1547,9 @@ fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget)
 
 fn walk_first_merge_body(report: &mut OpacityReport, path: &str, body: &FirstMergeBody) {
     match body {
-        FirstMergeBody::Semicolon => {}
-        FirstMergeBody::Brace(body) => {
-            for (index, element) in body.value.elements.iter().enumerate() {
+        FirstMergeBody::Semicolon { .. } => {}
+        FirstMergeBody::Brace { elements, .. } => {
+            for (index, element) in elements.iter().enumerate() {
                 let element_path = format!("{path}/body[{index}]");
                 match &element.value {
                     crate::ast::FirstMergeBodyElement::Member(member) => {

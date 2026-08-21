@@ -321,6 +321,15 @@ package '5-State-based Behavior-1a' {
                 transition initial then off;
                 state off;
                 transition 'off-starting' first off accept 'Vehicle Start Signal' if vehicle1_c1.'brake pedal depressed' do send new 'Start Signal'() to vehicle1_c1.vehicleController then starting {
+                    /*
+					 * The transition definition for a transition usage is always implicit.
+					 * "accept" marks the trigger, "if" the guard and "do" the effect.
+					 * 
+					 * The notation "'new Start Signal'()" constructs a specific instance of the
+					 * 'Start Signal' attribute def to be sent to the 'vehicleController'. If the
+					 * attribute def had properties, their values would be given as arguments
+					 * inside the parentheses.
+					 */
                 }
                 state starting;
                 transition 'starting-on' first starting accept 'Vehicle On Signal' then on;

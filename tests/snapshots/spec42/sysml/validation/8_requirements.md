@@ -283,6 +283,9 @@ package '8-Requirements' {
             attribute massActual : MassValue;
             attribute massReqd : MassValue;
             require constraint {
+                /*
+				 * A constraint can be used to formalize a requirement.
+				 */
                 massActual <= massReqd;
             }
         }
@@ -302,7 +305,11 @@ package '8-Requirements' {
 				 */
             }
             assume constraint fuelConstraint {
-                'doc';
+                /*
+				 * A constraint can also be used to specify an assumption.
+				 */
+                doc
+                /* full fuel tank */
                 vehicle.fuelLevel >= vehicle.fuelTankCapacity;
             }
         }

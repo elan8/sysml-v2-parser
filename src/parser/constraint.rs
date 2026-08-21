@@ -173,6 +173,14 @@ pub(crate) fn constraint_def_body_element(
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // Ahead of every guard below; see `body::starts_bare_comment` and the matching branch in
+    // `calc_def_body_element`.
+    if crate::parser::body::starts_bare_comment(input) {
+        let comment_start = input;
+        let (input, member) = crate::parser::body::annotating_member(comment_start)?;
+        let elem = ConstraintDefBodyElement::Annotating(member);
+        return Ok((input, node_from_to(comment_start, input, elem)));
+    }
     // `MemberPrefix` precedes the member's own keyword, so the usage guards below look past it;
     // each arm's parser re-reads it. Without this a `private ref constraint hidden;` matched no
     // guard and reached the expression fallback.
@@ -255,6 +263,31 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::RequireConstraint(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"return") {
+        // `ConstraintDefinition`/`ConstraintUsage` end in `CalculationBody`, whose
+        // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1378, 1382,
+        // 1359, 1366, 1370). Ahead of the terminal expression arm, which read `return` as a
+        // name. The same three parsers the calculation scope dispatches, in the same order and
+        // behind the same guard -- the two scopes are the one production.
+        if named_return_missing_type(input) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        if let Ok((next, decl)) = return_decl(input) {
+            (next, ConstraintDefBodyElement::ReturnDecl(Box::new(decl)))
+        } else if let Ok((next, expr)) = return_expression_stmt(input) {
+            (next, ConstraintDefBodyElement::Expression(expr))
+        } else {
+            let (next, node) = other_return_recovery(
+                input,
+                CONSTRAINT_DEF_BODY_STARTERS,
+                "constraint body",
+                "recovered_constraint_body_element",
+            )?;
+            (next, ConstraintDefBodyElement::Error(node))
+        }
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.
@@ -1157,6 +1190,37 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // (`Occurrences.kerml`).
     let (input, type_relationships) =
         crate::parser::package::kerml_type_relationship_clauses(input)?;
+    // `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
+    // `TypeRelationshipPart` alternatives (KerML BNF 408, 424), so it belongs in the same list as
+    // the three siblings just parsed. `specialization_clauses` above claims it first, because the
+    // SysML usage headers that helper also serves model it as a subsetting-family clause; this
+    // scope then read every other clause it returns and dropped this one. An authored `feature f
+    // : T intersects g;` lost the whole clause -- no relationship, no subsetting, no diagnostic,
+    // and nothing to emit.
+    //
+    // Positioned by its authored span rather than appended, so the list's documented source order
+    // still holds when `intersects` is written ahead of another clause.
+    let type_relationships = match clauses.intersects {
+        None => type_relationships,
+        Some(intersecting) => {
+            let span = intersecting.span.clone();
+            let node = crate::ast::Node::new(
+                span.clone(),
+                crate::ast::KermlTypeRelationship {
+                    keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
+                    targets: intersecting.value.target,
+                    span,
+                },
+            );
+            let mut merged = type_relationships;
+            let at = merged
+                .iter()
+                .position(|existing| existing.span.offset > node.span.offset)
+                .unwrap_or(merged.len());
+            merged.insert(at, node);
+            merged
+        }
+    };
     // `inverse of` may also trail the type relationships (`... unions successors, ... inverse
     // of withoutOccurrences { ... }`, `Occurrences.kerml`).
     let (input, inverse_of) = if inverse_of.is_none() {
@@ -1277,6 +1341,17 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // Ahead of every guard below, including the two computed eagerly: they all reach a parser
+    // that skips `/* ... */` as trivia, which then reads the *following* member's declaration as
+    // its own. `/* c */ feature f : T unions x;` lost the comment, took `feature f` as a
+    // declaration whose specialization tail no longer fit, and dropped the member into recovery.
+    // See `body::starts_bare_comment`.
+    if crate::parser::body::starts_bare_comment(input) {
+        let comment_start = input;
+        let (input, member) = crate::parser::body::annotating_member(comment_start)?;
+        let elem = CalcDefBodyElement::Annotating(member);
+        return Ok((input, node_from_to(comment_start, input, elem)));
+    }
     // Keyword dispatch looks past an optional visibility prefix (`private attribute ...`,
     // `private connector all ...`); each arm's parser re-parses the prefix itself.
     let after_visibility = crate::parser::lex::visibility_prefix(input)
@@ -1360,10 +1435,46 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::Succession(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"flow") {
+        // `TypeBodyElement -> FeatureMember -> OwnedFeatureMember -> FeatureElement -> Flow`
+        // (KerML BNF 434, 519, 526, 360/369, 1303), whose `FlowDeclaration` (BNF 1311) has the
+        // endpoint-only spelling `FlowEndMember 'to' FlowEndMember`. This scope had no arm for
+        // it, so `flow a.y to b.x1;` in a `classifier`/`struct`/`class`/`behavior`/`datatype`/
+        // `function` body reached the terminal bare-expression fallback and was shredded into
+        // four members -- `'flow';`, `a.y;`, `'to';`, `b.x1;` -- with no diagnostic at all.
+        //
+        // `flow_usage_member` is the parser every SysML sibling scope already dispatches for the
+        // identical surface syntax. Only the `flow` keyword routes here, so its two other
+        // spellings are untouched: `message` is SysML-only (`Message`, SysML BNF 805, which no
+        // KerML `FeatureElement` alternative reaches) and reaches a SysML calculation body one
+        // level earlier through `CALCULATION_ACTION_STARTERS`; `succession flow` (KerML
+        // `SuccessionFlow`, BNF 370/1307) is still claimed by the `succession` arm above, which
+        // is a pre-existing gap this slice does not widen.
+        map(crate::parser::flow::flow_usage_member, |n| {
+            CalcDefBodyElement::FlowUsage(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_keyword(after_visibility, b"attribute") {
         map(crate::parser::attribute::attribute_usage, |n| {
             CalcDefBodyElement::AttributeUsage(Box::new(n))
         })
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"redefines") {
+        // Keyword-led, nameless redefinition: `redefines predecessors [0];`. A `Feature` (KerML
+        // BNF 562) may be nothing but its `FeatureDeclaration` (601), and that declaration's
+        // second alternative is a bare `FeatureSpecializationPart` (632) = `FeatureSpecialization+
+        // MultiplicityPart?`, reaching `Redefinitions` (663) -> `Redefines` (666) = `REDEFINES
+        // OwnedRedefinition`. `REDEFINES` is spelled `:>>` or `redefines`.
+        //
+        // The `:>>` spelling had an arm below; the word spelling had none, so `redefines
+        // predecessors [0];` was shredded into `'redefines';` and `predecessors ['0'];` with no
+        // diagnostic. `redefinition_feature_binding` is the parser an attribute body, an
+        // occurrence body and a constraint body already dispatch for this exact production, and
+        // it demands the `:>>`/`:>`/`redefines` head, so it cannot shadow the keyword arms.
+        map(
+            crate::parser::attribute::redefinition_feature_binding,
+            |n| CalcDefBodyElement::AttributeUsage(Box::new(n)),
+        )
         .parse(input)?
     } else if input.fragment().starts_with(b":>>") {
         // Anonymous leading-redefinition binding: `:>> dimension = size(components);`
@@ -1484,7 +1595,13 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         } else if let Ok((input, expr)) = return_expression_stmt(input) {
             (input, CalcDefBodyElement::Expression(expr))
         } else {
-            other_calc_return(input)?
+            let (next, node) = other_return_recovery(
+                input,
+                CALC_DEF_BODY_STARTERS,
+                "calc body",
+                "recovered_calc_body_element",
+            )?;
+            (next, CalcDefBodyElement::Error(node))
         }
     } else if let Ok((next, binding)) = calc_named_binding(input) {
         // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
@@ -1620,7 +1737,16 @@ pub(crate) fn return_expression_stmt(input: Input<'_>) -> IResult<Input<'_>, Nod
 /// A `return` member that parses as neither a [`return_decl`] nor a return expression becomes
 /// an explicit recovery node with a diagnostic (previously a diagnostic-silent opaque
 /// `Other(preview)` capture).
-fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
+///
+/// The owning scope supplies its own starters, description and diagnostic code, because both
+/// scopes that dispatch a `ReturnParameterMember` -- the calculation body and the constraint
+/// body it shares `CalculationBody` with -- must report the failure as their own member.
+fn other_return_recovery<'a>(
+    input: Input<'a>,
+    starters: &[&[u8]],
+    scope: &str,
+    code: &'static str,
+) -> IResult<Input<'a>, Node<ParseErrorNode>> {
     let start_unknown = input;
     let (next, _) = skip_statement_or_block(input)?;
     if next.location_offset() == start_unknown.location_offset() {
@@ -1629,15 +1755,8 @@ fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement>
             nom::error::ErrorKind::Many0,
         )));
     }
-    let recovery = build_recovery_error_node_from_span(
-        start_unknown,
-        next,
-        CALC_DEF_BODY_STARTERS,
-        "calc body",
-        "recovered_calc_body_element",
-    );
-    let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-    Ok((next, CalcDefBodyElement::Error(node)))
+    let recovery = build_recovery_error_node_from_span(start_unknown, next, starters, scope, code);
+    Ok((next, node_from_to(start_unknown, next, recovery)))
 }
 
 pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {

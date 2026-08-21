@@ -11,6 +11,6 @@ ast_traversal!(
     /// declaration order, and its children in source order. Call the `walk_*` function from an
     /// override to keep descending.
     ///
-    /// See the [module documentation](self) for the exhaustiveness contract.
+    /// See the [module documentation](crate::ast::visit) for the exhaustiveness contract.
     Visitor,
 );

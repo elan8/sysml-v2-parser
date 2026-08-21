@@ -66,7 +66,20 @@ pub(crate) fn relationship_body_annotations(
 /// for their annotation tail.
 fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's annotating
+    // member. This was `ws_and_comments`, which consumed it as trivia before either arm below
+    // could claim it, so an authored comment in an `import` or `dependency` body was dropped
+    // outright -- silently, since the surviving members still parse. Measured across the pinned
+    // release, that lost 18 block comments in 15 files, `sysml.library`'s own `Occurrences.kerml`
+    // and `Requirements.sysml` among them, none of which reports a diagnostic.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // Ahead of the `kerml_feature` attempt, which skips trivia itself and would read the member
+    // written *after* the comment as its own; see `starts_bare_comment`.
+    if starts_bare_comment(input) {
+        let (next, member) = annotating_member(input)?;
+        let elem = RelationshipBodyElement::Annotating(member);
+        return Ok((next, node_from_to(input, next, elem)));
+    }
     if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature, |n| {
         RelationshipBodyElement::KermlFeature(Box::new(n))
     })
@@ -75,6 +88,21 @@ fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<Relatio
         return Ok((input, node_from_to(start, input, elem)));
     }
     relationship_body_element(input)
+}
+
+/// Whether a member boundary is at the keyword-less `Comment` spelling (`/* ... */`).
+///
+/// Takes trivia-free input, i.e. input already advanced past [`crate::parser::lex::ws_and_notes`].
+///
+/// A scope must test this *before* its own member dispatch, whether that dispatch is a keyword
+/// lookup or an ordered `alt` over productions. `/*` selects no production keyword, so a keyword
+/// chain never reaches [`annotating_member`] at all; and every sibling production begins by
+/// skipping trivia with `ws_and_comments`, which swallows the comment and then reads the member
+/// written *after* it as its own. Either way the annotating member is lost and its successor is
+/// misparsed. The test is exact rather than merely early: no other member spelling in any scope
+/// can begin with `/*`.
+pub(crate) fn starts_bare_comment(input: Input<'_>) -> bool {
+    input.fragment().starts_with(b"/*")
 }
 
 /// The grammar's `AnnotatingElement` production (KerML 8.2.3.3.1, SysML 8.2.2.4.1).
@@ -91,7 +119,7 @@ pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, Annotati
     }
     // Last resort among the four alternatives even though it is tested first: the keyword-led
     // spellings cannot begin with `/*`, so this test is exact rather than merely earlier.
-    if input.fragment().starts_with(b"/*") {
+    if starts_bare_comment(input) {
         return map(
             crate::parser::requirement::bare_comment,
             AnnotatingMember::Comment,
