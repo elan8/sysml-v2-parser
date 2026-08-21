@@ -43,6 +43,12 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"not",
     b"satisfy",
     b"attribute",
+    // `occurrence_body_element` owns keyword-less redefinition feature bindings. These three
+    // are their complete prefix FIRST set, so recovery before a later valid binding does not
+    // swallow that sibling into the malformed span.
+    b":>>",
+    b":>",
+    b"redefines",
     b"flow",
     b"message",
     b"succession",
@@ -298,34 +304,19 @@ fn occurrence_usage_tail(
     // Occurrence { ... }` (Systems Library `Actions.sysml`).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = occurrence_usage_body(input)?;
-    let (input, post_body_clauses) = specialization_clauses(input)?;
-    let subsets = post_body_clauses
+    // `Usage = UsageDeclaration UsageCompletion`, and `UsageCompletion` is only the optional
+    // value followed by `UsageBody` (SysML BNF 305-315; Pilot `SysML.xtext` 360-369).
+    // Specializations therefore end before the body. A speculative post-body `:>>` previously
+    // stole the next anonymous feature binding from this enclosing occurrence body, then failed
+    // when that sibling's `=` was not a terminator for the nested occurrence.
+    let subsets = trailing_clauses
         .subsets
         .map(|(name, _filter)| name)
-        .or_else(|| trailing_clauses.subsets.map(|(name, _filter)| name))
         .or_else(|| leading_clauses.subsets.map(|(name, _filter)| name));
-    let redefines = post_body_clauses
-        .redefines
-        .or(trailing_clauses.redefines)
-        .or(leading_clauses.redefines);
-    let references = post_body_clauses
-        .references
-        .or(trailing_clauses.references)
-        .or(leading_clauses.references);
-    let crosses = post_body_clauses
-        .crosses
-        .or(trailing_clauses.crosses)
-        .or(leading_clauses.crosses);
-    let intersects = post_body_clauses
-        .intersects
-        .or(trailing_clauses.intersects)
-        .or(leading_clauses.intersects);
-    let input = if post_body_clauses.had_any {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
-    };
+    let redefines = trailing_clauses.redefines.or(leading_clauses.redefines);
+    let references = trailing_clauses.references.or(leading_clauses.references);
+    let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
+    let intersects = trailing_clauses.intersects.or(leading_clauses.intersects);
     Ok((
         input,
         node_from_to(

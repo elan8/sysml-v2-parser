@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Occurrence usages stop at their grammar-owned body.** `OccurrenceUsage` no longer consumes
+  a following anonymous `:>>` feature binding as a post-body specialization; `UsageCompletion`
+  ends with its body, so that binding remains the enclosing occurrence body's next member.
+  Recovery now also synchronizes on the complete typed anonymous-binding prefix set. This retains
+  the nested decimal snapshot binding and later outer binding in TimeVaryingAttribute without a
+  `done`-specific parser path (SysML textual BNF 305-315, 572-586; pinned Pilot
+  `SysML.xtext` 845-858). No AST schema change.
+
 - **Action usages retain the complete accept parameter alternative.** `ActionUsage::accept` now
   uses the existing structured `TransitionAccept` shape, preserving either a typed payload or a
   source-backed bare payload reference and keeping `via` inside the accept parameter rather than
