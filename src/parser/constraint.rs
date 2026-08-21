@@ -594,8 +594,24 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         // `behavior B { in p : T; }` reaches `calc_def_body_element` and is a keyword-less
         // `Feature` (SysML BNF 1359-1370; KerML BNF 519-527, 562-608).
         // A direction may instead belong to a full occurrence usage. Preserve the pre-existing
-        // `in part …` action-body route before testing the bare parameter declaration; an
-        // `InOutDecl` parser is intentionally not allowed to treat `part` as a parameter name.
+        // `in calc …` / `in part …` action-body routes before testing the bare parameter
+        // declaration; an `InOutDecl` parser is intentionally not allowed to treat either kind
+        // keyword as a parameter name.
+        if let Ok((next, usage)) = calc_usage(input) {
+            let member = node_from_to(
+                input,
+                next,
+                crate::ast::ActionDefBodyElement::CalcUsage(Box::new(usage)),
+            );
+            return Ok((
+                next,
+                node_from_to(
+                    input,
+                    next,
+                    CalcDefBodyElement::ActionMember(Box::new(member)),
+                ),
+            ));
+        }
         if let Ok((next, usage)) = crate::parser::part::part_usage(input) {
             return Ok((
                 next,
