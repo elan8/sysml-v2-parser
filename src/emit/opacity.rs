@@ -1693,6 +1693,7 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
         match &element.value {
             InterfaceUsageBodyElement::RefRedef { body, .. } => walk_ref_body(report, &p, body),
             InterfaceUsageBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
+            InterfaceUsageBodyElement::FlowUsage(flow) => walk_flow_usage(report, &p, &flow.value),
             InterfaceUsageBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }

@@ -843,20 +843,34 @@ fn interface_usage_body_element(
             let span = end.span.clone();
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
         }),
-        |input| {
-            let start = input;
-            let (input, member) = crate::parser::body::annotating_member(input)?;
-            Ok((
-                input,
-                crate::parser::node_from_to(
-                    start,
-                    input,
-                    InterfaceUsageBodyElement::Annotating(member),
-                ),
-            ))
-        },
+        interface_usage_other_body_element,
     ))
     .parse(input)
+}
+
+fn interface_usage_other_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    alt((interface_usage_flow, interface_usage_annotating)).parse(input)
+}
+
+fn interface_usage_flow(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    map(crate::parser::flow::flow_usage_member, |flow| {
+        let span = flow.span.clone();
+        Node::new(span, InterfaceUsageBodyElement::FlowUsage(Box::new(flow)))
+    })
+    .parse(input)
+}
+
+fn interface_usage_annotating(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    let start = input;
+    let (input, member) = crate::parser::body::annotating_member(input)?;
+    Ok((
+        input,
+        crate::parser::node_from_to(start, input, InterfaceUsageBodyElement::Annotating(member)),
+    ))
 }
 
 // GH-85: interfaces don't allow the `#name` derived-end-name form (same as
@@ -936,17 +950,144 @@ fn interface_usage_body(
     }
 }
 
-/// Connector end reference used in interface/connect syntax.
-/// Accepts an optional leading cross multiplicity (`[1]`, discarded -- `InterfaceUsage::from`/
-/// `to` don't model per-end multiplicity yet, same as the end name below; GH-16: real Systems
-/// Library / Annex fixtures write `connect [1] a to [1] b;`, which failed to parse at all before
-/// this), then either `path` or `endName ::> path`; the end name is currently ignored.
-fn connector_end_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+/// The grammar-owned `InterfaceEnd`, not an arbitrary path expression.
+fn interface_end(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
+    crate::parser::span::reference_transaction(input, interface_end_inner)
+}
+
+fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt((name, preceded(ws_and_comments, tag(&b"::>"[..])))).parse(input)?;
-    preceded(ws_and_comments, path_expression).parse(input)
+    // A named end and a direct qualified reference share their first identifier.  Commit to the
+    // named shape only after its grammar-owned `::>` / `references` separator is visible;
+    // otherwise a failed optional branch would silently consume the label as a direct endpoint
+    // and leave the operator for the enclosing `InterfacePart`.
+    let (input, target) = if let Ok((after_name, (name_span, end_name))) =
+        with_span(name).parse(input)
+    {
+        let (after_trivia, _) = ws_and_comments(after_name)?;
+        let operator = if after_trivia.fragment().starts_with(b"::>") {
+            let (after_operator, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
+            Some((
+                after_operator,
+                InterfaceEndReferenceOperator::Symbol { span },
+            ))
+        } else if starts_with_keyword(after_trivia.fragment(), b"references") {
+            let (after_operator, (span, _)) =
+                with_span(tag(&b"references"[..])).parse(after_trivia)?;
+            Some((
+                after_operator,
+                InterfaceEndReferenceOperator::Keyword { span },
+            ))
+        } else {
+            None
+        };
+        if let Some((after_operator, operator)) = operator {
+            let (input, target) =
+                preceded(ws_and_comments, reference_path).parse(after_operator)?;
+            (
+                input,
+                InterfaceEndTarget::Named {
+                    name: Node::new(name_span, end_name),
+                    operator,
+                    target,
+                },
+            )
+        } else {
+            let (input, target) = reference_path(input)?;
+            (input, InterfaceEndTarget::Direct(target))
+        }
+    } else {
+        let (input, target) = reference_path(input)?;
+        (input, InterfaceEndTarget::Direct(target))
+    };
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfaceEnd {
+                multiplicity,
+                target,
+            },
+        ),
+    ))
+}
+
+/// `InterfacePart = BinaryInterfacePart | NaryInterfacePart`.
+fn interface_part(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
+    crate::parser::span::reference_transaction(input, interface_part_inner)
+}
+
+fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"(") {
+        let open_start = input;
+        let (mut input, _) = tag(&b"("[..]).parse(input)?;
+        let open_span = crate::parser::span::span_from_to(open_start, input);
+        let (next, first) = interface_end(input)?;
+        input = next;
+        let mut ends = vec![InterfaceEndMember {
+            comma_span: None,
+            end: first,
+        }];
+        loop {
+            let (next, _) = ws_and_comments(input)?;
+            input = next;
+            if input.fragment().starts_with(b")") {
+                let close_start = input;
+                let (input, _) = tag(&b")"[..]).parse(input)?;
+                if ends.len() < 2 {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many1,
+                    )));
+                }
+                return Ok((
+                    input,
+                    node_from_to(
+                        start,
+                        input,
+                        InterfacePart::Nary {
+                            open_span,
+                            ends,
+                            close_span: crate::parser::span::span_from_to(close_start, input),
+                        },
+                    ),
+                ));
+            }
+            let comma_start = input;
+            let (input_after_comma, _) = tag(&b","[..]).parse(input)?;
+            let comma_span = crate::parser::span::span_from_to(comma_start, input_after_comma);
+            let (next, end) = interface_end(input_after_comma)?;
+            ends.push(InterfaceEndMember {
+                comma_span: Some(comma_span),
+                end,
+            });
+            input = next;
+        }
+    }
+    let (input, from) = interface_end(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let to_start = input;
+    let (input, _) = tag(&b"to"[..]).parse(input)?;
+    let to_span = crate::parser::span::span_from_to(to_start, input);
+    let (input, to) = interface_end(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfacePart::Binary {
+                from,
+                to_span,
+                to: Box::new(to),
+            },
+        ),
+    ))
 }
 
 /// Interface usage: `interface` ( name (multiplicity)? `:` Type )? `connect` path `to` path body,
@@ -1039,9 +1180,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
         let (input, _) = ws1(input)?;
-        let (input, from_expr) = connector_end_expression(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
+        let (input, part) = interface_part(input)?;
         let (input, body) = interface_usage_body(input)?;
         return Ok((
             input,
@@ -1053,8 +1192,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     interface_type,
                     subsets,
                     redefines,
-                    from: from_expr,
-                    to: to_expr,
+                    part,
                     body,
                 },
             ),
@@ -1063,14 +1201,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     // BNF: the bare `InterfacePart` alternative (no `connect` keyword) is only legal when there
     // is no preceding `UsageDeclaration` at all -- i.e. no name and no type were captured above.
     if iface_name.is_none() && interface_type.is_none() {
-        if let Ok((after_to, (from_expr, to_expr))) = (|| {
-            let (input, from_expr) = connector_end_expression(input)?;
-            let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-            let (input, to_expr) =
-                preceded(ws_and_comments, connector_end_expression).parse(input)?;
-            Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
-        })() {
-            let (input, body) = interface_usage_body(after_to)?;
+        if let Ok((after_part, part)) = interface_part(input) {
+            let (input, body) = interface_usage_body(after_part)?;
             return Ok((
                 input,
                 node_from_to(
@@ -1079,8 +1211,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     InterfaceUsage::Connection {
                         subsets: subsets.clone(),
                         redefines: redefines.clone(),
-                        from: from_expr,
-                        to: to_expr,
+                        part,
                         body,
                     },
                 ),

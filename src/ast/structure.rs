@@ -1,6 +1,6 @@
 use super::behavior::{
-    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, InOut, InOutDecl, StateDefBody,
-    StateUsage,
+    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, FlowUsage, InOut, InOutDecl,
+    StateDefBody, StateUsage,
 };
 use super::body::Body;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
@@ -2031,6 +2031,64 @@ pub struct Bind {
 }
 
 /// Interface usage: typed+connect or connection form.
+///
+/// `InterfacePart` is intentionally separate from expression-based [`ConnectionEnd`]. The
+/// pinned `InterfaceEnd` production owns an optional declaration name plus a reference
+/// subsetting, so treating it as a path expression loses `left ::> port`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfacePart {
+    Binary {
+        from: Node<InterfaceEnd>,
+        to_span: Span,
+        to: Box<Node<InterfaceEnd>>,
+    },
+    Nary {
+        open_span: Span,
+        ends: Vec<InterfaceEndMember>,
+        close_span: Span,
+    },
+}
+
+/// One ordered endpoint in the parenthesized `NaryInterfacePart` form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InterfaceEndMember {
+    /// `None` only for the first endpoint; every later member owns its preceding comma.
+    pub comma_span: Option<Span>,
+    pub end: Node<InterfaceEnd>,
+}
+
+/// A source-backed `InterfaceEnd` (SysML textual BNF 778-784).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InterfaceEnd {
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub target: InterfaceEndTarget,
+}
+
+/// `InterfaceEnd`'s required reference subsetting, with its optional declaration label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfaceEndTarget {
+    Direct(QualifiedReferenceId),
+    Named {
+        /// Decoded `NAME`, retaining the authored token in the enclosing node.
+        name: Node<String>,
+        operator: InterfaceEndReferenceOperator,
+        target: QualifiedReferenceId,
+    },
+}
+
+/// The authored `REFERENCES` spelling joining an interface-end label to its target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfaceEndReferenceOperator {
+    Symbol { span: Span },
+    Keyword { span: Span },
+}
+
+/// Interface usage: typed+connect or connection form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsage {
@@ -2044,8 +2102,7 @@ pub enum InterfaceUsage {
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
-        from: Node<Expression>,
-        to: Node<Expression>,
+        part: Node<InterfacePart>,
         /// The `InterfaceBody`, delimiters included. Was a `ConnectBody` marker beside a separate
         /// element list -- one body fact in two fields, with no span for either brace.
         body: Body<InterfaceUsageBodyElement>,
@@ -2054,8 +2111,7 @@ pub enum InterfaceUsage {
     Connection {
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
-        from: Node<Expression>,
-        to: Node<Expression>,
+        part: Node<InterfacePart>,
         /// See [`InterfaceUsage::TypedConnect`]'s body. This variant kept only an element list
         /// that was always empty -- the parser discarded the body outright -- so the `;`/`{}`
         /// distinction and every member were lost.
@@ -2093,6 +2149,10 @@ pub enum InterfaceUsageBodyElement {
     /// `end` member inside a typed, non-`connect` interface usage's body. Boxed: `EndDecl` is
     /// much larger than `RefRedef`, the other variant here.
     EndDecl(Box<Node<EndDecl>>),
+    /// A behavior occurrence usage in an interface body. `InterfaceOccurrenceUsageElement`
+    /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
+    /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.
+    FlowUsage(Box<Node<FlowUsage>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.

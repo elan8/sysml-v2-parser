@@ -738,6 +738,16 @@ macro_rules! ast_traversal {
                 walk_interface_usage(self, node)
             }
 
+            /// Visits [`InterfacePart`]; the default implementation walks its children.
+            fn visit_interface_part(&mut self, node: &$($mutability)? Node<InterfacePart>) {
+                walk_interface_part(self, node)
+            }
+
+            /// Visits [`InterfaceEnd`]; the default implementation walks its children.
+            fn visit_interface_end(&mut self, node: &$($mutability)? Node<InterfaceEnd>) {
+                walk_interface_end(self, node)
+            }
+
             /// Visits [`InterfaceUsageBodyElement`]; the default implementation walks its children.
             fn visit_interface_usage_body_element(&mut self, node: &$($mutability)? Node<InterfaceUsageBodyElement>) {
                 walk_interface_usage_body_element(self, node)
@@ -4667,7 +4677,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                InterfaceUsage::TypedConnect { name, interface_type, subsets, redefines, from, to, body } => {
+                InterfaceUsage::TypedConnect { name, interface_type, subsets, redefines, part, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
@@ -4680,19 +4690,17 @@ macro_rules! ast_traversal {
                     if let Some(inner) = redefines {
                         visitor.visit_subsetting_relationship(inner);
                     }
-                    visitor.visit_expression(from);
-                    visitor.visit_expression(to);
+                    visitor.visit_interface_part(part);
                     walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Connection { subsets, redefines, from, to, body } => {
+                InterfaceUsage::Connection { subsets, redefines, part, body } => {
                     if let Some(inner) = subsets {
                         visitor.visit_subsetting_relationship(inner);
                     }
                     if let Some(inner) = redefines {
                         visitor.visit_subsetting_relationship(inner);
                     }
-                    visitor.visit_expression(from);
-                    visitor.visit_expression(to);
+                    visitor.visit_interface_part(part);
                     walk_interface_usage_body(visitor, body);
                 }
                 InterfaceUsage::Declaration { name, interface_type, subsets, redefines, body } => {
@@ -4714,6 +4722,51 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_interface_part<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InterfacePart>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            match &$($mutability)? node.value {
+                InterfacePart::Binary { from, to_span, to } => {
+                    visitor.visit_interface_end(from);
+                    visitor.visit_span(to_span);
+                    visitor.visit_interface_end(to);
+                }
+                InterfacePart::Nary { open_span, ends, close_span } => {
+                    visitor.visit_span(open_span);
+                    for member in ends {
+                        if let Some(comma_span) = &$($mutability)? member.comma_span {
+                            visitor.visit_span(comma_span);
+                        }
+                        visitor.visit_interface_end(&$($mutability)? member.end);
+                    }
+                    visitor.visit_span(close_span);
+                }
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_interface_end<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InterfaceEnd>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let InterfaceEnd { multiplicity, target } = &$($mutability)? node.value;
+            if let Some(multiplicity) = multiplicity {
+                visitor.visit_multiplicity(multiplicity);
+            }
+            match target {
+                InterfaceEndTarget::Direct(target) => visitor.visit_qualified_reference(target),
+                InterfaceEndTarget::Named { name, operator, target } => {
+                    visitor.visit_text(&$($mutability)? name.value);
+                    visitor.visit_span(&$($mutability)? name.span);
+                    match operator {
+                        InterfaceEndReferenceOperator::Symbol { span }
+                        | InterfaceEndReferenceOperator::Keyword { span } => visitor.visit_span(span),
+                    }
+                    visitor.visit_qualified_reference(target);
+                }
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
         pub fn walk_interface_usage_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InterfaceUsageBodyElement>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
@@ -4728,6 +4781,9 @@ macro_rules! ast_traversal {
                 }
                 InterfaceUsageBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(&$($mutability)? **field_0);
+                }
+                InterfaceUsageBodyElement::FlowUsage(field_0) => {
+                    visitor.visit_flow_usage(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);

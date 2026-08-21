@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Interface usage parts retain distinct named endpoints.** `InterfacePart` now owns the
+  binary and n-ary alternatives from `InterfaceUsageDeclaration`, with source-backed endpoint
+  multiplicities, optional declared names, `::>`/`references` operator spans, and ordered dotted
+  or qualified reference targets. Both declared-`connect` and bare-interface-part forms parse
+  transactionally; formatter, semantic projection, visitors, provenance validation, opacity, and
+  serde exhaustively retain the result without reusing `KermlConnectorEnd` or generic `connect`
+  expression endpoints. Interface bodies also retain their grammar-valid nested flow usages, so
+  VehicleUsages' named `driveShaft` interface no longer recovers as one opaque member (SysML
+  textual BNF 727-784; pinned Pilot `SysML.xtext` 1120-1186). VehicleUsages, Training 11/13,
+  semantic, and malformed-recovery snapshots cover binary, n-ary, and named-end boundaries.
+  **AST version 216.**
+
 - **Metadata bodies retain keyword-less reference usages.** `MetadataAnnotation` and
   `MetadataUsage` now own a distinct, recursive `MetadataBody` whose typed
   `MetadataBodyUsage` members retain the optional authored `ref`, `:>>`/`redefines` operator,

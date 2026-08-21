@@ -4641,23 +4641,79 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// Project the form and typed body so a regular comment cannot be invisible in a snapshot.
     fn write_interface_usage(&mut self, usage: &super::InterfaceUsage) -> io::Result<()> {
         self.writer.write_str("(interface-usage (form ")?;
-        let body = match usage {
-            super::InterfaceUsage::TypedConnect { body, .. } => {
+        let (part, body) = match usage {
+            super::InterfaceUsage::TypedConnect { part, body, .. } => {
                 self.writer.write_str("typed-connect")?;
-                body
+                (Some(part), body)
             }
-            super::InterfaceUsage::Connection { body, .. } => {
+            super::InterfaceUsage::Connection { part, body, .. } => {
                 self.writer.write_str("connection")?;
-                body
+                (Some(part), body)
             }
             super::InterfaceUsage::Declaration { body, .. } => {
                 self.writer.write_str("declaration")?;
-                body
+                (None, body)
             }
         };
+        self.writer.write_str(") (part ")?;
+        if let Some(part) = part {
+            self.write_interface_part(&part.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
         self.writer.write_str(") ")?;
         self.write_interface_usage_body(body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_interface_part(&mut self, part: &super::InterfacePart) -> io::Result<()> {
+        match part {
+            super::InterfacePart::Binary { from, to, .. } => {
+                self.writer.write_str("(binary (from ")?;
+                self.write_interface_end(&from.value)?;
+                self.writer.write_str(") (to ")?;
+                self.write_interface_end(&to.value)?;
+                self.writer.write_str("))")
+            }
+            super::InterfacePart::Nary { ends, .. } => {
+                self.writer.write_str("(nary")?;
+                for member in ends {
+                    self.writer.write_str(" ")?;
+                    self.write_interface_end(&member.end.value)?;
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_interface_end(&mut self, end: &super::InterfaceEnd) -> io::Result<()> {
+        self.writer.write_str("(interface-end (multiplicity ")?;
+        self.write_multiplicity_clause(end.multiplicity.as_ref())?;
+        self.writer.write_str(") (target ")?;
+        match &end.target {
+            super::InterfaceEndTarget::Direct(target) => self.write_reference(*target)?,
+            super::InterfaceEndTarget::Named {
+                name,
+                operator,
+                target,
+            } => {
+                self.writer.write_str("(named (name ")?;
+                write_quoted(self.writer, &name.value)?;
+                self.writer.write_str(") (references ")?;
+                match operator {
+                    super::InterfaceEndReferenceOperator::Symbol { .. } => {
+                        self.writer.write_str("symbol")?
+                    }
+                    super::InterfaceEndReferenceOperator::Keyword { .. } => {
+                        self.writer.write_str("keyword")?
+                    }
+                }
+                self.writer.write_str(") (target ")?;
+                self.write_reference(*target)?;
+                self.writer.write_str("))")?;
+            }
+        }
+        self.writer.write_str("))")
     }
 
     fn write_interface_usage_body(
@@ -4691,6 +4747,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::FlowUsage(flow) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_flow_usage(&flow.value)?;
                         }
                     }
                 }

@@ -845,19 +845,6 @@ impl PartialEq for ConnectionEnd {
 
 impl Eq for ConnectionEnd {}
 
-/// An interface end (`InterfaceUsage`'s `connect`/bare-path endpoints, and `ConnectStmt`'s ends
-/// when reached through `interface def`/`interface` bodies).
-///
-/// Checked against `ConnectStmt`'s actual usage sites (`src/parser/interface.rs` and
-/// `src/parser/connection.rs`, both of which build a `ConnectStmt` from the same shared
-/// `connect_ends` parser) and `InterfaceUsage::TypedConnect`/`Connection`
-/// (`src/parser/part/usage.rs`): an interface end carries nothing beyond what a generic
-/// connection end carries — both are just a path expression with a span. A distinct struct would
-/// have no fields of its own, so this is a type alias rather than a duplicate type; it exists so
-/// call sites can name "interface end" vs. "connection end" for readability without pretending
-/// they're semantically different today.
-pub type InterfaceEnd = ConnectionEnd;
-
 impl Expression {
     /// Whether this expression node is a literal Boolean.
     pub fn is_boolean_literal(&self) -> bool {
