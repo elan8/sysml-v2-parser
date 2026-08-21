@@ -162,7 +162,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/CalculationTest.sysml",
     "Simple Tests/ControlNodeTest.sysml",
     "Simple Tests/CommentTest.sysml",
-    "Simple Tests/ConjugationTest.sysml",
+    // ConjugationTest is intentionally not a required pass: its `end port` connection/interface
+    // members are accepted by the sibling Pilot grammar but not by the pinned 2026-04 textual BNF.
+    // The parser retains those members as exact recovery nodes instead of silently dropping the
+    // kind keyword; see `spec42/sysml/examples/conjugation_test.md`.
     "Simple Tests/DefaultValueTest.sysml",
     "Simple Tests/DependencyTest.sysml",
     "Simple Tests/FeaturePathTest.sysml",
@@ -189,6 +192,19 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // inside a case-family body is structured, and its declaration tail (multiplicity, subsets
     // targets) is no longer skipped, so the file reparses to the same AST.
     "Simple Tests/VerificationTest.sysml",
+    // Promoted by the corpus-coverage stack: these now retain their formerly recovered
+    // interface endpoints/body members, metadata bodies, collection parameters, subject
+    // specialization headers, and occurrence-body bindings through parse/emit/reparse.
+    "Analysis Examples/AnalysisAnnotation.sysml",
+    "Arrowhead Framework Example/AHFNorwayTopics.sysml",
+    "Flashlight Example/Flashlight Example.sysml",
+    "Geometry Examples/ExternalShapeRefExample.sysml",
+    "Mass Roll-up Example/MassRollup.sysml",
+    "Metadata Examples/RationaleMetadataExample.sysml",
+    "Metadata Examples/RiskMetadataExample.sysml",
+    "Requirements Examples/VehicleRequirementDerivation.sysml",
+    "Timeslice and Snapshot Examples/TimeVaryingAttribute.sysml",
+    "Vehicle Example/VehicleUsages.sysml",
     "Vehicle Example/VehicleDefinitions.sysml",
     // Promoted by the KerML declaration-grammar work (see ServerSequenceModelOutside above).
     "v1 Spec Examples/8.4.5 Constraining Decomposition/Vehicle Decomposition - Updated.sysml",
