@@ -519,8 +519,15 @@ where
 /// with no diagnostic at all, and formatted back that way.
 fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let (peek, _) = ws_and_comments(input)?;
+    // `MemberPrefix` is outside `StructureUsageMember` (SysML BNF 130-131, 262-264), so the
+    // action-family gate must look through it to recognize `private message …`.  Keep parsing
+    // from `peek`, rather than this lookahead remainder: `action_def_body_element` owns the
+    // prefix and records its source-backed visibility in the resulting membership.
+    let action_peek = visibility_prefix(peek)
+        .map(|(rest, _)| rest)
+        .unwrap_or(peek);
     if crate::parser::lex::starts_with_any_keyword(
-        peek.fragment(),
+        action_peek.fragment(),
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) {
         let start = input;
@@ -539,7 +546,7 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
             // begun and rejected a malformed relationship, preserve the error for calculation
             // body recovery instead of letting the keyword-less feature fallback shred it into
             // separate `ref` and name expressions.
-            Err(error) if starts_with_keyword(peek.fragment(), b"ref") => return Err(error),
+            Err(error) if starts_with_keyword(action_peek.fragment(), b"ref") => return Err(error),
             Err(_) => {}
         }
     }
@@ -1728,6 +1735,16 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             )?;
             (next, CalcDefBodyElement::Error(node))
         }
+    // `Message` is a SysML `StructureUsageElement` (SysML BNF 805), not a KerML
+    // `FeatureElement`.  A CalculationBody reaches it through ActionBodyItem above, but a
+    // KerML TypeBody must reject it before the keyword-less expression fallback can shred its
+    // declaration into `message`, name, `of`, and type expressions.  Use the original input so
+    // recovery retains a single exact source span, including a leading MemberPrefix.
+    } else if starts_with_keyword(after_visibility, b"message") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     } else if let Ok((next, binding)) = calc_named_binding(input) {
         // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
         // `private thisClock : Clock :>> self;`) -- tried before the bare-expression arm,

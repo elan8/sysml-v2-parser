@@ -2880,6 +2880,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::FlowUsageKind::Message => "message",
             super::FlowUsageKind::SuccessionFlow => "succession-flow",
         })?;
+        self.writer.write_str(") (visibility ")?;
+        self.writer
+            .write_str(visibility_name(flow.membership.visibility))?;
         self.writer.write_str(") (declaration ")?;
         match &flow.declaration {
             super::FlowDeclaration::Declared {
