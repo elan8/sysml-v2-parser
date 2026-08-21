@@ -92,10 +92,6 @@ macro_rules! ast_traversal {
                 walk_collection_operator_parameter_terminator(self, node)
             }
 
-            /// Visits [`CollectionOperatorParameterTyping`]; the default implementation walks its children.
-            fn visit_collection_operator_parameter_typing(&mut self, node: &$($mutability)? CollectionOperatorParameterTyping) {
-                walk_collection_operator_parameter_typing(self, node)
-            }
 
             /// Visits [`Argument`]; the default implementation walks its children.
             fn visit_argument(&mut self, node: &$($mutability)? Argument) {
@@ -1724,18 +1720,14 @@ macro_rules! ast_traversal {
         pub fn walk_collection_operator_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CollectionOperatorParameter>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CollectionOperatorParameter { direction, reference_keyword_span, name, name_span, typing, terminator } = &$($mutability)? node.value;
+            let CollectionOperatorParameter { direction, reference_keyword_span, declaration, terminator } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out(inner);
             }
             if let Some(inner) = reference_keyword_span {
                 visitor.visit_span(inner);
             }
-            visitor.visit_text(name);
-            visitor.visit_span(name_span);
-            if let Some(inner) = typing {
-                visitor.visit_collection_operator_parameter_typing(inner);
-            }
+            visitor.visit_usage_declaration(declaration);
             visitor.visit_collection_operator_parameter_terminator(terminator);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -1753,12 +1745,6 @@ macro_rules! ast_traversal {
                     visitor.visit_span(close_brace_span);
                 }
             }
-        }
-
-        pub fn walk_collection_operator_parameter_typing<V: $Visitor>(visitor: &mut V, node: &$($mutability)? CollectionOperatorParameterTyping) {
-            let CollectionOperatorParameterTyping { separator_span, target } = node;
-            visitor.visit_span(separator_span);
-            visitor.visit_qualified_reference(target);
         }
 
         pub fn walk_argument<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Argument) {

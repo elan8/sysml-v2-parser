@@ -417,7 +417,7 @@ pub struct CollectionOperatorBody {
     pub close_brace_span: Span,
 }
 
-/// One typed parameter declaration in a collection-operator body.
+/// One `UsageDeclaration` parameter in a collection-operator body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CollectionOperatorParameter {
@@ -428,10 +428,8 @@ pub struct CollectionOperatorParameter {
     pub direction: Option<Node<super::InOut>>,
     /// Exact `ref` keyword span when the parameter is a reference feature.
     pub reference_keyword_span: Option<Span>,
-    /// Decoded declaration label; `name_span` preserves its authored spelling.
-    pub name: String,
-    pub name_span: Span,
-    pub typing: Option<CollectionOperatorParameterTyping>,
+    /// The grammar-owned identification and complete feature-specialization header.
+    pub declaration: Node<super::UsageDeclaration>,
     /// How the parameter is terminated: `;` or its own brace body. `in ref a { doc /* ... */ }`
     /// (`TradeStudies.sysml:162`) documents the parameter instead of ending it with `;`.
     pub terminator: CollectionOperatorParameterTerminator,
@@ -449,14 +447,6 @@ pub enum CollectionOperatorParameterTerminator {
         doc: Option<Box<Node<super::DocComment>>>,
         close_brace_span: Span,
     },
-}
-
-/// Exact `:` typing syntax plus its source-backed target identity.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CollectionOperatorParameterTyping {
-    pub separator_span: Span,
-    pub target: QualifiedReferenceId,
 }
 
 /// Move every direct `Node<Expression>` child out of `expr`, replacing each with a cheap

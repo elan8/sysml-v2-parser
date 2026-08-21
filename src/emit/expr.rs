@@ -220,10 +220,35 @@ fn emit_body_expression_bare(
         if parameter.value.reference_keyword_span.is_some() {
             w.push_str("ref ");
         }
-        w.push_authored_name("collection body parameter/name", &parameter.value.name_span)?;
-        if let Some(typing) = &parameter.value.typing {
-            w.push_str(" : ");
-            w.push_qualified_reference("collection body parameter type", typing.target)?;
+        let declaration = &parameter.value.declaration.value;
+        w.push_authored_name(
+            "collection body parameter/name",
+            &declaration.identification_span,
+        )?;
+        if let Some(typing) = &declaration.typing {
+            super::structure::emit_typing_clause(w, &typing.value)?;
+        }
+        if let Some(multiplicity) = &declaration.multiplicity {
+            super::structure::emit_multiplicity(w, &multiplicity.value)?;
+        }
+        super::structure::emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+        if let Some((subsets, value)) = &declaration.subsets {
+            super::structure::emit_subsetting_clause(w, &subsets.value)?;
+            if let Some(value) = value {
+                w.push_str(" = ");
+                emit_expression(w, &value.value)?;
+            }
+        }
+        for relationship in [
+            declaration.redefines.as_ref(),
+            declaration.references.as_ref(),
+            declaration.crosses.as_ref(),
+            declaration.intersects.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            super::structure::emit_subsetting_clause(w, &relationship.value)?;
         }
         match &parameter.value.terminator {
             crate::ast::CollectionOperatorParameterTerminator::Semicolon { .. } => {

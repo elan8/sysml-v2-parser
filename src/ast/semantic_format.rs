@@ -454,20 +454,46 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             } else {
                 self.writer.write_str("none")?;
             }
-            self.writer.write_str(") (name ")?;
-            write_quoted(self.writer, &parameter.value.name)?;
-            self.writer.write_char(' ')?;
-            write_span(self.writer, &parameter.value.name_span)?;
+            let declaration = &parameter.value.declaration.value;
+            self.writer.write_str(") (declaration (name ")?;
+            write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+            self.writer.write_str(") (short-name ")?;
+            write_optional_quoted(
+                self.writer,
+                declaration.identification.short_name.as_deref(),
+            )?;
             self.writer.write_str(") (typing ")?;
-            if let Some(typing) = &parameter.value.typing {
-                self.writer.write_str("(typed (separator ")?;
-                write_span(self.writer, &typing.separator_span)?;
-                self.writer.write_str(") (target ")?;
-                self.write_reference(typing.target)?;
-                self.writer.write_str("))")?;
+            if let Some(typing) = &declaration.typing {
+                self.write_typing(&typing.value)?;
             } else {
                 self.writer.write_str("none")?;
             }
+            self.writer.write_str(") (multiplicity ")?;
+            self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+            self.writer.write_str(") ")?;
+            self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+            self.writer.write_str(" (subsets ")?;
+            if let Some((relationship, value)) = &declaration.subsets {
+                self.write_subsetting(&relationship.value)?;
+                self.writer.write_str(" (value ")?;
+                if let Some(value) = value {
+                    self.write_expression(value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_char(')')?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") ")?;
+            self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("references", declaration.references.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
+            self.writer.write_char(')')?;
             self.writer.write_str(") (terminator ")?;
             match &parameter.value.terminator {
                 crate::ast::CollectionOperatorParameterTerminator::Semicolon { span } => {

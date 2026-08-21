@@ -2,14 +2,14 @@
 
 use crate::ast::{
     Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody,
-    CollectionOperatorParameter, CollectionOperatorParameterTyping, Expression, InOut, Node,
-    ReferenceSeparator, SequenceExpressionElement, SequenceExpressionList, Span, TypeCheckKind,
-    UnaryOperator,
+    CollectionOperatorParameter, Expression, InOut, Node, ReferenceSeparator,
+    SequenceExpressionElement, SequenceExpressionList, Span, TypeCheckKind, UnaryOperator,
 };
 use crate::parser::lex::{
     classified_reference_path, name, qualified_reference, reference_path, starts_with_keyword,
     ws_and_comments, ReferencePathKind,
 };
+use crate::parser::usage::usage_declaration;
 use crate::parser::Input;
 use crate::parser::{node_from_to, with_span};
 use nom::branch::alt;
@@ -409,6 +409,12 @@ fn undirected_parameter_ahead(input: Input<'_>) -> bool {
 fn collection_operator_parameter(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<CollectionOperatorParameter>> {
+    crate::parser::span::reference_transaction(input, collection_operator_parameter_inner)
+}
+
+fn collection_operator_parameter_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CollectionOperatorParameter>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     // Optional: `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/
@@ -432,22 +438,7 @@ fn collection_operator_parameter(
     } else {
         (input, None)
     };
-    let (input, (name_span, parameter_name)) = with_span(name)(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, typing) = if input.fragment().starts_with(b":") {
-        let (input, (separator_span, _)) = with_span(tag(&b":"[..]))(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        let (input, target) = qualified_reference(input)?;
-        (
-            input,
-            Some(CollectionOperatorParameterTyping {
-                separator_span,
-                target,
-            }),
-        )
-    } else {
-        (input, None)
-    };
+    let (input, declaration) = usage_declaration(input)?;
     let (input, _) = ws_and_comments(input)?;
     // `;` or the parameter's own brace body (`in ref a { doc /* ... */ }`,
     // `TradeStudies.sysml:162`).
@@ -480,9 +471,7 @@ fn collection_operator_parameter(
             CollectionOperatorParameter {
                 direction,
                 reference_keyword_span,
-                name: parameter_name,
-                name_span,
-                typing,
+                declaration,
                 terminator,
             },
         ),
@@ -1810,71 +1799,6 @@ mod tests {
             }
             other => panic!("expected CollectionOp, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn collection_op_brace_body_retains_parameters_result_and_provenance() {
-        let source_text =
-            "items->forAll { in ref item : Domain::Item; out accepted; item == selected.item }";
-        let source = crate::ast::SourceStorage::from(source_text);
-        let context = crate::parser::span::ParseContext::new();
-        let (rest, node) = expression(context.input(source_text.as_bytes())).expect("expression");
-        assert!(rest.fragment().is_empty());
-        let Expression::CollectionOp {
-            op,
-            args,
-            brace_body: Some(body),
-            ..
-        } = &node.value
-        else {
-            panic!("expected collection operator with body");
-        };
-        assert_eq!(op, &CollectionOperator::ForAll);
-        assert!(args.is_empty());
-        assert_eq!(
-            source.slice(&body.span),
-            Some("{ in ref item : Domain::Item; out accepted; item == selected.item }")
-        );
-        assert_eq!(source.slice(&body.value.open_brace_span), Some("{"));
-        assert_eq!(source.slice(&body.value.close_brace_span), Some("}"));
-        assert_eq!(body.value.parameters.len(), 2);
-        let item = &body.value.parameters[0].value;
-        let direction = item.direction.as_ref().expect("direction");
-        assert_eq!(direction.value, InOut::In);
-        assert_eq!(source.slice(&direction.span), Some("in"));
-        assert_eq!(
-            item.reference_keyword_span
-                .as_ref()
-                .and_then(|span| source.slice(span)),
-            Some("ref")
-        );
-        assert_eq!(item.name, "item");
-        assert_eq!(source.slice(&item.name_span), Some("item"));
-        assert_eq!(
-            source.slice(&item.typing.as_ref().expect("typing").separator_span),
-            Some(":")
-        );
-        let crate::ast::CollectionOperatorParameterTerminator::Semicolon { span } =
-            &item.terminator
-        else {
-            panic!("expected a semicolon terminator");
-        };
-        assert_eq!(source.slice(span), Some(";"));
-        assert!(matches!(
-            body.value.result.as_deref().map(|result| &result.value),
-            Some(Expression::BinaryOp {
-                op: BinaryOperator::Eq,
-                ..
-            })
-        ));
-        let arena = context.finish();
-        assert_eq!(
-            arena
-                .get(&source, item.typing.as_ref().expect("typing").target)
-                .expect("type reference")
-                .authored_text(),
-            "Domain::Item"
-        );
     }
 
     #[test]

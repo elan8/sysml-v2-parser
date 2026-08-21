@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Collection-operator parameters retain their full usage declaration.** Body-expression
+  parameters now carry source-backed feature specialization, including `:>` subsetting, rather
+  than a second name-and-typing-only header. **AST version 213.**
+
 - **Usage declarations are source-backed shared grammar.** Action-node declarations, for-loop
   variables, and flow/message usages now embed one typed `UsageDeclaration`, retaining complete
   feature-specialization relationships rather than owner-specific field mirrors. **AST version
