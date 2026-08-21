@@ -19,8 +19,7 @@ use crate::parser::node_from_to;
 use crate::parser::occurrence_prefix::{
     next_word_is_reserved, occurrence_usage_prefix, optional_keyword_token,
 };
-use crate::parser::part::exhibit_state_as_state_usage;
-use crate::parser::part::part_usage;
+use crate::parser::part::{bind_, exhibit_state_as_state_usage, part_usage};
 use crate::parser::requirement::satisfy;
 use crate::parser::usage::{
     multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses,
@@ -35,6 +34,7 @@ use nom::Parser;
 
 pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"allocate",
+    b"bind",
     b"doc",
     b"event",
     // `assert`, `not` and `satisfy` are the three FIRST tokens of a `SatisfyRequirementUsage`;
@@ -380,7 +380,9 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // `OccurrenceBodyElement` includes `AnnotatingElement`; retain a bare regular comment
+        // for that dispatcher rather than consuming it as lexical trivia at the body boundary.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().is_empty() {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -520,6 +522,11 @@ pub(crate) fn occurrence_body_element(
             OccurrenceBodyElement::AttributeUsage,
         ),
         map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
+        // `BindingConnectorAsUsage` is a `NonOccurrenceUsageElement`, which an occurrence
+        // definition body admits through `DefinitionBodyItem` (SysML BNF 237-247, 349-353,
+        // 702-707; the pinned Pilot SysML grammar agrees). Reuse its typed parser so connector
+        // ends and an optional usage body remain source-backed rather than becoming recovery.
+        map(bind_, OccurrenceBodyElement::Bind),
         map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
         map(satisfy, |n| OccurrenceBodyElement::Satisfy(Box::new(n))),
         // Allocation / connection ends in structured definition bodies (`allocation def { end …; }`).

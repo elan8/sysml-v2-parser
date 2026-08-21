@@ -1,8 +1,8 @@
 //! Attribute definition and usage parsing.
 
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership,
-    Multiplicity, Node, SubsettingKind, SubsettingRelationship, TypingKind,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, DefaultReferenceUsage,
+    InOut, Membership, Multiplicity, Node, SubsettingKind, SubsettingRelationship, TypingKind,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -12,8 +12,8 @@ use crate::parser::lex::{
 };
 use crate::parser::node_from_to;
 use crate::parser::usage::{
-    multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    typing_node, typing_relationship_node, typings,
+    feature_usage_header, multiplicity_node, optional_typings, prefix_redefinition_target,
+    specialization_clauses, typing_node, typing_relationship_node,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -82,6 +82,7 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    b"variant",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
@@ -165,7 +166,27 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
             | "calc"
             | "enum"
             | "occurrence"
+            | "end"
     )
+}
+
+/// Pilot's `DefaultReferenceUsage` adds an optional bare `end` before the pinned `RefPrefix`.
+/// Keep exactly that extension recoverable in SysML-owned bodies; KerML's distinct `end feature`
+/// production has a different following keyword and is not selected by this guard.
+pub(crate) fn is_pilot_end_default_reference(input: Input<'_>) -> bool {
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    if !starts_with_keyword(input.fragment(), b"end") {
+        return false;
+    }
+    let Ok((input, _)) = tag::<_, _, nom::error::Error<Input<'_>>>(&b"end"[..]).parse(input) else {
+        return false;
+    };
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    input.fragment().starts_with(b":")
 }
 
 /// One `MultiplicityPart` (BNF §8.2.2.6.6): an optional multiplicity range plus the ordering and
@@ -252,6 +273,12 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    if is_pilot_end_default_reference(start) {
+        return Err(nom::Err::Failure(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
@@ -268,11 +295,12 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             crate::parser::body::annotating_member,
             AttributeBodyElement::Annotating,
         ),
-        map(
-            |i| attribute_def(i, true),
-            AttributeBodyElement::AttributeDef,
-        ),
+        map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
+        map(
+            default_reference_usage,
+            AttributeBodyElement::DefaultReferenceUsage,
+        ),
         // KerML type-body members: this body grammar also serves KerML `class`/`struct`/
         // `datatype` bodies via `class_def`, whose members are feature members (`feature x :
         // Natural[1];`, `member`/`derived`/`composite`/`portion`/`var` prefixed, `step`/`expr`/
@@ -292,10 +320,6 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             AttributeBodyElement::KermlClassifier(Box::new(n))
         }),
         map(value_keyword_binding, AttributeBodyElement::AttributeUsage),
-        map(
-            attribute_feature_binding,
-            AttributeBodyElement::AttributeUsage,
-        ),
         // §6 G27: this body is shared with `item def` / `item` usage bodies, which legally own
         // occurrence members. Placed after the bindings so a member merely *named* `occurrence`
         // still reaches them first.
@@ -359,6 +383,10 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::item::item_usage, |n| {
             AttributeBodyElement::ItemUsage(Box::new(n))
         }),
+        map(
+            crate::parser::part::variant_usage,
+            AttributeBodyElement::VariantUsage,
+        ),
         map(
             |i| {
                 crate::parser::recovery::unsupported_member(
@@ -503,194 +531,94 @@ pub(crate) fn attribute_feature_binding(
     ))
 }
 
-/// §6 G26: keyword-less `name = expr;` feature binding, i.e. a [`crate::ast::DefaultReferenceUsage`]
-/// that carries a value but no typing clause. Distinct from [`attribute_usage_shorthand`], which
-/// requires the `: Type` half; that stricter form stays the one dispatched from part bodies so
-/// their existing AST shape is untouched.
-///
-/// Real usage: `measurement = testVehicle.mass;` inside the perform body of the OMG spec Annex
-/// `9-Verification-simplified.sysml`.
-///
-/// The value is mandatory here deliberately: action bodies have a *targeted* recovery diagnostic
-/// for a bare identifier with no value at all (`invalid_bare_identifier_in_action_body`, "did you
-/// mean `perform batCap`?" -- `tests/recovery_actions.rs`), which a permissive bare-`name;` arm
-/// would silently swallow before that diagnostic ever runs. [`bare_or_valued_feature_binding`] is
-/// the value-optional sibling used outside action bodies, where no such diagnostic exists.
-/// `{ (doc | nested binding)* }` body for a keyword-less feature binding.
-fn feature_binding_body(
+/// SysML `DefaultReferenceUsage = RefPrefix Usage` (SysML BNF 332--333). This is the sole
+/// source-backed parser for keyword-less usages. The pinned grammar has no bare `end` slot;
+/// Pilot's extension remains a recovery case rather than successful syntax.
+pub(crate) fn default_reference_usage(
     input: Input<'_>,
-) -> IResult<Input<'_>, Vec<crate::ast::Node<crate::ast::FeatureBodyElement>>> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = tag(&b"}"[..]).parse(input)?;
-            return Ok((input, elements));
-        }
-        let member_start = input;
-        // KerML `FeatureBodyElement -> NonFeatureMember -> AnnotatingElement` reaches the full
-        // MetadataFeature production, including its `metadata` introducer and optional `#`
-        // prefixes. SysML bodies that own the distinct MetadataUsage production keep their own
-        // dispatch precedence in their scope parsers.
-        if let Ok((next, annotation)) =
-            crate::parser::metadata_annotation::metadata_annotation(input)
-        {
-            elements.push(crate::parser::node_from_to(
-                member_start,
-                next,
-                crate::ast::FeatureBodyElement::Annotating(
-                    crate::ast::AnnotatingMember::MetadataAnnotation(annotation),
-                ),
-            ));
-            input = next;
-            continue;
-        }
-        if let Ok((next, member)) = crate::parser::body::annotating_member(input) {
-            elements.push(crate::parser::node_from_to(
-                member_start,
-                next,
-                crate::ast::FeatureBodyElement::Annotating(member),
-            ));
-            input = next;
-            continue;
-        }
-        let (next, nested) = feature_value_binding(input)?;
-        let span = nested.span.clone();
-        elements.push(crate::ast::Node::new(
-            span,
-            crate::ast::FeatureBodyElement::Binding(Box::new(nested)),
-        ));
-        input = next;
-    }
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    crate::parser::span::reference_transaction(input, default_reference_usage_inner)
 }
 
-pub(crate) fn feature_value_binding(
+fn default_reference_usage_inner(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    // Anonymous leading-redefinition binding: `:>> mRef = transformation.source;` (Domain
-    // Libraries `VectorCalculations.sysml`). The redefinition target stands in for the name;
-    // `specialization_clauses` below captures it.
-    let (input, (name_span, name_str)) = if input.fragment().starts_with(b":>>") {
-        (input, (crate::ast::Span::dummy(), String::new()))
-    } else {
-        with_span(name).parse(input)?
-    };
-    if !name_str.is_empty() && is_reserved_shorthand_starter(&name_str) {
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::ref_prefix(input);
+    let identification_start = input;
+    let (input, identification) = identification(input)?;
+    if identification.name.as_deref().is_some_and(|name| {
+        is_reserved_shorthand_starter(name)
+            || crate::parser::lex::is_reserved_keyword(name.as_bytes())
+    }) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
         )));
     }
-    // GH-87: optional `:>`/`:>>` clause between the name and the value, e.g. `torquePerCurrent
-    // :> Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;` (State Space
-    // Representation Examples/EVSample.sysml:47). `subsetting()` (called by
-    // `specialization_clauses`) already optionally consumes its own trailing `= expr` as part of
-    // the `:>` clause itself -- reuse that captured value (via `wrap_bind_expression`, the same
-    // helper `attribute_feature_binding` already uses for this exact "subsets target = expr"
-    // shape) instead of also requiring a *second*, separate `= expr` afterward.
-    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
-    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
+    let name_span = identification
+        .name
+        .as_ref()
+        .map(|_| crate::parser::span_from_to(identification_start, input));
+    let name = identification.name.unwrap_or_default();
+    let short_name = identification.short_name;
+    // `UsageDeclaration` accepts an empty Identification, so a keyword-less usage can begin
+    // immediately with a `FeatureSpecializationPart`, for example
+    // `:>> unitConversion : ConversionByConvention { ... }`.  Keep its ordering in the shared
+    // header rather than making DefaultReferenceUsage a second, narrower specialization parser:
+    // the pinned grammar admits leading relationships, typing, multiplicity, modifiers, a second
+    // typing, and trailing relationships (SysML BNF 424--426).
+    let (input, header) = feature_usage_header(input)?;
+    let typing_span = header.typing.as_ref().map(|typing| typing.span.clone());
+    let leading_value = header
+        .subsetting_value
+        .map(crate::parser::feature_value::wrap_bind_expression);
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
-            .parse(input)?;
-    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let (input, value) = match value {
-        Some(v) => (input, v),
-        None => {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                start,
-                nom::error::ErrorKind::Tag,
-            )))
-        }
-    };
-    // `;`, or a `{ ... }` body of nested bindings/documentation: `:>> mRef =
-    // transformation.target { :>> dimensions = ...; }` (Domain Libraries
-    // `VectorCalculations.sysml`).
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = if input.fragment().starts_with(b"{") {
-        let (input, elements) = feature_binding_body(input)?;
-        (input, Some(elements))
-    } else {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        (input, None)
-    };
+        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+    let (input, body) = attribute_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing: None,
-                subsets: spec.subsets.map(|(target, _value)| target),
-                redefines: spec.redefines,
-                multiplicity: None,
-                value: Some(value),
-                name_span: Some(name_span),
-                typing_span: None,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
-                has_feature_keyword: false,
+            DefaultReferenceUsage {
+                prefix,
+                name,
+                short_name,
+                typing: header.typing,
+                subsets: header.subsets,
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
+                value: value.or(leading_value),
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                name_span,
+                typing_span,
+                membership: Membership::feature(visibility, visibility_span),
                 body,
             },
         ),
     ))
 }
 
-/// GH-87: the same keyword-less binding as [`feature_value_binding`], but with the value made
-/// optional -- a fully bare `name;` (no type, no value) is a legal `DefaultReferenceUsage` too,
-/// e.g. `part def V { m; }` (Simple Tests/AnalysisTest.sysml:4). Kept as a separate function
-/// (rather than widening `feature_value_binding` itself) so action bodies' targeted bare-identifier
-/// recovery diagnostic keeps firing -- see that function's doc comment.
-pub(crate) fn bare_or_valued_feature_binding(
+/// Narrow action/calc compatibility entry point: its owning scopes require a value to preserve
+/// their bare-identifier recovery contract, while all syntax and AST ownership stays shared.
+pub(crate) fn default_reference_value_binding(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    let (input, usage) = default_reference_usage(input)?;
+    if usage.value.value.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
-            start,
+            input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    // GH-87: optional `:>`/`:>>` clause between the name and the (also optional) value, e.g.
-    // `inflationPressure :> pressure;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel
-    // Package.sysml:21) -- no `=` value at all, the value is inherited from what it subsets.
-    // `subsetting()` (called by `specialization_clauses`) already optionally consumes its own
-    // trailing `= expr` as part of the `:>` clause itself (e.g. `torquePerCurrent :>
-    // Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;`, EVSample.sysml:47) --
-    // reuse that captured value (via `wrap_bind_expression`) instead of requiring a *second*,
-    // separate `= expr` afterward.
-    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
-    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
-    let (input, value) =
-        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
-    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing: None,
-                subsets: spec.subsets.map(|(target, _value)| target),
-                redefines: spec.redefines,
-                multiplicity: None,
-                value,
-                name_span: Some(name_span),
-                typing_span: None,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
-                has_feature_keyword: false,
-                body: None,
-            },
-        ),
-    ))
+    Ok((input, usage))
 }
 
 /// §6 G15: the same feature binding as [`attribute_feature_binding`], but with the `:>>` / `:>`
@@ -755,17 +683,11 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
     Ok((input, members.into_body()))
 }
 
-/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body
+/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body.
 ///
-/// When `disambiguate_from_usage` is true (definition bodies that also accept usages), any
-/// declaration without an explicit `def` keyword is left for [`attribute_usage`] — the `def`
-/// keyword is the sole discriminator between an `AttributeDef` and an `AttributeUsage`, never
-/// inferred from typing, modifiers, or the presence of a value. Package-level attributes pass
-/// false, since only definitions are legal there.
-pub(crate) fn attribute_def(
-    input: Input<'_>,
-    disambiguate_from_usage: bool,
-) -> IResult<Input<'_>, Node<AttributeDef>> {
+/// `def` is the sole grammar discriminator from [`attribute_usage`]. It is mandatory in every
+/// scope; a def-less attribute is always a usage, including at package level.
+pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
@@ -780,14 +702,7 @@ pub(crate) fn attribute_def(
         )?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let has_def = has_def.is_some();
-    if disambiguate_from_usage && !has_def {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
+    let (input, _) = preceded(tag(&b"def"[..]), ws1).parse(input)?;
     let ident_start = input;
     let (input, ident) = identification(input)?;
     let name_span = ident
@@ -1333,10 +1248,7 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
             crate::parser::body::annotating_member,
             AttributeBodyElement::Annotating,
         ),
-        map(
-            |i| attribute_def(i, true),
-            AttributeBodyElement::AttributeDef,
-        ),
+        map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         map(metadata_binding, AttributeBodyElement::AttributeUsage),
         // The same structured members `attribute_body_element` already dispatches (spec42
@@ -1410,65 +1322,6 @@ pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBod
         metadata_body_recovery,
     )?;
     Ok((input, members.into_body()))
-}
-
-/// SysML `DefaultReferenceUsage` shorthand: bare `name : Type (= value)?;` without the
-/// `attribute` keyword (commonly used inside part bodies).
-///
-/// Supports:
-/// - `name : Type ;`
-/// - `name : Type = expr ;`
-/// - `:>> name : Type = expr ;` (leading `:>>` ignored; treated as a usage)
-pub(crate) fn attribute_usage_shorthand(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            start,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (input, (typing_span, is_conjugated, targets, spelling)) = typings(input)?;
-    let typing = Some(typing_node(
-        typing_span.clone(),
-        is_conjugated,
-        targets,
-        spelling,
-    ));
-    // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
-    let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
-            .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing,
-                // Leading `:>>` (before the name) is a different shape from GH-87's `name :>
-                // Target` (target after the name) -- see this function's doc comment; that form's
-                // target isn't captured here today, unchanged from before GH-87.
-                subsets: None,
-                redefines: None,
-                value,
-                multiplicity: None,
-                name_span: Some(name_span),
-                typing_span: Some(typing_span),
-                // No visibility prefix on the no-keyword shorthand form.
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
-                has_feature_keyword: false,
-                body: None,
-            },
-        ),
-    ))
 }
 
 #[cfg(test)]
@@ -1557,45 +1410,6 @@ mod attribute_body_tests {
     }
 
     #[test]
-    fn feature_binding_parses_unit_conversion_prefix_form() {
-        let text =
-            ":>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }";
-        let source = input(text);
-        let (rest, node) = attribute_feature_binding(source).expect("feature binding");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|n| target_texts(source, &n.value.target)),
-            Some(vec!["unitConversion".to_string()])
-        );
-        assert_eq!(
-            node.value
-                .typing
-                .as_ref()
-                .map(|n| target_texts(source, &n.value.target)),
-            Some(vec!["ConversionByPrefix".to_string()])
-        );
-        let AttributeBody::Brace { elements, .. } = &node.value.body else {
-            panic!("expected brace body");
-        };
-        assert_eq!(elements.len(), 2);
-        assert!(
-            node.value.name.is_empty(),
-            "a redefinition target is not a declared name"
-        );
-        assert!(node.value.name_span.is_none());
-        for element in elements {
-            let AttributeBodyElement::AttributeUsage(binding) = &element.value else {
-                panic!("expected metadata binding");
-            };
-            assert!(binding.value.name.is_empty());
-            assert!(binding.value.name_span.is_none());
-        }
-    }
-
-    #[test]
     fn metadata_subsetting_binding_has_no_declared_name() {
         let source = input(":> annotatedElement : SysML::Usage;");
         let (rest, node) = metadata_binding(source).expect("metadata subsetting binding");
@@ -1658,7 +1472,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_visibility_prefix_is_captured_on_membership() {
         let text = "protected attribute def Samples: Real;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -1673,7 +1487,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_public_visibility_prefix_is_captured_on_membership() {
         let text = "public attribute def Samples: Real;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -1745,7 +1559,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_retains_ordered_and_nonunique_modifiers() {
         let text = "attribute def Samples :> Real[0..*] ordered nonunique;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.multiplicity_modifiers.is_ordered());
         assert!(!node.value.multiplicity_modifiers.is_unique());

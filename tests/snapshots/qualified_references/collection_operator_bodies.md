@@ -39,8 +39,8 @@ package Collections {
 # FORMAT
 ~~~sysml
 package Collections {
-    import Filtered [items->forAll { in ref item : Domain::Item; 'item' == selected.'item' }];
-    import Transformed [items->collect { in item; 'item'.value }];
+    import Filtered [items->forAll { in ref item : Domain::Item; item == selected.item }];
+    import Transformed [items->collect { in item; item.value }];
     import Broken[items->select {
         in item : Domain::Item
         item == selected

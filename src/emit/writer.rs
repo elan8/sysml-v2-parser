@@ -74,10 +74,11 @@ impl<'a> EmitWriter<'a> {
         Ok(())
     }
 
-    /// Emit an authored name from its source span, applying the same quoting rules as an owned
-    /// name would (`format_name`). Used by nodes that keep only a span for the declared name
-    /// rather than copying its text, per the "authored spelling lives in source" contract.
-    pub(crate) fn push_span_name(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
+    /// Emit an authored name token from its validated source span.
+    ///
+    /// The span includes the token's authored quoting and escapes, so formatting the decoded
+    /// `String` again would both lose a quoted `BASIC_NAME` and corrupt an `UNRESTRICTED_NAME`.
+    pub(crate) fn push_authored_name(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
         let text = self
             .document
             .source
@@ -86,7 +87,7 @@ impl<'a> EmitWriter<'a> {
                 path: path.to_owned(),
                 span: span.clone(),
             })?;
-        self.push_str(&format_name(text));
+        self.push_str(text);
         Ok(())
     }
 
@@ -118,13 +119,16 @@ impl<'a> EmitWriter<'a> {
                     });
                 }
             }
-            let decoded = reference.segment_decoded_text(index).ok_or_else(|| {
-                EmitError::InvalidQualifiedReference {
+            // The arena retains each segment's exact lexical span. Re-emit that authored token
+            // rather than its decoded name: quoting is syntactic provenance, and a quoted name
+            // that happens to be a valid bare identifier must not be normalized away.
+            let authored = document.source.slice(&segment.source_span).ok_or_else(|| {
+                EmitError::InvalidSpan {
                     path: path.to_owned(),
-                    id,
+                    span: segment.source_span.clone(),
                 }
             })?;
-            self.push_str(&format_name(decoded.as_ref()));
+            self.push_str(authored);
         }
         Ok(())
     }

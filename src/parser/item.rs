@@ -6,6 +6,7 @@ use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, short_name_prefix, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::occurrence_prefix::next_word_is_reserved;
 use crate::parser::usage::multiplicity_node;
 use crate::parser::Input;
 use nom::combinator::opt;
@@ -73,14 +74,18 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     // existing comment below already cites for the name-optional shape).
     let (input, short_name) = short_name_prefix(input)?;
     // Name is optional: `ItemUsage`'s BNF `Identification` legally omits the name in favor of a
-    // leading `:>>` redefinition (`item :>> shape : Cylinder { ... }`), the same shape
-    // `PartUsage`/`AttributeUsage` already support. `name` simply fails to match `:>>` (not a
-    // valid identifier start), so `opt` naturally falls through to `feature_usage_header` below,
-    // which already recognizes a leading redefines/typing clause on its own via
-    // `specialization_clauses` -- no separate `prefix_redefinition_target` branch needed, unlike
-    // `part_usage`/`view_usage`'s hand-rolled dispatch. Confirmed real usage (not speculative) in
-    // the OMG Geometry domain library's `VehicleGeometryAndCoordinateFrames.sysml` example.
-    let (input, name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    // leading FeatureSpecializationPart (`item :>> shape : Cylinder { ... }` or `item redefines
+    // fuelSupply;`). A bare parser `name` accepts reserved keywords, so it used to take
+    // `redefines` as the declaration label and strand its target. The shared reserved-name guard
+    // leaves every unquoted grammar keyword for the header parser; quoted `'redefines'` remains a
+    // valid declaration name. Confirmed direct corpus use: Training 12 Binding Connectors, lines
+    // 11--12. This is the same `Identification` boundary `requirement` owns for its anonymous
+    // usage declaration.
+    let (input, name) = if next_word_is_reserved(input) {
+        (input, None)
+    } else {
+        opt(preceded(ws_and_comments, name)).parse(input)?
+    };
     let name = name.unwrap_or_default();
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = parse_feature_usage_header(input)?;

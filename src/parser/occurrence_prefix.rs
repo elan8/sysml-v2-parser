@@ -116,7 +116,7 @@ pub(crate) fn optional_alternative<'a, T: Copy>(
 /// [`starts_with_keyword`] would reject `in` against `inout x` anyway, because `o` is not a token
 /// boundary.
 /// Takes trivia-free input; see [`slot_keyword`].
-fn ref_prefix(input: Input<'_>) -> (Input<'_>, RefPrefix) {
+pub(crate) fn ref_prefix(input: Input<'_>) -> (Input<'_>, RefPrefix) {
     let (input, direction) = optional_direction(input);
     let (input, derived_span) = match slot_keyword(input, b"derived") {
         Some((rest, span)) => (rest, Some(span)),

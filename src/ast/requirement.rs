@@ -5,8 +5,8 @@ use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    AttributeBody, AttributeDef, AttributeUsage, DefinitionPrefix, MetadataKeywordUsage,
-    VariantUsage,
+    AttributeBody, AttributeDef, AttributeUsage, DefinitionBody, DefinitionPrefix,
+    MetadataKeywordUsage, VariantUsage,
 };
 use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
@@ -164,8 +164,14 @@ impl PartialEq for PurposeMember {
     }
 }
 
-/// Subject declaration: `subject` name? (`:` type)? multiplicity? (`=` value)? `;`
-/// or the bare binding `subject = expr;`.
+/// Subject declaration: `subject` `UsageDeclaration` `UsageCompletion`.
+///
+/// `SubjectUsage` is a `ReferenceUsage`, so its completion is the shared `UsageBody =
+/// DefinitionBody` production (SysML textual BNF 1419, 305-315; Pilot `SysML.xtext` 2053,
+/// 592-605). In particular, a braced subject body owns its annotating members rather than
+/// treating them as trivia. Its declaration uses the complete `FeatureSpecializationPart`
+/// (SysML textual BNF 424-480), so its typed header keeps each relationship kind and the
+/// multiplicity slot rather than reducing a `:` clause to one reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
@@ -173,15 +179,28 @@ pub struct SubjectDecl {
     /// `Identification`'s `( '<' declaredShortName '>' )?`, reached through `UsageDeclaration`
     /// (SysML BNF 42/308). See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<String>,
-    pub type_name: Option<QualifiedReferenceId>,
-    /// `:>>`/`redefines` redefinition clause (`subject subj :>> Case::subj;`, or the type-less
-    /// anonymous form `subject :>> vehicle = vehicle_large;`; spec42 Gap 35).
+    /// Complete `Typings` relationship (`:`, `typed by`, or `defined by`) from
+    /// `FeatureSpecializationPart`, including all targets and its authored spelling.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// `:>` / `subsets` relationship from `FeatureSpecializationPart`.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` / `redefines` relationship from `FeatureSpecializationPart`.
     pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `::>` / `references` relationship from `FeatureSpecializationPart`.
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// `=>` / `crosses` relationship from `FeatureSpecializationPart`.
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// `intersects` relationship accepted by the shared feature-header production.
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored ordering/uniqueness slots belonging to `MultiplicityPart`.
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `= expr` / `default expr` value clause (`subject generateTorque default
     /// engine1.generateTorque;`, OMG spec Annex A; spec42 Gap 35 widened this from a bare
     /// `=`-only `Expression`).
     pub value: Option<Node<crate::ast::FeatureValue>>,
+    /// The terminating `UsageBody`, including its delimiters and typed members.
+    pub body: DefinitionBody,
 }
 
 /// Actor parameter in a requirement body: `actor` name? `:` type `;`.
@@ -501,7 +520,12 @@ pub struct FrameMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
+    /// Decoded `NAME`; [`Self::name_span`] retains the exact authored BASIC_NAME or
+    /// UNRESTRICTED_NAME token for source-faithful emission.
     pub name: String,
+    /// Exact source span of [`Self::name`], including quotes and escapes when authored as an
+    /// UNRESTRICTED_NAME.
+    pub name_span: Span,
     /// `abstract` keyword, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
     /// (Systems Library `Requirements.sysml`). The parser has always accepted it; this struct
     /// had nowhere to put it, so emission dropped the keyword.
@@ -579,20 +603,22 @@ pub struct AnalysisCaseDef {
     pub membership: Membership,
 }
 
-/// Analysis case usage: `analysis` name (`:` type)? body.
+/// Analysis case usage: `OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody`
+/// (SysML textual BNF 1533-1535; pinned Pilot `SysML.xtext` 2236).
+///
+/// The prefix is one grammar-owned, source-backed value rather than separate `abstract` and
+/// `individual` flags. In particular, Systems Library `AnalysisCases.sysml:21` writes
+/// `ref analysis self : AnalysisCase :>> Case::self;`; retaining the complete prefix prevents
+/// `ref` from being reinterpreted as an unrelated reference declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnalysisCaseUsage {
+    /// The complete `OccurrenceUsagePrefix` in its authored slot order.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// True for `abstract analysis ...`.
-    pub is_abstract: bool,
-    /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
-    /// analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (`Individuals Examples/
-    /// AnalysisIndividualExample.sysml:79`).
-    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; `analysis_case_usage` captures real visibility,
     /// `kind` always [`crate::ast::MembershipKind::FeatureMembership`].

@@ -105,6 +105,143 @@ pub(crate) fn emit_action_def(
     emit_action_def_body(w, path, &def.body)
 }
 
+/// Stream the shared `ActionNodePrefix` before a loop-node keyword. The prefix owns its optional
+/// `action` declaration and complete feature-specialization header; `while`, `loop`, and `for`
+/// merely choose the following node alternative.
+fn emit_action_node_prefix(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    prefix: &crate::ast::ActionNodePrefix,
+) -> Result<(), EmitError> {
+    structure::emit_occurrence_usage_prefix(
+        w,
+        &format!("{path}/occurrence-prefix"),
+        &prefix.occurrence_prefix,
+    )?;
+    if let Some(declaration) = &prefix.action_declaration {
+        emit_action_node_usage_declaration(w, path, &declaration.value)?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
+fn emit_action_node_usage_declaration(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    declaration: &crate::ast::ActionNodeUsageDeclaration,
+) -> Result<(), EmitError> {
+    w.push_str("action");
+    if declaration.identification_span.len != 0 {
+        w.push_char(' ');
+        w.push_authored_name(
+            &format!("{path}/action-declaration/identification"),
+            &declaration.identification_span,
+        )?;
+    }
+    if let Some(typing) = &declaration.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+    if let Some((subsets, value)) = &declaration.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+        if let Some(value) = value {
+            w.push_str(" = ");
+            emit_expression(w, &value.value)?;
+        }
+    }
+    for relationship in [
+        declaration.redefines.as_ref(),
+        declaration.references.as_ref(),
+        declaration.crosses.as_ref(),
+        declaration.intersects.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        emit_subsetting_clause(w, &relationship.value)?;
+    }
+    Ok(())
+}
+
+fn emit_action_body_parameter(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &crate::ast::ActionBodyParameter,
+) -> Result<(), EmitError> {
+    if let Some(declaration) = &body.action_declaration {
+        w.push_char(' ');
+        emit_action_node_usage_declaration(w, path, &declaration.value)?;
+    }
+    emit_action_def_body(w, path, &body.body)
+}
+
+/// Emit the complete `ForLoopNode` production.  Its variable is a declaration, so its name is
+/// streamed from the aggregate authored span rather than re-escaped from the decoded label.
+pub(crate) fn emit_for_loop(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    for_loop: &crate::ast::ForLoop,
+) -> Result<(), EmitError> {
+    emit_action_node_prefix(w, path, &for_loop.prefix)?;
+    w.push_str("for ");
+    emit_for_variable_declaration(w, path, &for_loop.variable.value)?;
+    w.push_str(" in ");
+    emit_expression(w, &for_loop.in_parameter.expression.value)?;
+    emit_action_body_parameter(w, path, &for_loop.body)
+}
+
+fn emit_for_variable_declaration(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    declaration: &crate::ast::ForVariableDeclaration,
+) -> Result<(), EmitError> {
+    w.push_authored_name(
+        &format!("{path}/for-variable/identification"),
+        &declaration.identification_span,
+    )?;
+    if let Some(typing) = &declaration.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+    if let Some((subsets, value)) = &declaration.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+        if let Some(value) = value {
+            w.push_str(" = ");
+            emit_expression(w, &value.value)?;
+        }
+    }
+    for relationship in [
+        declaration.redefines.as_ref(),
+        declaration.references.as_ref(),
+        declaration.crosses.as_ref(),
+        declaration.intersects.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        emit_subsetting_clause(w, &relationship.value)?;
+    }
+    Ok(())
+}
+
+fn emit_until_parameter(
+    w: &mut EmitWriter<'_>,
+    until: Option<&crate::ast::UntilParameter>,
+) -> Result<(), EmitError> {
+    if let Some(until) = until {
+        w.push_str(" until ");
+        emit_expression(w, &until.expression.value)?;
+        w.push_char(';');
+    }
+    Ok(())
+}
+
 pub(crate) fn emit_action_usage(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -167,7 +304,10 @@ pub(crate) fn emit_action_usage(
     }
     if !usage.name.is_empty() {
         w.push_char(' ');
-        w.push_str(&format_name(&usage.name));
+        let Some(name_span) = &usage.name_span else {
+            return w.unsupported(path, "action usage name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -178,6 +318,7 @@ pub(crate) fn emit_action_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    super::structure::emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -211,7 +352,7 @@ fn emit_payload_clause(
     path: &str,
     payload: &crate::ast::PayloadClause,
 ) -> Result<(), EmitError> {
-    w.push_str(&format_name(&payload.name));
+    w.push_authored_name(&format!("{path}/name"), &payload.name_span)?;
     if let Some(ty) = payload.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(path, ty)?;
@@ -277,11 +418,13 @@ pub(crate) fn emit_action_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ActionDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        ActionDefBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionDefBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }
         ActionDefBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         ActionDefBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
+        ActionDefBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
@@ -310,14 +453,17 @@ pub(crate) fn emit_action_def_body_element(
         ActionDefBodyElement::JoinStmt(j) => emit_join_stmt(w, path, &j.value),
         ActionDefBodyElement::ForkStmt(f) => emit_fork_stmt(w, path, &f.value),
         ActionDefBodyElement::LoopStmt(l) => {
-            w.push_str("loop ");
-            emit_action_def_body(w, path, &l.value.body)
+            emit_action_node_prefix(w, path, &l.value.prefix)?;
+            w.push_str("loop");
+            emit_action_body_parameter(w, path, &l.value.body)?;
+            emit_until_parameter(w, l.value.until.as_ref())
         }
         ActionDefBodyElement::WhileStmt(wh) => {
+            emit_action_node_prefix(w, path, &wh.value.prefix)?;
             w.push_str("while ");
             emit_expression(w, &wh.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &wh.value.body)
+            emit_action_body_parameter(w, path, &wh.value.body)?;
+            emit_until_parameter(w, wh.value.until.as_ref())
         }
         ActionDefBodyElement::IfStmt(i) => {
             w.push_str("if ");
@@ -329,26 +475,16 @@ pub(crate) fn emit_action_def_body_element(
             }
             Ok(())
         }
-        ActionDefBodyElement::ForLoop(f) => {
-            w.push_str("for ");
-            w.push_str(&format_name(&f.value.var));
-            w.push_str(" in ");
-            emit_expression(w, &f.value.range.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &f.value.body)
-        }
+        ActionDefBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         ActionDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        ActionDefBodyElement::MetadataUsage(m) => structure::emit_metadata_usage(w, path, &m.value),
         ActionDefBodyElement::Dependency(d) => {
             super::requirement::emit_dependency(w, path, &d.value)
         }
-        other @ (ActionDefBodyElement::MetadataUsage(_)
-        | ActionDefBodyElement::TerminateStmt(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        ActionDefBodyElement::TerminateStmt(terminate) => emit_terminate_stmt(w, &terminate.value),
     }
 }
 
@@ -384,6 +520,7 @@ pub(crate) fn emit_action_usage_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ActionUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        ActionUsageBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionUsageBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }
@@ -416,14 +553,17 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::JoinStmt(j) => emit_join_stmt(w, path, &j.value),
         ActionUsageBodyElement::ForkStmt(f) => emit_fork_stmt(w, path, &f.value),
         ActionUsageBodyElement::LoopStmt(l) => {
-            w.push_str("loop ");
-            emit_action_def_body(w, path, &l.value.body)
+            emit_action_node_prefix(w, path, &l.value.prefix)?;
+            w.push_str("loop");
+            emit_action_body_parameter(w, path, &l.value.body)?;
+            emit_until_parameter(w, l.value.until.as_ref())
         }
         ActionUsageBodyElement::WhileStmt(wh) => {
+            emit_action_node_prefix(w, path, &wh.value.prefix)?;
             w.push_str("while ");
             emit_expression(w, &wh.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &wh.value.body)
+            emit_action_body_parameter(w, path, &wh.value.body)?;
+            emit_until_parameter(w, wh.value.until.as_ref())
         }
         ActionUsageBodyElement::IfStmt(i) => {
             w.push_str("if ");
@@ -440,16 +580,32 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        ActionUsageBodyElement::MetadataUsage(m) => {
+            structure::emit_metadata_usage(w, path, &m.value)
+        }
         ActionUsageBodyElement::Dependency(d) => {
             super::requirement::emit_dependency(w, path, &d.value)
         }
-        other @ (ActionUsageBodyElement::MetadataUsage(_)
-        | ActionUsageBodyElement::TerminateStmt(_)
-        | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        ActionUsageBodyElement::TerminateStmt(terminate) => {
+            emit_terminate_stmt(w, &terminate.value)
+        }
+        ActionUsageBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
     }
+}
+
+/// The currently supported semicolon form of `TerminateNode`: `terminate;` or
+/// `terminate target;`. The target remains a typed expression from parsing through emission.
+fn emit_terminate_stmt(
+    w: &mut EmitWriter<'_>,
+    terminate: &crate::ast::TerminateStmt,
+) -> Result<(), EmitError> {
+    w.push_str("terminate");
+    if let Some(target) = &terminate.target {
+        w.push_char(' ');
+        emit_expression(w, &target.value)?;
+    }
+    w.push_char(';');
+    Ok(())
 }
 
 fn emit_assign(w: &mut EmitWriter<'_>, assign: &AssignStmt) -> Result<(), EmitError> {
@@ -484,6 +640,7 @@ pub(crate) fn emit_then_action_pub(
         ThenTarget::Merge(m) => emit_merge_stmt(w, path, &m.value),
         ThenTarget::Fork(f) => emit_fork_stmt(w, path, &f.value),
         ThenTarget::Decide(d) => emit_decision_stmt(w, path, &d.value),
+        ThenTarget::Join(j) => emit_join_stmt(w, path, &j.value),
         ThenTarget::Accept(a) => {
             w.push_str("accept ");
             emit_transition_accept(w, path, &a.value)?;
@@ -642,6 +799,7 @@ pub(crate) fn emit_state_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    super::structure::emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -831,7 +989,7 @@ fn emit_state_def_body_element(
         }
         StateDefBodyElement::FinalState(f) => {
             w.push_str("final ");
-            w.push_str(&format_name(&f.value.state_name));
+            w.push_authored_name(&format!("{path}/final-name"), &f.value.name_span)?;
             w.push_char(';');
             Ok(())
         }
@@ -848,6 +1006,10 @@ fn emit_state_def_body_element(
         StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, path, &s.value),
         StateDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
+        }
+        StateDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
+        StateDefBodyElement::ConstraintUsage(c) => {
+            super::view::emit_constraint_usage(w, path, &c.value)
         }
         StateDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
@@ -952,20 +1114,29 @@ pub(crate) fn emit_transition_effect(
     effect: &crate::ast::TransitionEffect,
 ) -> Result<(), EmitError> {
     match effect {
-        crate::ast::TransitionEffect::Perform { name, type_name } => {
-            w.push_str("action ");
+        crate::ast::TransitionEffect::Perform {
+            name,
+            type_name,
+            body,
+        } => {
+            w.push_str("action");
             if let Some(n) = name {
+                w.push_char(' ');
                 w.push_str(&format_name(n));
             }
             if let Some(ty) = type_name {
                 w.push_str(" : ");
                 w.push_qualified_reference(path, *ty)?;
             }
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
         crate::ast::TransitionEffect::Accept {
             payload,
             type_name,
             via,
+            body,
         } => {
             w.push_str("accept ");
             emit_expression(w, &payload.value)?;
@@ -977,12 +1148,16 @@ pub(crate) fn emit_transition_effect(
                 w.push_str(" via ");
                 emit_expression(w, &v.value)?;
             }
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
         crate::ast::TransitionEffect::Send {
             payload,
             type_name,
             via,
             to,
+            body,
         } => {
             w.push_str("send ");
             emit_expression(w, &payload.value)?;
@@ -998,12 +1173,18 @@ pub(crate) fn emit_transition_effect(
                 w.push_str(" to ");
                 emit_expression(w, &t.value)?;
             }
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
-        crate::ast::TransitionEffect::Assign { lhs, rhs } => {
+        crate::ast::TransitionEffect::Assign { lhs, rhs, body } => {
             w.push_str("assign ");
             emit_expression(w, &lhs.value)?;
             w.push_str(" := ");
             emit_expression(w, &rhs.value)?;
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
         crate::ast::TransitionEffect::Expression(e) => emit_expression(w, &e.value)?,
     }
@@ -1072,7 +1253,7 @@ pub(crate) fn emit_flow_usage(
     emit_definition_body(w, path, &flow.body)
 }
 
-fn emit_definition_body(
+pub(crate) fn emit_definition_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &crate::ast::DefinitionBody,
@@ -1273,9 +1454,7 @@ fn emit_merge_stmt(
     path: &str,
     merge: &crate::ast::MergeStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("merge ");
-    emit_expression(w, &merge.merge.value)?;
-    emit_first_merge_body(w, path, &merge.body)
+    emit_control_node(w, path, "merge", &merge.declaration, &merge.body)
 }
 
 fn emit_decision_stmt(
@@ -1283,9 +1462,7 @@ fn emit_decision_stmt(
     path: &str,
     decision: &crate::ast::DecisionStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("decide ");
-    emit_expression(w, &decision.decide.value)?;
-    emit_first_merge_body(w, path, &decision.body)
+    emit_control_node(w, path, "decide", &decision.declaration, &decision.body)
 }
 
 fn emit_join_stmt(
@@ -1293,9 +1470,7 @@ fn emit_join_stmt(
     path: &str,
     join: &crate::ast::JoinStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("join ");
-    emit_expression(w, &join.join.value)?;
-    emit_first_merge_body(w, path, &join.body)
+    emit_control_node(w, path, "join", &join.declaration, &join.body)
 }
 
 fn emit_fork_stmt(
@@ -1303,9 +1478,28 @@ fn emit_fork_stmt(
     path: &str,
     fork: &crate::ast::ForkStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("fork ");
-    emit_expression(w, &fork.fork.value)?;
-    emit_first_merge_body(w, path, &fork.body)
+    emit_control_node(w, path, "fork", &fork.declaration, &fork.body)
+}
+
+/// All four `ControlNode` productions share an empty-or-named declaration followed by their
+/// mandatory action body. Keep declaration emission typed so anonymous controls do not acquire a
+/// fabricated name or spacing before `;` / `{`.
+fn emit_control_node(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    keyword: &str,
+    declaration: &crate::ast::ControlNodeDeclaration,
+    body: &crate::ast::FirstMergeBody,
+) -> Result<(), EmitError> {
+    w.push_str(keyword);
+    match declaration {
+        crate::ast::ControlNodeDeclaration::Anonymous => {}
+        crate::ast::ControlNodeDeclaration::Named(name) => {
+            w.push_char(' ');
+            emit_expression(w, &name.value)?;
+        }
+    }
+    emit_first_merge_body(w, path, body)
 }
 
 pub(crate) fn emit_occurrence_def(
@@ -1421,6 +1615,7 @@ pub(crate) fn emit_occurrence_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         crate::ast::OccurrenceBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
+        crate::ast::OccurrenceBodyElement::Bind(b) => structure::emit_bind(w, path, &b.value),
         crate::ast::OccurrenceBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }

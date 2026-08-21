@@ -21,7 +21,6 @@ package ExtendedExamples {
 (fixture-diagnostics
   (document "coverage_extended.md"
     (diagnostics
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 290) (line 9) (column 16) (len 14)) (message "unrecognized declaration `x` in package body"))
     )
   )
 )
@@ -40,7 +39,8 @@ package ExtendedExamples {
     #situation
     x : T;
     #situation
-    x : T { }
+    x : T {
+    }
     variation #situation def V;
 }
 ~~~
@@ -57,9 +57,11 @@ package ExtendedExamples {
     (reference r6 (scope relative) (span (offset 192) (line 6) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 192) (line 6) (column 6) (len 9)))))
     (reference r7 (scope relative) (span (offset 231) (line 7) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 231) (line 7) (column 6) (len 9)))))
     (reference r8 (scope relative) (span (offset 258) (line 8) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 258) (line 8) (column 6) (len 9)))))
-    (reference r9 (scope relative) (span (offset 280) (line 9) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 280) (line 9) (column 6) (len 9)))))
-    (reference r10 (scope relative) (span (offset 315) (line 10) (column 16) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 315) (line 10) (column 16) (len 9)))))
+    (reference r9 (scope relative) (span (offset 272) (line 8) (column 20) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 272) (line 8) (column 20) (len 1)))))
+    (reference r10 (scope relative) (span (offset 280) (line 9) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 280) (line 9) (column 6) (len 9)))))
+    (reference r11 (scope relative) (span (offset 294) (line 9) (column 20) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 294) (line 9) (column 20) (len 1)))))
+    (reference r12 (scope relative) (span (offset 315) (line 10) (column 16) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 315) (line 10) (column 16) (len 9)))))
   )
-  (root (package (name "ExtendedExamples") (body brace (extended-def (prefix-keywords ((ref r0))) (definition-prefix none) (def true) (name "Failure") (specializes none) (body semicolon)) (extended-def (prefix-keywords ((ref r1))) (definition-prefix none) (def true) (name "Failure") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r2)))) (body semicolon)) (extended-def (prefix-keywords ((ref r3))) (definition-prefix abstract) (def true) (name "AbstractFailure") (specializes none) (body semicolon)) (extended-def (prefix-keywords ((ref r4) (ref r5))) (definition-prefix none) (def true) (name "Vulnerability") (specializes none) (body semicolon)) (extended-def (prefix-keywords ((ref r6))) (definition-prefix none) (def true) (name "Failure") (specializes none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "p") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)))) (extended-def (prefix-keywords ((ref r7))) (definition-prefix none) (def false) (name "batteryLow") (specializes none) (body semicolon)) (metadata-keyword-usage (type (ref r8)) (body none)) (default-reference-usage) (metadata-keyword-usage (type (ref r9)) (body none)) (malformed (code "unrecognized_declaration_in_scope") (found "x : T { }") (span (offset 290) (line 9) (column 16) (len 14))) (extended-def (prefix-keywords ((ref r10))) (definition-prefix variation) (def true) (name "V") (specializes none) (body semicolon)))))
+  (root (package (name "ExtendedExamples") (body brace (extended-def (prefix-keywords ((ref r0))) (definition-prefix none) (def true) (name "Failure") (specializes none) (body semicolon)) (extended-def (prefix-keywords ((ref r1))) (definition-prefix none) (def true) (name "Failure") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r2)))) (body semicolon)) (extended-def (prefix-keywords ((ref r3))) (definition-prefix abstract) (def true) (name "AbstractFailure") (specializes none) (body semicolon)) (extended-def (prefix-keywords ((ref r4) (ref r5))) (definition-prefix none) (def true) (name "Vulnerability") (specializes none) (body semicolon)) (extended-def (prefix-keywords ((ref r6))) (definition-prefix none) (def true) (name "Failure") (specializes none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "p") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)))) (extended-def (prefix-keywords ((ref r7))) (definition-prefix none) (def false) (name "batteryLow") (specializes none) (body semicolon)) (metadata-keyword-usage (type (ref r8)) (body none)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name "x") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r9)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (metadata-keyword-usage (type (ref r10)) (body none)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name "x") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r11)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace)) (extended-def (prefix-keywords ((ref r12))) (definition-prefix variation) (def true) (name "V") (specializes none) (body semicolon)))))
 )
 ~~~

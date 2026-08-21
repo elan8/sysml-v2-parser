@@ -585,8 +585,14 @@ pub(crate) fn use_case_def_body_element(
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
     // `RefDecl` and `metadata_keyword_prefix` reads `#Tag` as a standalone member, and neither
-    // knows about the `part` keyword that follows, so `PartUsage` gets first refusal.
+    // knows about the kind keyword that follows, so each migrated occurrence-usage family gets
+    // first refusal. A failed AnalysisCaseUsage attempt preserves the established `ref case` and
+    // `ref verification` RefDecl paths below.
     if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::case::analysis_case_usage(start) {
+            let elem = UseCaseDefBodyElement::AnalysisCaseUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
         if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
             let elem = UseCaseDefBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
@@ -606,10 +612,7 @@ pub(crate) fn use_case_def_body_element(
                 crate::parser::metadata_annotation::metadata_keyword_prefix,
                 UseCaseDefBodyElement::MetadataKeywordUsage,
             ),
-            map(
-                |i| attribute_def(i, true),
-                UseCaseDefBodyElement::AttributeDef,
-            ),
+            map(attribute_def, UseCaseDefBodyElement::AttributeDef),
             map(
                 crate::parser::attribute::directed_attribute_usage,
                 UseCaseDefBodyElement::AttributeUsage,

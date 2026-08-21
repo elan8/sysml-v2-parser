@@ -462,9 +462,14 @@ fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     let open_start = input;
     let (input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
+    // `PerformBodyElement` admits `AnnotatingElement`, whose shortest spelling is a bare regular
+    // comment. Skipping it here would make the inner dispatcher unreachable for that spelling.
     let (input, elements) = preceded(
-        ws_and_comments,
-        many0(preceded(ws_and_comments, perform_body_element)),
+        crate::parser::lex::ws_and_notes,
+        many0(preceded(
+            crate::parser::lex::ws_and_notes,
+            perform_body_element,
+        )),
     )
     .parse(input)?;
     let (close_start, _) = ws_and_comments(input)?;
@@ -903,7 +908,9 @@ fn interface_usage_body(
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // A bare `/* ... */` is an `AnnotatingElement` at this member boundary, not trivia.
+        // Leave it for `interface_usage_body_element`; its final annotating arm owns it.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().starts_with(b"}") {
             let close_start = input;
@@ -1137,11 +1144,16 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, _) = opt(preceded(
-        ws_and_comments,
-        preceded(tag(&b":>>"[..]), ws_and_comments),
-    ))
-    .parse(input)?;
+    // An anonymous leading `:>> target` is a redefinition relationship, not punctuation before
+    // a declaration label. Leave that form to `connector::ref_decl`, which retains it in
+    // `RefDecl::redefines`; consuming it here would turn the target into `RefDecl::name`.
+    let (after_ref, _) = ws_and_comments(input)?;
+    if after_ref.fragment().starts_with(b":>>") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` (SysML BNF 335) reaches
     // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` through
     // `UsageDeclaration`, so `ref <rd> rd : T;` is legal. This parser went straight to the name
@@ -1237,9 +1249,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Part(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Part(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1252,9 +1262,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Attribute(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1267,9 +1275,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Item(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Item(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1282,9 +1288,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Port(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Port(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1299,9 +1303,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Requirement(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Requirement(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1316,9 +1318,24 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
                 start,
                 next,
                 VariantUsage {
-                    reference: None,
-                    typed: Some(VariantTypedUsage::Perform(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Perform(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+
+    // `VariantUsageElement → BehaviorUsageElement → ActionUsage` (SysML textual BNF 374-390,
+    // 392-413; pinned Pilot `SysML.xtext` 679-719). `action_usage` is tried before the untyped
+    // reference branch so its declaration and optional action body stay typed.
+    if let Ok((next, usage)) = crate::parser::action::action_usage(input) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Action(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1342,9 +1359,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
             start,
             input,
             VariantUsage {
-                reference: Some(reference),
-                typed: None,
-                body,
+                form: VariantUsageForm::Reference { reference, body },
                 membership,
             },
         ),
@@ -1389,6 +1404,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         }
         if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
             let elem = PartUsageBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = analysis_case_usage(start) {
+            let elem = PartUsageBodyElement::AnalysisCaseUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
@@ -1452,7 +1471,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 PartUsageBodyElement::AttributeUsage,
             ),
             map(
-                attribute_usage_shorthand,
+                default_reference_usage,
                 PartUsageBodyElement::DefaultReferenceUsage,
             ),
             alt((
@@ -1617,6 +1636,7 @@ pub(crate) fn exhibit_state_as_state_usage(
             .and_then(|typing| typing.value.target.first().copied()),
         typing: exhibit.value.typing,
         multiplicity: exhibit.value.multiplicity,
+        multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
         subsets: exhibit.value.subsets,
         // §6 G18: previously dropped, which silently lost the redefinition target of
         // `exhibit <name> :>> <target>;`.

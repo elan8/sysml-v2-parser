@@ -80,6 +80,10 @@ pub enum ConstraintDefBodyElement {
     /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
     /// but modelled neither, so a `#` member was reported unsupported here.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `AliasMember`, reached through `CalculationBodyItem -> ActionBodyItem ->
+    /// NonBehaviorBodyItem`. The shared source-backed [`crate::ast::AliasDef`] owns its
+    /// identification, target, relationship body, and membership.
+    AliasDef(Node<crate::ast::AliasDef>),
     InOutDecl(Box<Node<InOutDecl>>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems
@@ -238,6 +242,13 @@ pub enum CalcDefBodyElement {
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
+    /// `AliasMember`, admitted directly by KerML `TypeBodyElement` and by a SysML calculation
+    /// body through `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem`.
+    ///
+    /// The source-backed [`crate::ast::AliasDef`] already owns its identification, target,
+    /// relationship body, and membership. Keeping that grammar-owned node here avoids the
+    /// expression fallback splitting `alias name for Target;` into unrelated members.
+    AliasDef(Node<crate::ast::AliasDef>),
     /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
     /// Systems Library `Interfaces.sysml`; previously captured opaquely).
     ///
@@ -369,8 +380,13 @@ pub enum ViewDefBodyElement {
     /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
     /// but modelled neither, so a `#` member was reported unsupported here.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `AliasMember`, admitted through `ViewDefinitionBodyItem -> DefinitionBodyItem`.
+    AliasDef(Node<crate::ast::AliasDef>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// Ordinary `RenderingUsage`, distinct from the view-specific `render` spelling above.
+    /// `ViewDefinitionBodyItem -> DefinitionBodyItem -> StructureUsageElement` admits it.
+    RenderingUsage(Node<RenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and
     /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings;` (Systems Library
     /// `Views.sysml`). This scope accepted no `ref` member at all.
@@ -514,8 +530,13 @@ pub enum ViewBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `AliasMember`, admitted through `ViewBodyItem -> DefinitionBodyItem`.
+    AliasDef(Node<crate::ast::AliasDef>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// Ordinary `RenderingUsage`, distinct from the view-specific `render` spelling above.
+    /// `ViewBodyItem -> DefinitionBodyItem -> StructureUsageElement` admits it.
+    RenderingUsage(Node<RenderingUsage>),
     Expose(Node<ExposeMember>),
     /// `SatisfyRequirementUsage` in a view usage body.
     ///

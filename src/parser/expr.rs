@@ -3,7 +3,8 @@
 use crate::ast::{
     Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody,
     CollectionOperatorParameter, CollectionOperatorParameterTyping, Expression, InOut, Node,
-    ReferenceSeparator, Span, TypeCheckKind, UnaryOperator,
+    ReferenceSeparator, SequenceExpressionElement, SequenceExpressionList, Span, TypeCheckKind,
+    UnaryOperator,
 };
 use crate::parser::lex::{
     classified_reference_path, name, qualified_reference, reference_path, starts_with_keyword,
@@ -185,103 +186,6 @@ fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     .parse(input)
 }
 
-fn quoted_unit_string(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let quote = *input.fragment().first().ok_or_else(|| {
-        nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
-    })?;
-    if quote != b'\'' && quote != b'"' {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (input, _) = nom::bytes::complete::take(1usize).parse(input)?;
-    let frag = input.fragment();
-    let mut i = 0usize;
-    while i < frag.len() {
-        if frag[i] == quote {
-            let s = String::from_utf8_lossy(&frag[..i]).to_string();
-            let (input, _) = nom::bytes::complete::take(i + 1).parse(input)?;
-            return Ok((input, s));
-        }
-        if frag[i] == b'\\' && i + 1 < frag.len() {
-            i += 2;
-            continue;
-        }
-        i += 1;
-    }
-    Err(nom::Err::Error(nom::error::Error::new(
-        input,
-        nom::error::ErrorKind::Tag,
-    )))
-}
-
-/// Unit text inside `[` … `]` (e.g. `kg`, `m/s`, `'$'`).
-fn unit_name_in_brackets(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    if matches!(input.fragment().first(), Some(b'"' | b'\'')) {
-        return quoted_unit_string(input);
-    }
-    let frag = input.fragment();
-    let mut i = 0usize;
-    while i < frag.len() {
-        let c = frag[i];
-        if c == b']' {
-            break;
-        }
-        if c.is_ascii_whitespace() {
-            break;
-        }
-        if c.is_ascii_alphanumeric() || matches!(c, b'_' | b'/' | b'-' | b'^' | b'.' | b'*' | b':')
-        {
-            i += 1;
-            continue;
-        }
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::AlphaNumeric,
-        )));
-    }
-    if i == 0 {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::AlphaNumeric,
-        )));
-    }
-    let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
-    let (input, _) = nom::bytes::complete::take(i).parse(input)?;
-    Ok((input, s))
-}
-
-/// Literal with optional [ unit ]: 1750 [kg] -> LiteralWithUnit(...).
-fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, value_node) = literal_only(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    if !input.fragment().starts_with(b"[") {
-        return Ok((input, value_node));
-    }
-    let (input, _) = tag(&b"["[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let unit_start = input;
-    let (input, unit_name) = unit_name_in_brackets.parse(input)?;
-    let unit_name_span = crate::parser::span_from_to(unit_start, input);
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"]"[..]).parse(input)?;
-    let unit = Node::new(
-        unit_name_span.clone(),
-        Expression::Bracket(Box::new(Node::new(
-            unit_name_span,
-            Expression::Unit(unit_name),
-        ))),
-    );
-    let expr = Expression::LiteralWithUnit {
-        value: Box::new(value_node),
-        unit: Box::new(unit),
-    };
-    Ok((input, node_from_to(start, input, expr)))
-}
-
 /// KerML null value: the `null` keyword. Empty parens `()` are a *separate* production
 /// (`Expression::Null` too, but spelled `(` `)`) handled directly by the iterative expression
 /// engine below, alongside every other `(`-led construct, since -- like any parenthesized group --
@@ -427,7 +331,6 @@ fn primary_atom(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     alt((
         conditional_expression,
         extent_expression,
-        literal_with_unit,
         literal_only,
         null_expression,
         metadata_ref_primary,
@@ -873,14 +776,19 @@ impl<'a> ItemState<'a> {
     }
 }
 
-/// What a suspended `(`-delimited item list will build once its closing `)` is reached.
+/// What a suspended delimiter-owned list will build once its matching closer is reached.
 enum FrameKind {
-    /// `(` expr (`,` expr)* `)` in primary position: one item -> `Parenthesized`, 2+ -> `Tuple`.
+    /// KerML `SequenceExpression`: `(` SequenceExpressionList `)`.
     Group,
     /// Invocation argument list: postfix `(` args `)` applied to `base`.
     Invocation { base: Node<Expression> },
-    /// Index argument: postfix `#(` expr `)` applied to `base` -- exactly one item, no comma.
-    Index { base: Node<Expression> },
+    /// KerML `IndexExpression`: `base#(` SequenceExpressionList `)`.
+    Index {
+        base: Node<Expression>,
+        hash_span: Span,
+    },
+    /// KerML `BracketExpression`: `base[` SequenceExpressionList `]`.
+    Bracket { base: Node<Expression> },
     /// Arrow-invocation argument list: postfix `->` name `(` args `)` applied to `base`.
     ArrowInvocation {
         base: Node<Expression>,
@@ -892,16 +800,40 @@ enum FrameKind {
     },
 }
 
-/// A suspended `(`-delimited list, collecting comma-separated items until its closing `)`.
+/// A suspended delimiter-owned list, collecting items until its matching closer.
 struct Frame<'a> {
     kind: FrameKind,
     /// Span anchor for the eventual built node: the start of `base`/`new`/the opening `(` itself
     /// for a bare group -- exactly where the original recursive parser captured its `start`.
     open_at: Input<'a>,
+    content_start: Input<'a>,
+    open_delimiter_span: Span,
+    close_delimiter: u8,
     items: Vec<Argument>,
+    comma_spans: Vec<Span>,
+    trailing_comma_span: Option<Span>,
 }
 
 impl<'a> Frame<'a> {
+    fn new(
+        kind: FrameKind,
+        open_at: Input<'a>,
+        content_start: Input<'a>,
+        open_delimiter_span: Span,
+        close_delimiter: u8,
+    ) -> Self {
+        Self {
+            kind,
+            open_at,
+            content_start,
+            open_delimiter_span,
+            close_delimiter,
+            items: Vec::new(),
+            comma_spans: Vec::new(),
+            trailing_comma_span: None,
+        }
+    }
+
     /// Call-style frames (as opposed to `Group`/`Index`) support `NAME '=' value` items and allow
     /// zero items (`f()`).
     fn is_call_style(&self) -> bool {
@@ -913,9 +845,17 @@ impl<'a> Frame<'a> {
         )
     }
 
-    /// `Index` never allows a comma -- its argument list is exactly one bare expression.
+    /// Only grammar-owned sequence lists allow a trailing comma; all frame kinds accept commas
+    /// between their own items.
     fn allows_comma(&self) -> bool {
-        !matches!(self.kind, FrameKind::Index { .. })
+        true
+    }
+
+    fn is_sequence(&self) -> bool {
+        matches!(
+            self.kind,
+            FrameKind::Group | FrameKind::Index { .. } | FrameKind::Bracket { .. }
+        )
     }
 }
 
@@ -970,26 +910,52 @@ fn try_constructor_prefix(
     qualified_reference(after_kw).ok()
 }
 
-/// Build the final node for a frame once its closing `)` has been consumed.
-fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
+/// Build the final node for a frame once its closing delimiter has been consumed.
+fn build_frame_node<'a>(
+    frame: Frame<'a>,
+    close_start: Input<'a>,
+    end: Input<'a>,
+) -> Node<Expression> {
     let Frame {
         kind,
         open_at,
+        content_start,
+        open_delimiter_span,
         items,
+        comma_spans,
+        trailing_comma_span,
+        ..
     } = frame;
+    let sequence_list = |items: Vec<Argument>| {
+        let elements = items
+            .into_iter()
+            .enumerate()
+            .map(|(index, argument)| SequenceExpressionElement {
+                comma_before: index
+                    .checked_sub(1)
+                    .and_then(|i| comma_spans.get(i).cloned()),
+                expression: argument.value,
+            })
+            .collect();
+        Box::new(node_from_to(
+            content_start,
+            close_start,
+            SequenceExpressionList {
+                elements,
+                trailing_comma_span,
+            },
+        ))
+    };
     match kind {
-        FrameKind::Group => {
-            let mut values: Vec<Node<Expression>> =
-                items.into_iter().map(|arg| arg.value).collect();
-            if values.len() == 1 {
-                let value = values
-                    .pop()
-                    .unwrap_or_else(|| Node::new(Span::dummy(), Expression::Null));
-                node_from_to(open_at, end, Expression::Parenthesized(Box::new(value)))
-            } else {
-                node_from_to(open_at, end, Expression::Tuple(values))
-            }
-        }
+        FrameKind::Group => node_from_to(
+            open_at,
+            end,
+            Expression::Sequence {
+                open_paren_span: open_delimiter_span,
+                operands: sequence_list(items),
+                close_paren_span: crate::parser::span_from_to(close_start, end),
+            },
+        ),
         FrameKind::Invocation { base } => node_from_to(
             open_at,
             end,
@@ -998,21 +964,27 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
                 args: items,
             },
         ),
-        FrameKind::Index { base } => {
-            let index = items
-                .into_iter()
-                .next()
-                .map(|arg| arg.value)
-                .unwrap_or_else(|| Node::new(Span::dummy(), Expression::Null));
-            node_from_to(
-                open_at,
-                end,
-                Expression::Index {
-                    base: Box::new(base),
-                    index: Box::new(index),
-                },
-            )
-        }
+        FrameKind::Index { base, hash_span } => node_from_to(
+            open_at,
+            end,
+            Expression::Index {
+                base: Box::new(base),
+                hash_span,
+                open_paren_span: open_delimiter_span,
+                operands: sequence_list(items),
+                close_paren_span: crate::parser::span_from_to(close_start, end),
+            },
+        ),
+        FrameKind::Bracket { base } => node_from_to(
+            open_at,
+            end,
+            Expression::Bracket {
+                base: Box::new(base),
+                open_bracket_span: open_delimiter_span,
+                operands: sequence_list(items),
+                close_bracket_span: crate::parser::span_from_to(close_start, end),
+            },
+        ),
         FrameKind::ArrowInvocation { base, member } => node_from_to(
             open_at,
             end,
@@ -1072,11 +1044,13 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                         )
                     } else {
                         stack.push((
-                            Frame {
-                                kind: FrameKind::Group,
-                                open_at: after_ws,
-                                items: Vec::new(),
-                            },
+                            Frame::new(
+                                FrameKind::Group,
+                                after_ws,
+                                after_paren,
+                                crate::parser::span_from_to(after_ws, after_paren),
+                                b')',
+                            ),
                             std::mem::replace(&mut state, ItemState::fresh(after_paren)),
                         ));
                         input = after_paren;
@@ -1103,11 +1077,13 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                             )
                         } else {
                             stack.push((
-                                Frame {
-                                    kind: FrameKind::Constructor { type_name },
-                                    open_at: after_ws,
-                                    items: Vec::new(),
-                                },
+                                Frame::new(
+                                    FrameKind::Constructor { type_name },
+                                    after_ws,
+                                    after_paren,
+                                    crate::parser::span_from_to(peek, after_paren),
+                                    b')',
+                                ),
                                 std::mem::replace(&mut state, ItemState::fresh(after_paren)),
                             ));
                             input = after_paren;
@@ -1157,11 +1133,13 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                     continue;
                 }
                 stack.push((
-                    Frame {
-                        kind: FrameKind::Invocation { base: atom },
-                        open_at: primary_start,
-                        items: Vec::new(),
-                    },
+                    Frame::new(
+                        FrameKind::Invocation { base: atom },
+                        primary_start,
+                        after_paren,
+                        crate::parser::span_from_to(next, after_paren),
+                        b')',
+                    ),
                     std::mem::replace(&mut state, ItemState::fresh(after_paren)),
                 ));
                 input = after_paren;
@@ -1177,14 +1155,38 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 let (after_paren, _) =
                     preceded(ws_and_comments, tag(&b"("[..])).parse(after_hash)?;
                 stack.push((
-                    Frame {
-                        kind: FrameKind::Index { base: atom },
-                        open_at: primary_start,
-                        items: Vec::new(),
-                    },
+                    Frame::new(
+                        FrameKind::Index {
+                            base: atom,
+                            hash_span: crate::parser::span_from_to(next, after_hash),
+                        },
+                        primary_start,
+                        after_paren,
+                        crate::parser::span_from_to(after_hash, after_paren),
+                        b')',
+                    ),
                     std::mem::replace(&mut state, ItemState::fresh(after_paren)),
                 ));
                 input = after_paren;
+                continue 'outer;
+            }
+            // KerML `BracketExpression` (textual BNF 8.2.5.8.2): every primary expression can
+            // carry a repeatable `[` SequenceExpressionList `]` postfix. This is structurally
+            // distinct from declaration `MultiplicityPart`, which is parsed only by usage
+            // headers before a feature value is entered.
+            if next.fragment().starts_with(b"[") {
+                let (after_open, _) = tag(&b"["[..]).parse(next)?;
+                stack.push((
+                    Frame::new(
+                        FrameKind::Bracket { base: atom },
+                        primary_start,
+                        after_open,
+                        crate::parser::span_from_to(next, after_open),
+                        b']',
+                    ),
+                    std::mem::replace(&mut state, ItemState::fresh(after_open)),
+                ));
+                input = after_open;
                 continue 'outer;
             }
             if next.fragment().starts_with(b"::") {
@@ -1199,51 +1201,6 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
                 continue;
-            }
-            // `[unit]` measurement/coordinate-frame annotation after a value-shaped atom:
-            // `(0, shape.width/2, 0)[source]`, `new Rotation(...)[frame]`, `angle[deg]` in
-            // expression position (Domain Geometry libraries; spec42 Gap 49c). Numeric literals
-            // keep their dedicated `literal_with_unit` path at atom level. Speculative: only
-            // commits when a unit-shaped token closes with `]`, so declaration-level
-            // multiplicities (`[1]`, `[0..*]`) after a typing are unaffected -- those never pass
-            // through this engine.
-            if next.fragment().starts_with(b"[")
-                && matches!(
-                    atom.value,
-                    Expression::Parenthesized(_)
-                        | Expression::Tuple(_)
-                        | Expression::Invocation { .. }
-                        | Expression::Constructor { .. }
-                        | Expression::FeatureRef(_)
-                        | Expression::MemberAccess { .. }
-                )
-            {
-                let bracket_attempt = (|| -> IResult<Input<'_>, (Span, String)> {
-                    let (after_open, _) = tag(&b"["[..]).parse(next)?;
-                    let (after_open, _) = ws_and_comments(after_open)?;
-                    let unit_start = after_open;
-                    let (after_unit, unit_name) = unit_name_in_brackets(after_open)?;
-                    let unit_span = crate::parser::span_from_to(unit_start, after_unit);
-                    let (after_unit, _) = ws_and_comments(after_unit)?;
-                    let (after_close, _) = tag(&b"]"[..]).parse(after_unit)?;
-                    Ok((after_close, (unit_span, unit_name)))
-                })();
-                if let Ok((after_close, (unit_span, unit_name))) = bracket_attempt {
-                    let unit = Node::new(
-                        unit_span.clone(),
-                        Expression::Bracket(Box::new(Node::new(
-                            unit_span,
-                            Expression::Unit(unit_name),
-                        ))),
-                    );
-                    let expr = Expression::LiteralWithUnit {
-                        value: Box::new(atom),
-                        unit: Box::new(unit),
-                    };
-                    atom = node_from_to(primary_start, after_close, expr);
-                    input = after_close;
-                    continue;
-                }
             }
             // KerML dot shorthands for body-expression operators: `x.{in xx; xx + 1}` is the
             // `collect` sugar and `x.?{in xx; cond}` the `select` sugar (spec42
@@ -1328,11 +1285,13 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                         continue;
                     }
                     stack.push((
-                        Frame {
-                            kind: FrameKind::ArrowInvocation { base: atom, member },
-                            open_at: primary_start,
-                            items: Vec::new(),
-                        },
+                        Frame::new(
+                            FrameKind::ArrowInvocation { base: atom, member },
+                            primary_start,
+                            after_paren,
+                            crate::parser::span_from_to(after_name, after_paren),
+                            b')',
+                        ),
                         std::mem::replace(&mut state, ItemState::fresh(after_paren)),
                     ));
                     input = after_paren;
@@ -1455,22 +1414,34 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         });
         let allows_comma = frame.allows_comma();
         let is_call_style = frame.is_call_style();
-        let (peek, _) = ws_and_comments(input)?;
+        let is_sequence = frame.is_sequence();
+        let close_delimiter = frame.close_delimiter;
+        let (mut peek, _) = ws_and_comments(input)?;
         if allows_comma && peek.fragment().starts_with(b",") {
+            let comma_start = peek;
             let (next, _) = tag(&b","[..]).parse(peek)?;
-            input = next;
-            state = ItemState::fresh(next);
-            if is_call_style {
-                let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                if let Some(parameter) = maybe_name {
-                    state.arg_parameter = Some(parameter);
-                    input = after_lookahead;
+            let comma_span = crate::parser::span_from_to(comma_start, next);
+            frame.comma_spans.push(comma_span.clone());
+            let (after_comma, _) = ws_and_comments(next)?;
+            if is_sequence && after_comma.fragment().first() == Some(&close_delimiter) {
+                frame.trailing_comma_span = Some(comma_span);
+                peek = after_comma;
+            } else {
+                input = next;
+                state = ItemState::fresh(next);
+                if is_call_style {
+                    let (after_lookahead, maybe_name) = named_arg_prefix(input);
+                    if let Some(parameter) = maybe_name {
+                        state.arg_parameter = Some(parameter);
+                        input = after_lookahead;
+                    }
                 }
+                continue 'outer;
             }
-            continue 'outer;
         }
-        if peek.fragment().starts_with(b")") {
-            let (next, _) = tag(&b")"[..]).parse(peek)?;
+        if peek.fragment().first() == Some(&close_delimiter) {
+            let close_start = peek;
+            let (next, _) = nom::bytes::complete::take(1usize).parse(peek)?;
             // `stack` is known non-empty here (the `let-else` above already confirmed it, and
             // nothing between there and here can pop it) -- but rather than assert that with a
             // panicking `expect`, treat the (unreachable) alternative as an ordinary parse error,
@@ -1482,7 +1453,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 )));
             };
             let open_at = frame.open_at;
-            let built = build_frame_node(frame, next);
+            let built = build_frame_node(frame, close_start, next);
             state = outer_state;
             input = next;
             pending_atom = Some((built, open_at));
@@ -1963,33 +1934,38 @@ mod tests {
     }
 
     #[test]
-    fn parenthesized_expression_preserves_explicit_parens_marker() {
+    fn sequence_expression_preserves_explicit_parens_and_single_operand() {
         let input = span_input("(a + b)");
         let (_, node) = expression(input).expect("expression");
         match &node.value {
-            Expression::Parenthesized(inner) => {
-                assert!(matches!(&inner.value, Expression::BinaryOp { .. }));
+            Expression::Sequence { operands, .. } => {
+                assert_eq!(operands.value.elements.len(), 1);
+                assert!(matches!(
+                    &operands.value.elements[0].expression.value,
+                    Expression::BinaryOp { .. }
+                ));
             }
-            other => panic!("expected Parenthesized, got {other:?}"),
+            other => panic!("expected Sequence, got {other:?}"),
         }
     }
 
     #[test]
-    fn non_parenthesized_binary_expression_has_no_parenthesized_wrapper() {
+    fn non_parenthesized_binary_expression_has_no_sequence_wrapper() {
         let input = span_input("a + b");
         let (_, node) = expression(input).expect("expression");
         assert!(matches!(&node.value, Expression::BinaryOp { .. }));
     }
 
     #[test]
-    fn tuple_expression_parses_multiple_elements() {
-        let input = span_input("(a, b, c)");
+    fn sequence_expression_parses_multiple_elements_and_trailing_comma() {
+        let input = span_input("(a, b, c,)");
         let (_, node) = expression(input).expect("expression");
         match &node.value {
-            Expression::Tuple(elements) => {
-                assert_eq!(elements.len(), 3);
+            Expression::Sequence { operands, .. } => {
+                assert_eq!(operands.value.elements.len(), 3);
+                assert!(operands.value.trailing_comma_span.is_some());
             }
-            other => panic!("expected Tuple, got {other:?}"),
+            other => panic!("expected Sequence, got {other:?}"),
         }
     }
 
@@ -2001,15 +1977,19 @@ mod tests {
     }
 
     #[test]
-    fn index_expression_parses_single_bracketed_expression() {
-        let input = span_input("items#(0)");
+    fn index_expression_parses_typed_sequence_operands() {
+        let input = span_input("items#(0, offset)");
         let (_, node) = expression(input).expect("expression");
         match &node.value {
-            Expression::Index { base, index } => {
+            Expression::Index { base, operands, .. } => {
                 assert!(
                     matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "items"))
                 );
-                assert!(matches!(&index.value, Expression::LiteralInteger(0)));
+                assert_eq!(operands.value.elements.len(), 2);
+                assert!(matches!(
+                    &operands.value.elements[0].expression.value,
+                    Expression::LiteralInteger(0)
+                ));
             }
             other => panic!("expected Index, got {other:?}"),
         }
@@ -2033,9 +2013,9 @@ mod tests {
         let mut current = &node;
         loop {
             match &current.value {
-                Expression::Parenthesized(inner) => {
+                Expression::Sequence { operands, .. } => {
                     depth += 1;
-                    current = inner;
+                    current = &operands.value.elements[0].expression;
                 }
                 Expression::LiteralInteger(1) => break,
                 other => panic!("unexpected node at depth {depth}: {other:?}"),
@@ -2044,28 +2024,32 @@ mod tests {
         assert_eq!(depth, DEPTH);
     }
 
-    /// Spec42 Gap 49c: the `[unit]` annotation applies to tuple/invocation/reference bases in
-    /// expression position (`(0, w/2, 0)[source]`, Domain Geometry coordinate-frame idiom),
-    /// not just scalar literals.
+    /// KerML `BracketExpression` (textual BNF 8.2.5.8.2) is a repeatable postfix over any
+    /// primary expression, with a full typed sequence-expression operand.
     #[test]
-    fn unit_annotation_applies_to_non_literal_bases() {
-        for (source, expect_tuple) in [
+    fn bracket_expression_applies_to_all_primary_bases() {
+        for (source, outer_bracket) in [
+            ("60[SI::mm]", true),
+            ("10.0[N * m]", true),
             ("(0, w/2, 0)[source]", true),
             ("new Translation((0, w, 0)[source])", false),
-            ("angle[deg]", false),
+            ("angle[deg]", true),
+            ("angle[deg][source]", true),
         ] {
             let (rest, node) = expression(crate::parser::span::test_input(source)).expect(source);
             assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-            let dump = format!("{:?}", node.value);
-            assert!(
-                dump.contains("LiteralWithUnit"),
-                "no unit in {source}: {dump}"
-            );
-            if expect_tuple {
-                let Expression::LiteralWithUnit { value, .. } = &node.value else {
-                    panic!("expected LiteralWithUnit for {source}");
-                };
-                assert!(matches!(value.value, Expression::Tuple(_)));
+            if outer_bracket {
+                assert!(
+                    matches!(node.value, Expression::Bracket { .. }),
+                    "{source}: {:?}",
+                    node.value
+                );
+            } else {
+                assert!(
+                    matches!(node.value, Expression::Constructor { .. }),
+                    "{source}: {:?}",
+                    node.value
+                );
             }
         }
     }

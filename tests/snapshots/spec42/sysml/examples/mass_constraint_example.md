@@ -212,7 +212,7 @@ package MassConstraintExample {
     part def Vehicle5 {
         assert constraint ml : MassLimit {
             in mass = m;
-            in maxMass = 2500 [kg];
+            in maxMass = 2500[kg];
         }
         attribute m : MassValue = eng.m + trans.m;
         part eng : Engine {

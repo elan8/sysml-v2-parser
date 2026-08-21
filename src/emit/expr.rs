@@ -4,7 +4,7 @@ use super::writer::EmitWriter;
 use super::EmitError;
 use crate::ast::{
     Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody, Expression, FeatureValue,
-    FeatureValueKind, InOut, Node, TypeCheckKind, UnaryOperator,
+    FeatureValueKind, InOut, Node, SequenceExpressionList, TypeCheckKind, UnaryOperator,
 };
 
 pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Result<(), EmitError> {
@@ -17,7 +17,6 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_char('"');
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
-        Expression::Unit(unit) => w.push_str(&super::writer::format_name(unit)),
         Expression::FeatureRef(reference) => {
             w.push_qualified_reference("expression feature", *reference)?
         }
@@ -33,55 +32,17 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             });
             w.push_qualified_reference("expression member", *member)?;
         }
-        Expression::Index { base, index } => {
+        Expression::Index { base, operands, .. } => {
             emit_expression(w, &base.value)?;
             w.push_str("#(");
-            emit_expression(w, &index.value)?;
+            emit_sequence_expression_list(w, &operands.value)?;
             w.push_char(')');
         }
-        Expression::Bracket(inner) => {
+        Expression::Bracket { base, operands, .. } => {
+            emit_expression(w, &base.value)?;
             w.push_char('[');
-            emit_expression(w, &inner.value)?;
+            emit_sequence_expression_list(w, &operands.value)?;
             w.push_char(']');
-        }
-        Expression::LiteralWithUnit { value, unit } => {
-            emit_expression(w, &value.value)?;
-            w.push_char(' ');
-            // `unit` is often already `Expression::Bracket(...)`; avoid `[[kg]]`.
-            match &unit.value {
-                Expression::Bracket(_) => emit_expression(w, &unit.value)?,
-                other @ (Expression::LiteralInteger(_)
-                | Expression::LiteralReal(_)
-                | Expression::LiteralString(_)
-                | Expression::LiteralBoolean(_)
-                | Expression::Unit(_)
-                | Expression::FeatureRef(_)
-                | Expression::MemberAccess { .. }
-                | Expression::Index { .. }
-                | Expression::LiteralWithUnit { .. }
-                | Expression::BinaryOp { .. }
-                | Expression::UnaryOp { .. }
-                | Expression::Invocation { .. }
-                | Expression::Tuple(_)
-                | Expression::Classification { .. }
-                | Expression::MetaCast { .. }
-                | Expression::TypeCheck { .. }
-                | Expression::Select { .. }
-                | Expression::Collect { .. }
-                | Expression::Null
-                | Expression::Parenthesized(_)
-                | Expression::Constructor { .. }
-                | Expression::FeatureChainRef(_)
-                | Expression::CollectionOp { .. }
-                | Expression::MetadataAccess(_)
-                | Expression::Conditional { .. }
-                | Expression::Extent { .. }
-                | Expression::BodyExpr(_)) => {
-                    w.push_char('[');
-                    emit_expression(w, other)?;
-                    w.push_char(']');
-                }
-            }
         }
         Expression::BinaryOp { op, left, right } => {
             emit_expression(w, &left.value)?;
@@ -101,14 +62,9 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             emit_expression(w, &callee.value)?;
             emit_args(w, args)?;
         }
-        Expression::Tuple(items) => {
+        Expression::Sequence { operands, .. } => {
             w.push_char('(');
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    w.push_str(", ");
-                }
-                emit_expression(w, &item.value)?;
-            }
+            emit_sequence_expression_list(w, &operands.value)?;
             w.push_char(')');
         }
         Expression::Classification { metaclass } => {
@@ -144,11 +100,6 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_qualified_reference("collect", *selector)?;
         }
         Expression::Null => w.push_str("null"),
-        Expression::Parenthesized(inner) => {
-            w.push_char('(');
-            emit_expression(w, &inner.value)?;
-            w.push_char(')');
-        }
         Expression::Constructor { type_name, args } => {
             w.push_str("new ");
             w.push_qualified_reference("constructor", *type_name)?;
@@ -222,6 +173,22 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
     Ok(())
 }
 
+fn emit_sequence_expression_list(
+    w: &mut EmitWriter<'_>,
+    operands: &SequenceExpressionList,
+) -> Result<(), EmitError> {
+    for (index, element) in operands.elements.iter().enumerate() {
+        if index > 0 {
+            w.push_str(", ");
+        }
+        emit_expression(w, &element.expression.value)?;
+    }
+    if operands.trailing_comma_span.is_some() {
+        w.push_char(',');
+    }
+    Ok(())
+}
+
 fn emit_collection_operator_body(
     w: &mut EmitWriter<'_>,
     body: &CollectionOperatorBody,
@@ -253,7 +220,7 @@ fn emit_body_expression_bare(
         if parameter.value.reference_keyword_span.is_some() {
             w.push_str("ref ");
         }
-        w.push_str(&parameter.value.name);
+        w.push_authored_name("collection body parameter/name", &parameter.value.name_span)?;
         if let Some(typing) = &parameter.value.typing {
             w.push_str(" : ");
             w.push_qualified_reference("collection body parameter type", typing.target)?;

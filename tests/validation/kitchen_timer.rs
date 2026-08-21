@@ -21,8 +21,18 @@ fn test_parse_kitchen_timer() {
     // Two root members: the file's leading `/* ... */` header block, which is the `Comment`
     // production's keyword-less spelling and therefore a member rather than trivia, and the
     // package itself.
-    let strict = parse(&input).expect("strict parse should succeed");
-    assert_eq!(strict.elements.len(), 2);
+    let strict = parse(&input).expect_err(
+        "pinned SysML/Pilot grammar rejects the fixture's Pilot-only `end port` interface members",
+    );
+    assert_eq!(
+        strict.code.as_deref(),
+        Some("recovered_interface_def_body_element")
+    );
+    assert_eq!(strict.line, Some(65));
+    assert_eq!(
+        strict.found.as_deref(),
+        Some("end port source : BuzzerCommandPort;")
+    );
 
     let result = parse_with_diagnostics(&input);
     assert_eq!(
@@ -49,10 +59,37 @@ fn test_parse_kitchen_timer() {
         other => panic!("expected root element to be package, got {:?}", other),
     }
 
+    let recovered_end_ports: Vec<_> = result
+        .errors
+        .iter()
+        .filter(|error| {
+            error.code.as_deref() == Some("recovered_interface_def_body_element")
+                && error
+                    .found
+                    .as_deref()
+                    .is_some_and(|found| found.starts_with("end port "))
+        })
+        .collect();
     assert_eq!(
-        result.errors.len(),
-        0,
-        "KitchenTimer should parse without diagnostics, got {:?}",
+        recovered_end_ports.len(),
+        1,
+        "the first unsupported `end port` stays pinned-policy recovery, got {:?}",
         result.errors
+    );
+    let cascade = result
+        .errors
+        .iter()
+        .find(|error| error.code.as_deref() == Some("recovery_cascade_suppressed"))
+        .expect("the remaining same-body end-port diagnostics should be intentionally coalesced");
+    assert_eq!(cascade.line, Some(65));
+    assert_eq!(
+        cascade.found.as_deref(),
+        Some("end port source : BuzzerCommandPort;")
+    );
+    assert!(
+        cascade
+            .message
+            .contains("suppressed 11 cascading recovered diagnostics"),
+        "coalesced recovery should document the exact suppressed tail: {cascade:?}"
     );
 }

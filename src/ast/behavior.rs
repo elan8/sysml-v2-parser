@@ -9,8 +9,8 @@ use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
 use crate::ast::feature_value::FeatureValue;
-use crate::ast::DefinitionPrefix;
 use crate::ast::QualifiedReferenceId;
+use crate::ast::{DefinitionPrefix, MultiplicityModifiers, OccurrenceUsagePrefix};
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +46,11 @@ pub type ActionDefBody = Body<ActionDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
     Error(Node<ParseErrorNode>),
+    /// An import owned directly by this action body.
+    ///
+    /// `ActionBodyItem → NonBehaviorBodyItem → Import` (SysML textual BNF 901-917; pinned
+    /// Pilot `SysML.xtext` 1368-1381) applies to both action definitions and usages.
+    Import(Node<crate::ast::Import>),
     InOutDecl(Node<InOutDecl>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -102,6 +107,9 @@ pub enum ActionDefBodyElement {
     /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
     /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
     DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
+    /// `variant` member via `ActionBodyItem → NonBehaviorBodyItem → VariantUsageMember`
+    /// (SysML textual BNF 894-917; pinned Pilot `SysML.xtext` 1361-1381).
+    VariantUsage(Node<crate::ast::VariantUsage>),
 }
 
 /// Assignment statement (SysML v2 AssignmentNode/AssignmentActionUsage).
@@ -117,26 +125,55 @@ pub struct AssignStmt {
     pub rhs: Node<Expression>,
 }
 
-/// For-loop node (SysML v2 ForLoopNode) - modeled minimally.
+/// `ForVariableDeclarationMember`'s typed `UsageDeclaration`.
+///
+/// This is a declaration label and feature-specialization header, not a string reconstructed from
+/// the `for` text. The aggregate identification span preserves authored names for emission.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ForVariableDeclaration {
+    pub identification: Identification,
+    pub identification_span: Span,
+    pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: MultiplicityModifiers,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
+}
+
+/// The `in` node parameter of `ForLoopNode`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ForLoopInParameter {
+    pub in_span: Span,
+    pub expression: Node<Expression>,
+}
+
+/// `ForLoopNode = ActionNodePrefix 'for' ForVariableDeclarationMember 'in'
+/// NodeParameterMember ActionBodyParameter` (SysML textual BNF 1151-1155).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForLoop {
-    pub var: String,
-    pub range: Node<Expression>,
-    pub body: ActionDefBody,
+    pub prefix: ActionNodePrefix,
+    pub variable: Node<ForVariableDeclaration>,
+    pub in_parameter: ForLoopInParameter,
+    pub body: ActionBodyParameter,
 }
 
-/// Succession to a following node: `then action ...`, `then perform ...`, `then merge <name>;`,
-/// or `then <name>;`.
+/// Succession to a following node: `then action ...`, `then perform ...`, a control node, or
+/// `then <name>;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenAction {
     pub target: ThenTarget,
 }
 
-/// What a `then` succession connects to. Only [`ThenTarget::Action`] existed before §6 G23; the
-/// other two forms are the succession shorthand used after `first <name>;` in the OMG spec Annex
-/// (`3a-Function-based Behavior-2.sysml`).
+/// What a `then` succession connects to. Control-node alternatives own their declaration and
+/// mandatory `ActionBody`, rather than degrading an anonymous control keyword into a feature
+/// reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ThenTarget {
@@ -144,13 +181,15 @@ pub enum ThenTarget {
     Action(Box<Node<ActionUsage>>),
     /// `then perform body;` — succession to a perform usage (Systems Library `Actions.sysml`).
     Perform(Box<Node<crate::ast::Perform>>),
-    /// `then merge continue;` — an inline merge node.
+    /// `then merge continue;` or `then merge;` — an inline merge node.
     Merge(Node<MergeStmt>),
     /// `then fork F { in a; out b1; out b2; }` — an inline fork node (GH-86, Simple Tests/
     /// ControlNodeTest.sysml).
     Fork(Node<ForkStmt>),
     /// `then decide D;` — an inline decision node (GH-86, Simple Tests/DecisionTest.sysml).
     Decide(Node<DecisionStmt>),
+    /// `then join J;` or `then join;` — an inline join node.
+    Join(Node<JoinStmt>),
     /// `then accept S;` — an inline accept trigger, reusing the same shorthand/payload/
     /// time-trigger forms already supported after a state `transition` (GH-86, Simple Tests/
     /// ActionTest.sysml).
@@ -272,21 +311,26 @@ pub enum TriggerKind {
 /// Transition `do` effect: a structured action-usage form (SysML v2 `EffectBehaviorUsage`)
 /// or a bare expression shorthand.
 ///
-/// Examples: `do action powerUp : PowerUp;`, `do send new TimeoutSignal() via commPort`,
-/// `do accept Ack via commPort`, `do assign x := y`.
+/// Examples: `do action powerUp : PowerUp;`, `do action { in x; }`,
+/// `do send new TimeoutSignal() via commPort`, `do accept Ack via commPort`,
+/// `do assign x := y`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransitionEffect {
-    /// `action` name (`:` type)? — perform an owned/named action.
+    /// `action` UsageDeclaration? ActionBody? — perform an owned action. The declaration and
+    /// brace body are independently optional (SysML BNF 1324-1325; Pilot `EffectBehaviorUsage`
+    /// 1917-1919), so `do action { ... }` retains a body without inventing a declaration name.
     Perform {
         name: Option<String>,
         type_name: Option<QualifiedReferenceId>,
+        body: Option<ActionDefBody>,
     },
     /// `accept` payload (`:` type)? (`via` expr)?
     Accept {
         payload: Node<Expression>,
         type_name: Option<QualifiedReferenceId>,
         via: Option<Node<Expression>>,
+        body: Option<ActionDefBody>,
     },
     /// `send` payload (`:` type)? ((`via` expr)? (`to` expr)? | `to` expr)
     Send {
@@ -294,11 +338,13 @@ pub enum TransitionEffect {
         type_name: Option<QualifiedReferenceId>,
         via: Option<Node<Expression>>,
         to: Option<Node<Expression>>,
+        body: Option<ActionDefBody>,
     },
     /// `assign` lhs `:=` rhs
     Assign {
         lhs: Node<Expression>,
         rhs: Node<Expression>,
+        body: Option<ActionDefBody>,
     },
     /// Bare expression shorthand (e.g. a reference to an existing action usage).
     Expression(Node<Expression>),
@@ -326,6 +372,9 @@ pub struct ActionUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, e.g. `[0..*]`.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored `ordered`/`nonunique` slots from the same `MultiplicityPart` as
+    /// [`Self::multiplicity`].
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` / `:>` clause.
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
@@ -369,6 +418,7 @@ impl PartialEq for ActionUsage {
             && self.type_name == other.type_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.accept == other.accept
@@ -390,6 +440,8 @@ pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
+    /// An import owned directly by this action body; see [`ActionDefBodyElement::Import`].
+    Import(Node<crate::ast::Import>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
@@ -529,35 +581,50 @@ pub struct FirstStmt {
     pub body: FirstMergeBody,
 }
 
-/// Merge: `merge` expr body.
+/// The optional declaration following a control-node keyword.
+///
+/// `UsageDeclaration` is syntactically present in the pinned SysML BNF but can be empty because
+/// its `Identification` slots are optional (BNF 42-44, 308-310); the Pilot grammar writes the
+/// same fact as `UsageDeclaration?` (SysML.xtext 1664-1685). Model the two authored states
+/// explicitly rather than encoding an absent declaration as an optional expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ControlNodeDeclaration {
+    /// `merge;`, `decide;`, `join;`, or `fork;`.
+    Anonymous,
+    /// The currently supported named declaration surface, e.g. `merge continue;`.
+    Named(Node<Expression>),
+}
+
+/// Merge: `merge` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MergeStmt {
-    pub merge: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
-/// Decision node: `decide` expr body.
+/// Decision node: `decide` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DecisionStmt {
-    pub decide: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
-/// Join node: `join` expr body.
+/// Join node: `join` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JoinStmt {
-    pub join: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
-/// Fork node: `fork` expr body.
+/// Fork node: `fork` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForkStmt {
-    pub fork: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
@@ -684,20 +751,85 @@ pub struct TerminateStmt {
     pub target: Option<Node<Expression>>,
 }
 
-/// While-loop control node: `while` condition `{` ActionDefBodyElement* `}`.
+/// The prefix shared by every action-node alternative.
+///
+/// `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` (SysML textual BNF
+/// 957-958; pinned Pilot `SysML.xtext` 1438-1439).  `WhileLoopNode` and `ForLoopNode` both name
+/// this production, so it is one component rather than a collection of loop-specific flags.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct WhileStmt {
-    pub condition: Node<Expression>,
+pub struct ActionNodePrefix {
+    /// The complete occurrence prefix in its grammar-defined order.
+    pub occurrence_prefix: OccurrenceUsagePrefix,
+    /// The optional `action` usage declaration immediately before the node keyword.
+    pub action_declaration: Option<Node<ActionNodeUsageDeclaration>>,
+}
+
+/// `ActionNodeUsageDeclaration = 'action' UsageDeclaration?`.
+///
+/// The declaration owns the complete `UsageDeclaration` / `FeatureSpecializationPart` surface,
+/// not a display string or an action-usage-shaped compatibility mirror.  Its optional
+/// identification has an aggregate source span so emission preserves authored spelling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ActionNodeUsageDeclaration {
+    pub action_span: Span,
+    pub identification: Identification,
+    pub identification_span: Span,
+    pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: MultiplicityModifiers,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
+}
+
+/// The optional `until` parameter tail of a `WhileLoopNode`.
+///
+/// The two keyword/delimiter spans keep this grammar-owned clause distinct from a bare expression
+/// and let provenance validation reject a serialized tree that points them at unrelated text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct UntilParameter {
+    pub until_span: Span,
+    pub expression: Node<Expression>,
+    pub semicolon_span: Span,
+}
+
+/// `ActionBodyParameter = ('action' UsageDeclaration?)? '{' ActionBodyItem* '}'`.
+///
+/// The optional declaration is grammatically after the loop/while condition, not part of
+/// [`ActionNodePrefix`]. It reuses [`ActionNodeUsageDeclaration`] because both spell precisely
+/// `'action' UsageDeclaration?`; retaining that distinction is what keeps `loop action charging
+/// { ... }` from becoming a malformed loop or an invented prefix declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ActionBodyParameter {
+    pub action_declaration: Option<Node<ActionNodeUsageDeclaration>>,
     pub body: ActionDefBody,
 }
 
-/// Loop control node: `loop` `{` body `}` (§6 G14) — a `while` with no condition. Closed alongside
-/// `decide`/`join`/`fork`/`if`/`while` in the §5 audit's family, which missed `loop`.
+/// While-loop control node: `ActionNodePrefix while` condition action-body (`until` condition
+/// `;`)? (SysML textual BNF 1143-1149).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WhileStmt {
+    pub prefix: ActionNodePrefix,
+    pub condition: Node<Expression>,
+    pub body: ActionBodyParameter,
+    pub until: Option<UntilParameter>,
+}
+
+/// Loop control node: `ActionNodePrefix loop` action-body (`until` condition `;`)? (SysML textual
+/// BNF 1143-1149) — the empty-parameter alternative of `WhileLoopNode`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LoopStmt {
-    pub body: ActionDefBody,
+    pub prefix: ActionNodePrefix,
+    pub body: ActionBodyParameter,
+    pub until: Option<UntilParameter>,
 }
 
 /// If control node: `if` condition `{` thenBody `}` (`else` `{` elseBody `}`)?.
@@ -835,6 +967,15 @@ pub enum StateDefBodyElement {
     SuccessionUsage(Node<crate::ast::SuccessionUsage>),
     /// `assert constraint { ... }` member (spec42 Gap 42).
     AssertConstraint(Node<crate::ast::AssertConstraintMember>),
+    /// `part` usage through `StateBodyItem -> NonBehaviorBodyItem ->
+    /// StructureUsageMember -> StructureUsageElement -> PartUsage` (SysML BNF 1200-1205,
+    /// 910-917, 262-264, 356-363, 623).  It keeps the existing source-backed PartUsage shape
+    /// rather than treating a state body as a special spelling of a part body.
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// `constraint` usage through the state body's `BehaviorUsageMember` branch (SysML BNF
+    /// 1200-1205, 266-268, 374-389, 1382-1395).  ConstraintUsage already owns its complete
+    /// occurrence prefix, specialization clauses, and CalculationBody.
+    ConstraintUsage(Box<Node<crate::ast::ConstraintUsage>>),
 }
 
 /// Entry action: `entry` (`;` or body).
@@ -957,6 +1098,9 @@ pub struct StateUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, when present.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored `ordered`/`nonunique` slots from the same `MultiplicityPart` as
+    /// [`Self::multiplicity`].
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` / `:>` clause.
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.

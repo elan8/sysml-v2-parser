@@ -61,7 +61,12 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
             crate::parser::connector::ref_decl,
             ViewDefBodyElement::RefDecl,
         ),
+        map(
+            crate::parser::alias::alias_def,
+            ViewDefBodyElement::AliasDef,
+        ),
         map(view_filter_member, ViewDefBodyElement::Filter),
+        map(rendering_usage, ViewDefBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
         map(crate::parser::requirement::satisfy, |n| {
@@ -383,7 +388,9 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
             ViewBodyElement::Annotating,
         ),
         map(crate::parser::connector::ref_decl, ViewBodyElement::RefDecl),
+        map(crate::parser::alias::alias_def, ViewBodyElement::AliasDef),
         map(view_filter_member, ViewBodyElement::Filter),
+        map(rendering_usage, ViewBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
         map(expose_member, ViewBodyElement::Expose),
         // `ViewBodyItem -> DefinitionBodyItem -> ... -> SatisfyRequirementUsage`: one satisfy

@@ -33,7 +33,7 @@ package RequirementDefinitionBodyMembers {
         requirement ;
         port evidence : EvidencePort;
         allocate source to target;
-        attribute 'after' : Boolean;
+        attribute after : Boolean;
     }
 }
 ~~~

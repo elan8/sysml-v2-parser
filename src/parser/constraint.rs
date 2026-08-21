@@ -4,7 +4,7 @@ use crate::ast::{
     ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
-use crate::parser::body::parse_structured_brace_members;
+use crate::parser::body::{parse_structured_brace_members, semicolon_body};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
@@ -233,6 +233,17 @@ pub(crate) fn constraint_def_body_element(
                 ConstraintDefBodyElement::MetadataKeywordUsage,
             ),
         ))
+        .parse(input)?
+    } else if starts_with_keyword(after_visibility.fragment(), b"alias") {
+        // Both ConstraintDefinition and ConstraintUsage own CalculationBody, whose
+        // CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem production admits an
+        // AliasMember (SysML BNF 1359-1368, 1378-1382, and 901-917). Reuse AliasDef's
+        // source-backed identification/target/body rather than letting expression fallback
+        // split the member into unrelated expressions.
+        map(
+            crate::parser::alias::alias_def,
+            ConstraintDefBodyElement::AliasDef,
+        )
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
@@ -513,15 +524,23 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) {
         let start = input;
-        if let Ok((next, member)) = crate::parser::action::action_def_body_element(peek) {
-            return Ok((
-                next,
-                node_from_to(
-                    start,
+        match crate::parser::action::action_def_body_element(peek) {
+            Ok((next, member)) => {
+                return Ok((
                     next,
-                    CalcDefBodyElement::ActionMember(Box::new(member)),
-                ),
-            ));
+                    node_from_to(
+                        start,
+                        next,
+                        CalcDefBodyElement::ActionMember(Box::new(member)),
+                    ),
+                ));
+            }
+            // `ref` is unambiguously an ActionBodyItem in this owner. If its typed parser has
+            // begun and rejected a malformed relationship, preserve the error for calculation
+            // body recovery instead of letting the keyword-less feature fallback shred it into
+            // separate `ref` and name expressions.
+            Err(error) if starts_with_keyword(peek.fragment(), b"ref") => return Err(error),
+            Err(_) => {}
         }
     }
     calc_def_body_element(input)
@@ -903,7 +922,9 @@ fn calc_named_binding_inner(
             nom::error::ErrorKind::Verify,
         )));
     }
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    // This production accepts only the semicolon body alternative. Delegate its token capture to
+    // the shared body parser so the serialized body delimiter remains source-backed.
+    let (input, body) = semicolon_body(input)?;
     let typing_span = typing.as_ref().map(|t| t.span.clone());
     Ok((
         input,
@@ -911,17 +932,22 @@ fn calc_named_binding_inner(
             start,
             input,
             crate::ast::DefaultReferenceUsage {
+                prefix: crate::ast::RefPrefix::default(),
                 name: name_str,
+                short_name: None,
                 typing,
                 subsets: None,
                 redefines,
+                references: None,
+                crosses: None,
+                intersects: None,
                 value,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 name_span: Some(name_span),
                 typing_span,
                 membership: Membership::feature(visibility, visibility_span),
-                has_feature_keyword: false,
-                body: None,
+                body,
             },
         ),
     ))
@@ -1052,6 +1078,153 @@ fn owned_cross_feature(
     ))
 }
 
+/// One `TypeRelationshipPart` in a KerML feature declaration tail.
+///
+/// This deliberately consumes one clause only. Its caller owns
+/// `FeatureRelationshipPart*`, where type relationships can interleave with
+/// `chains`, `inverse of`, and `featured by`.
+fn kerml_feature_type_relationship_part(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlTypeRelationship>> {
+    let start = input;
+    let (input, keyword) = if starts_with_keyword(input.fragment(), b"disjoint") {
+        let (input, _) = tag(&b"disjoint"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        let (input, _) = tag(&b"from"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (
+            input,
+            crate::ast::KermlTypeRelationshipKeyword::DisjointFrom,
+        )
+    } else if starts_with_keyword(input.fragment(), b"unions") {
+        let (input, _) = tag(&b"unions"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, crate::ast::KermlTypeRelationshipKeyword::Unions)
+    } else if starts_with_keyword(input.fragment(), b"intersects") {
+        let (input, _) = tag(&b"intersects"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, crate::ast::KermlTypeRelationshipKeyword::Intersects)
+    } else if starts_with_keyword(input.fragment(), b"differences") {
+        let (input, _) = tag(&b"differences"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, crate::ast::KermlTypeRelationshipKeyword::Differences)
+    } else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    };
+    let (input, first) = qualified_reference(input)?;
+    let (input, more) = nom::multi::many0(preceded(
+        preceded(ws_and_comments, tag(&b","[..])),
+        preceded(ws_and_comments, qualified_reference),
+    ))
+    .parse(input)?;
+    let mut targets = vec![first];
+    targets.extend(more);
+    let span = crate::parser::span_from_to(start, input);
+    Ok((
+        input,
+        Node::new(
+            span.clone(),
+            crate::ast::KermlTypeRelationship {
+                keyword,
+                targets,
+                span,
+            },
+        ),
+    ))
+}
+
+/// `FeatureRelationshipPart*` on a KerML `FeatureDeclaration`.
+///
+/// KerML permits all alternatives in arbitrary authored order and permits
+/// repetitions. The AST therefore retains one ordered, exhaustive list rather
+/// than independent fixed slots for selected alternatives.
+fn kerml_feature_relationship_parts(
+    input: Input<'_>,
+    intersecting: Option<Node<crate::ast::SubsettingRelationship>>,
+) -> IResult<Input<'_>, Vec<Node<crate::ast::FeatureRelationshipPart>>> {
+    let mut parts = Vec::new();
+    if let Some(intersecting) = intersecting {
+        let span = intersecting.span.clone();
+        let relationship = Node::new(
+            span.clone(),
+            crate::ast::KermlTypeRelationship {
+                keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
+                targets: intersecting.value.target,
+                span: span.clone(),
+            },
+        );
+        parts.push(Node::new(
+            span,
+            crate::ast::FeatureRelationshipPart::TypeRelationship(relationship),
+        ));
+    }
+
+    let mut input = input;
+    loop {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if starts_with_keyword(after_ws.fragment(), b"chains") {
+            let start = after_ws;
+            let (rest, _) = tag(&b"chains"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, target) = crate::parser::lex::reference_path(rest)?;
+            parts.push(Node::new(
+                crate::parser::span_from_to(start, rest),
+                crate::ast::FeatureRelationshipPart::Chaining { target },
+            ));
+            input = rest;
+        } else if starts_with_keyword(after_ws.fragment(), b"inverse") {
+            let start = after_ws;
+            let (rest, _) = tag(&b"inverse"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, _) = tag(&b"of"[..]).parse(rest)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, target) = crate::parser::lex::reference_path(rest)?;
+            parts.push(Node::new(
+                crate::parser::span_from_to(start, rest),
+                crate::ast::FeatureRelationshipPart::Inverting { target },
+            ));
+            input = rest;
+        } else if starts_with_keyword(after_ws.fragment(), b"featured") {
+            let start = after_ws;
+            let (rest, _) = tag(&b"featured"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, _) = tag(&b"by"[..]).parse(rest)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, first) = qualified_reference(rest)?;
+            let (rest, more) = nom::multi::many0(preceded(
+                preceded(ws_and_comments, tag(&b","[..])),
+                preceded(ws_and_comments, qualified_reference),
+            ))
+            .parse(rest)?;
+            let mut targets = vec![first];
+            targets.extend(more);
+            let span = crate::parser::span_from_to(start, rest);
+            let featuring = Node::new(span.clone(), crate::ast::TypeFeaturingPart { targets });
+            parts.push(Node::new(
+                span,
+                crate::ast::FeatureRelationshipPart::TypeFeaturing(featuring),
+            ));
+            input = rest;
+        } else if starts_with_any_keyword(
+            after_ws.fragment(),
+            &[b"disjoint", b"unions", b"intersects", b"differences"],
+        ) {
+            let (rest, relationship) = kerml_feature_type_relationship_part(after_ws)?;
+            let span = relationship.span.clone();
+            parts.push(Node::new(
+                span,
+                crate::ast::FeatureRelationshipPart::TypeRelationship(relationship),
+            ));
+            input = rest;
+        } else {
+            return Ok((input, parts));
+        }
+    }
+}
+
 pub(crate) fn kerml_feature(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
@@ -1165,79 +1338,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     let redefines = leading_redefines.or(clauses.redefines);
     let references = clauses.references;
     let crosses = clauses.crosses;
-    // `chains <chain>`: `feature self: Anything[1] subsets things chains things.that { ... }`
-    // (`Base.kerml`).
-    let (input, chains) = opt(preceded(
-        (ws_and_comments, tag(&b"chains"[..]), ws1),
-        crate::parser::lex::reference_path,
-    ))
-    .parse(input)?;
-    // `inverse of <chain>`: `feature all spaceShotOf: Occurrence[0..*] subsets spaceSliceOf
-    // inverse of spaceShots { ... }` (`Occurrences.kerml`).
-    let (input, inverse_of) = opt(preceded(
-        (
-            ws_and_comments,
-            tag(&b"inverse"[..]),
-            ws1,
-            tag(&b"of"[..]),
-            ws1,
-        ),
-        crate::parser::lex::reference_path,
-    ))
-    .parse(input)?;
-    // `unions a, b` / `intersects a, b` / `disjoint from a` type relationship clauses:
-    // `feature withoutOccurrences: Occurrence[0..*] unions successors, predecessors, ...`
-    // (`Occurrences.kerml`).
-    let (input, type_relationships) =
-        crate::parser::package::kerml_type_relationship_clauses(input)?;
-    // `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
-    // `TypeRelationshipPart` alternatives (KerML BNF 408, 424), so it belongs in the same list as
-    // the three siblings just parsed. `specialization_clauses` above claims it first, because the
-    // SysML usage headers that helper also serves model it as a subsetting-family clause; this
-    // scope then read every other clause it returns and dropped this one. An authored `feature f
-    // : T intersects g;` lost the whole clause -- no relationship, no subsetting, no diagnostic,
-    // and nothing to emit.
-    //
-    // Positioned by its authored span rather than appended, so the list's documented source order
-    // still holds when `intersects` is written ahead of another clause.
-    let type_relationships = match clauses.intersects {
-        None => type_relationships,
-        Some(intersecting) => {
-            let span = intersecting.span.clone();
-            let node = crate::ast::Node::new(
-                span.clone(),
-                crate::ast::KermlTypeRelationship {
-                    keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
-                    targets: intersecting.value.target,
-                    span,
-                },
-            );
-            let mut merged = type_relationships;
-            let at = merged
-                .iter()
-                .position(|existing| existing.span.offset > node.span.offset)
-                .unwrap_or(merged.len());
-            merged.insert(at, node);
-            merged
-        }
-    };
-    // `inverse of` may also trail the type relationships (`... unions successors, ... inverse
-    // of withoutOccurrences { ... }`, `Occurrences.kerml`).
-    let (input, inverse_of) = if inverse_of.is_none() {
-        opt(preceded(
-            (
-                ws_and_comments,
-                tag(&b"inverse"[..]),
-                ws1,
-                tag(&b"of"[..]),
-                ws1,
-            ),
-            crate::parser::lex::reference_path,
-        ))
-        .parse(input)?
-    } else {
-        (input, inverse_of)
-    };
+    let (input, relationship_parts) = kerml_feature_relationship_parts(input, clauses.intersects)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -1260,9 +1361,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 redefines,
                 references,
                 crosses,
-                chains,
-                inverse_of,
-                type_relationships,
+                relationship_parts,
                 value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
@@ -1420,6 +1519,17 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::Import(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"alias") {
+        // KerML `TypeBodyElement` admits `AliasMember` directly (textual BNF 431-438), and a
+        // SysML `CalculationBody` reaches the same member through `ActionBodyItem ->
+        // NonBehaviorBodyItem` (SysML textual BNF 1359-1368, 901-917). `alias_def` owns the
+        // source-backed target and runs its qualified-reference allocation transaction before
+        // this scope accepts the member.
+        map(
+            crate::parser::alias::alias_def,
+            CalcDefBodyElement::AliasDef,
+        )
+        .parse(input)?
     } else if starts_with_keyword(after_visibility, b"connector") {
         map(kerml_connector_member, |n| {
             CalcDefBodyElement::Connector(Box::new(n))
@@ -1479,9 +1589,10 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     } else if input.fragment().starts_with(b":>>") {
         // Anonymous leading-redefinition binding: `:>> dimension = size(components);`
         // (`VectorValues.kerml`).
-        map(crate::parser::attribute::feature_value_binding, |n| {
-            CalcDefBodyElement::DefaultReferenceUsage(Box::new(n))
-        })
+        map(
+            crate::parser::attribute::default_reference_value_binding,
+            |n| CalcDefBodyElement::DefaultReferenceUsage(Box::new(n)),
+        )
         .parse(input)?
     } else if starts_with_any_keyword(
         after_visibility,
@@ -1503,7 +1614,11 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::KermlFeature(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"inv") {
+    // `Invariant` is a `FeatureElement`, so the optional `MemberPrefix` visibility belongs to
+    // this member just as it does to the feature arm above (KerML BNF 519-527, 913-917). Dispatch
+    // must inspect beyond that prefix: otherwise `private inv { ... }` falls through to the
+    // expression fallback, which turns `private` into a sibling feature reference.
+    } else if starts_with_keyword(after_visibility, b"inv") {
         map(kerml_invariant_member, |n| {
             CalcDefBodyElement::Invariant(Box::new(n))
         })
@@ -1863,6 +1978,31 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod calc_named_binding_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// This keyword-less type-body binding owns an `AttributeBody`; its semicolon must retain the
+    /// authored delimiter for serialized provenance validation.
+    #[test]
+    fn calc_named_binding_keeps_its_semicolon_body_span() {
+        let source = "private thisClock : Clock :>> self;";
+        let (rest, binding) = calc_named_binding(input(source)).expect("named binding");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let crate::ast::AttributeBody::Semicolon { semicolon_span } = &binding.value.body else {
+            panic!("expected a semicolon body");
+        };
+        assert_eq!(
+            &source[semicolon_span.offset..semicolon_span.offset + semicolon_span.len],
+            ";"
+        );
+    }
 }
 
 #[cfg(test)]

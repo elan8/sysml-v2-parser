@@ -56,8 +56,10 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"message",
     b"interface",
     b"item",
+    b"library",
     b"occurrence",
     b"part",
+    b"package",
     b"perform",
     b"port",
     b"private",
@@ -67,6 +69,7 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"requirement",
     b"satisfy",
     b"state",
+    b"standard",
     b"succession",
     b"snapshot",
     b"timeslice",
@@ -115,6 +118,7 @@ pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    b"variant",
     // The remaining members `port_def_body_element` dispatches. A starter table is only worth
     // having if it names where a member *starts*; recovery synchronizes on it, so a missing entry
     // is a valid sibling consumed by the malformed node before it.
@@ -136,6 +140,7 @@ pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
     b":>>",
     b":>",
     b"doc",
+    b"event",
     b"port",
     b"in",
     b"out",
@@ -151,8 +156,7 @@ pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
     // `DefinitionBodyItem` admits a `VariantUsageMember` here, which `variation port :>> autoPort
     // { variant port autoPort1; }` writes (`Variability Examples/VehicleVariabilityModel.sysml:79`).
-    // The member itself is not modelled -- see `planning/port-usage-prefix-matrix.md` §10.1 -- but
-    // it is still where a member starts, so recovery must synchronize on it.
+    // This scope now owns that typed member, and recovery synchronizes at its grammar starter.
     b"variant",
     b"attribute",
     b"item",
@@ -223,6 +227,14 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"#",
     b"@",
     b"accept",
+    // `StateBodyItem -> NonBehaviorBodyItem -> StructureUsageMember -> PartUsage`, and the
+    // sibling `BehaviorUsageMember -> ConstraintUsage`, each begin with the complete
+    // OccurrenceUsagePrefix. These entries are recovery FIRST-set membership, not a permissive
+    // parser: the owning part/constraint parsers still validate the complete production.
+    b"abstract",
+    b"constant",
+    b"constraint",
+    b"derived",
     b"doc",
     b"do",
     b"entry",
@@ -232,11 +244,16 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"if",
     b"in",
     b"inout",
+    b"individual",
     b"out",
+    b"part",
     b"ref",
+    b"snapshot",
     b"state",
     b"then",
+    b"timeslice",
     b"transition",
+    b"variation",
 ];
 
 pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
@@ -289,8 +306,17 @@ pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"out",
     b"inout",
     b"return",
+    // SysML `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem` owns
+    // `ReferenceUsage` (SysML BNF 1366/1367, 901/902, 335). Keep recovery from consuming a
+    // valid generic `ref` declaration after malformed calculation-body content.
+    b"ref",
     b"calc",
     b"part",
+    // KerML `TypeBodyElement` owns `AliasMember` directly (textual BNF 431-438), while a
+    // SysML `CalculationBody` reaches it through `ActionBodyItem -> NonBehaviorBodyItem`
+    // (SysML textual BNF 1359-1368, 901-917). Keep recovery from swallowing a valid alias
+    // after malformed content in either owner.
+    b"alias",
     // `TypeBodyElement -> FeatureMember -> OwnedFeatureMember -> FeatureElement -> Flow` (KerML
     // BNF 434, 519, 526, 360/369, 1303): a KerML type body owns a `flow` member, so recovery
     // resynchronizes on the keyword rather than swallowing the flow after a malformed sibling.
@@ -334,6 +360,9 @@ pub(crate) const CALCULATION_ACTION_STARTERS: &[&[u8]] = &[
     // (spec42 Gap 61). `Message` is a SysML-only production; KerML `FeatureElement` does not
     // reach it, so `calc_def_body_element` deliberately has no `message` arm of its own.
     b"message",
+    // Route generic `ReferenceUsage` through the action-body parser before calculation's
+    // keyword-less binding fallback can interpret `ref` as a feature name.
+    b"ref",
 ];
 
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
@@ -343,6 +372,9 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"out",
     b"inout",
     b"constraint",
+    // `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem` admits AliasMember.
+    // Keep recovery from swallowing a valid alias after malformed constraint-body content.
+    b"alias",
     // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1366, 1370), and
     // a constraint body is a `CalculationBody`, so `return` starts a member here too.
     b"return",
@@ -374,11 +406,13 @@ pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] =
 /// satisfy usage in a view definition body consumed it.
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"@",
+    b"alias",
     b"assert",
     b"doc",
     b"filter",
     b"not",
     b"render",
+    b"rendering",
     b"ref",
     b"satisfy",
     b"abstract",
@@ -398,12 +432,14 @@ pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
+    b"alias",
     b"assert",
     b"doc",
     b"expose",
     b"filter",
     b"not",
     b"render",
+    b"rendering",
     b"satisfy",
     // FIRST(`OccurrenceUsagePrefix`) on the satisfy usage this scope dispatches. See
     // `planning/occurrence-usage-prefix-matrix.md` §4.
@@ -467,6 +503,9 @@ pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
 /// scope carry the whole shared prefix; see `planning/port-usage-prefix-matrix.md` §6 and §10.1.
 pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"connect",
+    // `InterfaceOccurrenceUsageElement` includes `BehaviorUsageElement`, whose ConstraintUsage
+    // alternative owns the full occurrence-prefix and calculation-body grammar.
+    b"constraint",
     b"end",
     b"ref",
     b"doc",

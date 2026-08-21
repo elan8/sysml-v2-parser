@@ -182,7 +182,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
     let q = v.value.as_ref().expect("quantity default");
     assert!(matches!(
         &q.value.expression.value,
-        Expression::LiteralWithUnit { .. }
+        Expression::Bracket { .. }
     ));
 }
 

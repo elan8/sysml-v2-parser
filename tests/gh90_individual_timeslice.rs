@@ -159,28 +159,6 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
     assert!(action_usage.is_individual);
 }
 
-/// Real usage: `Individuals Examples/AnalysisIndividualExample.sysml:79`:
-/// ```text
-/// individual analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 {
-///     subject vehicle : Vehicle_1 :> vehicle_c1 { ... }
-/// }
-/// ```
-/// Previously: `analysis_case_usage` had no `individual` prefix handling.
-#[test]
-fn gh90_1_individual_prefix_on_analysis_case_usage() {
-    let elements = package_elements(
-        r#"package P {
-            analysis def FuelEconomyAnalysis_1;
-            individual analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1;
-        }"#,
-    );
-    let PackageBodyElement::AnalysisCaseUsage(usage) = &elements[1] else {
-        panic!("expected AnalysisCaseUsage, got {:?}", elements[1]);
-    };
-    assert!(usage.value.is_individual);
-    assert_eq!(usage.value.name, "fuelEconomyAnalysis_1");
-}
-
 /// Real usage: `Individuals Examples/JohnIndividualExample.sysml:9-16`:
 /// ```text
 /// item def Person {

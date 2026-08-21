@@ -9,6 +9,232 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **For action nodes retain their complete pinned grammar structure.** `ForLoopNode` now shares
+  `ActionNodePrefix` with its loop/while siblings, owns a source-backed typed
+  `ForVariableDeclaration` (including the full usage header), a structured `in` node parameter,
+  and the mandatory `ActionBodyParameter`. Action definition, action usage, and use-case bodies
+  all dispatch and emit the same typed node. Semantic snapshots, recovery, visitors, opacity, and
+  serde cover this complete production (SysML textual BNF 954-965 and 1151-1155; pinned Pilot
+  `SysML.xtext` 1438-1439 and 1624-1628). **AST version 211.**
+
+- **Loop and while action nodes retain their shared prefix and termination parameter.** The
+  grammar-owned `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` now serves
+  both `loop` and `while` forms, retaining the optional source-backed `action`
+  `UsageDeclaration` and its complete feature-specialization header ahead of the node keyword.
+  `WhileLoopNode`'s empty-parameter `loop` alternative and conditional `while` alternative now
+  both retain their mandatory `ActionBodyParameter`, including its separate optional `action`
+  declaration before the braces, and optional source-spanned `until` expression tail
+  (SysML textual BNF 954-965 and 1143-1149; pinned Pilot `SysML.xtext` 1438-1439 and
+  1615-1621). Emission, semantic projection, visitors, opacity inspection, recovery dispatch,
+  and serde cover the shared shape; `ForLoopNode` remains a separate follow-up migration despite
+  naming the same prefix production. **AST version 210.**
+
+- **Reference-prefixed action and state usages retain their typed owner.** Complete `ref action`
+  and `ref state` forms now dispatch to the existing `ActionUsage` and `StateUsage` nodes ahead
+  of generic `ReferenceUsage` in action-definition, action-usage, state, package, and requirement
+  bodies. Generic `ref name` remains a transactional fallback. Both usage nodes now retain their
+  authored `MultiplicityPart` modifier slots, and emission, semantic projection, visitors, and
+  recovery expose the complete typed header and body. **AST version 209.**
+
+- **Enumeration values retain their full pin-valid usage declaration.** The pinned
+  `EnumerationUsageMember = MemberPrefix EnumeratedValue` and `EnumeratedValue = 'enum'? Usage`
+  productions (SysML textual BNF 528-535) now retain visibility, the authored optional `enum`
+  token, decoded `Identification` plus its exact authored source span, typed
+  feature-specialization relationships, multiplicity modifiers,
+  value, and body. This turns MetadataTest's ordinary typed `uncl` and `conf` values into
+  structured enum members while intentionally retaining the sibling Pilot-only
+  `#Security enum secret ...` extension as exact recovery: Pilot alone adds
+  `UsageExtensionKeyword*` before the optional `enum` token. Emission, semantic projection,
+  visitors, opacity inspection, recovery synchronization, and serde cover the complete shape.
+  **AST version 208.**
+
+- **KerML feature relationship tails retain ordered `featured by` clauses.** `KermlFeature` now
+  owns the complete ordered `FeatureRelationshipPart*` tail from `FeatureDeclaration`, including
+  source-backed, comma-separated `TypeFeaturingPart` targets. This replaces the lossy fixed
+  `chains`, `inverse_of`, and type-relationship slots, so repeated and interleaved `chains`,
+  type relationships, `inverse of`, and `featured by` clauses emit in authored order. The slice
+  covers the typed Feature/Step/Expression/BooleanExpression owners; connector declarations keep
+  their separate, optional `FeatureDeclaration` alternative for the follow-up shared-declaration
+  migration. Semantic formatting, visitors, opacity traversal, and serde now cover the exhaustive
+  relationship-part representation. **AST version 207.**
+
+- **Concern usage names retain their authored spelling.** `ConcernUsage` now records the exact
+  `NAME` span alongside its decoded name and emits it directly, preserving intentional quotes
+  around a BASIC_NAME and `\\'` escapes in an UNRESTRICTED_NAME at both package and nested
+  requirement-body positions. Its semantic projection is structured rather than a contentless
+  marker, and visitor/serde traversal includes the source-backed span. Focused and Training 42
+  snapshots cover the package and nested cases. **AST version 206.**
+
+- **Constraint calculation bodies retain aliases.** `ConstraintDefinition` and
+  `ConstraintUsage` both own `CalculationBody`, whose `CalculationBodyItem -> ActionBodyItem ->
+  NonBehaviorBodyItem` alternative includes `AliasMember` (SysML textual BNF 1359-1368,
+  1378-1382, and 901-917; pinned Pilot `SysML.xtext` agrees). The separate
+  `ConstraintDefBodyElement` now owns the existing source-backed `AliasDef` for both constraint
+  definitions and usages, with exhaustive emission, semantic projection, traversal, opacity
+  inspection, and recovery synchronization. Focused semantic and recovery snapshots cover the
+  body owners. **AST version 205.**
+
+- **KerML type and SysML calculation bodies retain aliases.** KerML `TypeBodyElement` admits
+  `AliasMember` directly (textual BNF 431-438; pinned Pilot `KerML.xtext` 363-370 agrees), and
+  SysML `CalculationBody` reaches the same member through `CalculationBodyItem -> ActionBodyItem
+  -> NonBehaviorBodyItem` (SysML textual BNF 1359-1368 and 901-917; pinned Pilot
+  `SysML.xtext` 1368-1381 and 1947-1959 agrees). `CalcDefBodyElement` now owns the existing
+  source-backed `AliasDef` rather than letting the expression fallback split it into bare
+  expressions; emission, semantic projection, traversal, opacity inspection, and recovery
+  synchronization are exhaustive. Semantic/recovery fixtures and both affected upstream KerML
+  examples cover this. **AST version 204.**
+
+- **End declarations retain their immediate `ref` / KerML `feature` introducer.** The pinned
+  `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` production (SysML textual BNF
+  285-286 and 335-337; pinned Pilot `SysML.xtext` agrees) now stores `EndDeclIntroducer` with the
+  keyword's exact source span. The shared connector-end parser, formatter, semantic projection,
+  traversal, and opacity inspection preserve both the reference and already-accepted KerML
+  feature spellings across connection, interface, occurrence, part/ref-body, and interface-usage
+  owners. This remains distinct from rejected Pilot-only occurrence-end prefixes and bare
+  DefaultReferenceUsage `end` forms. Semantic/recovery snapshots and the affected upstream
+  corpus snapshots cover the result. **AST version 203.**
+
+- **Variant usages retain every shared owning-body form.** `VariantUsageMember` owns the same
+  `VariantUsageElement` in `AttributeBody`, `ActionBody`, `PortBody`, and `PortDefBody`; that
+  element reaches `ActionUsage` through `BehaviorUsageElement` (SysML textual BNF 237-252,
+  374-413, and 894-917; pinned Pilot `SysML.xtext` 518-531, 679-719, and 1361-1381). Those
+  scopes now dispatch and recover typed variant members, while `VariantUsage` uses a discriminated
+  reference-or-typed form and adds the source-backed `variant action` alternative. Emission,
+  semantic projection, visitors, and opacity inspection are exhaustive. **AST version 202.**
+
+- **Action bodies retain direct imports.** `ActionBodyItem` admits `Import` through
+  `NonBehaviorBodyItem` (SysML textual BNF 894-917; pinned Pilot `SysML.xtext` 1361-1381), and
+  the same `ActionBody` is owned by both `ActionDefinition` and `ActionUsage`. Both typed action
+  body enums now retain the existing source-backed import node, including visibility and typed
+  import-target shape, through emission, semantic projection, traversal, opacity inspection, and
+  recovery synchronization. Focused semantic/recovery fixtures and the upstream
+  `Metadata Example-2.sysml` action body cover the direct and visibility-prefixed forms.
+  **AST version 201.**
+
+- **Subject usages retain their complete feature-specialization header.** `SubjectUsage` reaches
+  `UsageDeclaration FeatureSpecializationPart? UsageCompletion`, including every `Typings`,
+  `Subsettings`, `References`, `Crosses`, and `Redefinitions` alternative and a
+  `MultiplicityPart` before or after those relationships (SysML textual BNF 305-315 and
+  424-480; pinned Pilot `SysML.xtext` 365-467 and 592-605). `SubjectDecl` now owns the complete
+  typed relationships and multiplicity modifiers rather than a lossy single type reference and
+  redefinition slot; emission, semantic projection, visitors, and opacity traversal retain the
+  grammar-owned header together with the existing typed `DefinitionBody` and value. Focused
+  semantic/recovery fixtures and separate upstream-context fixtures cover the six reported
+  corpus forms. **AST version 200.**
+
+- **Interface-definition bodies retain constraint usages.** `InterfaceBodyItem` admits
+  `InterfaceOccurrenceUsageMember -> InterfaceOccurrenceUsageElement -> BehaviorUsageElement ->
+  ConstraintUsage` (SysML textual BNF 727-750, 374-389, and 1382-1395; the pinned Pilot
+  `SysML.xtext` agrees). The existing source-backed usage node now has an owning
+  `InterfaceDefBodyElement` variant with exhaustive emission, semantic projection, opacity
+  traversal, visitor support, and recovery synchronization at `constraint`. Fixtures:
+  `tests/snapshots/sysml/interface_def_constraint_usage.md` and
+  `tests/snapshots/sysml/interface_def_constraint_usage_recovery.md`. **AST version 199.**
+
+- **Analysis case usages retain their complete occurrence prefix.** `AnalysisCaseUsage` now owns
+  the shared source-backed `OccurrenceUsagePrefix`, as required by `AnalysisCaseUsage =
+  OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody` (SysML textual BNF
+  1533-1535; pinned Pilot `SysML.xtext` 2236). This claims Systems Library
+  `AnalysisCases.sysml:21`'s `ref analysis self : AnalysisCase :>> Case::self;` before a body
+  expression fallback can consume only `ref`, while leaving `ref case` and `ref verification`
+  on their existing `RefDecl` routes. Emission, semantic projection, visitors, and opacity
+  traversal retain the resulting typed usage. **AST version 198.**
+
+- **State-definition bodies retain part and constraint usages.** `StateBodyItem` admits
+  `NonBehaviorBodyItem -> StructureUsageMember -> PartUsage` and its sibling
+  `BehaviorUsageMember -> ConstraintUsage` (SysML textual BNF 1200-1205, 910-920, 262-268,
+  356-389, 623, and 1382-1395; the pinned Pilot `SysML.xtext` StateBodyItem agrees). Both
+  existing source-backed usage nodes now have owning `StateDefBodyElement` variants, exhaustive
+  emission, semantic projection, visitor, and opacity traversal. Recovery synchronizes at both
+  kinds and every shared occurrence-prefix starter. Fixtures:
+  `tests/snapshots/sysml/state_body_part_and_constraint_usages.md` and
+  `tests/snapshots/sysml/state_body_part_and_constraint_usages_recovery.md`. **AST version 197.**
+
+- **Control-node `then` targets retain anonymous declarations.** `merge`, `decide`, `join`, and
+  `fork` now share an explicit anonymous-or-named declaration state and retain their mandatory
+  `ActionBody` (SysML textual BNF 898-909, 969-998; the zero-width-capable
+  `UsageDeclaration` is defined at 42-44 and 308-312, while the pinned Pilot writes it as
+  optional at `SysML.xtext` 1650-1685). `then join` is now dispatched alongside the other three
+  control kinds; all emit, semantic, visitor, opacity, serialization, and recovery boundaries
+  cover it. **AST version 196.**
+
+- **Part-definition bodies retain nested package definitions.** A part definition owns a
+  `DefinitionBody`, whose `DefinitionBodyItem → DefinitionMember → DefinitionElement` path
+  admits both `Package` and `LibraryPackage` (SysML textual BNF 180-207 and 234-248; the pinned
+  Pilot SysML grammar agrees). `PartDefBodyElement` now has separate typed variants for those
+  productions, preserving `library`/`standard library` spelling in the existing
+  `LibraryPackage` node. Formatting, opacity traversal, semantic snapshots, and visitors recurse
+  through their package bodies; recovery synchronizes at `package`, `library`, and `standard`.
+  Fixtures: `tests/snapshots/sysml/part_def_nested_packages.md` and
+  `tests/snapshots/sysml/part_def_nested_packages_recovery.md`. **AST version 195.**
+
+- **Transition effects retain optional typed action bodies.** `EffectBehaviorUsage` admits the
+  perform, accept, send, and assignment alternatives with an optional `ActionBody` (SysML
+  textual BNF 1314-1334; Pilot `SysML.xtext` 1909-1919). Their brace bodies are now parsed as
+  typed `ActionDefBody` values, emitted, visited, checked for opacity, and projected in semantic
+  snapshots. This includes anonymous `do action { ... }`, which previously fell through to a
+  bare expression and discarded its body. Fixtures cover the AHF Norway corpus transition and
+  malformed-body recovery with a following valid sibling. **AST version 194.**
+
+- **Occurrence bodies retain typed binding connectors.** `DefinitionBodyItem` admits a
+  `NonOccurrenceUsageMember`, whose `NonOccurrenceUsageElement` includes
+  `BindingConnectorAsUsage` (SysML textual BNF 237-247, 349-353, 702-707); the pinned Pilot
+  SysML grammar agrees. `OccurrenceBodyElement::Bind` now owns the existing structured
+  connector, including its typed ends and usage body, and emission, opacity traversal, semantic
+  snapshots, and visitors handle it exhaustively. Recovery synchronizes on `bind`, preserving a
+  later valid connector after malformed content. Fixtures:
+  `tests/snapshots/sysml/occurrence_body_bind.md` and
+  `tests/snapshots/sysml/occurrence_body_bind_recovery.md`. **AST version 193.**
+
+- **Keyword-less DefaultReferenceUsage now has one source-backed, grammar-owned shape.** The
+  pinned SysML grammar defines `DefaultReferenceUsage = RefPrefix Usage`
+  (`SysML-textual-bnf.kebnf` 332-333), with the ordinary nullable `Identification`, full
+  `FeatureSpecializationPart`, `ValuePart`, and `UsageBody`. Package, part, and attribute-shaped
+  bodies now share that parser and retain declaration short names, each `RefPrefix` slot,
+  multiplicity modifiers, all five specialization relationships, values, and nested bodies in the
+  typed AST. `AttributeBodyElement` now dispatches the production directly rather than promoting
+  it to an `AttributeUsage`; older package/value/shorthand parsers and the mirrored `feature`
+  boolean/body shape are gone. The Pilot Xtext grammar's optional bare `end` extension is not in
+  the authoritative pin, so `end : T;` and `end :>> target;` recover explicitly while later
+  members remain intact. Fixtures: `tests/snapshots/sysml/default_reference_usage.md` and
+  `tests/snapshots/sysml/default_reference_usage_end_recovery.md`. **AST version 192.**
+
+- **Subject declarations retain their typed usage bodies.** `SubjectUsage` is a
+  `ReferenceUsage` (`SysML-textual-bnf.kebnf` 1416-1419), hence it completes through
+  `UsageBody = DefinitionBody` (305-315); the sibling Pilot grammar agrees at `SysML.xtext`
+  2049-2055 and 592-605. A braced `subject` body is now retained as `SubjectDecl::body`, emitted,
+  visited, included in opacity traversal, and projected in semantic snapshots instead of being
+  parsed as a constraint-body surrogate and discarded. Fixtures cover regular-comment retention
+  and member recovery after malformed subject-body content. **AST version 191.**
+
+- **Bracket, index, and parenthesized expressions now retain the grammar's typed sequence
+  operands instead of a unit-string special case.** KerML textual BNF §8.2.5.8.2 defines
+  `BracketExpression = PrimaryArgumentMember '[' SequenceExpressionListMember ']'`, and shares
+  that `SequenceExpressionList` with `IndexExpression` and `SequenceExpression`. The AST now
+  owns those source-spanned operands, comma delimiters, and opening/closing tokens in one form;
+  `[SI::mm]` is a qualified reference, `[N * m]` is a binary expression, and neither can become
+  a declaration multiplicity after a feature value has begun. The older `Unit`, unary bracket,
+  literal-with-unit, tuple, and parenthesized compatibility variants were removed. The sibling
+  Pilot grammar confirms the same repeatable primary-expression postfix at
+  `KerMLExpressions.xtext:299-323,389-394`. Empty or malformed bracket operands now report the
+  structural `invalid_bracket_expression` diagnostic rather than claiming an invalid unit.
+  Fixtures include `tests/snapshots/sysml/bracketed_unit_expressions.md` and the affected Spec42
+  value-expression corpus. **AST version 190.**
+
+- **View bodies retain their ordinary `rendering` and `alias` members.** `ViewBodyItem` and
+  `ViewDefinitionBodyItem` each inherit `DefinitionBodyItem`, which admits `AliasMember` and the
+  generic `RenderingUsage` alongside the view-specific `render` member. Both scopes now dispatch
+  those existing productions into typed AST variants, emit them, traverse their nested bodies for
+  opacity, and project their retained headers, targets, and bodies in semantic snapshots.
+  Fixtures: `tests/snapshots/sysml/view_body_rendering_and_alias.md` and
+  `tests/snapshots/sysml/view_body_rendering_and_alias_recovery.md`. **AST version 189.**
+
+- **Package attributes, anonymous reference redefinitions, and port-body events retain their
+  grammatical identity.** Def-less package `attribute` declarations now produce
+  `AttributeUsage`, `ref :>> target;` retains `target` as a redefinition rather than inventing a
+  declaration name, and event occurrences nested in port bodies use the typed occurrence node
+  instead of recovery. `PortBodyElement` gains `OccurrenceUsage`. **AST version 188.**
+
 - **A KerML type body owns the `flow` and keyword-less `redefines` members its `FeatureElement`
   grants it, and a calculation body owns its `message` member.** Fixtures:
   `tests/snapshots/spec42/kerml_type_body_flow_and_redefinition_members.md`,

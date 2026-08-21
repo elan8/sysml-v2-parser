@@ -556,7 +556,7 @@ pub(crate) fn missing_expression_after_operator_diagnostic(
         ),
     ];
 
-    // GH-29: bound the scan to the current statement (mirrors `invalid_unit_reference_diagnostic`/
+    // GH-29: bound the scan to the current statement (mirrors `invalid_bracket_expression_diagnostic`/
     // `bare_comma_sequence_diagnostic`, GH-18/#28) -- otherwise a `.contains()` match on unrelated
     // text or a comment further down the file (e.g. a doc comment mentioning `= ;`) can override
     // the true diagnostic for a genuinely malformed statement here.
@@ -613,7 +613,7 @@ pub(crate) fn missing_expression_after_operator_diagnostic(
 /// Bounds `fragment` to the current statement/member: scanning stops before entering a `//` or
 /// `/* */` comment, at the first depth-0 `;`, or at a depth-0 closing `}`/`)`/`]` that isn't
 /// matched by an opener within the window (i.e. the enclosing scope's own delimiter). Local
-/// pattern-matching diagnostics (like [`invalid_unit_reference_diagnostic`] and
+/// pattern-matching diagnostics (like [`invalid_bracket_expression_diagnostic`] and
 /// [`bare_comma_sequence_diagnostic`]) must scan within this window rather than the unbounded rest
 /// of the file -- otherwise bracket- or comma-like text in unrelated code, or in a doc comment far
 /// below the real error site, can override the true diagnostic (GH-18).
@@ -644,7 +644,7 @@ fn local_statement_window(fragment: &[u8]) -> &[u8] {
     &fragment[..end]
 }
 
-pub(crate) fn invalid_unit_reference_diagnostic(
+pub(crate) fn invalid_bracket_expression_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     let fragment = trim_ascii_start(fragment);
@@ -656,10 +656,10 @@ pub(crate) fn invalid_unit_reference_diagnostic(
 
     if text.contains("[]") || text.contains("[ ]") {
         return Some((
-            "invalid_unit_reference",
-            "expected unit name inside '[ ]'".to_string(),
-            "unit name inside '[ ]'".to_string(),
-            "Use a concrete unit such as `1750 [kg]`.".to_string(),
+            "invalid_bracket_expression",
+            "expected an expression inside '[ ]'".to_string(),
+            "expression inside '[ ]'".to_string(),
+            "Use a bracket operand such as `1750[kg]`.".to_string(),
         ));
     }
 
@@ -670,10 +670,10 @@ pub(crate) fn invalid_unit_reference_diagnostic(
         || text.contains("[,")
     {
         return Some((
-            "invalid_unit_reference",
-            "invalid unit expression inside '[ ]'".to_string(),
-            "unit name inside '[ ]'".to_string(),
-            "Use a unit symbol or qualified unit name (example: `[kg]` or `[SI::kg]`).".to_string(),
+            "invalid_bracket_expression",
+            "invalid bracket expression inside '[ ]'".to_string(),
+            "expression inside '[ ]'".to_string(),
+            "Use a complete expression inside brackets (example: `[kg]` or `[N * m]`).".to_string(),
         ));
     }
 
@@ -900,7 +900,7 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("invalid_qualified_name_separator")
         | Some("invalid_typing_operator")
         | Some("missing_expression_after_operator")
-        | Some("invalid_unit_reference")
+        | Some("invalid_bracket_expression")
         | Some("missing_body_or_semicolon")
         | Some("invalid_requirement_short_name_syntax")
         | Some("missing_semicolon")

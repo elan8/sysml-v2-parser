@@ -10,7 +10,7 @@ use crate::parser::lex::{
     starts_with_keyword, subset_operator, typed_by_operator, ws1, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
-use nom::bytes::complete::{tag, take_until};
+use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::multi::many0;
 use nom::sequence::preceded;
@@ -79,30 +79,22 @@ pub(crate) struct UsageHeader {
     /// so scopes whose emitter must reproduce what was written read this instead.
     pub typing: Option<Node<TypingRelationship>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional `= expression` written as part of a `Subsettings` clause. The shared grammar
+    /// consumes this before the ordinary `FeatureValue` position, so callers that own a typed
+    /// value must carry it forward rather than silently losing the expression.
+    pub subsetting_value: Option<Node<Expression>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
     pub had_specialization: bool,
-    /// Post-typing multiplicity clause, captured by [`feature_usage_header`] (the pre-typing
-    /// clause position is typically consumed by the caller before the header). `None` for
-    /// [`usage_header`], which has no multiplicity grammar.
+    /// Multiplicity clause captured by [`feature_usage_header`], whether it was written before
+    /// or after a specialization group. `None` for [`usage_header`], which has no multiplicity
+    /// grammar.
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `MultiplicityPart`'s ordering and uniqueness keyword slots (BNF §8.2.2.6.6), with the
     /// authored spellings and their exact spans.
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
-}
-
-/// Multiplicity part: '[' ... ']'.
-pub(crate) fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"["[..]).parse(input)?;
-    let (input, content) = take_until(&b"]"[..]).parse(input)?;
-    let (input, _) = tag(&b"]"[..]).parse(input)?;
-    Ok((
-        input,
-        format!("[{}]", String::from_utf8_lossy(content.fragment()).trim()),
-    ))
 }
 
 /// Byte offset of the `]` that closes multiplicity content starting at `frag` (the `[` is
@@ -381,15 +373,6 @@ pub(crate) fn single_target_typing(
     )
 }
 
-/// Build a single-target `redefines`/`:>>` relationship from an already-parsed arena identity,
-/// mirroring [`single_target_typing`] for the same ad hoc `ref`-declaration call sites.
-pub(crate) fn single_target_redefines(
-    span: Span,
-    target: QualifiedReferenceId,
-) -> Node<SubsettingRelationship> {
-    single_target_subsetting(span, SubsettingKind::Redefines, target)
-}
-
 /// Single-target convenience over [`subsetting_relationship_node`] for ad hoc `:>`/`:>>`-family
 /// shapes parsed directly outside `specialization_targets` (a bare, unqualified feature name --
 /// these ad hoc shapes never parse a qualified `::`/`.`-segmented target). Shared by
@@ -456,6 +439,24 @@ pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<Subsetti
         input,
         subsetting_relationship_node(target, SubsettingKind::Redefines, span),
     ))
+}
+
+/// Parse an optional `Redefinitions` clause without hiding a malformed one.
+///
+/// `nom::combinator::opt(redefinition)` would turn `:>> ;` into an absent relationship and let
+/// the caller's permissive tail skip discard the authored operator. Once the concrete starter is
+/// present, the clause is mandatory; callers therefore recover the invalid declaration at their
+/// owning body boundary instead.
+pub(crate) fn optional_redefinition(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Node<SubsettingRelationship>>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if peek.fragment().starts_with(b":>>") || starts_with_keyword(peek.fragment(), b"redefines") {
+        let (input, relationship) = redefinition(input)?;
+        Ok((input, Some(relationship)))
+    } else {
+        Ok((input, None))
+    }
 }
 
 /// Prefix redefinition: `:>>` / `redefines` qualified_name (for usage heads).
@@ -746,10 +747,15 @@ fn merge_usage_header(
     // Clauses may be written both before and after the typing (`:> a : T :> b`). The two groups
     // are the same relationship for the same feature, so they merge on the same grounds as a
     // repeat within one group -- see `specialization_clauses`.
-    let subsets = merge_groups(
-        leading.subsets.map(|(target, _value)| target),
-        trailing.subsets.map(|(target, _value)| target),
-    );
+    let (leading_subsets, leading_subsetting_value) = match leading.subsets {
+        Some((relationship, value)) => (Some(relationship), value),
+        None => (None, None),
+    };
+    let (trailing_subsets, trailing_subsetting_value) = match trailing.subsets {
+        Some((relationship, value)) => (Some(relationship), value),
+        None => (None, None),
+    };
+    let subsets = merge_groups(leading_subsets, trailing_subsets);
     let redefines = merge_groups(leading.redefines, trailing.redefines);
     let references = merge_groups(leading.references, trailing.references);
     let crosses = merge_groups(leading.crosses, trailing.crosses);
@@ -760,6 +766,7 @@ fn merge_usage_header(
         type_reference,
         typing,
         subsets,
+        subsetting_value: leading_subsetting_value.or(trailing_subsetting_value),
         redefines,
         references,
         crosses,
@@ -771,17 +778,20 @@ fn merge_usage_header(
 }
 
 /// Usage header for library-style feature usages: optional leading multiplicity,
-/// typing, trailing multiplicity, `ordered` / `nonunique`, subsetting/redefinition,
-/// and `intersects` (folded into `specialization_clauses`, called for both the leading and
-/// trailing position) before the body.
+/// typing, multiplicity, and a second typing/specialization group before the body. This follows
+/// `FeatureSpecializationPart`'s `FeatureSpecialization+ MultiplicityPart?
+/// FeatureSpecialization* | MultiplicityPart FeatureSpecialization*` ordering (SysML BNF
+/// 424-426): a typing may appear on either side of the multiplicity just like every other
+/// specialization alternative.
 pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> {
     let (input, leading_multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (input, trailing_multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, modifiers) = multiplicity_modifier_slots(input)?;
+    let (input, trailing_type_result) = optional_typings(input)?;
     let (input, trailing) = specialization_clauses(input)?;
-    let mut header = merge_usage_header(leading, trailing, type_result);
+    let mut header = merge_usage_header(leading, trailing, type_result.or(trailing_type_result));
     header.multiplicity = trailing_multiplicity.or(leading_multiplicity);
     header.multiplicity_modifiers = modifiers;
     Ok((input, header))

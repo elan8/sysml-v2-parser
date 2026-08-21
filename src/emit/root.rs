@@ -48,7 +48,7 @@ pub(crate) fn emit_package(
     emit_package_body(w, path, &pkg.body)
 }
 
-fn emit_library_package(
+pub(crate) fn emit_library_package(
     w: &mut EmitWriter<'_>,
     path: &str,
     pkg: &LibraryPackage,
@@ -248,7 +248,7 @@ fn emit_kerml_bare_declaration(
     w.push_str(declaration.keyword.as_str());
     if let Some(name_span) = &declaration.name_span {
         w.push_char(' ');
-        w.push_span_name("kerml-bare-declaration/name", name_span)?;
+        w.push_authored_name("kerml-bare-declaration/name", name_span)?;
     }
     if let Some(multiplicity) = &declaration.multiplicity {
         w.push_char(' ');

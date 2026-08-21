@@ -180,6 +180,7 @@ fn control_node_payload_stmt<'a>(
                 type_name: None,
                 typing: None,
                 multiplicity: None,
+                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 subsets: None,
                 redefines: None,
                 accept,

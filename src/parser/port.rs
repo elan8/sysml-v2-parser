@@ -43,7 +43,18 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
     // already sees `ref port q;` (`Simple Tests/PartTest.sysml:21`) and `#Tag port t;` before
     // `connector::ref_decl` and the annotating members below can claim their first token.
     let (input, elem) = alt((
+        map(
+            crate::parser::part::variant_usage,
+            PortBodyElement::VariantUsage,
+        ),
         map(port_usage, |p| PortBodyElement::PortUsage(Box::new(p))),
+        // `EventOccurrenceUsage` is a `StructureUsageElement`, so a port usage body owns the
+        // same typed occurrence member that part and action bodies already dispatch. Keeping it
+        // on `OccurrenceUsage` preserves the event/reference distinction and its source-backed
+        // targets instead of recovering the whole member.
+        map(crate::parser::occurrence_body::occurrence_usage, |usage| {
+            PortBodyElement::OccurrenceUsage(Box::new(usage))
+        }),
         map(in_out_decl, PortBodyElement::InOutDecl),
         map(
             crate::parser::body::annotating_member,
@@ -279,6 +290,10 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         return Ok((input, node_from_to(start, input, elem)));
     }
     let (input, elem) = alt((
+        map(
+            crate::parser::part::variant_usage,
+            PortDefBodyElement::VariantUsage,
+        ),
         map(item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
         map(in_out_decl, PortDefBodyElement::InOutDecl),
@@ -286,7 +301,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
             crate::parser::body::annotating_member,
             PortDefBodyElement::Annotating,
         ),
-        map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
+        map(attribute_def, PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
         map(
             attribute_feature_binding,

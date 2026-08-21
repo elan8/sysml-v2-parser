@@ -5,6 +5,7 @@ use super::usage::{
 };
 use crate::parser::action::first_stmt;
 use crate::parser::lex::skip_statement_or_block;
+use crate::parser::package::{library_package_, package_};
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
@@ -223,9 +224,20 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             let elem = PartDefBodyElement::PortUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = analysis_case_usage(start) {
+            let elem = PartDefBodyElement::AnalysisCaseUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         alt((
+            // `PartDefinition` has a `DefinitionBody`, so `DefinitionBodyItem` reaches
+            // `DefinitionMember -> DefinitionElement`, which owns both `Package` and
+            // `LibraryPackage` (SysML BNF 180-207, 234-248; the pinned Pilot SysML grammar
+            // agrees). Reuse the package module's typed parsers rather than reinterpreting a
+            // nested namespace as opaque source.
+            map(package_, PartDefBodyElement::Package),
+            map(library_package_, PartDefBodyElement::LibraryPackage),
             map(
                 crate::parser::body::annotating_member,
                 PartDefBodyElement::Annotating,
@@ -304,14 +316,18 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             }),
             map(state_usage, PartDefBodyElement::StateUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
+            // Anonymous `ref :>> target;` owns a relationship target rather than a declaration
+            // name, so the shared full ref-declaration parser must get a chance after the named
+            // reference-usage parser declines it.
+            map(crate::parser::connector::ref_decl, PartDefBodyElement::Ref),
             // GH-42 Gap 1: bare `bind a = b;` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2) was
             // never dispatched here, even though `bind_` was already wired into part *usage*
             // bodies (`part_usage_body_element` below) -- mirrors that arm's placement.
             map(bind_, PartDefBodyElement::Bind),
-            map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
+            map(attribute_def, PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
-                attribute_usage_shorthand,
+                default_reference_usage,
                 PartDefBodyElement::DefaultReferenceUsage,
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
@@ -397,10 +413,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         ),
         // GH-87: keyword-less `name;` / `name = expr;` feature binding (§6 G26), previously only
         // reachable inside action bodies even though `part def V { m; }` is real usage (Simple
-        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `attribute_usage_shorthand`
+        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `default_reference_usage`
         // above (which requires `: Type`), so every keyword-led/typed member keeps priority.
         map(
-            crate::parser::attribute::bare_or_valued_feature_binding,
+            crate::parser::attribute::default_reference_usage,
             PartDefBodyElement::DefaultReferenceUsage,
         ),
     ))

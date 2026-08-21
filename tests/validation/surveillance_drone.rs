@@ -1,7 +1,9 @@
 //! Parser tests for `tests/fixtures/SurveillanceDrone*.sysml`.
 
 use std::path::Path;
-use sysml_v2_parser::ast::{AnnotatingMember, PackageBodyElement, PartDef, RootElement};
+use sysml_v2_parser::ast::{
+    AnnotatingMember, Package, PackageBody, PackageBodyElement, PartDef, RootElement,
+};
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
 /// Path to the SurveillanceDrone fixture (project-local, not sysml-v2-release).
@@ -12,7 +14,7 @@ fn surveillance_drone_fixture_path() -> std::path::PathBuf {
         .join("SurveillanceDrone.sysml")
 }
 
-/// Path to SurveillanceDrone-error.sysml (contains invalid statement on line 333).
+/// Path to the historical SurveillanceDrone-error.sysml probe.
 fn surveillance_drone_error_fixture_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -20,12 +22,30 @@ fn surveillance_drone_error_fixture_path() -> std::path::PathBuf {
         .join("SurveillanceDrone-error.sysml")
 }
 
-/// Path to SurveillanceDrone-errors.sysml (contains multiple invalid statements).
+/// Path to the historical multi-package SurveillanceDrone-errors.sysml probe.
 fn surveillance_drone_errors_fixture_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
         .join("SurveillanceDrone-errors.sysml")
+}
+
+fn assert_typed_package_member_on_line(package: &Package, line: u32) {
+    let PackageBody::Brace { elements, .. } = &package.body else {
+        panic!("expected a braced package body");
+    };
+    let member = elements
+        .iter()
+        .find(|member| member.span.line == line)
+        .unwrap_or_else(|| panic!("expected a package member on source line {line}"));
+    assert!(
+        !matches!(
+            member.value,
+            PackageBodyElement::Error(_) | PackageBodyElement::Unsupported(_)
+        ),
+        "source line {line} must remain a typed member, got {:?}",
+        member.value
+    );
 }
 
 #[test]
@@ -145,117 +165,77 @@ fn test_parse_surveillance_drone() {
     );
 }
 
-/// SurveillanceDrone-error.sysml has an invalid statement on line 333: `test {}`.
-/// This test ensures the parser rejects the file. Ideally the reported error is on line 333
-/// and mentions "test"; we assert that when the parser reports it.
+/// The historical `test {}` probe is now accepted as a complete package member. Keep the exact
+/// source fixture as a regression case for that widened dispatch rather than continuing to call
+/// it invalid.
 #[test]
-fn test_surveillance_drone_error_reports_error_on_line_333() {
+fn test_surveillance_drone_error_fixture_now_parses_cleanly() {
     super::init_log();
     let path = surveillance_drone_error_fixture_path();
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
+    let strict = parse(&input).expect("the complete historical probe should parse strictly");
+    assert!(
+        strict.elements.len() == 2,
+        "fixture should preserve its header comment and package"
+    );
+    let RootElement::Package(package) = &strict.elements[1].value else {
+        panic!("historical probe should retain its root package");
+    };
+    assert_typed_package_member_on_line(&package.value, 333);
+    assert_typed_package_member_on_line(&package.value, 364);
     let result = parse_with_diagnostics(&input);
     assert!(
-        !result.is_ok(),
-        "SurveillanceDrone-error.sysml should not parse successfully (invalid 'test {{}}' on line 333)"
-    );
-
-    let err = result
-        .errors
-        .iter()
-        .find(|e| e.line == Some(333))
-        .expect("expected a diagnostic on line 333 (invalid 'test {{}}' statement)");
-
-    assert!(
-        err.found.as_deref().is_some_and(|f| f.contains("test")),
-        "error at line 333 should have 'found' containing 'test', got: {:?}",
-        err.found
+        result.errors.is_empty(),
+        "historical `test {{}}`/`test2 {{}}` members are now typed, not recovery: {:?}",
+        result.errors
     );
 }
 
-/// SurveillanceDrone-error.sysml contains invalid statements (`test {}` on line 333, `test2 {}` on line 364).
-/// `parse_with_diagnostics` should surface diagnostics for unparseable lines rather than silently skipping them.
+/// The two formerly-error-labelled members must stay observable in the editor/strict equivalence
+/// path: no diagnostic-free source may get a partial editor tree.
 #[test]
-fn test_surveillance_drone_error_reports_exactly_one_error() {
+fn test_surveillance_drone_error_fixture_editor_matches_strict_root() {
     super::init_log();
     let path = surveillance_drone_error_fixture_path();
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
+    let strict = parse(&input).expect("historical error fixture should parse strictly");
     let result = parse_with_diagnostics(&input);
     assert!(
-        !result.is_ok(),
-        "SurveillanceDrone-error.sysml should have parse errors"
+        result.errors.is_empty(),
+        "editor parse should share strict acceptance: {:?}",
+        result.errors
     );
-    assert!(
-        result.errors.len() >= 2,
-        "expected at least 2 parse errors; got {}: {:?}",
-        result.errors.len(),
-        result
-            .errors
-            .iter()
-            .map(|e| (e.line, e.found.as_deref().unwrap_or("")))
-            .collect::<Vec<_>>()
-    );
-
-    let err_333 = result
-        .errors
-        .iter()
-        .find(|e| e.line == Some(333))
-        .expect("expected a diagnostic on line 333");
-    assert!(
-        err_333.found.as_deref().is_some_and(|f| f.contains("test")),
-        "error on line 333 should have 'found' containing 'test'; got: {:?}",
-        err_333.found
-    );
-
-    let err_364 = result
-        .errors
-        .iter()
-        .find(|e| e.line == Some(364))
-        .expect("expected a diagnostic on line 364");
-    assert!(
-        err_364
-            .found
-            .as_deref()
-            .is_some_and(|f| f.contains("test2")),
-        "error on line 364 should have 'found' containing 'test2'; got: {:?}",
-        err_364.found
-    );
+    assert_eq!(result.document.root, strict.root);
 }
 
-/// SurveillanceDrone-errors.sysml has multiple invalid statements: `test {}` (line 14),
-/// `xyz {}` (line 20), `badstmt {}` (line 26). Uses parse_with_diagnostics to collect all errors.
+/// The multi-package historical error probe now parses cleanly. Its package boundaries remain a
+/// useful recovery-regression input, so retain it and assert the complete ordered root instead of
+/// stale diagnostics for `test`/`xyz`/`badstmt`.
 #[test]
-fn test_surveillance_drone_errors_reports_all_errors() {
+fn test_surveillance_drone_errors_fixture_now_parses_cleanly() {
     super::init_log();
     let path = surveillance_drone_errors_fixture_path();
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
+    let strict = parse(&input).expect("historical multi-package probe should parse strictly");
     let result = parse_with_diagnostics(&input);
-    assert!(
-        !result.is_ok(),
-        "SurveillanceDrone-errors.sysml should have parse errors"
-    );
     assert_eq!(
         result.errors.len(),
-        3,
-        "expected 3 parse errors (test, xyz, badstmt); got {}: {:?}",
-        result.errors.len(),
-        result
-            .errors
-            .iter()
-            .map(|e| (e.line, e.found.as_deref().unwrap_or("")))
-            .collect::<Vec<_>>()
+        0,
+        "historical probe is now fully typed: {:?}",
+        result.errors
     );
 
-    // The file's leading `/* ... */` header is a root member of its own, then all four packages
-    // are recovered as separate root elements (invalid members are skipped).
+    // The file's leading `/* ... */` header is a root member of its own, followed by every source
+    // package in authored order.
     assert_eq!(
         result.document.root.elements.len(),
         5,
@@ -273,30 +253,13 @@ fn test_surveillance_drone_errors_reports_all_errors() {
         Some("SurveillanceDroneFirst"),
         "first package should be SurveillanceDroneFirst"
     );
-
-    // Each error should have correct line and found snippet (lines from parser output)
-    let error_specs: Vec<(u32, &str)> = vec![(15, "test"), (19, "xyz"), (23, "badstmt")];
-    for (i, (expected_line, expected_found)) in error_specs.iter().enumerate() {
-        let err = &result.errors[i];
-        assert_eq!(
-            err.line,
-            Some(*expected_line),
-            "error {} should be on line {}; got line {:?}, found: {:?}",
-            i + 1,
-            expected_line,
-            err.line,
-            err.found
-        );
-        assert!(
-            err.found
-                .as_deref()
-                .is_some_and(|f| f.contains(expected_found)),
-            "error {} should have 'found' containing '{}'; got: {:?}",
-            i + 1,
-            expected_found,
-            err.found
-        );
-        assert!(err.expected.is_some(), "error should have expected context");
-        assert!(err.code.is_some(), "error should have a code");
+    let expected_typed_members = [(2, 15), (3, 19), (4, 23)];
+    for (root_index, source_line) in expected_typed_members {
+        let RootElement::Package(package) = &strict.elements[root_index].value else {
+            panic!("expected root element {root_index} to be a package");
+        };
+        assert_typed_package_member_on_line(&package.value, source_line);
     }
+
+    assert_eq!(result.document.root, strict.root);
 }

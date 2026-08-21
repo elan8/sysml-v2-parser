@@ -7,11 +7,11 @@ use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
     ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
-    EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
-    InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement, PortDef,
-    PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
-    SubsettingRelationship, TypingKind, TypingRelationship,
+    EndDeclIntroducer, EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody,
+    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
+    RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -62,7 +62,10 @@ pub(crate) fn emit_part_usage(
         w.push_str("> ");
     }
     if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+        let Some(name_span) = &usage.name_span else {
+            return w.unsupported(path, "part usage name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     }
     let target_only = usage.name.is_empty() && usage.redefines.is_some();
     if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
@@ -187,8 +190,10 @@ pub(crate) fn emit_attribute_usage(
     // reparses as the *unrelated* anonymous-colon-typed form instead of a redefines clause).
     // Mirrors `emit_part_usage`'s `redefines_only` handling.
     let target_only = usage.name_span.is_none();
-    if !target_only {
-        w.push_str(&format_name(&usage.name));
+    if let Some(name_span) = &usage.name_span {
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
+    } else if !usage.name.is_empty() {
+        return w.unsupported(path, "attribute usage name without an authored source span");
     }
     if !target_only {
         if let Some(typing) = &usage.typing {
@@ -274,6 +279,10 @@ fn emit_part_def_body_element(
         }
         PartDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
+        }
+        PartDefBodyElement::Package(package) => super::root::emit_package(w, path, &package.value),
+        PartDefBodyElement::LibraryPackage(package) => {
+            super::root::emit_library_package(w, path, &package.value)
         }
         PartDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PartDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
@@ -578,8 +587,12 @@ fn emit_attribute_body_element(
         AttributeBodyElement::ConstraintUsage(c) => {
             super::view::emit_constraint_usage(w, path, &c.value)
         }
+        AttributeBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        AttributeBodyElement::DefaultReferenceUsage(a) => {
+            emit_default_reference_usage(w, path, &a.value)
+        }
         AttributeBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
@@ -637,7 +650,10 @@ pub(crate) fn emit_port_usage(
         w.push_str("> ");
     }
     if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+        let Some(name_span) = &usage.name_span else {
+            return w.unsupported(path, "port usage name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     }
     let target_only = usage.name.is_empty() && usage.redefines.is_some();
     if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
@@ -735,6 +751,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PortDefBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }
 }
 
@@ -773,10 +790,14 @@ fn emit_port_body_element(
         PortBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PortBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        PortBodyElement::OccurrenceUsage(usage) => {
+            super::behavior::emit_occurrence_usage(w, path, &usage.value)
+        }
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
         PortBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
+        PortBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }
 }
 
@@ -878,6 +899,9 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::FlowUsage(f) => {
             super::behavior::emit_flow_usage(w, path, &f.value)
         }
+        InterfaceDefBodyElement::ConstraintUsage(c) => {
+            super::view::emit_constraint_usage(w, path, &c.value)
+        }
         other @ (InterfaceDefBodyElement::ItemDef(_) | InterfaceDefBodyElement::ItemUsage(_)) => w
             .unsupported(
                 path,
@@ -891,27 +915,54 @@ pub(crate) fn emit_end_decl(
     path: &str,
     end: &EndDecl,
 ) -> Result<(), EmitError> {
+    if end.nested_usage.is_some()
+        && (end.typing.is_some()
+            || end.references.is_some()
+            || end.redefines.is_some()
+            || end.crosses.is_some()
+            || end.type_ref_span.is_some())
+    {
+        return w.unsupported(
+            path,
+            "EndDecl nested usage with outer type/reference relationship",
+        );
+    }
     w.push_str("end ");
+    match &end.introducer {
+        EndDeclIntroducer::Bare => {}
+        EndDeclIntroducer::Reference { .. } => w.push_str("ref "),
+        EndDeclIntroducer::KerMLFeature { .. } => w.push_str("feature "),
+    }
     if let Some(short_name) = &end.short_name {
         w.push_char('<');
         w.push_str(&format_name(short_name));
         w.push_str("> ");
     }
     match &end.identity {
-        EndIdentity::Declaration(name) => w.push_str(&format_name(&name.value)),
+        EndIdentity::Declaration(name) => {
+            w.push_authored_name(&format!("{path}/identity"), &name.span)?
+        }
         EndIdentity::Derivation(role) => match role.value {
             DerivationEndRole::Original => w.push_str("#original"),
             DerivationEndRole::Derive => w.push_str("#derive"),
         },
     }
     if let Some(nested) = &end.nested_usage {
-        return w.unsupported(
-            path,
-            format!("EndDecl nested_usage {nested:?}")
-                .chars()
-                .take(64)
-                .collect::<String>(),
-        );
+        if let Some(mult) = &end.multiplicity {
+            w.push_char(' ');
+            emit_multiplicity(w, &mult.value)?;
+        }
+        w.push_char(' ');
+        return match nested.as_ref() {
+            EndNestedUsage::Occurrence(usage) => super::behavior::emit_occurrence_usage(
+                w,
+                &format!("{path}/nested-occurrence"),
+                &usage.value,
+            ),
+            EndNestedUsage::Item(usage) => {
+                super::requirement::emit_item_usage(w, &format!("{path}/nested-item"), &usage.value)
+            }
+        };
     }
     if let Some(typing) = &end.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -1149,7 +1200,10 @@ pub(crate) fn emit_ref_decl(
     // `''` fabricated a quoted empty name the author never wrote (spec42 Gap 49d fallout).
     if !decl.name.is_empty() {
         w.push_char(' ');
-        w.push_str(&format_name(&decl.name));
+        let Some(name_span) = &decl.name_span else {
+            return w.unsupported(path, "ref declaration name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     } else if decl.kind_keyword.is_some() && decl.multiplicity.is_some() {
         // Keep the anonymous kind keyword lexically separate from its leading multiplicity.
         // `ref requirement[1..*]` parses `requirement` as a declaration name; the authored
@@ -1251,7 +1305,7 @@ pub(crate) fn emit_binding_connector_usage(
     }
     if let Some(name_span) = &usage.name_span {
         w.push_char(' ');
-        w.push_span_name("binding-connector-usage/name", name_span)?;
+        w.push_authored_name("binding-connector-usage/name", name_span)?;
     }
     if let Some(mult) = &usage.multiplicity {
         if usage.name_span.is_none() {
@@ -1559,58 +1613,50 @@ pub(crate) fn emit_default_reference_usage(
     usage: &crate::ast::DefaultReferenceUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if usage.has_feature_keyword {
-        w.push_str("feature ");
+    if let Some(direction) = &usage.prefix.direction {
+        emit_direction(w, direction.value);
     }
-    w.push_str(&format_name(&usage.name));
+    if usage.prefix.derived_span.is_some() {
+        w.push_str("derived ");
+    }
+    emit_definition_prefix(w, usage.prefix.variance.as_ref());
+    if usage.prefix.constant_span.is_some() {
+        w.push_str("constant ");
+    }
+    if let Some(short_name) = &usage.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short_name));
+        w.push_str("> ");
+    }
+    if !usage.name.is_empty() {
+        w.push_str(&format_name(&usage.name));
+    }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
+    if let Some(references) = &usage.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(crosses) = &usage.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
+    }
+    if let Some(intersects) = &usage.intersects {
+        emit_subsetting_clause(w, &intersects.value)?;
+    }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
-    match &usage.body {
-        None => {
-            w.push_char(';');
-            Ok(())
-        }
-        Some(elements) => {
-            w.push_str(" {");
-            w.newline();
-            w.indent();
-            for (i, el) in elements.iter().enumerate() {
-                emit_feature_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
-                w.newline();
-            }
-            w.dedent();
-            w.push_char('}');
-            Ok(())
-        }
-    }
-}
-
-fn emit_feature_body_element(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &crate::ast::FeatureBodyElement,
-) -> Result<(), EmitError> {
-    match el {
-        crate::ast::FeatureBodyElement::Binding(b) => {
-            emit_default_reference_usage(w, path, &b.value)
-        }
-        crate::ast::FeatureBodyElement::Annotating(member) => {
-            super::root::emit_annotating_member(w, path, member)
-        }
-    }
+    emit_attribute_body(w, path, &usage.body)
 }
 
 pub(crate) fn emit_metadata_def(
@@ -1684,16 +1730,54 @@ pub(crate) fn emit_enum_def(
                         super::root::emit_annotating_member(w, path, member)?;
                     }
                     crate::ast::EnumerationBodyElement::Value(value) => {
-                        if let Some(short_name) = &value.value.short_name {
-                            w.push_char('<');
-                            w.push_str(&format_name(short_name));
-                            w.push_str("> ");
+                        let value = &value.value;
+                        emit_visibility(w, value.membership.visibility);
+                        if value.enum_keyword_span.is_some() {
+                            w.push_str("enum ");
                         }
-                        w.push_str(&format_name(&value.value.name));
-                        if let Some(initializer) = &value.value.value {
-                            emit_feature_value(w, initializer)?;
+                        if value.identification_span.len != 0 {
+                            w.push_authored_name(
+                                &format!("{path}/enumerated-value/identification"),
+                                &value.identification_span,
+                            )?;
                         }
-                        emit_part_usage_body(w, path, &value.value.body)?;
+                        if let Some(typing) = &value.typing {
+                            emit_typing_clause(w, &typing.value)?;
+                        }
+                        if let Some(multiplicity) = &value.multiplicity {
+                            emit_multiplicity(w, &multiplicity.value)?;
+                        }
+                        emit_multiplicity_modifiers(w, &value.multiplicity_modifiers);
+                        if let Some((subsets, subset_value)) = &value.subsets {
+                            emit_subsetting_clause(w, &subsets.value)?;
+                            if let Some(expression) = subset_value {
+                                w.push_str(" = ");
+                                emit_expression(w, &expression.value)?;
+                            }
+                        }
+                        if let Some(redefines) = &value.redefines {
+                            emit_subsetting_clause(w, &redefines.value)?;
+                        }
+                        if let Some(references) = &value.references {
+                            emit_subsetting_clause(w, &references.value)?;
+                        }
+                        if let Some(crosses) = &value.crosses {
+                            emit_subsetting_clause(w, &crosses.value)?;
+                        }
+                        if let Some(intersects) = &value.intersects {
+                            emit_subsetting_clause(w, &intersects.value)?;
+                        }
+                        if let Some(initializer) = &value.value {
+                            if value
+                                .subsets
+                                .as_ref()
+                                .and_then(|(_, expression)| expression.as_ref())
+                                .is_none()
+                            {
+                                emit_feature_value(w, initializer)?;
+                            }
+                        }
+                        emit_part_usage_body(w, path, &value.body)?;
                     }
                     crate::ast::EnumerationBodyElement::Error(error) => {
                         w.push_recovery_span(path, &error.span)?;
@@ -1715,14 +1799,10 @@ pub(crate) fn emit_variant_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, variant.membership.visibility);
     w.push_str("variant ");
-    match &variant.typed {
-        None => {
-            let reference = variant.reference.ok_or_else(|| EmitError::Unsupported {
-                path: path.to_owned(),
-                construct: "untyped variant without a reference".to_owned(),
-            })?;
-            w.push_qualified_reference(&format!("{path}/reference"), reference)?;
-            match &variant.body {
+    match &variant.form {
+        crate::ast::VariantUsageForm::Reference { reference, body } => {
+            w.push_qualified_reference(&format!("{path}/reference"), *reference)?;
+            match body {
                 Some(body) => emit_part_usage_body(w, path, body),
                 None => {
                     w.push_char(';');
@@ -1730,18 +1810,25 @@ pub(crate) fn emit_variant_usage(
                 }
             }
         }
-        Some(crate::ast::VariantTypedUsage::Part(p)) => emit_part_usage(w, path, &p.value),
-        Some(crate::ast::VariantTypedUsage::Attribute(a)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Part(p)) => {
+            emit_part_usage(w, path, &p.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Attribute(a)) => {
             emit_attribute_usage(w, path, &a.value)
         }
-        Some(crate::ast::VariantTypedUsage::Item(i)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Item(i)) => {
             super::requirement::emit_item_usage(w, path, &i.value)
         }
-        Some(crate::ast::VariantTypedUsage::Port(p)) => emit_port_usage(w, path, &p.value),
-        Some(crate::ast::VariantTypedUsage::Perform(p)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Port(p)) => {
+            emit_port_usage(w, path, &p.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Action(a)) => {
+            super::behavior::emit_action_usage(w, path, &a.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Perform(p)) => {
             super::behavior::emit_perform(w, path, &p.value)
         }
-        Some(crate::ast::VariantTypedUsage::Requirement(r)) => {
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Requirement(r)) => {
             super::requirement::emit_requirement_usage(w, path, &r.value)
         }
     }

@@ -2,7 +2,7 @@ use crate::ast::{
     DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateDef,
     StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
 };
-use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -16,13 +16,12 @@ use crate::parser::metadata_annotation::{metadata_keyword_prefix, metadata_keywo
 use crate::parser::node_from_to;
 use crate::parser::payload::transition_accept;
 use crate::parser::requirement::requirement_usage;
-use crate::parser::usage::multiplicity;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
 pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> {
@@ -286,8 +285,21 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     ))
 }
 
-/// Ref in state body: `ref` (`state`)? name (`:` type)? (`:>>` / `:>` redeclarations)? body
+/// Reference usage in a state body.
+///
+/// `ReferenceUsage` reaches a state body through `ActionBodyItem` (SysML BNF 335, 1359 and
+/// 1455). Its `FeatureSpecializationPart` permits a complete `Redefinitions` clause on either
+/// side of typing. Keep that clause in the existing `RefDecl` relationship field instead of
+/// skipping it as opaque shorthand.
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+    crate::parser::span::reference_transaction(input, state_ref_inner)
+}
+
+fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+    use crate::parser::usage::{
+        optional_redefinition, optional_typings, subsetting, typing_reference_fields_from_result,
+    };
+
     let start = input;
     // `BasicUsagePrefix = RefPrefix ('ref')?` -- see `connector::ref_decl`.
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
@@ -295,30 +307,48 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, parsed_name) = opt(with_span(name)).parse(input)?;
-    let (input, _multiplicity) = opt(multiplicity).parse(input)?;
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, leading_multiplicity_modifiers) = if leading_multiplicity.is_some() {
+        crate::parser::usage::multiplicity_modifier_slots(input)?
+    } else {
+        (input, crate::ast::MultiplicityModifiers::default())
+    };
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
-    let (input, uses_shift) = preceded(
-        ws_and_comments,
-        alt((
-            map(tag(&b":>>"[..]), |_| true),
-            map(tag(&b":>"[..]), |_| false),
-            map(tag(&b":"[..]), |_| false),
-        )),
-    )
-    .parse(input)?;
-    let (input, type_target) = if uses_shift {
-        (input, None)
+    let (input, leading_redefines) = optional_redefinition(input)?;
+    let (input, typing_result) = optional_typings(input)?;
+    let (type_ref_span, _type_reference, typing) =
+        typing_reference_fields_from_result(typing_result);
+    // Canonical emission places multiplicity after typing, while the grammar also admits the
+    // leading position parsed above. Accept both positions but keep one authoritative slot.
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
     } else {
-        let (input, target) =
-            preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
-        (input, Some(target))
+        (input, None)
     };
-    let type_ref_span = type_target
-        .as_ref()
-        .map(|(span, _)| span.clone())
-        .unwrap_or_else(crate::ast::Span::dummy);
-    let typing = type_target.map(|(span, id)| crate::parser::usage::single_target_typing(span, id));
+    let (input, multiplicity_modifiers) = if trailing_multiplicity.is_some() {
+        crate::parser::usage::multiplicity_modifier_slots(input)?
+    } else {
+        (input, leading_multiplicity_modifiers)
+    };
+    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
+    let (input, trailing_redefines) = if leading_redefines.is_none() {
+        optional_redefinition(input)?
+    } else {
+        (input, None)
+    };
+    let redefines = leading_redefines.or(trailing_redefines);
+    let (input, subsets) = opt(preceded(ws_and_comments, subsetting))
+        .parse(input)
+        .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
 
     let (input, _) = ws_and_comments(input)?;
     let (mut input, value) = opt(preceded(
@@ -351,14 +381,14 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 kind_keyword: None,
                 name: name_str,
                 typing,
-                redefines: None,
-                subsets: None,
-                multiplicity: None,
-                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
+                redefines,
+                subsets,
+                multiplicity,
+                multiplicity_modifiers,
                 value,
                 body,
                 name_span: Some(name_span),
-                type_ref_span: Some(type_ref_span),
+                type_ref_span,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
@@ -405,6 +435,29 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
     let start = input;
+    // `ref action` and `ref state` are typed ActionUsage/StateUsage forms in this shared
+    // ActionBodyItem scope. They must precede the generic RefDecl parser; rejected attempts are
+    // transactional, preserving bare `ref name` for that generic fallback.
+    if starts_with_keyword(start.fragment(), b"ref") {
+        if let Ok((next, usage)) =
+            crate::parser::span::reference_transaction(start, crate::parser::action::action_usage)
+        {
+            return Ok((
+                next,
+                node_from_to(
+                    start,
+                    next,
+                    StateDefBodyElement::ActionUsage(Box::new(usage)),
+                ),
+            ));
+        }
+        if let Ok((next, usage)) = crate::parser::span::reference_transaction(start, state_usage) {
+            return Ok((
+                next,
+                node_from_to(start, next, StateDefBodyElement::StateUsage(usage)),
+            ));
+        }
+    }
     let mut parser = alt((
         map(crate::parser::body::annotating_member, |n| {
             node_from_to(start, input, StateDefBodyElement::Annotating(n))
@@ -461,6 +514,21 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
             crate::parser::occurrence_body::assert_constraint_member,
             |n| node_from_to(start, input, StateDefBodyElement::AssertConstraint(n)),
         ),
+        // `StateBodyItem` first admits `NonBehaviorBodyItem`, whose StructureUsageMember branch
+        // owns PartUsage, then separately admits BehaviorUsageMember, whose alternatives include
+        // ConstraintUsage (SysML BNF 1200-1205, 910-920, 262-268, 356-389, 623, 1382).  Reuse
+        // those grammar-owned parsers and their source-backed nodes; a state body adds no
+        // alternate header or body spelling of either production.
+        map(crate::parser::part::part_usage, |n| {
+            node_from_to(start, input, StateDefBodyElement::PartUsage(Box::new(n)))
+        }),
+        map(crate::parser::constraint::constraint_usage, |n| {
+            node_from_to(
+                start,
+                input,
+                StateDefBodyElement::ConstraintUsage(Box::new(n)),
+            )
+        }),
         map(crate::parser::action::in_out_decl, |n| {
             node_from_to(start, input, StateDefBodyElement::InOutDecl(n))
         }),
@@ -522,7 +590,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =
         nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
-    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
     let (_type_ref_span, type_name, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
@@ -556,6 +624,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 type_name,
                 typing,
                 multiplicity,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 body,
@@ -565,17 +634,18 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     ))
 }
 
-/// Optional trailing `{ ActionBodyItem* }` on a transition effect action usage; contents are
-/// not retained (mirrors how nested action-usage bodies are treated elsewhere in this module).
-fn transition_effect_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    map(
-        delimited(
-            tag(&b"{"[..]),
-            advance_to_closing_brace,
-            preceded(ws_and_comments, tag(&b"}"[..])),
-        ),
-        |_| (),
-    )
+/// The optional brace body owned by every structured `EffectBehaviorUsage` alternative.
+///
+/// This is deliberately brace-only: the authoritative production has `('{'
+/// ActionBodyItem* '}')?` after the action declaration (SysML BNF 1324-1334), not a second
+/// `UsageBody`; a semicolon remains the transition parser's lenient separator.
+fn transition_effect_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<crate::ast::ActionDefBody>> {
+    opt(preceded(
+        ws_and_comments,
+        crate::parser::action::action_def_body_brace,
+    ))
     .parse(input)
 }
 
@@ -590,17 +660,19 @@ fn transition_effect_type_suffix(
     .parse(input)
 }
 
-/// `do action` effect: `action` name (`:` type)? — SysML v2 `PerformActionUsageDeclaration`'s
-/// `'action' UsageDeclaration` form, e.g. `do action powerUp : PowerUp;`.
+/// `do action` effect: `action` UsageDeclaration? (`{` ActionBodyItem* `}`)? — SysML v2
+/// `TransitionPerformActionUsage`, e.g. `do action powerUp : PowerUp;` or `do action { in x; }`.
 fn transition_effect_perform(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
     let (input, _) = preceded(tag(&b"action"[..]), ws1).parse(input)?;
-    let (input, action_name) = name(input)?;
+    let (input, action_name) = opt(name).parse(input)?;
     let (input, type_name) = transition_effect_type_suffix(input)?;
+    let (input, body) = transition_effect_body(input)?;
     Ok((
         input,
         TransitionEffect::Perform {
-            name: Some(action_name),
+            name: action_name,
             type_name,
+            body,
         },
     ))
 }
@@ -616,12 +688,14 @@ fn transition_effect_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionEf
         preceded(ws1, expression),
     ))
     .parse(input)?;
+    let (input, body) = transition_effect_body(input)?;
     Ok((
         input,
         TransitionEffect::Accept {
             payload,
             type_name,
             via,
+            body,
         },
     ))
 }
@@ -642,6 +716,7 @@ fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffe
         preceded(ws1, expression),
     ))
     .parse(input)?;
+    let (input, body) = transition_effect_body(input)?;
     Ok((
         input,
         TransitionEffect::Send {
@@ -649,6 +724,7 @@ fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffe
             type_name,
             via,
             to,
+            body,
         },
     ))
 }
@@ -659,7 +735,8 @@ fn transition_effect_assign(input: Input<'_>) -> IResult<Input<'_>, TransitionEf
     let (input, lhs) = expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
     let (input, rhs) = preceded(ws_and_comments, expression).parse(input)?;
-    Ok((input, TransitionEffect::Assign { lhs, rhs }))
+    let (input, body) = transition_effect_body(input)?;
+    Ok((input, TransitionEffect::Assign { lhs, rhs, body }))
 }
 
 /// Transition `do` effect: structured `action`/`accept`/`send`/`assign` action usage, or a bare
@@ -674,7 +751,6 @@ fn transition_effect(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
         map(expression, TransitionEffect::Expression),
     ))
     .parse(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, transition_effect_brace)).parse(input)?;
     // Lenient: some models write a trailing `;` after the effect action usage even though
     // the grammar's TransitionUsage has no separator before `then` (matches spec examples,
     // e.g. `do action powerUp : PowerUp;\nthen on;`).

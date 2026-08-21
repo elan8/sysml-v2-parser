@@ -348,9 +348,8 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
         w.push_char(' ');
         w.push_str(&format_name(&subject.name));
     }
-    if let Some(type_name) = subject.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference("subject/type", type_name)?;
+    if let Some(typing) = &subject.typing {
+        emit_typing_clause(w, &typing.value)?;
     }
     // Multiplicity before the subsetting clause: it binds to the declared feature, and emitting
     // it after the target produced `:>> RequirementCheck::subj[1]`, which reparses as a
@@ -358,14 +357,26 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     if let Some(mult) = &subject.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    emit_multiplicity_modifiers(w, &subject.multiplicity_modifiers);
+    if let Some(subsets) = &subject.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
     if let Some(redefines) = &subject.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(references) = &subject.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(crosses) = &subject.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
+    }
+    if let Some(intersects) = &subject.intersects {
+        emit_subsetting_clause(w, &intersects.value)?;
     }
     if let Some(value) = &subject.value {
         super::expr::emit_feature_value(w, value)?;
     }
-    w.push_char(';');
-    Ok(())
+    super::behavior::emit_definition_body(w, "subject/body", &subject.body)
 }
 
 pub(crate) fn emit_require_constraint(
@@ -496,7 +507,7 @@ pub(crate) fn emit_concern_usage(
     if concern.is_definition {
         w.push_str("def ");
     }
-    w.push_str(&format_name(&concern.name));
+    w.push_authored_name(&format!("{path}/name"), &concern.name_span)?;
     if let Some(mult) = &concern.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
@@ -576,12 +587,7 @@ pub(crate) fn emit_analysis_case_usage(
     usage: &crate::ast::AnalysisCaseUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
+    structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("analysis ");
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
@@ -859,14 +865,7 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::AssertConstraint(assert) => {
             crate::emit::view::emit_assert_constraint(w, path, &assert.value)
         }
-        UseCaseDefBodyElement::ForLoop(f) => {
-            w.push_str("for ");
-            w.push_str(&format_name(&f.value.var));
-            w.push_str(" in ");
-            emit_expression(w, &f.value.range.value)?;
-            w.push_char(' ');
-            super::behavior::emit_action_def_body(w, path, &f.value.body)
-        }
+        UseCaseDefBodyElement::ForLoop(f) => super::behavior::emit_for_loop(w, path, &f.value),
         UseCaseDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
         UseCaseDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
@@ -933,7 +932,13 @@ fn emit_case_return_decl(
         w.push_str(":>> ");
         w.push_qualified_reference("case-return/target", target)?;
     } else if !decl.declaration_name.is_empty() {
-        w.push_str(&format_name(&decl.declaration_name));
+        let Some(name_span) = &decl.name_span else {
+            return w.unsupported(
+                "case-return",
+                "return declaration name without an authored source span",
+            );
+        };
+        w.push_authored_name("case-return/name", name_span)?;
     }
     if let Some(ty) = &decl.type_name {
         let has_head = decl.target.is_some() || !decl.declaration_name.is_empty();

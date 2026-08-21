@@ -22,14 +22,8 @@ package AssignTest {
 )
 ~~~
 # FORMAT
-~~~sysml
-package AssignTest {
-    action def A {
-        assign x := seq#(i);
-        assign var := data#(idx);
-        assign a.b := items#(0);
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

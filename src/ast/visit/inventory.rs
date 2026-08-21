@@ -432,11 +432,6 @@ macro_rules! ast_traversal {
                 walk_default_reference_usage(self, node)
             }
 
-            /// Visits [`FeatureBodyElement`]; the default implementation walks its children.
-            fn visit_feature_body_element(&mut self, node: &$($mutability)? Node<FeatureBodyElement>) {
-                walk_feature_body_element(self, node)
-            }
-
             /// Visits [`PortDef`]; the default implementation walks its children.
             fn visit_port_def(&mut self, node: &$($mutability)? Node<PortDef>) {
                 walk_port_def(self, node)
@@ -495,6 +490,11 @@ macro_rules! ast_traversal {
             /// Visits [`EndDecl`]; the default implementation walks its children.
             fn visit_end_decl(&mut self, node: &$($mutability)? Node<EndDecl>) {
                 walk_end_decl(self, node)
+            }
+
+            /// Visits [`EndDeclIntroducer`]; the default implementation walks its children.
+            fn visit_end_decl_introducer(&mut self, node: &$($mutability)? EndDeclIntroducer) {
+                walk_end_decl_introducer(self, node)
             }
 
             /// Visits [`EndIdentity`]; the default implementation walks its children.
@@ -782,6 +782,16 @@ macro_rules! ast_traversal {
                 walk_for_loop(self, node)
             }
 
+            /// Visits [`ForVariableDeclaration`]; the default implementation walks its children.
+            fn visit_for_variable_declaration(&mut self, node: &$($mutability)? Node<ForVariableDeclaration>) {
+                walk_for_variable_declaration(self, node)
+            }
+
+            /// Visits [`ForLoopInParameter`]; the default implementation walks its children.
+            fn visit_for_loop_in_parameter(&mut self, node: &$($mutability)? ForLoopInParameter) {
+                walk_for_loop_in_parameter(self, node)
+            }
+
             /// Visits [`ThenAction`]; the default implementation walks its children.
             fn visit_then_action(&mut self, node: &$($mutability)? Node<ThenAction>) {
                 walk_then_action(self, node)
@@ -910,6 +920,28 @@ macro_rules! ast_traversal {
             /// Visits [`TerminateStmt`]; the default implementation walks its children.
             fn visit_terminate_stmt(&mut self, node: &$($mutability)? Node<TerminateStmt>) {
                 walk_terminate_stmt(self, node)
+            }
+
+            /// Visits the grammar-owned [`ActionNodePrefix`]; the default implementation walks
+            /// its occurrence prefix and optional action usage declaration.
+            fn visit_action_node_prefix(&mut self, node: &$($mutability)? ActionNodePrefix) {
+                walk_action_node_prefix(self, node)
+            }
+
+            /// Visits [`ActionNodeUsageDeclaration`]; the default implementation walks its
+            /// identification and complete feature-specialization header.
+            fn visit_action_node_usage_declaration(&mut self, node: &$($mutability)? Node<ActionNodeUsageDeclaration>) {
+                walk_action_node_usage_declaration(self, node)
+            }
+
+            /// Visits the optional `until` parameter of a loop node.
+            fn visit_until_parameter(&mut self, node: &$($mutability)? UntilParameter) {
+                walk_until_parameter(self, node)
+            }
+
+            /// Visits the mandatory braced body parameter of a loop node.
+            fn visit_action_body_parameter(&mut self, node: &$($mutability)? ActionBodyParameter) {
+                walk_action_body_parameter(self, node)
             }
 
             /// Visits [`WhileStmt`]; the default implementation walks its children.
@@ -1407,6 +1439,18 @@ macro_rules! ast_traversal {
                 walk_kerml_type_relationship_keyword(self, node)
             }
 
+            /// Visits one ordered KerML `FeatureRelationshipPart`; the default implementation
+            /// walks its source-backed targets.
+            fn visit_feature_relationship_part(&mut self, node: &$($mutability)? Node<FeatureRelationshipPart>) {
+                walk_feature_relationship_part(self, node)
+            }
+
+            /// Visits a KerML `TypeFeaturingPart`; the default implementation walks every
+            /// authored-order target.
+            fn visit_type_featuring_part(&mut self, node: &$($mutability)? Node<TypeFeaturingPart>) {
+                walk_type_featuring_part(self, node)
+            }
+
             /// Visits [`KermlFeature`]; the default implementation walks its children.
             fn visit_kerml_feature(&mut self, node: &$($mutability)? Node<KermlFeature>) {
                 walk_kerml_feature(self, node)
@@ -1525,9 +1569,6 @@ macro_rules! ast_traversal {
                 Expression::LiteralBoolean(field_0) => {
                     let _ = field_0;
                 }
-                Expression::Unit(field_0) => {
-                    visitor.visit_text(field_0);
-                }
                 Expression::FeatureRef(field_0) => {
                     visitor.visit_qualified_reference(field_0);
                 }
@@ -1536,16 +1577,36 @@ macro_rules! ast_traversal {
                     visitor.visit_qualified_reference(member);
                     visitor.visit_reference_separator(separator);
                 }
-                Expression::Index { base, index } => {
+                Expression::Index { base, hash_span, open_paren_span, operands, close_paren_span } => {
                     visitor.visit_expression(&$($mutability)? **base);
-                    visitor.visit_expression(&$($mutability)? **index);
+                    visitor.visit_span(hash_span);
+                    visitor.visit_span(open_paren_span);
+                    visitor.visit_span(&$($mutability)? operands.span);
+                    for element in &$($mutability)? operands.value.elements {
+                        if let Some(comma) = &$($mutability)? element.comma_before {
+                            visitor.visit_span(comma);
+                        }
+                        visitor.visit_expression(&$($mutability)? element.expression);
+                    }
+                    if let Some(comma) = &$($mutability)? operands.value.trailing_comma_span {
+                        visitor.visit_span(comma);
+                    }
+                    visitor.visit_span(close_paren_span);
                 }
-                Expression::Bracket(field_0) => {
-                    visitor.visit_expression(&$($mutability)? **field_0);
-                }
-                Expression::LiteralWithUnit { value, unit } => {
-                    visitor.visit_expression(&$($mutability)? **value);
-                    visitor.visit_expression(&$($mutability)? **unit);
+                Expression::Bracket { base, open_bracket_span, operands, close_bracket_span } => {
+                    visitor.visit_expression(&$($mutability)? **base);
+                    visitor.visit_span(open_bracket_span);
+                    visitor.visit_span(&$($mutability)? operands.span);
+                    for element in &$($mutability)? operands.value.elements {
+                        if let Some(comma) = &$($mutability)? element.comma_before {
+                            visitor.visit_span(comma);
+                        }
+                        visitor.visit_expression(&$($mutability)? element.expression);
+                    }
+                    if let Some(comma) = &$($mutability)? operands.value.trailing_comma_span {
+                        visitor.visit_span(comma);
+                    }
+                    visitor.visit_span(close_bracket_span);
                 }
                 Expression::BinaryOp { op, left, right } => {
                     visitor.visit_binary_operator(op);
@@ -1560,11 +1621,6 @@ macro_rules! ast_traversal {
                     visitor.visit_expression(&$($mutability)? **callee);
                     for inner in args {
                         visitor.visit_argument(inner);
-                    }
-                }
-                Expression::Tuple(field_0) => {
-                    for inner in field_0 {
-                        visitor.visit_expression(inner);
                     }
                 }
                 Expression::Classification { metaclass } => {
@@ -1590,8 +1646,19 @@ macro_rules! ast_traversal {
                     visitor.visit_qualified_reference(selector);
                 }
                 Expression::Null => {}
-                Expression::Parenthesized(field_0) => {
-                    visitor.visit_expression(&$($mutability)? **field_0);
+                Expression::Sequence { open_paren_span, operands, close_paren_span } => {
+                    visitor.visit_span(open_paren_span);
+                    visitor.visit_span(&$($mutability)? operands.span);
+                    for element in &$($mutability)? operands.value.elements {
+                        if let Some(comma) = &$($mutability)? element.comma_before {
+                            visitor.visit_span(comma);
+                        }
+                        visitor.visit_expression(&$($mutability)? element.expression);
+                    }
+                    if let Some(comma) = &$($mutability)? operands.value.trailing_comma_span {
+                        visitor.visit_span(comma);
+                    }
+                    visitor.visit_span(close_paren_span);
                 }
                 Expression::Constructor { type_name, args } => {
                     visitor.visit_qualified_reference(type_name);
@@ -2492,6 +2559,12 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                PartDefBodyElement::Package(field_0) => {
+                    visitor.visit_package(field_0);
+                }
+                PartDefBodyElement::LibraryPackage(field_0) => {
+                    visitor.visit_library_package(field_0);
+                }
                 PartDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
@@ -2819,6 +2892,9 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
                 }
+                AttributeBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(field_0);
+                }
                 AttributeBodyElement::OccurrenceUsage(field_0) => {
                     visitor.visit_occurrence_usage(&$($mutability)? **field_0);
                 }
@@ -2866,6 +2942,9 @@ macro_rules! ast_traversal {
                 }
                 AttributeBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(&$($mutability)? **field_0);
+                }
+                AttributeBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
                 }
                 AttributeBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
@@ -3190,15 +3269,15 @@ macro_rules! ast_traversal {
         pub fn walk_variant_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VariantUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VariantUsage { reference, typed, body, membership } = &$($mutability)? node.value;
-            if let Some(inner) = reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = typed {
-                visitor.visit_variant_typed_usage(inner);
-            }
-            if let Some(inner) = body {
-                visitor.visit_part_usage_body(inner);
+            let VariantUsage { form, membership } = &$($mutability)? node.value;
+            match form {
+                VariantUsageForm::Reference { reference, body } => {
+                    visitor.visit_qualified_reference(reference);
+                    if let Some(inner) = body {
+                        visitor.visit_part_usage_body(inner);
+                    }
+                }
+                VariantUsageForm::Typed(inner) => visitor.visit_variant_typed_usage(inner),
             }
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
@@ -3217,6 +3296,9 @@ macro_rules! ast_traversal {
                 }
                 VariantTypedUsage::Port(field_0) => {
                     visitor.visit_port_usage(&$($mutability)? **field_0);
+                }
+                VariantTypedUsage::Action(field_0) => {
+                    visitor.visit_action_usage(&$($mutability)? **field_0);
                 }
                 VariantTypedUsage::Perform(field_0) => {
                     visitor.visit_perform(&$($mutability)? **field_0);
@@ -3373,8 +3455,12 @@ macro_rules! ast_traversal {
         pub fn walk_default_reference_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DefaultReferenceUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DefaultReferenceUsage { name, typing, subsets, redefines, value, multiplicity, name_span, typing_span, membership, has_feature_keyword, body } = &$($mutability)? node.value;
+            let DefaultReferenceUsage { prefix, name, short_name, typing, subsets, redefines, references, crosses, intersects, value, multiplicity, multiplicity_modifiers, name_span, typing_span, membership, body } = &$($mutability)? node.value;
+            visitor.visit_ref_prefix(prefix);
             visitor.visit_text(name);
+            if let Some(inner) = short_name {
+                visitor.visit_text(inner);
+            }
             if let Some(inner) = typing {
                 visitor.visit_typing_relationship(inner);
             }
@@ -3384,12 +3470,22 @@ macro_rules! ast_traversal {
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = name_span {
                 visitor.visit_span(inner);
             }
@@ -3397,26 +3493,7 @@ macro_rules! ast_traversal {
                 visitor.visit_span(inner);
             }
             visitor.visit_membership(membership);
-            let _ = has_feature_keyword;
-            if let Some(inner) = body {
-                for inner in inner {
-                    visitor.visit_feature_body_element(inner);
-                }
-            }
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_feature_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureBodyElement>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            match &$($mutability)? node.value {
-                FeatureBodyElement::Binding(field_0) => {
-                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
-                }
-                FeatureBodyElement::Annotating(field_0) => {
-                    visitor.visit_annotating_member(field_0);
-                }
-            }
+            visitor.visit_attribute_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -3489,6 +3566,9 @@ macro_rules! ast_traversal {
                 }
                 PortDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
+                }
+                PortDefBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
                 }
                 PortDefBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
@@ -3576,6 +3656,9 @@ macro_rules! ast_traversal {
                 PortBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
+                PortBodyElement::OccurrenceUsage(field_0) => {
+                    visitor.visit_occurrence_usage(field_0);
+                }
                 PortBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
@@ -3587,6 +3670,9 @@ macro_rules! ast_traversal {
                 }
                 PortBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
+                }
+                PortBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -3691,6 +3777,9 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
+                InterfaceDefBodyElement::ConstraintUsage(field_0) => {
+                    visitor.visit_constraint_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -3709,7 +3798,8 @@ macro_rules! ast_traversal {
         pub fn walk_end_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EndDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EndDecl { short_name, identity, typing, references, multiplicity, redefines, crosses, nested_usage, type_ref_span } = &$($mutability)? node.value;
+            let EndDecl { introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, nested_usage, type_ref_span } = &$($mutability)? node.value;
+            visitor.visit_end_decl_introducer(introducer);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
             visitor.visit_end_identity(identity);
             if let Some(inner) = typing {
@@ -3734,6 +3824,18 @@ macro_rules! ast_traversal {
                 visitor.visit_span(inner);
             }
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_end_decl_introducer<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndDeclIntroducer) {
+            match node {
+                EndDeclIntroducer::Bare => {}
+                EndDeclIntroducer::Reference { keyword_span } => {
+                    visitor.visit_span(keyword_span);
+                }
+                EndDeclIntroducer::KerMLFeature { keyword_span } => {
+                    visitor.visit_span(keyword_span);
+                }
+            }
         }
 
         pub fn walk_end_identity<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndIdentity) {
@@ -4032,18 +4134,42 @@ macro_rules! ast_traversal {
         pub fn walk_enumerated_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumeratedValue>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumeratedValue { name, short_name, value, body, name_span } = &$($mutability)? node.value;
-            visitor.visit_text(name);
-            if let Some(inner) = short_name {
-                visitor.visit_text(inner);
+            let EnumeratedValue { enum_keyword_span, identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_identification(identification);
+            visitor.visit_span(identification_span);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some((relationship, expression)) = subsets {
+                visitor.visit_subsetting_relationship(relationship);
+                if let Some(expression) = expression {
+                    visitor.visit_expression(expression);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
             visitor.visit_part_usage_body(body);
-            if let Some(inner) = name_span {
+            if let Some(inner) = enum_keyword_span {
                 visitor.visit_span(inner);
             }
+            visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -4356,6 +4482,9 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
+                OccurrenceBodyElement::Bind(field_0) => {
+                    visitor.visit_bind(field_0);
+                }
                 OccurrenceBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
                 }
@@ -4663,6 +4792,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
+                ActionDefBodyElement::Import(field_0) => {
+                    visitor.visit_import(field_0);
+                }
                 ActionDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
@@ -4756,6 +4888,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::DefaultReferenceUsage(field_0) => {
                     visitor.visit_default_reference_usage(field_0);
                 }
+                ActionDefBodyElement::VariantUsage(field_0) => {
+                    visitor.visit_variant_usage(field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -4773,11 +4908,63 @@ macro_rules! ast_traversal {
         pub fn walk_for_loop<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForLoop>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ForLoop { var, range, body } = &$($mutability)? node.value;
-            visitor.visit_text(var);
-            visitor.visit_expression(range);
-            visitor.visit_action_def_body(body);
+            let ForLoop { prefix, variable, in_parameter, body } = &$($mutability)? node.value;
+            visitor.visit_action_node_prefix(prefix);
+            visitor.visit_for_variable_declaration(variable);
+            visitor.visit_for_loop_in_parameter(in_parameter);
+            visitor.visit_action_body_parameter(body);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_for_variable_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForVariableDeclaration>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let ForVariableDeclaration {
+                identification,
+                identification_span,
+                typing,
+                multiplicity,
+                multiplicity_modifiers,
+                subsets,
+                redefines,
+                references,
+                crosses,
+                intersects,
+            } = &$($mutability)? node.value;
+            visitor.visit_identification(identification);
+            visitor.visit_span(identification_span);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some((relationship, value)) = subsets {
+                visitor.visit_subsetting_relationship(relationship);
+                if let Some(value) = value {
+                    visitor.visit_expression(value);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_for_loop_in_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ForLoopInParameter) {
+            let ForLoopInParameter { in_span, expression } = node;
+            visitor.visit_span(in_span);
+            visitor.visit_expression(expression);
         }
 
         pub fn walk_then_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ThenAction>) {
@@ -4804,6 +4991,9 @@ macro_rules! ast_traversal {
                 }
                 ThenTarget::Decide(field_0) => {
                     visitor.visit_decision_stmt(field_0);
+                }
+                ThenTarget::Join(field_0) => {
+                    visitor.visit_join_stmt(field_0);
                 }
                 ThenTarget::Accept(field_0) => {
                     visitor.visit_transition_accept(field_0);
@@ -4925,15 +5115,18 @@ macro_rules! ast_traversal {
 
         pub fn walk_transition_effect<V: $Visitor>(visitor: &mut V, node: &$($mutability)? TransitionEffect) {
             match node {
-                TransitionEffect::Perform { name, type_name } => {
+                TransitionEffect::Perform { name, type_name, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
                     if let Some(inner) = type_name {
                         visitor.visit_qualified_reference(inner);
                     }
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
-                TransitionEffect::Accept { payload, type_name, via } => {
+                TransitionEffect::Accept { payload, type_name, via, body } => {
                     visitor.visit_expression(payload);
                     if let Some(inner) = type_name {
                         visitor.visit_qualified_reference(inner);
@@ -4941,8 +5134,11 @@ macro_rules! ast_traversal {
                     if let Some(inner) = via {
                         visitor.visit_expression(inner);
                     }
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
-                TransitionEffect::Send { payload, type_name, via, to } => {
+                TransitionEffect::Send { payload, type_name, via, to, body } => {
                     visitor.visit_expression(payload);
                     if let Some(inner) = type_name {
                         visitor.visit_qualified_reference(inner);
@@ -4953,10 +5149,16 @@ macro_rules! ast_traversal {
                     if let Some(inner) = to {
                         visitor.visit_expression(inner);
                     }
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
-                TransitionEffect::Assign { lhs, rhs } => {
+                TransitionEffect::Assign { lhs, rhs, body } => {
                     visitor.visit_expression(lhs);
                     visitor.visit_expression(rhs);
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
                 TransitionEffect::Expression(field_0) => {
                     visitor.visit_expression(field_0);
@@ -4967,7 +5169,7 @@ macro_rules! ast_traversal {
         pub fn walk_action_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActionUsage { is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, subsets, redefines, accept, send, via, to, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let ActionUsage { is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, accept, send, via, to, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             let _ = is_abstract;
             let _ = is_variation;
             let _ = is_reference;
@@ -4983,6 +5185,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -5037,6 +5240,9 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
+                }
+                ActionUsageBodyElement::Import(field_0) => {
+                    visitor.visit_import(field_0);
                 }
                 ActionUsageBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
@@ -5235,8 +5441,11 @@ macro_rules! ast_traversal {
         pub fn walk_merge_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MergeStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let MergeStmt { merge, body } = &$($mutability)? node.value;
-            visitor.visit_expression(merge);
+            let MergeStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5244,8 +5453,11 @@ macro_rules! ast_traversal {
         pub fn walk_decision_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DecisionStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DecisionStmt { decide, body } = &$($mutability)? node.value;
-            visitor.visit_expression(decide);
+            let DecisionStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5253,8 +5465,11 @@ macro_rules! ast_traversal {
         pub fn walk_join_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<JoinStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let JoinStmt { join, body } = &$($mutability)? node.value;
-            visitor.visit_expression(join);
+            let JoinStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5262,8 +5477,11 @@ macro_rules! ast_traversal {
         pub fn walk_fork_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForkStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ForkStmt { fork, body } = &$($mutability)? node.value;
-            visitor.visit_expression(fork);
+            let ForkStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5312,20 +5530,98 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_action_node_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionNodePrefix) {
+            let ActionNodePrefix { occurrence_prefix, action_declaration } = node;
+            visitor.visit_occurrence_usage_prefix(occurrence_prefix);
+            if let Some(declaration) = action_declaration {
+                visitor.visit_action_node_usage_declaration(declaration);
+            }
+        }
+
+        pub fn walk_action_node_usage_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionNodeUsageDeclaration>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let ActionNodeUsageDeclaration {
+                action_span,
+                identification,
+                identification_span,
+                typing,
+                multiplicity,
+                multiplicity_modifiers,
+                subsets,
+                redefines,
+                references,
+                crosses,
+                intersects,
+            } = &$($mutability)? node.value;
+            visitor.visit_span(action_span);
+            visitor.visit_identification(identification);
+            visitor.visit_span(identification_span);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some((relationship, value)) = subsets {
+                visitor.visit_subsetting_relationship(relationship);
+                if let Some(value) = value {
+                    visitor.visit_expression(value);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_until_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? UntilParameter) {
+            let UntilParameter { until_span, expression, semicolon_span } = node;
+            visitor.visit_span(until_span);
+            visitor.visit_expression(expression);
+            visitor.visit_span(semicolon_span);
+        }
+
+        pub fn walk_action_body_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionBodyParameter) {
+            let ActionBodyParameter { action_declaration, body } = node;
+            if let Some(declaration) = action_declaration {
+                visitor.visit_action_node_usage_declaration(declaration);
+            }
+            visitor.visit_action_def_body(body);
+        }
+
         pub fn walk_while_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<WhileStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let WhileStmt { condition, body } = &$($mutability)? node.value;
+            let WhileStmt { prefix, condition, body, until } = &$($mutability)? node.value;
+            visitor.visit_action_node_prefix(prefix);
             visitor.visit_expression(condition);
-            visitor.visit_action_def_body(body);
+            visitor.visit_action_body_parameter(body);
+            if let Some(until) = until {
+                visitor.visit_until_parameter(until);
+            }
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_loop_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<LoopStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let LoopStmt { body } = &$($mutability)? node.value;
-            visitor.visit_action_def_body(body);
+            let LoopStmt { prefix, body, until } = &$($mutability)? node.value;
+            visitor.visit_action_node_prefix(prefix);
+            visitor.visit_action_body_parameter(body);
+            if let Some(until) = until {
+                visitor.visit_until_parameter(until);
+            }
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -5479,6 +5775,12 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::AssertConstraint(field_0) => {
                     visitor.visit_assert_constraint_member(field_0);
                 }
+                StateDefBodyElement::PartUsage(field_0) => {
+                    visitor.visit_part_usage(&$($mutability)? **field_0);
+                }
+                StateDefBodyElement::ConstraintUsage(field_0) => {
+                    visitor.visit_constraint_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5575,7 +5877,7 @@ macro_rules! ast_traversal {
         pub fn walk_state_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, type_name, typing, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
@@ -5596,6 +5898,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -5798,23 +6101,37 @@ macro_rules! ast_traversal {
         pub fn walk_subject_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SubjectDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let SubjectDecl { name, short_name, type_name, redefines, multiplicity, value } = &$($mutability)? node.value;
+            let SubjectDecl { name, short_name, typing, subsets, redefines, references, crosses, intersects, multiplicity, multiplicity_modifiers, value, body } = &$($mutability)? node.value;
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
+            visitor.visit_definition_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6117,8 +6434,9 @@ macro_rules! ast_traversal {
         pub fn walk_concern_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConcernUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConcernUsage { name, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
+            let ConcernUsage { name, name_span, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            visitor.visit_span(name_span);
             let _ = is_abstract;
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -6197,7 +6515,8 @@ macro_rules! ast_traversal {
         pub fn walk_analysis_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AnalysisCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AnalysisCaseUsage { name, type_name, subsets, redefines, is_abstract, is_individual, body, membership } = &$($mutability)? node.value;
+            let AnalysisCaseUsage { prefix, name, type_name, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
@@ -6208,8 +6527,6 @@ macro_rules! ast_traversal {
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
-            let _ = is_abstract;
-            let _ = is_individual;
             visitor.visit_use_case_def_body_value(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
@@ -6682,6 +6999,9 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                ConstraintDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 ConstraintDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
                 }
@@ -6814,6 +7134,9 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::Import(field_0) => {
                     visitor.visit_import(&$($mutability)? **field_0);
                 }
+                CalcDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 CalcDefBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(&$($mutability)? **field_0);
                 }
@@ -6929,6 +7252,9 @@ macro_rules! ast_traversal {
                 ViewDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                ViewDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 ViewDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
@@ -6943,6 +7269,9 @@ macro_rules! ast_traversal {
                 }
                 ViewDefBodyElement::ViewRendering(field_0) => {
                     visitor.visit_view_rendering_usage(field_0);
+                }
+                ViewDefBodyElement::RenderingUsage(field_0) => {
+                    visitor.visit_rendering_usage(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -7124,6 +7453,9 @@ macro_rules! ast_traversal {
                 ViewBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                ViewBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 ViewBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
@@ -7132,6 +7464,9 @@ macro_rules! ast_traversal {
                 }
                 ViewBodyElement::ViewRendering(field_0) => {
                     visitor.visit_view_rendering_usage(field_0);
+                }
+                ViewBodyElement::RenderingUsage(field_0) => {
+                    visitor.visit_rendering_usage(field_0);
                 }
                 ViewBodyElement::Expose(field_0) => {
                     visitor.visit_expose_member(field_0);
@@ -7342,10 +7677,40 @@ macro_rules! ast_traversal {
             }
         }
 
+        pub fn walk_feature_relationship_part<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureRelationshipPart>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            match &$($mutability)? node.value {
+                FeatureRelationshipPart::TypeRelationship(inner) => {
+                    visitor.visit_kerml_type_relationship(inner);
+                }
+                FeatureRelationshipPart::Chaining { target } => {
+                    visitor.visit_qualified_reference(target);
+                }
+                FeatureRelationshipPart::Inverting { target } => {
+                    visitor.visit_qualified_reference(target);
+                }
+                FeatureRelationshipPart::TypeFeaturing(inner) => {
+                    visitor.visit_type_featuring_part(inner);
+                }
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_type_featuring_part<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<TypeFeaturingPart>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let TypeFeaturingPart { targets } = &$($mutability)? node.value;
+            for target in targets {
+                visitor.visit_qualified_reference(target);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
         pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, relationship_parts, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {
@@ -7372,14 +7737,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = crosses {
                 visitor.visit_subsetting_relationship(inner);
             }
-            if let Some(inner) = chains {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = inverse_of {
-                visitor.visit_qualified_reference(inner);
-            }
-            for inner in type_relationships {
-                visitor.visit_kerml_type_relationship(inner);
+            for inner in relationship_parts {
+                visitor.visit_feature_relationship_part(inner);
             }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);

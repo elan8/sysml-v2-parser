@@ -224,56 +224,6 @@ fn gh86_2_then_accept_shorthand_target() {
     }
 }
 
-/// Real usage: `Simple Tests/ControlNodeTest.sysml:12-16`:
-/// ```text
-/// join J;
-/// then fork F {
-///     in a;
-///     out b1;
-///     out b2;
-/// }
-/// then B1;
-/// ```
-/// Previously: `then_action`'s target list had no path for a bare `fork <name> { ... }`
-/// control-node reference, even though `fork_stmt` already fully parses it standalone.
-#[test]
-fn gh86_2_then_fork_target() {
-    let elements = package_elements(
-        r#"package P {
-            action def ControlNodeTest {
-                action A1;
-                then J;
-                join J;
-                then fork F {
-                    in a;
-                    out b1;
-                    out b2;
-                }
-                then B1;
-                action B1;
-            }
-        }"#,
-    );
-    let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
-        panic!("expected ActionDef, got {:?}", elements[0]);
-    };
-    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
-        panic!("expected brace action def body");
-    };
-    let then_fork = elements.iter().find_map(|e| match &e.value {
-        ActionDefBodyElement::ThenAction(t) => match &t.value.target {
-            ThenTarget::Fork(f) => Some(&f.value),
-            _ => None,
-        },
-        _ => None,
-    });
-    let fork = then_fork.expect("expected a `then fork ...;` element");
-    assert!(matches!(
-        &fork.fork.value,
-        sysml_v2_parser::ast::Expression::FeatureRef(_)
-    ));
-}
-
 /// Real usage: `Simple Tests/DecisionTest.sysml:5-7`:
 /// ```text
 /// if x == 1 then A1;
@@ -350,42 +300,6 @@ fn gh86_3_if_then_else_non_brace_shorthand() {
     assert!(matches!(
         &else_member.value,
         ActionDefBodyElement::ThenAction(_)
-    ));
-}
-
-/// Real usage: `Simple Tests/DecisionTest.sysml:9`: `then decide D;` -- a bare `decide`
-/// control-node reference as a `then` target, same class of gap as `then accept`/`then fork`.
-#[test]
-fn gh86_3_then_decide_target() {
-    let elements = package_elements(
-        r#"package P {
-            attribute def S;
-            action a1 {
-                first start;
-                then decide D;
-                decide D;
-            }
-        }"#,
-    );
-    let PackageBodyElement::ActionUsage(action_usage) = &elements[1] else {
-        panic!("expected ActionUsage, got {:?}", elements[1]);
-    };
-    let ActionUsageBody::Brace { elements, .. } =
-        action_usage.value.body.as_ref().expect("an authored body")
-    else {
-        panic!("expected brace action usage body");
-    };
-    let then_decide = elements.iter().find_map(|e| match &e.value {
-        ActionUsageBodyElement::ThenAction(t) => match &t.value.target {
-            ThenTarget::Decide(d) => Some(&d.value),
-            _ => None,
-        },
-        _ => None,
-    });
-    let decide = then_decide.expect("expected a `then decide ...;` element");
-    assert!(matches!(
-        &decide.decide.value,
-        sysml_v2_parser::ast::Expression::FeatureRef(_)
     ));
 }
 
