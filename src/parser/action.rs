@@ -756,7 +756,6 @@ pub(crate) fn action_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ActionDefBodyElement>> {
     use crate::ast::ActionDefBodyElement;
-    use crate::parser::part::perform_action_decl;
     use crate::parser::state::state_usage;
 
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's annotating
@@ -831,27 +830,67 @@ pub(crate) fn action_def_body_element(
             ));
         }
     }
-    let (input, elem) = nom::branch::alt((
+    let (input, elem) = action_def_body_dispatched_element(input)?;
+    Ok((input, node_from_to(start, input, elem)))
+}
+
+/// The non-prefixed `ActionDefBodyElement` alternatives in their grammar priority order.
+///
+/// Keep these as function-item groups, rather than one wide `nom::Choice`. A nested action body
+/// retains the caller's dispatcher frame while it descends; after `GuardedSuccession` added one
+/// more rich parser, the single definition-body `Choice` again overflowed the Gap-68 two-MiB
+/// debug-worker budget. The groups below retain the exact pre-existing arm order while bounding
+/// every individual combinator frame.
+fn action_def_body_dispatched_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionDefBodyElement> {
+    alt((
+        action_def_body_leading_element,
+        action_def_body_declaration_element,
+        action_def_body_relationship_element,
+        action_def_body_behavior_element,
+        action_def_body_control_element,
+        action_def_body_fallback_element,
+    ))
+    .parse(input)
+}
+
+fn action_def_body_leading_element(input: Input<'_>) -> IResult<Input<'_>, ActionDefBodyElement> {
+    alt((
         map(crate::parser::import::import_, ActionDefBodyElement::Import),
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
         map(then_action, ActionDefBodyElement::ThenAction),
-        // Gap 33: `attribute`/`calc`/`event` declarations dispatch through their typed
-        // productions (the opaque `ActionBodyDecl` fallback is retired). Before `in_out_decl`
-        // so these keywords never read as parameter names; `occurrence_usage` covers the
-        // `event`/`event occurrence` forms.
-        nom::branch::alt((
-            map(crate::parser::attribute::attribute_usage, |a| {
-                ActionDefBodyElement::AttributeUsage(Box::new(a))
-            }),
-            map(crate::parser::constraint::calc_usage, |c| {
-                ActionDefBodyElement::CalcUsage(Box::new(c))
-            }),
-            map(crate::parser::occurrence_body::occurrence_usage, |n| {
-                ActionDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-        )),
+    ))
+    .parse(input)
+}
+
+fn action_def_body_declaration_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionDefBodyElement> {
+    // Gap 33: `attribute`/`calc`/`event` declarations dispatch through their typed productions
+    // before `in_out_decl`, so their kind keywords never read as parameter names.
+    alt((
+        map(crate::parser::attribute::attribute_usage, |a| {
+            ActionDefBodyElement::AttributeUsage(Box::new(a))
+        }),
+        map(crate::parser::constraint::calc_usage, |c| {
+            ActionDefBodyElement::CalcUsage(Box::new(c))
+        }),
+        map(crate::parser::occurrence_body::occurrence_usage, |n| {
+            ActionDefBodyElement::OccurrenceUsage(Box::new(n))
+        }),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
+    ))
+    .parse(input)
+}
+
+fn action_def_body_relationship_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, ActionDefBodyElement> {
+    use crate::parser::part::perform_action_decl;
+
+    alt((
         map(annotating_member_stmt, ActionDefBodyElement::Annotating),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
@@ -872,72 +911,79 @@ pub(crate) fn action_def_body_element(
             crate::parser::flow::flow_usage_member,
             ActionDefBodyElement::FlowUsage,
         ),
-        // These adjacent ActionBody alternatives are intentionally grouped only to stay below
-        // nom's 21-branch tuple limit. Their ordering remains the grammar ordering: the richer
-        // guarded form must claim `first … if … then …` before the legacy `FirstStmt`.
-        nom::branch::alt((
-            map(guarded_succession, ActionDefBodyElement::GuardedSuccession),
-            map(first_stmt, ActionDefBodyElement::FirstStmt),
-            map(merge_stmt, ActionDefBodyElement::MergeStmt),
-            map(decision_stmt, ActionDefBodyElement::DecisionStmt),
-            map(join_stmt, ActionDefBodyElement::JoinStmt),
-            map(fork_stmt, ActionDefBodyElement::ForkStmt),
-            map(state_usage, ActionDefBodyElement::StateUsage),
-        )),
-        // nom's alt() caps out at 21 branches; nest the newer control nodes plus the
-        // remaining fallbacks in a sub-alt() to stay under that limit.
-        nom::branch::alt((
-            map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
-            map(while_stmt, ActionDefBodyElement::WhileStmt),
-            map(loop_stmt, ActionDefBodyElement::LoopStmt),
-            map(if_stmt, ActionDefBodyElement::IfStmt),
-            // Literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`,
-            // GH-86), e.g. `metadata ToolExecution { ... }`. Previously only dispatched at
-            // package-body scope even though `crate::parser::metadata::metadata_usage` already
-            // implements it fully (including rejecting `metadata def ...`).
-            map(
-                crate::parser::metadata::metadata_usage,
-                ActionDefBodyElement::MetadataUsage,
-            ),
-            // Nested `action def` must win over `action_usage` (which would otherwise treat
-            // `def` as a usage name).
-            map(action_def, |d| ActionDefBodyElement::ActionDef(Box::new(d))),
-            map(control_node_action_usage, |a| {
-                ActionDefBodyElement::ActionUsage(Box::new(a))
-            }),
-            map(visibility_action_usage, |a| {
-                ActionDefBodyElement::ActionUsage(Box::new(a))
-            }),
-            // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
-            // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
-            // Directed `in item`/`in part` reach here after `in_out_decl` rejects those keywords.
-            nom::branch::alt((
-                map(
-                    crate::parser::part::variant_usage,
-                    ActionDefBodyElement::VariantUsage,
-                ),
-                map(crate::parser::part::part_usage, |p| {
-                    ActionDefBodyElement::PartUsage(Box::new(p))
-                }),
-                map(
-                    crate::parser::item::item_usage,
-                    ActionDefBodyElement::ItemUsage,
-                ),
-                map(
-                    crate::parser::occurrence_body::assert_constraint_member,
-                    ActionDefBodyElement::AssertConstraint,
-                ),
-            )),
-            // §6 G26: last, so every keyword-led member above keeps priority over the
-            // keyword-less `name = expr;` binding.
-            map(
-                crate::parser::attribute::default_reference_value_binding,
-                ActionDefBodyElement::DefaultReferenceUsage,
-            ),
-        )),
     ))
-    .parse(input)?;
-    Ok((input, node_from_to(start, input, elem)))
+    .parse(input)
+}
+
+fn action_def_body_behavior_element(input: Input<'_>) -> IResult<Input<'_>, ActionDefBodyElement> {
+    use crate::parser::state::state_usage;
+
+    // Guarded succession must stay before FirstStmt: it owns `first … if … then …`.
+    alt((
+        map(guarded_succession, ActionDefBodyElement::GuardedSuccession),
+        map(first_stmt, ActionDefBodyElement::FirstStmt),
+        map(merge_stmt, ActionDefBodyElement::MergeStmt),
+        map(decision_stmt, ActionDefBodyElement::DecisionStmt),
+        map(join_stmt, ActionDefBodyElement::JoinStmt),
+        map(fork_stmt, ActionDefBodyElement::ForkStmt),
+        map(state_usage, ActionDefBodyElement::StateUsage),
+    ))
+    .parse(input)
+}
+
+fn action_def_body_control_element(input: Input<'_>) -> IResult<Input<'_>, ActionDefBodyElement> {
+    alt((
+        map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
+        map(while_stmt, ActionDefBodyElement::WhileStmt),
+        map(loop_stmt, ActionDefBodyElement::LoopStmt),
+        map(if_stmt, ActionDefBodyElement::IfStmt),
+        map(
+            crate::parser::metadata::metadata_usage,
+            ActionDefBodyElement::MetadataUsage,
+        ),
+        // Nested `action def` must win over `action_usage`, which would otherwise accept `def`
+        // as its usage name.
+        map(action_def, |d| ActionDefBodyElement::ActionDef(Box::new(d))),
+        map(control_node_action_usage, |a| {
+            ActionDefBodyElement::ActionUsage(Box::new(a))
+        }),
+        map(visibility_action_usage, |a| {
+            ActionDefBodyElement::ActionUsage(Box::new(a))
+        }),
+    ))
+    .parse(input)
+}
+
+fn action_def_body_fallback_element(input: Input<'_>) -> IResult<Input<'_>, ActionDefBodyElement> {
+    alt((
+        // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` →
+        // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`). Directed
+        // `in item`/`in part` reach here after `in_out_decl` rejects their kind keywords.
+        alt((
+            map(
+                crate::parser::part::variant_usage,
+                ActionDefBodyElement::VariantUsage,
+            ),
+            map(crate::parser::part::part_usage, |p| {
+                ActionDefBodyElement::PartUsage(Box::new(p))
+            }),
+            map(
+                crate::parser::item::item_usage,
+                ActionDefBodyElement::ItemUsage,
+            ),
+            map(
+                crate::parser::occurrence_body::assert_constraint_member,
+                ActionDefBodyElement::AssertConstraint,
+            ),
+        )),
+        // §6 G26: last, so every keyword-led member above keeps priority over the keyword-less
+        // `name = expr;` binding.
+        map(
+            crate::parser::attribute::default_reference_value_binding,
+            ActionDefBodyElement::DefaultReferenceUsage,
+        ),
+    ))
+    .parse(input)
 }
 
 /// Action definition: `action` `def` Identification body
