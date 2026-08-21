@@ -108,8 +108,9 @@ fn malformed_expose_branch_rolls_back_before_the_next_view_member() {
 }
 
 #[test]
-fn failed_package_binding_lookahead_does_not_publish_an_orphan_reference() {
-    let result = parse_with_diagnostics("candidate :> Live::Target;");
+fn failed_default_reference_usage_does_not_publish_an_orphan_reference() {
+    let result = parse_with_diagnostics("candidate :> Live::Target unexpected;");
+    assert!(!result.errors.is_empty());
     assert_eq!(result.document.qualified_references.len(), 0);
     let mut projection = Vec::new();
     result
