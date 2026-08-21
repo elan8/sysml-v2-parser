@@ -776,14 +776,7 @@ fn test_parse_interface_usage_named_with_multiplicity() {
 
 #[test]
 fn test_parse_part_def_connection_usage_multiline_connect_clause() {
-    // Note: `end` declarations here intentionally have no leading multiplicity (`end part room1 :
-    // Room;`, not `end [1] part room1 : Room;`) -- that's a separate, real gap (`end_decl` doesn't
-    // yet parse a leading multiplicity before the optional `part`/`port` keyword, per BNF
-    // `ConnectorEnd`'s `OwnedCrossMultiplicityMember` position) discovered via GH-51's
-    // `collect_errors.rs` fix surfacing a previously-silent diagnostic here. Tracked separately;
-    // this test is specifically about the multiline `connect` clause below, so its `Door` header
-    // avoids depending on the untracked capability.
-    let input = "package P {\nconnection def Door { end part room1 : Room; end part room2 : Room; }\npart def Home {\nconnection livingRoom2bedRoom[1] : Door\n  connect livingRoom to bedRoom;\nconnection livingRoom2kitchen[1] : Door\n  connect livingRoom to kitchen;\nconnection livingRoom2bathRoom[1] : Door\n  connect livingRoom to bathRoom;\n}\n}";
+    let input = "package P {\nconnection def Door { end room1 : Room; end room2 : Room; }\npart def Home {\nconnection livingRoom2bedRoom[1] : Door\n  connect livingRoom to bedRoom;\nconnection livingRoom2kitchen[1] : Door\n  connect livingRoom to kitchen;\nconnection livingRoom2bathRoom[1] : Door\n  connect livingRoom to bathRoom;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -3001,12 +2994,12 @@ fn test_package_level_named_typed_connection_dispatches_to_connection_usage() {
 part def Hub;
 part def Device;
 connection def DeviceConnection {
-end part hub : Hub;
-end part device : Device;
+end hub : Hub;
+end device : Device;
 }
 connection connection1 : DeviceConnection {
-end part hub ::> mainSwitch[1];
-end part device ::> sensorFeed[1];
+end hub ::> mainSwitch[1];
+end device ::> sensorFeed[1];
 }
 }"#;
     let result = parse_with_diagnostics(input);
@@ -3085,124 +3078,7 @@ fn test_package_level_explicit_def_typed_connection_stays_connection_def() {
     );
 }
 
-/// GH-19/GH-20 follow-up: the real-world examples from both issues use `end part hub : Hub;` /
-/// `end part hub ::> mainSwitch[1];` -- a structural kind keyword (`part`) after `end`, and a
-/// trailing multiplicity bracket on the reference-subsetting target. Both were previously
-/// rejected: `connection.rs`'s `end_decl` accepted no kind keyword at all (only `interface.rs`
-/// accepted a bare `port`), and the shared `reference_subsetting` parser only consumes the
-/// qualified target, never a following `[mult]`. The end-to-end issue reproductions therefore
-/// still silently recovered to `Error` nodes even after the GH-19/GH-20 fixes landed.
-#[test]
-fn test_connection_end_decl_accepts_kind_keyword_and_trailing_multiplicity() {
-    let input = r#"package test {
-part def Hub;
-part def Device;
-connection def DeviceConnection {
-end part hub : Hub;
-end part device : Device;
-}
-part mainSwitch : Hub;
-part sensorFeed : Device;
-connection connection1 : DeviceConnection {
-end part hub ::> mainSwitch[1];
-end part device ::> sensorFeed[1];
-}
-}"#;
-    let result = parse_with_diagnostics(input);
-    assert!(
-        result.errors.is_empty(),
-        "unexpected diagnostics: {:?}",
-        result.errors
-    );
-    let pkg = match &result.document.root.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let PackageBody::Brace { elements, .. } = &pkg.body else {
-        panic!("expected brace body");
-    };
-
-    let def_ends = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::ConnectionDef(d)
-                if d.value.identification.name.as_deref() == Some("DeviceConnection") =>
-            {
-                match &d.value.body {
-                    ConnectionDefBody::Brace { elements, .. } => Some(elements),
-                    _ => None,
-                }
-            }
-            _ => None,
-        })
-        .expect("expected DeviceConnection def body");
-    assert_eq!(
-        def_ends.len(),
-        2,
-        "`end part hub : Hub;`/`end part device : Device;` should both parse as EndDecl, not recover to Error: {:?}",
-        def_ends
-    );
-    for end in def_ends {
-        match &end.value {
-            ConnectionDefBodyElement::EndDecl(end) => {
-                assert!(end.value.typing.is_some());
-                assert!(end.value.references.is_none());
-            }
-            other => panic!("expected EndDecl, got {:?}", other),
-        }
-    }
-
-    let usage_ends = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::ConnectionUsage(u)
-                if u.value.name.as_deref() == Some("connection1") =>
-            {
-                match &u.value.body {
-                    ConnectionDefBody::Brace { elements, .. } => Some(elements),
-                    _ => None,
-                }
-            }
-            _ => None,
-        })
-        .expect("expected connection1 usage body");
-    assert_eq!(
-        usage_ends.len(),
-        2,
-        "`end part hub ::> mainSwitch[1];`/`end part device ::> sensorFeed[1];` should both parse as EndDecl, not recover to Error: {:?}",
-        usage_ends
-    );
-    let expected_names = ["hub", "device"];
-    for (end, expected_name) in usage_ends.iter().zip(expected_names) {
-        match &end.value {
-            ConnectionDefBodyElement::EndDecl(end) => {
-                assert!(matches!(
-                    &end.value.identity,
-                    sysml_v2_parser::ast::EndIdentity::Declaration(name)
-                        if name.value == expected_name
-                ));
-                assert!(end.value.typing.is_none());
-                let refs = end
-                    .value
-                    .references
-                    .as_ref()
-                    .expect("`::>` end should populate structured references");
-                assert_eq!(refs.value.target.len(), 1);
-                let multiplicity = end
-                    .value
-                    .multiplicity
-                    .as_ref()
-                    .expect("trailing `[1]` should populate EndDecl.multiplicity");
-                assert!(multiplicity.value.lower.is_some());
-                assert!(multiplicity.value.upper.is_some());
-            }
-            other => panic!("expected EndDecl, got {:?}", other),
-        }
-    }
-}
-
-/// Word-boundary regression for the kind-keyword parsing above: `party`/`porter` must not be
-/// misparsed as keyword `part`/`port` plus a one-letter name `y`/`er`.
+/// Word-boundary regression for end-declaration names: `party`/`porter` remain names.
 #[test]
 fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
     let input = "package P {\npart def Organisation;\npart acmeLtd : Organisation;\nconnection systemInterest {\nend party ::> acmeLtd;\n}\n}";

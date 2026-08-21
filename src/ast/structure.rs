@@ -1315,9 +1315,8 @@ pub struct EndDecl {
     /// Structured reference-subsetting relationship for the `::>`/`references` form (GH-19):
     /// `end name ::> target;` / `end name references target;` names a reference, not a type, so
     /// it must not be modeled as typing (`endType`) downstream. Also populated when `::>`
-    /// *trails* an explicit `: Type` instead of replacing it, e.g. `end port p3: P ::> p.p1;`
-    /// (GH-85, `Simple Tests/
-    /// ConjugationTest.sysml`). `None` when no reference-subsetting clause was written at all.
+    /// *trails* an explicit `: Type` instead of replacing it, e.g. `end p3: P ::> p.p1;`.
+    /// `None` when no reference-subsetting clause was written at all.
     pub references: Option<Node<SubsettingRelationship>>,
     /// Optional multiplicity after the type/reference target, e.g. `[1]` in `end hub ::>
     /// mainSwitch[1];` (BNF `DefaultInterfaceEnd`'s `Usage` production carries the same optional
@@ -1328,9 +1327,7 @@ pub struct EndDecl {
     /// `end source: Anything :>> BinaryLinkObject::source;` (Systems Library `Connections.sysml`).
     /// `None` when absent or when this end used the `::>`/`references` form instead.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// GH-85: `crosses` cross-subsetting clause trailing the `: Type` typed form, e.g. `end item
-    /// cart: ShoppingCart[1] crosses selectedProduct.inCart;` (OMG spec Annex `Association
-    /// Examples/ProductSelection_UnownedEnds.sysml`). `None` when absent.
+    /// `crosses` cross-subsetting clause trailing the `: Type` typed form. `None` when absent.
     pub crosses: Option<Node<SubsettingRelationship>>,
     /// GH-53: an alternative end-declaration form where the target is itself a complete, nested
     /// kind-prefixed usage rather than a bare type/reference, e.g. `end theCauses [*] occurrence
@@ -1985,10 +1982,8 @@ pub enum InterfaceUsageBodyElement {
     },
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    /// GH-85: `end` member inside a typed, non-`connect` interface usage's body, e.g. `interface
-    /// i: I { end port p3: P ::> p.p1; end port p4: ~P ::> p.p2; }` (`Simple Tests/
-    /// ConjugationTest.sysml`), parallel to the already-supported `connection a: A { end port
-    /// p3: ...; }` form. Boxed: `EndDecl` is much larger than `RefRedef`, the other variant here.
+    /// `end` member inside a typed, non-`connect` interface usage's body. Boxed: `EndDecl` is
+    /// much larger than `RefRedef`, the other variant here.
     EndDecl(Box<Node<EndDecl>>),
 }
 
