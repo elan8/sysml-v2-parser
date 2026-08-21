@@ -29,6 +29,10 @@ use nom::IResult;
 use nom::Parser;
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
+    b"import",
+    b"public",
+    b"private",
+    b"protected",
     b"in",
     b"out",
     b"ref",
@@ -262,6 +266,7 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::CalcUsage(_)
         | ActionDefBodyElement::ActionDef(_)
         | ActionDefBodyElement::Error(_)
+        | ActionDefBodyElement::Import(_)
         | ActionDefBodyElement::InOutDecl(_)
         | ActionDefBodyElement::Annotating(_)
         | ActionDefBodyElement::MetadataKeywordUsage(_)
@@ -741,6 +746,7 @@ pub(crate) fn action_def_body_element(
         }
     }
     let (input, elem) = nom::branch::alt((
+        map(crate::parser::import::import_, ActionDefBodyElement::Import),
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
         map(then_action, ActionDefBodyElement::ThenAction),
@@ -1194,6 +1200,7 @@ fn peek_implicit_action_usage_body_end(input: Input<'_>) -> IResult<Input<'_>, (
                 b"private",
                 b"public",
                 b"protected",
+                b"import",
                 b"action",
                 b"perform",
                 b"bind",
@@ -1274,6 +1281,10 @@ pub(crate) fn action_usage_body_element(
         }
     }
     let (input, elem) = alt((
+        map(
+            crate::parser::import::import_,
+            ActionUsageBodyElement::Import,
+        ),
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
         map(then_action, ActionUsageBodyElement::ThenAction),

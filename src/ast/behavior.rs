@@ -46,6 +46,11 @@ pub type ActionDefBody = Body<ActionDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
     Error(Node<ParseErrorNode>),
+    /// An import owned directly by this action body.
+    ///
+    /// `ActionBodyItem → NonBehaviorBodyItem → Import` (SysML textual BNF 901-917; pinned
+    /// Pilot `SysML.xtext` 1368-1381) applies to both action definitions and usages.
+    Import(Node<crate::ast::Import>),
     InOutDecl(Node<InOutDecl>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -399,6 +404,8 @@ pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
+    /// An import owned directly by this action body; see [`ActionDefBodyElement::Import`].
+    Import(Node<crate::ast::Import>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),

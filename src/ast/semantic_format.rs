@@ -2410,6 +2410,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     ) -> io::Result<()> {
         match member {
             ActionDefBodyElement::Error(error) => self.write_malformed(&error.value, span),
+            ActionDefBodyElement::Import(import) => {
+                self.writer.write_str("(import ")?;
+                self.write_import_target(&import.value.target)?;
+                self.writer.write_char(')')
+            }
             ActionDefBodyElement::InOutDecl(declaration) => {
                 self.writer.write_str("(in-out (direction ")?;
                 match declaration.value.direction {
@@ -2983,6 +2988,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::ActionUsageBodyElement::Import(import) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(import ")?;
+                            self.write_import_target(&import.value.target)?;
+                            self.writer.write_char(')')?;
                         }
                         super::ActionUsageBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;

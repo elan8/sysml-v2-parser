@@ -866,6 +866,9 @@ fn walk_action_def_body_elements(
         let p = format!("{path}/body[{i}]");
         match &el.value {
             ActionDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
+            ActionDefBodyElement::Import(import) => {
+                walk_optional_relationship_body(report, &p, import.value.body_elements.as_deref())
+            }
             ActionDefBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
@@ -968,6 +971,9 @@ fn walk_action_usage_body_elements(
         let p = format!("{path}/body[{i}]");
         match &el.value {
             ActionUsageBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
+            ActionUsageBodyElement::Import(import) => {
+                walk_optional_relationship_body(report, &p, import.value.body_elements.as_deref())
+            }
             ActionUsageBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }

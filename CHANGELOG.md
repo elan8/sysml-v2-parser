@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Action bodies retain direct imports.** `ActionBodyItem` admits `Import` through
+  `NonBehaviorBodyItem` (SysML textual BNF 894-917; pinned Pilot `SysML.xtext` 1361-1381), and
+  the same `ActionBody` is owned by both `ActionDefinition` and `ActionUsage`. Both typed action
+  body enums now retain the existing source-backed import node, including visibility and typed
+  import-target shape, through emission, semantic projection, traversal, opacity inspection, and
+  recovery synchronization. Focused semantic/recovery fixtures and the upstream
+  `Metadata Example-2.sysml` action body cover the direct and visibility-prefixed forms.
+  **AST version 201.**
+
 - **Subject usages retain their complete feature-specialization header.** `SubjectUsage` reaches
   `UsageDeclaration FeatureSpecializationPart? UsageCompletion`, including every `Typings`,
   `Subsettings`, `References`, `Crosses`, and `Redefinitions` alternative and a

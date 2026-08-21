@@ -4694,6 +4694,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
+                ActionDefBodyElement::Import(field_0) => {
+                    visitor.visit_import(field_0);
+                }
                 ActionDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
@@ -5083,6 +5086,9 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
+                }
+                ActionUsageBodyElement::Import(field_0) => {
+                    visitor.visit_import(field_0);
                 }
                 ActionUsageBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);

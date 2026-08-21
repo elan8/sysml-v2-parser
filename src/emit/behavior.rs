@@ -280,6 +280,7 @@ pub(crate) fn emit_action_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ActionDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        ActionDefBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionDefBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }
@@ -384,6 +385,7 @@ pub(crate) fn emit_action_usage_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ActionUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        ActionUsageBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionUsageBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }
