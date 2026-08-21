@@ -666,6 +666,16 @@ pub(crate) fn emit_then_action_pub(
             Ok(())
         }
         ThenTarget::Send(a) => emit_action_usage(w, path, &a.value),
+        ThenTarget::If(i) => {
+            w.push_str("if ");
+            emit_expression(w, &i.value.condition.value)?;
+            emit_action_branch_body(w, path, &i.value.then_body)?;
+            if let Some(else_body) = &i.value.else_body {
+                w.push_str(" else");
+                emit_action_branch_body(w, path, else_body)?;
+            }
+            Ok(())
+        }
         ThenTarget::Feature(f) => {
             emit_expression(w, &f.value)?;
             w.push_char(';');

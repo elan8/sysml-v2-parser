@@ -2089,6 +2089,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_control_node("join", &join.value.declaration, &join.value.body)?;
                 self.writer.write_char(')')
             }
+            super::ThenTarget::If(if_stmt) => {
+                self.writer.write_str("(then-if ")?;
+                self.write_if_stmt(&if_stmt.value)?;
+                self.writer.write_char(')')
+            }
             // Retain the established compact projection for unrelated alternatives while matching
             // them explicitly: a new target variant must decide whether it is a control node.
             super::ThenTarget::Action(_)
@@ -2096,6 +2101,34 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             | super::ThenTarget::Accept(_)
             | super::ThenTarget::Send(_)
             | super::ThenTarget::Feature(_) => self.writer.write_str("(then-action)"),
+        }
+    }
+
+    /// The complete semantic shape of `IfNode`, including the two distinct grammatical branch
+    /// spellings. A `then if` succession owns this same node, so this writer is shared rather than
+    /// maintaining a compact target-specific marker that would hide its condition or members.
+    fn write_if_stmt(&mut self, if_stmt: &super::IfStmt) -> io::Result<()> {
+        self.writer.write_str("(if (condition ")?;
+        self.write_expression(&if_stmt.condition)?;
+        self.writer.write_str(") (then ")?;
+        self.write_action_branch_body(&if_stmt.then_body)?;
+        self.writer.write_str(") (else ")?;
+        if let Some(else_body) = &if_stmt.else_body {
+            self.write_action_branch_body(else_body)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
+    }
+
+    fn write_action_branch_body(&mut self, branch: &super::ActionBranchBody) -> io::Result<()> {
+        match branch {
+            super::ActionBranchBody::Braced(body) => self.write_action_body(body),
+            super::ActionBranchBody::Shorthand(member) => {
+                self.writer.write_str("(body shorthand ")?;
+                self.write_first_merge_member(&member.value, &member.span)?;
+                self.writer.write_char(')')
+            }
         }
     }
 
@@ -2850,7 +2883,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 &loop_stmt.value.body,
                 loop_stmt.value.until.as_ref(),
             ),
-            ActionDefBodyElement::IfStmt(_if) => self.writer.write_str("(if)"),
+            ActionDefBodyElement::IfStmt(if_stmt) => self.write_if_stmt(&if_stmt.value),
             ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
             ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
             ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
@@ -3623,8 +3656,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 member.value.until.as_ref(),
                             )?;
                         }
-                        super::ActionUsageBodyElement::IfStmt(_member) => {
-                            self.write_marker(&mut first, "if")?;
+                        super::ActionUsageBodyElement::IfStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_if_stmt(&member.value)?;
                         }
                         super::ActionUsageBodyElement::StateUsage(member) => {
                             self.write_item_prefix(&mut first)?;

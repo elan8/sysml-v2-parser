@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Then successions retain inline conditional action nodes.** `ThenTarget::If` now owns the
+  existing typed `IfStmt`, including its condition and braced or shorthand branches, rather than
+  recovering `then if ...` as an unrecognized action-body element. The parser dispatches the
+  pinned `IfNode` alternative before the feature fallback; emission, semantic projection,
+  visitors, opacity inspection, provenance validation, and serde traverse it exhaustively (SysML
+  textual BNF 954-965 and 1123-1141; pinned Pilot `SysML.xtext` 1438-1439 and 1596-1612).
+  Focused semantic/recovery snapshots and Training 17 cover the source succession boundary.
+  **AST version 218.**
+
 - **Perform action usage declarations retain their grammatical alternative.**
   `PerformActionUsageDeclaration` now distinguishes a declared `action` with its shared,
   source-backed `UsageDeclaration` (including an anonymous declaration) from the supported

@@ -205,6 +205,10 @@ pub enum ThenTarget {
     /// ActionTest.sysml). Carries the same `ActionUsage` shape (with `send`/`via`/`to`
     /// clauses) the standalone `send ...;` statement produces.
     Send(Box<Node<ActionUsage>>),
+    /// `then if condition { ... }` — an inline conditional action node. `IfNode` owns its
+    /// condition and either braced or shorthand branches, so it cannot be represented as a
+    /// feature succession without losing the action-body grammar (SysML textual BNF 1123-1141).
+    If(Node<IfStmt>),
     /// `then continue;` — a reference to an already-declared node.
     Feature(Node<Expression>),
 }

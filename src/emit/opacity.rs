@@ -1806,6 +1806,12 @@ fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget)
         ThenTarget::Send(action) => {
             walk_optional_action_usage_body(report, path, &action.value.body)
         }
+        ThenTarget::If(if_stmt) => {
+            walk_action_branch_body(report, &format!("{path}/then"), &if_stmt.value.then_body);
+            if let Some(else_body) = &if_stmt.value.else_body {
+                walk_action_branch_body(report, &format!("{path}/else"), else_body);
+            }
+        }
         ThenTarget::Accept(_) | ThenTarget::Feature(_) => {}
     }
 }

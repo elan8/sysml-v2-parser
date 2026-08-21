@@ -5077,6 +5077,9 @@ macro_rules! ast_traversal {
                 ThenTarget::Send(field_0) => {
                     visitor.visit_action_usage(&$($mutability)? **field_0);
                 }
+                ThenTarget::If(field_0) => {
+                    visitor.visit_if_stmt(field_0);
+                }
                 ThenTarget::Feature(field_0) => {
                     visitor.visit_expression(field_0);
                 }

@@ -689,6 +689,10 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         }),
         // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
+        // `IfNode` is itself an `ActionNode`, including its mandatory action-body parameter.
+        // It must precede the feature fallback so `then if ...` retains its condition and branch
+        // structure instead of being recovered as an unrecognized succession target.
+        map(if_stmt, ThenTarget::If),
         map(
             nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
             ThenTarget::Feature,
