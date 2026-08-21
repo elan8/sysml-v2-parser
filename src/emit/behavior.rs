@@ -181,6 +181,7 @@ pub(crate) fn emit_action_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    super::structure::emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -665,6 +666,7 @@ pub(crate) fn emit_state_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    super::structure::emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }

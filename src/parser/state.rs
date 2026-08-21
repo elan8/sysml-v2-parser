@@ -435,6 +435,29 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
     let start = input;
+    // `ref action` and `ref state` are typed ActionUsage/StateUsage forms in this shared
+    // ActionBodyItem scope. They must precede the generic RefDecl parser; rejected attempts are
+    // transactional, preserving bare `ref name` for that generic fallback.
+    if starts_with_keyword(start.fragment(), b"ref") {
+        if let Ok((next, usage)) =
+            crate::parser::span::reference_transaction(start, crate::parser::action::action_usage)
+        {
+            return Ok((
+                next,
+                node_from_to(
+                    start,
+                    next,
+                    StateDefBodyElement::ActionUsage(Box::new(usage)),
+                ),
+            ));
+        }
+        if let Ok((next, usage)) = crate::parser::span::reference_transaction(start, state_usage) {
+            return Ok((
+                next,
+                node_from_to(start, next, StateDefBodyElement::StateUsage(usage)),
+            ));
+        }
+    }
     let mut parser = alt((
         map(crate::parser::body::annotating_member, |n| {
             node_from_to(start, input, StateDefBodyElement::Annotating(n))
@@ -567,7 +590,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =
         nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
-    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
     let (_type_ref_span, type_name, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
@@ -601,6 +624,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 type_name,
                 typing,
                 multiplicity,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 body,

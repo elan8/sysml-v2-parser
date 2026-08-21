@@ -5085,7 +5085,7 @@ macro_rules! ast_traversal {
         pub fn walk_action_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActionUsage { is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, subsets, redefines, accept, send, via, to, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let ActionUsage { is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, accept, send, via, to, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             let _ = is_abstract;
             let _ = is_variation;
             let _ = is_reference;
@@ -5101,6 +5101,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -5714,7 +5715,7 @@ macro_rules! ast_traversal {
         pub fn walk_state_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, type_name, typing, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
@@ -5735,6 +5736,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }

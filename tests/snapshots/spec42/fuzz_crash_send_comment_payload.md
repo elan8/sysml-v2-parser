@@ -36,6 +36,6 @@ in send// nd port for HTT3prin  pq  for y  // nd port for HTT3prin items { }
 (parsed-document
   (references
   )
-  (root (package (name "P") (body brace (action-def (name "A") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "for") (span (offset 31) (line 3) (column 5) (len 83))) (action-usage (declaration "send") (type none)))))))
+  (root (package (name "P") (body brace (action-def (name "A") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "for") (span (offset 31) (line 3) (column 5) (len 83))) (action-usage (name "send") (short-name none) (prefix (abstract false) (variation false) (reference false) (individual false)) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body absent)))))))
 )
 ~~~

@@ -756,6 +756,28 @@ pub(crate) fn action_def_body_element(
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
+    // `ref action` and `ref state` are the reference-prefixed forms of their existing typed
+    // usage productions, not generic `ReferenceUsage` declarations. Try the complete parsers
+    // before `action_ref_decl`; each attempt is transactional so a bare `ref name` keeps the
+    // generic RefDecl fallback and no rejected qualified references escape into the arena.
+    if starts_with_keyword(start.fragment(), b"ref") {
+        if let Ok((next, usage)) = crate::parser::span::reference_transaction(start, action_usage) {
+            return Ok((
+                next,
+                node_from_to(
+                    start,
+                    next,
+                    ActionDefBodyElement::ActionUsage(Box::new(usage)),
+                ),
+            ));
+        }
+        if let Ok((next, usage)) = crate::parser::span::reference_transaction(start, state_usage) {
+            return Ok((
+                next,
+                node_from_to(start, next, ActionDefBodyElement::StateUsage(usage)),
+            ));
+        }
+    }
     let (input, elem) = nom::branch::alt((
         map(crate::parser::import::import_, ActionDefBodyElement::Import),
         map(assign_stmt, ActionDefBodyElement::Assign),
@@ -1295,6 +1317,26 @@ pub(crate) fn action_usage_body_element(
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
+    // See the matching ActionDefBody dispatcher: only successful, complete `ref action` / `ref
+    // state` usages preempt the generic RefDecl branch; all rejected attempts roll back.
+    if starts_with_keyword(start.fragment(), b"ref") {
+        if let Ok((next, usage)) = crate::parser::span::reference_transaction(start, action_usage) {
+            return Ok((
+                next,
+                node_from_to(
+                    start,
+                    next,
+                    ActionUsageBodyElement::ActionUsage(Box::new(usage)),
+                ),
+            ));
+        }
+        if let Ok((next, usage)) = crate::parser::span::reference_transaction(start, state_usage) {
+            return Ok((
+                next,
+                node_from_to(start, next, ActionUsageBodyElement::StateUsage(usage)),
+            ));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::import::import_,
@@ -1502,7 +1544,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =
         nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
-    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    let (input, multiplicity_modifiers) = multiplicity_modifier_slots(input)?;
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
     let (type_ref_span, type_name, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
@@ -1599,6 +1641,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 type_name,
                 typing,
                 multiplicity,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 accept,

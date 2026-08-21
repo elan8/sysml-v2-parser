@@ -180,6 +180,25 @@ fn requirement_def_body_element(
                 let elem = RequirementDefBodyElement::PortUsage(Box::new(usage));
                 return Ok((next, node_from_to(start, next, elem)));
             }
+            // This owner already has the typed action/state variants. Route only complete
+            // `ref action` / `ref state` forms before its RefDecl arm; a failed speculative
+            // parse rolls back references and leaves generic `ref name` unchanged.
+            if starts_with_keyword(after_ws.fragment(), b"ref") {
+                if let Ok((next, usage)) = crate::parser::span::reference_transaction(
+                    after_ws,
+                    crate::parser::action::action_usage,
+                ) {
+                    let elem = RequirementDefBodyElement::ActionUsage(Box::new(usage));
+                    return Ok((next, node_from_to(start, next, elem)));
+                }
+                if let Ok((next, usage)) = crate::parser::span::reference_transaction(
+                    after_ws,
+                    crate::parser::state::state_usage,
+                ) {
+                    let elem = RequirementDefBodyElement::StateUsage(usage);
+                    return Ok((next, node_from_to(start, next, elem)));
+                }
+            }
         }
     }
     let (rest, elem) = alt((

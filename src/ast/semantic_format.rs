@@ -967,8 +967,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         // `DefinitionBodyItem`. Each is projected exactly as the sibling scopes
                         // that already own it project it, so a member reads the same wherever it
                         // is written.
-                        RequirementDefBodyElement::ActionUsage(_usage) => {
-                            self.write_marker(&mut first, "action-usage")?;
+                        RequirementDefBodyElement::ActionUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_action_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::SuccessionUsage(_usage) => {
                             self.write_marker(&mut first, "succession-usage")?;
@@ -976,8 +977,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Perform(_perform) => {
                             self.write_marker(&mut first, "perform")?;
                         }
-                        RequirementDefBodyElement::StateUsage(_usage) => {
-                            self.write_marker(&mut first, "state-usage")?;
+                        RequirementDefBodyElement::StateUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;
@@ -1339,8 +1341,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::RequirementUsage(_usage) => {
                             self.write_marker(&mut first, "requirement-usage")?;
                         }
-                        StateDefBodyElement::StateUsage(_usage) => {
-                            self.write_marker(&mut first, "state-usage")?;
+                        StateDefBodyElement::StateUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_usage(&usage.value)?;
                         }
                         StateDefBodyElement::Transition(transition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1350,8 +1353,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;
                         }
-                        StateDefBodyElement::ActionUsage(_usage) => {
-                            self.write_marker(&mut first, "action-usage")?;
+                        StateDefBodyElement::ActionUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_action_usage(&usage.value)?;
                         }
                         StateDefBodyElement::SuccessionUsage(_usage) => {
                             self.write_marker(&mut first, "succession-usage")?;
@@ -2580,18 +2584,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::WhileStmt(_while) => self.writer.write_str("(while)"),
             ActionDefBodyElement::LoopStmt(_loop) => self.writer.write_str("(loop)"),
             ActionDefBodyElement::IfStmt(_if) => self.writer.write_str("(if)"),
-            ActionDefBodyElement::StateUsage(_state) => self.writer.write_str("(state-usage)"),
-            ActionDefBodyElement::ActionUsage(usage) => {
-                self.writer.write_str("(action-usage (declaration ")?;
-                self.write_usage_declaration_name(&usage.value.name)?;
-                self.writer.write_str(") (type ")?;
-                if let Some(reference) = usage.value.type_name {
-                    self.write_reference(reference)?;
-                } else {
-                    self.writer.write_str("none")?;
-                }
-                self.writer.write_str("))")
-            }
+            ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
+            ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
             ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
             ActionDefBodyElement::ItemUsage(item) => self.write_item_usage(&item.value),
             ActionDefBodyElement::AssertConstraint(_constraint) => {
@@ -3036,11 +3030,63 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_quoted(self.writer, &usage.name)?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, usage.short_name.as_deref())?;
+        write!(
+            self.writer,
+            ") (prefix (abstract {}) (variation {}) (reference {}) (individual {})) (typing ",
+            usage.is_abstract, usage.is_variation, usage.is_reference, usage.is_individual
+        )?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
         match &usage.body {
             Some(body) => self.write_action_usage_body(body)?,
             None => self.writer.write_str("(body absent)")?,
         }
+        self.writer.write_char(')')
+    }
+
+    /// One source-backed state usage, shared by every body owner that stores the typed node.
+    fn write_state_usage(&mut self, usage: &super::StateUsage) -> io::Result<()> {
+        self.writer.write_str("(state-usage (name ")?;
+        write_quoted(self.writer, &usage.name)?;
+        self.writer.write_str(") (prefix (direction ")?;
+        match usage.direction {
+            Some(super::InOut::In) => self.writer.write_str("in")?,
+            Some(super::InOut::Out) => self.writer.write_str("out")?,
+            Some(super::InOut::InOut) => self.writer.write_str("inout")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (derived {}) (abstract {}) (reference {}) (individual {})) (typing ",
+            usage.is_derived, usage.is_abstract, usage.is_reference, usage.is_individual
+        )?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_state_body(&usage.body)?;
         self.writer.write_char(')')
     }
 
@@ -3166,8 +3212,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::IfStmt(_member) => {
                             self.write_marker(&mut first, "if")?;
                         }
-                        super::ActionUsageBodyElement::StateUsage(_member) => {
-                            self.write_marker(&mut first, "state-usage")?;
+                        super::ActionUsageBodyElement::StateUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_usage(&member.value)?;
                         }
                         super::ActionUsageBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -5251,7 +5298,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_state_definition(&definition.value)
             }
-            PackageBodyElement::StateUsage(_usage) => self.write_marker(first, "state-usage"),
+            PackageBodyElement::StateUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_state_usage(&usage.value)
+            }
             PackageBodyElement::ItemDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_item_definition(&definition.value)

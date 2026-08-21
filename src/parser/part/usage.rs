@@ -1636,6 +1636,7 @@ pub(crate) fn exhibit_state_as_state_usage(
             .and_then(|typing| typing.value.target.first().copied()),
         typing: exhibit.value.typing,
         multiplicity: exhibit.value.multiplicity,
+        multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
         subsets: exhibit.value.subsets,
         // §6 G18: previously dropped, which silently lost the redefinition target of
         // `exhibit <name> :>> <target>;`.

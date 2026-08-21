@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reference-prefixed action and state usages retain their typed owner.** Complete `ref action`
+  and `ref state` forms now dispatch to the existing `ActionUsage` and `StateUsage` nodes ahead
+  of generic `ReferenceUsage` in action-definition, action-usage, state, package, and requirement
+  bodies. Generic `ref name` remains a transactional fallback. Both usage nodes now retain their
+  authored `MultiplicityPart` modifier slots, and emission, semantic projection, visitors, and
+  recovery expose the complete typed header and body. **AST version 209.**
+
 - **Enumeration values retain their full pin-valid usage declaration.** The pinned
   `EnumerationUsageMember = MemberPrefix EnumeratedValue` and `EnumeratedValue = 'enum'? Usage`
   productions (SysML textual BNF 528-535) now retain visibility, the authored optional `enum`

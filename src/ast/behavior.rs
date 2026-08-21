@@ -343,6 +343,9 @@ pub struct ActionUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, e.g. `[0..*]`.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored `ordered`/`nonunique` slots from the same `MultiplicityPart` as
+    /// [`Self::multiplicity`].
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` / `:>` clause.
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
@@ -386,6 +389,7 @@ impl PartialEq for ActionUsage {
             && self.type_name == other.type_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.accept == other.accept
@@ -1000,6 +1004,9 @@ pub struct StateUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, when present.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored `ordered`/`nonunique` slots from the same `MultiplicityPart` as
+    /// [`Self::multiplicity`].
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` / `:>` clause.
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.

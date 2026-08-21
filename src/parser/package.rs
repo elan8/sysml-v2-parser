@@ -2123,6 +2123,35 @@ pub(crate) fn package_body_element(
                 )),
             ));
         }
+        // `ref action` / `ref state` have existing package-body variants. Give their complete
+        // typed parsers first refusal over the generic RefDecl paths in structure dispatch;
+        // transactions preserve every other `ref` spelling and its arena state on failure.
+        if starts_with_keyword(input.fragment(), b"ref") {
+            if let Ok((next, usage)) =
+                crate::parser::span::reference_transaction(input, action_usage)
+            {
+                return Ok((
+                    next,
+                    Box::new(node_from_to(
+                        start,
+                        next,
+                        PackageBodyElement::ActionUsage(usage),
+                    )),
+                ));
+            }
+            if let Ok((next, usage)) =
+                crate::parser::span::reference_transaction(input, state_usage)
+            {
+                return Ok((
+                    next,
+                    Box::new(node_from_to(
+                        start,
+                        next,
+                        PackageBodyElement::StateUsage(usage),
+                    )),
+                ));
+            }
+        }
     }
     if let Ok(r) = try_package_body_annotations(input, start, starter) {
         return Ok(r);
