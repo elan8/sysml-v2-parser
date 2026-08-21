@@ -230,9 +230,10 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::DefaultReferenceUsage(n) => {
             walk_default_reference_usage(report, path, &n.value)
         }
-        PackageBodyElement::Filter(_)
-        | PackageBodyElement::Actor(_)
-        | PackageBodyElement::EnumDef(_) => {}
+        PackageBodyElement::EnumDef(definition) => {
+            walk_enumeration_body(report, path, &definition.value.body)
+        }
+        PackageBodyElement::Filter(_) | PackageBodyElement::Actor(_) => {}
     }
 }
 
@@ -249,6 +250,33 @@ fn walk_kerml_feature(report: &mut OpacityReport, path: &str, feature: &crate::a
         }
     }
     walk_calc_def_body(report, path, &feature.body);
+}
+
+/// `EnumerationBody` names two typed member alternatives directly.  Its error member is just as
+/// opacity-relevant as an error in any other body, and each value's `UsageBody` may contain a
+/// nested recovery node of its own.
+fn walk_enumeration_body(
+    report: &mut OpacityReport,
+    path: &str,
+    body: &crate::ast::EnumerationBody,
+) {
+    let crate::ast::EnumerationBody::Brace { elements, .. } = body else {
+        return;
+    };
+    for (index, element) in elements.iter().enumerate() {
+        let path = format!("{path}/body[{index}]");
+        match &element.value {
+            crate::ast::EnumerationBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &path, member)
+            }
+            crate::ast::EnumerationBodyElement::Value(value) => {
+                walk_part_usage_body(report, &path, &value.value.body)
+            }
+            crate::ast::EnumerationBodyElement::Error(_) => {
+                hit(report, &path, OpacityKind::ParseError)
+            }
+        }
+    }
 }
 
 fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &InterfaceDefBody) {
@@ -585,7 +613,9 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::DefaultReferenceUsage(n) => {
                 walk_default_reference_usage(report, &p, &n.value)
             }
-            PartDefBodyElement::EnumDef(_) => {}
+            PartDefBodyElement::EnumDef(definition) => {
+                walk_enumeration_body(report, &p, &definition.value.body)
+            }
         }
     }
 }
@@ -715,7 +745,9 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::DefaultReferenceUsage(n) => {
                 walk_default_reference_usage(report, &p, &n.value)
             }
-            PartUsageBodyElement::EnumDef(_) => {}
+            PartUsageBodyElement::EnumDef(definition) => {
+                walk_enumeration_body(report, &p, &definition.value.body)
+            }
         }
     }
 }

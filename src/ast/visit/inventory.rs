@@ -4102,18 +4102,42 @@ macro_rules! ast_traversal {
         pub fn walk_enumerated_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumeratedValue>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumeratedValue { name, short_name, value, body, name_span } = &$($mutability)? node.value;
-            visitor.visit_text(name);
-            if let Some(inner) = short_name {
-                visitor.visit_text(inner);
+            let EnumeratedValue { enum_keyword_span, identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_identification(identification);
+            visitor.visit_span(identification_span);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some((relationship, expression)) = subsets {
+                visitor.visit_subsetting_relationship(relationship);
+                if let Some(expression) = expression {
+                    visitor.visit_expression(expression);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
             visitor.visit_part_usage_body(body);
-            if let Some(inner) = name_span {
+            if let Some(inner) = enum_keyword_span {
                 visitor.visit_span(inner);
             }
+            visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

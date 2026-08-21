@@ -1693,25 +1693,56 @@ pub type EnumerationBody = Body<EnumerationBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EnumerationBodyElement {
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
-    Annotating(AnnotatingMember),
+    /// Boxed alongside the full usage alternative so this heterogeneous body enum stays compact
+    /// for every member kind rather than reserving annotation-sized inline storage for each one.
+    Annotating(Box<AnnotatingMember>),
     /// `EnumerationUsageMember`, one enumerated value.
-    Value(Node<EnumeratedValue>),
+    ///
+    /// The full `Usage` header is intentionally stored on the value rather than flattened into
+    /// text. Box it at this heterogeneous body boundary so that those typed relationships do not
+    /// inflate every `EnumerationBodyElement`, including annotating and recovery members.
+    Value(Box<Node<EnumeratedValue>>),
     /// Malformed syntax retained by the structured recovery parser. This body had no recovery
     /// representation at all: an unparseable member sent it to the closing brace, discarding
     /// everything in between with no node and no diagnostic.
     Error(Node<ParseErrorNode>),
 }
 
-/// One enumerated value inside an `enum def { ... }` body. `EnumeratedValue` is a full SysML
-/// `Usage`, so its identification, optional value part and usage body are all retained.
+/// One `EnumerationUsageMember` inside an `enum def { ... }` body.
+///
+/// The pinned SysML grammar gives this its own membership boundary:
+/// `EnumerationUsageMember = MemberPrefix EnumeratedValue`,
+/// `EnumeratedValue = 'enum'? Usage` (SysML-textual-bnf.kebnf 528-535).  It is therefore a
+/// complete usage declaration -- not merely a literal name and initializer -- with the same
+/// typed feature-specialization and multiplicity surface as the grammar-owned `Usage` tail.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumeratedValue {
-    pub name: String,
-    pub short_name: Option<String>,
+    /// Authored optional `enum` keyword.  Its presence is syntactic provenance, not an inferred
+    /// boolean; emission streams it only when the source contained it.
+    pub enum_keyword_span: Option<Span>,
+    /// `UsageDeclaration` identification.
+    pub identification: Identification,
+    /// Exact aggregate span of the optional short name and declared name. The decoded
+    /// [`Self::identification`] remains the semantic view; emission streams this source span so
+    /// quoted BASIC_NAME and escaped UNRESTRICTED_NAME spellings are not normalized away.
+    pub identification_span: Span,
+    /// Full `FeatureSpecializationPart` header, kept as typed relationships rather than a
+    /// reconstructed declaration string.
+    pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: MultiplicityModifiers,
+    /// `subsets` plus its grammar-owned optional `= expression` value.  The pair keeps the value
+    /// attached to the relationship slot that owns it rather than duplicating a feature value.
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub value: Option<Node<FeatureValue>>,
     pub body: PartUsageBody,
-    pub name_span: Option<Span>,
+    /// `MemberPrefix` is a `VariantMembership`, including its optional visibility indicator.
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------

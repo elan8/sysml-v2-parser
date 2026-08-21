@@ -1730,16 +1730,54 @@ pub(crate) fn emit_enum_def(
                         super::root::emit_annotating_member(w, path, member)?;
                     }
                     crate::ast::EnumerationBodyElement::Value(value) => {
-                        if let Some(short_name) = &value.value.short_name {
-                            w.push_char('<');
-                            w.push_str(&format_name(short_name));
-                            w.push_str("> ");
+                        let value = &value.value;
+                        emit_visibility(w, value.membership.visibility);
+                        if value.enum_keyword_span.is_some() {
+                            w.push_str("enum ");
                         }
-                        w.push_str(&format_name(&value.value.name));
-                        if let Some(initializer) = &value.value.value {
-                            emit_feature_value(w, initializer)?;
+                        if value.identification_span.len != 0 {
+                            w.push_authored_name(
+                                &format!("{path}/enumerated-value/identification"),
+                                &value.identification_span,
+                            )?;
                         }
-                        emit_part_usage_body(w, path, &value.value.body)?;
+                        if let Some(typing) = &value.typing {
+                            emit_typing_clause(w, &typing.value)?;
+                        }
+                        if let Some(multiplicity) = &value.multiplicity {
+                            emit_multiplicity(w, &multiplicity.value)?;
+                        }
+                        emit_multiplicity_modifiers(w, &value.multiplicity_modifiers);
+                        if let Some((subsets, subset_value)) = &value.subsets {
+                            emit_subsetting_clause(w, &subsets.value)?;
+                            if let Some(expression) = subset_value {
+                                w.push_str(" = ");
+                                emit_expression(w, &expression.value)?;
+                            }
+                        }
+                        if let Some(redefines) = &value.redefines {
+                            emit_subsetting_clause(w, &redefines.value)?;
+                        }
+                        if let Some(references) = &value.references {
+                            emit_subsetting_clause(w, &references.value)?;
+                        }
+                        if let Some(crosses) = &value.crosses {
+                            emit_subsetting_clause(w, &crosses.value)?;
+                        }
+                        if let Some(intersects) = &value.intersects {
+                            emit_subsetting_clause(w, &intersects.value)?;
+                        }
+                        if let Some(initializer) = &value.value {
+                            if value
+                                .subsets
+                                .as_ref()
+                                .and_then(|(_, expression)| expression.as_ref())
+                                .is_none()
+                            {
+                                emit_feature_value(w, initializer)?;
+                            }
+                        }
+                        emit_part_usage_body(w, path, &value.body)?;
                     }
                     crate::ast::EnumerationBodyElement::Error(error) => {
                         w.push_recovery_span(path, &error.span)?;

@@ -4663,20 +4663,75 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         super::EnumerationBodyElement::Value(value) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(enum-value (name ")?;
-                            write_quoted(self.writer, &value.value.name)?;
+                            let value_span = &value.span;
+                            let value = &value.value;
+                            self.writer.write_str("(enum-value (enum-keyword ")?;
+                            self.writer
+                                .write_str(if value.enum_keyword_span.is_some() {
+                                    "present"
+                                } else {
+                                    "none"
+                                })?;
+                            self.writer.write_str(") (visibility ")?;
+                            self.writer
+                                .write_str(visibility_name(value.membership.visibility))?;
+                            self.writer.write_str(") (name ")?;
+                            write_optional_quoted(
+                                self.writer,
+                                value.identification.name.as_deref(),
+                            )?;
                             self.writer.write_str(") (short-name ")?;
-                            write_optional_quoted(self.writer, value.value.short_name.as_deref())?;
-                            self.writer.write_str(") (value ")?;
-                            if let Some(initializer) = &value.value.value {
+                            write_optional_quoted(
+                                self.writer,
+                                value.identification.short_name.as_deref(),
+                            )?;
+                            self.writer.write_str(") (typing ")?;
+                            if let Some(typing) = &value.typing {
+                                self.write_typing(&typing.value)?;
+                            } else {
+                                self.writer.write_str("none")?;
+                            }
+                            self.writer.write_str(") (multiplicity ")?;
+                            self.write_multiplicity_clause(value.multiplicity.as_ref())?;
+                            self.writer.write_str(") ")?;
+                            self.write_multiplicity_modifiers(&value.multiplicity_modifiers)?;
+                            self.writer.write_str(" (subsets ")?;
+                            if let Some((subsets, expression)) = &value.subsets {
+                                self.write_subsetting(&subsets.value)?;
+                                self.writer.write_str(" (value ")?;
+                                if let Some(expression) = expression {
+                                    self.write_expression(expression)?;
+                                } else {
+                                    self.writer.write_str("none")?;
+                                }
+                                self.writer.write_char(')')?;
+                            } else {
+                                self.writer.write_str("none")?;
+                            }
+                            self.writer.write_str(") ")?;
+                            self.write_optional_subsetting("redefines", value.redefines.as_ref())?;
+                            self.writer.write_char(' ')?;
+                            self.write_optional_subsetting(
+                                "references",
+                                value.references.as_ref(),
+                            )?;
+                            self.writer.write_char(' ')?;
+                            self.write_optional_subsetting("crosses", value.crosses.as_ref())?;
+                            self.writer.write_char(' ')?;
+                            self.write_optional_subsetting(
+                                "intersects",
+                                value.intersects.as_ref(),
+                            )?;
+                            self.writer.write_str(" (value ")?;
+                            if let Some(initializer) = &value.value {
                                 self.write_feature_value(&initializer.value)?;
                             } else {
                                 self.writer.write_str("none")?;
                             }
                             self.writer.write_str(") ")?;
-                            self.write_ref_body(&value.value.body)?;
+                            self.write_ref_body(&value.body)?;
                             self.writer.write_char(' ')?;
-                            write_span(self.writer, &value.span)?;
+                            write_span(self.writer, value_span)?;
                             self.writer.write_char(')')?;
                         }
                         super::EnumerationBodyElement::Error(error) => {

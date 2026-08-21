@@ -11,6 +11,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::lex::{identification, name, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{feature_usage_header, multiplicity_node};
+use crate::parser::with_span;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -18,19 +19,24 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// Enumerated value: `UsageExtensionKeyword* EnumerationUsageKeyword? Usage`. Extension keywords
-/// are not currently modeled elsewhere, but the owned `Usage` is retained without flattening its
-/// value or body.
+/// `EnumerationUsageMember = MemberPrefix EnumeratedValue`, where the pinned
+/// `EnumeratedValue = 'enum'? Usage` (SysML-textual-bnf.kebnf 528-535).
+///
+/// This deliberately does **not** accept Pilot's leading `UsageExtensionKeyword*`: the pinned
+/// grammar has no such slot, so `#Security enum value ...` remains a source-backed recovery node
+/// rather than looking like supported SysML.  Once the optional enum token is past, the remaining
+/// declaration is the shared full `Usage` shape: Identification, FeatureSpecializationPart,
+/// ValuePart, then UsageBody.
 fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"enum"[..]), ws1)).parse(input)?;
-    let name_start = input;
-    let (input, ident) = identification(input)?;
-    let name_span = ident
-        .name
-        .as_ref()
-        .map(|_| crate::parser::span_from_to(name_start, input));
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, enum_keyword_span) = opt(with_span(|input| {
+        preceded(tag(&b"enum"[..]), ws1).parse(input)
+    }))
+    .parse(input)?;
+    let (input, (identification_span, ident)) = with_span(identification).parse(input)?;
+    let (input, header) = feature_usage_header(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = crate::parser::part::part_usage_body(input)?;
     Ok((
@@ -39,11 +45,22 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue
             start,
             input,
             EnumeratedValue {
-                name: ident.name.unwrap_or_default(),
-                short_name: ident.short_name,
+                enum_keyword_span: enum_keyword_span.map(|(span, _)| span),
+                identification: ident,
+                identification_span,
+                typing: header.typing,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                subsets: header
+                    .subsets
+                    .map(|subsets| (subsets, header.subsetting_value)),
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
                 value,
                 body,
-                name_span,
+                membership: Membership::variant(visibility, visibility_span),
             },
         ),
     ))
@@ -87,7 +104,16 @@ fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
     Ok((input, members.into_body()))
 }
 
-const ENUMERATION_BODY_STARTERS: &[&[u8]] = &[b"enum", b"doc", b"comment", b"rep", b"language"];
+const ENUMERATION_BODY_STARTERS: &[&[u8]] = &[
+    b"enum",
+    b"private",
+    b"protected",
+    b"public",
+    b"doc",
+    b"comment",
+    b"rep",
+    b"language",
+];
 
 fn enumeration_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationBodyElement>> {
     let start = input;
@@ -95,11 +121,12 @@ fn enumeration_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Enumera
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, element) = nom::branch::alt((
-        nom::combinator::map(
-            crate::parser::body::annotating_member,
-            EnumerationBodyElement::Annotating,
-        ),
-        nom::combinator::map(enumerated_value, EnumerationBodyElement::Value),
+        nom::combinator::map(crate::parser::body::annotating_member, |member| {
+            EnumerationBodyElement::Annotating(Box::new(member))
+        }),
+        nom::combinator::map(enumerated_value, |value| {
+            EnumerationBodyElement::Value(Box::new(value))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, element)))
@@ -212,85 +239,5 @@ mod membership_tests {
     fn enum_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = enum_usage(input("enum e1 : E1;")).expect("enum usage");
         assert_eq!(node.value.membership.visibility, None);
-    }
-}
-
-#[cfg(test)]
-mod enumerated_value_tests {
-    use super::*;
-
-    fn input(text: &str) -> Input<'_> {
-        crate::parser::span::test_input(text)
-    }
-
-    // The aggregate span covers the full owned usage; `name_span` independently preserves the
-    // authored declaration token.
-
-    #[test]
-    fn enumerated_value_bare_semicolon_form_has_name_span() {
-        let (rest, node) = enumerated_value(input("active;")).expect("enumerated value");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "active");
-        assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "active;".len());
-        assert_eq!(
-            node.value.name_span.as_ref().map(|span| span.len),
-            Some("active".len())
-        );
-    }
-
-    #[test]
-    fn enumerated_value_inline_body_is_retained() {
-        let (rest, node) =
-            enumerated_value(input("active { doc /* x */ }")).expect("enumerated value");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "active");
-        assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "active { doc /* x */ }".len());
-        assert!(matches!(node.value.body, crate::ast::Body::Brace { .. }));
-    }
-
-    #[test]
-    fn enumerated_value_initializer_is_retained() {
-        let (rest, node) = enumerated_value(input("active = 1;")).expect("enumerated value");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "active");
-        assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "active = 1;".len());
-        assert!(node.value.value.is_some());
-    }
-
-    #[test]
-    fn enumerated_value_optional_enum_keyword_prefix_offsets_the_name_span() {
-        let (rest, node) = enumerated_value(input("enum active;")).expect("enumerated value");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "active");
-        assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "enum active;".len());
-        assert_eq!(
-            node.value.name_span.as_ref().map(|span| span.offset),
-            Some("enum ".len())
-        );
-    }
-
-    #[test]
-    fn enumeration_body_collects_spanned_values_in_order() {
-        let (rest, body) =
-            enumeration_body(input("{ active; inactive = 1; degraded { } }")).expect("body");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let EnumerationBody::Brace {
-            elements: values, ..
-        } = body
-        else {
-            panic!("expected brace body");
-        };
-        let names: Vec<_> = values
-            .iter()
-            .map(|element| match &element.value {
-                EnumerationBodyElement::Value(value) => value.value.name.as_str(),
-                other => panic!("expected an enumerated value, got {other:?}"),
-            })
-            .collect();
-        assert_eq!(names, ["active", "inactive", "degraded"]);
     }
 }

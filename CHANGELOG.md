@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Enumeration values retain their full pin-valid usage declaration.** The pinned
+  `EnumerationUsageMember = MemberPrefix EnumeratedValue` and `EnumeratedValue = 'enum'? Usage`
+  productions (SysML textual BNF 528-535) now retain visibility, the authored optional `enum`
+  token, decoded `Identification` plus its exact authored source span, typed
+  feature-specialization relationships, multiplicity modifiers,
+  value, and body. This turns MetadataTest's ordinary typed `uncl` and `conf` values into
+  structured enum members while intentionally retaining the sibling Pilot-only
+  `#Security enum secret ...` extension as exact recovery: Pilot alone adds
+  `UsageExtensionKeyword*` before the optional `enum` token. Emission, semantic projection,
+  visitors, opacity inspection, recovery synchronization, and serde cover the complete shape.
+  **AST version 208.**
+
 - **KerML feature relationship tails retain ordered `featured by` clauses.** `KermlFeature` now
   owns the complete ordered `FeatureRelationshipPart*` tail from `FeatureDeclaration`, including
   source-backed, comma-separated `TypeFeaturingPart` targets. This replaces the lossy fixed

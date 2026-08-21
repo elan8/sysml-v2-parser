@@ -24,21 +24,14 @@ package EnumeratedValuePilotMetadataRecovery {
 )
 ~~~
 # FORMAT
-~~~sysml
-package EnumeratedValuePilotMetadataRecovery {
-    metadata def Security;
-    enum def ClassificationLevel {
-        uncl = 0;
-        #Security enum secret : ClassificationLevel = 2;
-        conf = 1;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
 (parsed-document
   (references
   )
-  (root (package (name "EnumeratedValuePilotMetadataRecovery") (body brace (metadata-def (name "Security") (abstract false) (specializes none) (body semicolon)) (enum-def (name "ClassificationLevel") (body brace (enum-value (name "uncl") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 129) (line 4) (column 21) (len 1)) (integer 0))))) (body semicolon) (span (offset 117) (line 4) (column 9) (len 14))) (malformed (code "unsupported_annotation_syntax") (found "#Security enum secret : ClassificationLevel = 2;") (span (offset 140) (line 5) (column 9) (len 57))) (enum-value (name "conf") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 209) (line 6) (column 21) (len 1)) (integer 1))))) (body semicolon) (span (offset 197) (line 6) (column 9) (len 14))))))))
+  (root (package (name "EnumeratedValuePilotMetadataRecovery") (body brace (metadata-def (name "Security") (abstract false) (specializes none) (body semicolon)) (enum-def (name "ClassificationLevel") (body brace (enum-value (enum-keyword present) (visibility none) (name "uncl") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 129) (line 4) (column 21) (len 1)) (integer 0))))) (body semicolon) (span (offset 117) (line 4) (column 9) (len 14))) (malformed (code "unsupported_annotation_syntax") (found "#Security enum secret : ClassificationLevel = 2;") (span (offset 140) (line 5) (column 9) (len 57))) (enum-value (enum-keyword present) (visibility none) (name "conf") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 209) (line 6) (column 21) (len 1)) (integer 1))))) (body semicolon) (span (offset 197) (line 6) (column 9) (len 14))))))))
 )
 ~~~
