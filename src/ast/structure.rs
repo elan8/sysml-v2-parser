@@ -1317,11 +1317,29 @@ pub enum EndNestedUsage {
     Item(Box<Node<ItemUsage>>),
 }
 
+/// The immediate declaration introducer after an `end` prefix.
+///
+/// `ref` is the required keyword of the pinned `ReferenceUsage` production after its
+/// `EndUsagePrefix`; `feature` is the distinct KerML compatibility spelling already accepted by
+/// the shared end parser. They are alternatives, not a boolean layered on top of the end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EndDeclIntroducer {
+    /// The existing bare end-declaration form has no intervening introducer.
+    Bare,
+    /// Source-backed `ref` from `EndUsagePrefix 'ref' Usage`.
+    Reference { keyword_span: Span },
+    /// Source-backed KerML compatibility `feature` spelling.
+    KerMLFeature { keyword_span: Span },
+}
+
 /// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
 /// target | nested `occurrence`/`item` usage, see [`nested_usage`](EndDecl::nested_usage)) `;`.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
+    /// `Bare`, source-backed `ref`, or source-backed KerML `feature` immediately after `end`.
+    pub introducer: EndDeclIntroducer,
     pub short_name: Option<String>,
     /// A normal declared name or a fixed derivation-end role. `#original`/`#derive` are grammar
     /// roles, not declaration labels.
@@ -1380,7 +1398,8 @@ pub enum DerivationEndRole {
 
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.short_name == other.short_name
+        self.introducer == other.introducer
+            && self.short_name == other.short_name
             && self.identity == other.identity
             && self.typing == other.typing
             && self.references == other.references

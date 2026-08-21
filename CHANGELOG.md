@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **End declarations retain their immediate `ref` / KerML `feature` introducer.** The pinned
+  `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` production (SysML textual BNF
+  285-286 and 335-337; pinned Pilot `SysML.xtext` agrees) now stores `EndDeclIntroducer` with the
+  keyword's exact source span. The shared connector-end parser, formatter, semantic projection,
+  traversal, and opacity inspection preserve both the reference and already-accepted KerML
+  feature spellings across connection, interface, occurrence, part/ref-body, and interface-usage
+  owners. This remains distinct from rejected Pilot-only occurrence-end prefixes and bare
+  DefaultReferenceUsage `end` forms. Semantic/recovery snapshots and the affected upstream
+  corpus snapshots cover the result. **AST version 203.**
+
 - **Variant usages retain every shared owning-body form.** `VariantUsageMember` owns the same
   `VariantUsageElement` in `AttributeBody`, `ActionBody`, `PortBody`, and `PortDefBody`; that
   element reaches `ActionUsage` through `BehaviorUsageElement` (SysML textual BNF 237-252,

@@ -492,6 +492,11 @@ macro_rules! ast_traversal {
                 walk_end_decl(self, node)
             }
 
+            /// Visits [`EndDeclIntroducer`]; the default implementation walks its children.
+            fn visit_end_decl_introducer(&mut self, node: &$($mutability)? EndDeclIntroducer) {
+                walk_end_decl_introducer(self, node)
+            }
+
             /// Visits [`EndIdentity`]; the default implementation walks its children.
             fn visit_end_identity(&mut self, node: &$($mutability)? EndIdentity) {
                 walk_end_identity(self, node)
@@ -3749,7 +3754,8 @@ macro_rules! ast_traversal {
         pub fn walk_end_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EndDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EndDecl { short_name, identity, typing, references, multiplicity, redefines, crosses, nested_usage, type_ref_span } = &$($mutability)? node.value;
+            let EndDecl { introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, nested_usage, type_ref_span } = &$($mutability)? node.value;
+            visitor.visit_end_decl_introducer(introducer);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
             visitor.visit_end_identity(identity);
             if let Some(inner) = typing {
@@ -3774,6 +3780,18 @@ macro_rules! ast_traversal {
                 visitor.visit_span(inner);
             }
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_end_decl_introducer<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndDeclIntroducer) {
+            match node {
+                EndDeclIntroducer::Bare => {}
+                EndDeclIntroducer::Reference { keyword_span } => {
+                    visitor.visit_span(keyword_span);
+                }
+                EndDeclIntroducer::KerMLFeature { keyword_span } => {
+                    visitor.visit_span(keyword_span);
+                }
+            }
         }
 
         pub fn walk_end_identity<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndIdentity) {

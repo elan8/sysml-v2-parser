@@ -11,15 +11,15 @@ use std::io::Write as _;
 
 use super::{
     ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectionDefBody,
-    ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndIdentity, Expression,
-    FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement, ImportShape,
-    ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement, Node,
-    PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody,
-    PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator,
-    RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
-    StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind,
-    TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
-    Visibility,
+    ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndDeclIntroducer,
+    EndIdentity, Expression, FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement,
+    ImportShape, ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement,
+    Node, PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement,
+    PerformBody, PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId,
+    ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement, RootElement, Span,
+    StateDefBody, StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind,
+    TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
+    ViewBodyElement, Visibility,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -3791,7 +3791,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_end(&mut self, end: &super::EndDecl) -> io::Result<()> {
-        self.writer.write_str("(end (short-name ")?;
+        self.writer.write_str("(end (introducer ")?;
+        match &end.introducer {
+            EndDeclIntroducer::Bare => self.writer.write_str("bare")?,
+            EndDeclIntroducer::Reference { keyword_span } => {
+                self.writer.write_str("(reference ")?;
+                write_span(self.writer, keyword_span)?;
+                self.writer.write_char(')')?;
+            }
+            EndDeclIntroducer::KerMLFeature { keyword_span } => {
+                self.writer.write_str("(kerml-feature ")?;
+                write_span(self.writer, keyword_span)?;
+                self.writer.write_char(')')?;
+            }
+        }
+        self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, end.short_name.as_deref())?;
         self.writer.write_str(") (identity ")?;
         match &end.identity {

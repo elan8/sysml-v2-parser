@@ -26,8 +26,8 @@
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity, EndNestedUsage, Node,
-    RefDecl,
+    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndDeclIntroducer, EndIdentity,
+    EndNestedUsage, Node, RefDecl,
 };
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
@@ -44,7 +44,7 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::preceded;
+use nom::sequence::{preceded, terminated};
 use nom::IResult;
 use nom::Parser;
 
@@ -106,19 +106,29 @@ pub(crate) fn end_decl(
     let (input, leading_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     // `ref` belongs to the pinned `ReferenceUsage = (EndUsagePrefix | RefPrefix) 'ref' Usage`
-    // production (SysML BNF 335--337); `feature` is retained for the KerML end-feature spelling
-    // that reaches this compatibility parser. Do not consume occurrence-kind keywords here:
+    // production (SysML BNF 335--337); `feature` is the KerML compatibility spelling that
+    // reaches this parser. Both tokens are source-backed grammar facts and must survive.
+    // Do not consume occurrence-kind keywords here:
     // Pilot alone widens `OccurrenceUsagePrefix` with `EndUsagePrefix`, while the pinned grammar
     // defines it as `BasicUsagePrefix ...` (SysML BNF 564--570). Accepting `end part|port|item|
     // occurrence ...` here silently erased the keyword because `EndDecl` has no such field.
     // Nested `end name [*] occurrence/item nestedName …` (GH-53) is unaffected: that kind keyword
     // appears *after* the end's own name there, so it is not consumed by this leading-position
     // optional kind (this alt only fires before a name has been parsed at all).
-    let (input, _) = opt(preceded(
+    let (input, introducer) = opt(preceded(
         ws_and_comments,
-        alt(((tag(&b"ref"[..]), ws1), (tag(&b"feature"[..]), ws1))),
+        alt((
+            map(terminated(with_span(tag(&b"ref"[..])), ws1), |(span, _)| {
+                EndDeclIntroducer::Reference { keyword_span: span }
+            }),
+            map(
+                terminated(with_span(tag(&b"feature"[..])), ws1),
+                |(span, _)| EndDeclIntroducer::KerMLFeature { keyword_span: span },
+            ),
+        )),
     ))
     .parse(input)?;
+    let introducer = introducer.unwrap_or(EndDeclIntroducer::Bare);
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
@@ -156,6 +166,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    introducer,
                     short_name,
                     identity,
                     typing: None,
@@ -185,6 +196,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    introducer,
                     short_name,
                     identity,
                     typing: None,
@@ -206,6 +218,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    introducer,
                     short_name,
                     identity,
                     typing: None,
@@ -233,6 +246,7 @@ pub(crate) fn end_decl(
                     start,
                     rest,
                     EndDecl {
+                        introducer,
                         short_name,
                         identity,
                         typing: None,
@@ -278,6 +292,7 @@ pub(crate) fn end_decl(
             start,
             input,
             EndDecl {
+                introducer,
                 short_name,
                 identity,
                 typing,

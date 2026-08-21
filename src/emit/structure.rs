@@ -7,11 +7,11 @@ use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
     ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
-    EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
-    InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody,
-    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement,
-    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
-    SubsettingRelationship, TypingKind, TypingRelationship,
+    EndDeclIntroducer, EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody,
+    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
+    RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -928,6 +928,11 @@ pub(crate) fn emit_end_decl(
         );
     }
     w.push_str("end ");
+    match &end.introducer {
+        EndDeclIntroducer::Bare => {}
+        EndDeclIntroducer::Reference { .. } => w.push_str("ref "),
+        EndDeclIntroducer::KerMLFeature { .. } => w.push_str("feature "),
+    }
     if let Some(short_name) = &end.short_name {
         w.push_char('<');
         w.push_str(&format_name(short_name));
