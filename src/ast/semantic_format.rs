@@ -2464,9 +2464,37 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// This names each relationship alternative and streams targets in source
     /// order, making repeated and interleaved parts observable in snapshots.
     fn write_kerml_feature(&mut self, feature: &super::KermlFeature) -> io::Result<()> {
-        self.writer.write_str("(kerml-feature (name ")?;
+        self.writer.write_str("(kerml-feature ")?;
+        self.write_kerml_feature_prefix(&feature.prefix)?;
+        self.writer.write_str(" (kind ")?;
+        match &feature.kind {
+            Some(kind) => self.writer.write_str(kind.value.as_str())?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (member {}) (all {}) (name ",
+            feature.is_member, feature.is_all
+        )?;
         self.write_usage_declaration_name(&feature.name)?;
-        self.writer.write_str(") (relationships")?;
+        self.writer.write_str(") (typing ")?;
+        match &feature.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", feature.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", feature.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", feature.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", feature.crosses.as_ref())?;
+        self.writer.write_str(" (relationships")?;
         for part in &feature.relationship_parts {
             self.writer.write_char(' ')?;
             match &part.value {
@@ -2509,6 +2537,57 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&feature.body)?;
         self.writer.write_char(')')
+    }
+
+    /// The complete KerML `FeaturePrefix` in its grammar-owned shape. This makes a directed
+    /// keyword-less Feature distinct from the SysML-only `InOutDecl` surface, while preserving
+    /// every mutually-exclusive prefix slot in semantic snapshots.
+    fn write_kerml_feature_prefix(&mut self, prefix: &super::FeaturePrefix) -> io::Result<()> {
+        self.writer.write_str("(prefix (head ")?;
+        match &prefix.head {
+            super::FeaturePrefixHead::Basic(basic) => {
+                self.writer.write_str("basic) (direction ")?;
+                self.write_direction(basic.direction.as_ref().map(|direction| direction.value))?;
+                write!(
+                    self.writer,
+                    ") (derived {}) (abstract {}) (portion ",
+                    basic.derived_span.is_some(),
+                    basic.abstract_span.is_some()
+                )?;
+                match basic.portioning.as_ref().map(|portion| portion.value) {
+                    Some(super::FeaturePortionKind::Composite) => {
+                        self.writer.write_str("composite")?
+                    }
+                    Some(super::FeaturePortionKind::Portion) => self.writer.write_str("portion")?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (variability ")?;
+                match basic
+                    .variability
+                    .as_ref()
+                    .map(|variability| variability.value)
+                {
+                    Some(super::FeatureVariability::Var) => self.writer.write_str("var")?,
+                    Some(super::FeatureVariability::Const) => self.writer.write_str("const")?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_char(')')?;
+            }
+            super::FeaturePrefixHead::End { prefix, cross } => {
+                write!(
+                    self.writer,
+                    "end) (constant {}) (cross {})",
+                    prefix.constant_span.is_some(),
+                    if cross.is_some() { "present" } else { "none" }
+                )?;
+            }
+        }
+        self.writer.write_str(" (metadata")?;
+        for keyword in &prefix.metadata_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str("))")
     }
 
     /// `ConstraintDefBody`, with its members.
@@ -2709,9 +2788,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::ActionMember(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_first_merge_member(&member.value, &member.span)?;
-                        }
-                        super::CalcDefBodyElement::InOutDecl(_declaration) => {
-                            self.write_marker(&mut first, "in-out-declaration")?;
                         }
                         super::CalcDefBodyElement::KermlFeature(member) => {
                             self.write_item_prefix(&mut first)?;

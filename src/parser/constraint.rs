@@ -584,6 +584,44 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
             Err(_) => {}
         }
     }
+    if starts_with_keyword(peek.fragment(), b"in")
+        || starts_with_keyword(peek.fragment(), b"out")
+        || starts_with_keyword(peek.fragment(), b"inout")
+    {
+        // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` keeps the directed
+        // parameter spelling in its SysML action-owned production. Do this before the KerML
+        // TypeBody fallback below: `calc def F { in p : T; }` must remain `InOutDecl`, whereas
+        // `behavior B { in p : T; }` reaches `calc_def_body_element` and is a keyword-less
+        // `Feature` (SysML BNF 1359-1370; KerML BNF 519-527, 562-608).
+        // A direction may instead belong to a full occurrence usage. Preserve the pre-existing
+        // `in part …` action-body route before testing the bare parameter declaration; an
+        // `InOutDecl` parser is intentionally not allowed to treat `part` as a parameter name.
+        if let Ok((next, usage)) = crate::parser::part::part_usage(input) {
+            return Ok((
+                next,
+                node_from_to(input, next, CalcDefBodyElement::PartUsage(Box::new(usage))),
+            ));
+        }
+        let start = input;
+        // Do not call the whole action dispatcher here: its directed `calc` usage probe may
+        // accept the `calc` prefix of an ordinary parameter name before this production gets a
+        // chance to retain the declaration. The grammar-owned parameter parser is already
+        // transactional and supplies the exact `ActionDefBodyElement` alternative directly.
+        let (next, declaration) = in_out_decl(input)?;
+        let member = node_from_to(
+            start,
+            next,
+            crate::ast::ActionDefBodyElement::InOutDecl(declaration),
+        );
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                CalcDefBodyElement::ActionMember(Box::new(member)),
+            ),
+        ));
+    }
     calc_def_body_element(input)
 }
 
@@ -1728,21 +1766,22 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             }
             // `in expr …` / `in bool …` / `in feature …` / `in step …` are `FeaturePrefix`'s
             // direction slot in front of the same four productions the undirected spelling uses
-            // (KerML BNF 577/562/863/895/908), so they are the same node. Ahead of plain
-            // `InOutDecl`, which would misread the kind keyword as the parameter name.
+            // (KerML BNF 577/562/863/895/908), so they are the same node.
             Some(_) => map(kerml_feature, |n| {
                 CalcDefBodyElement::KermlFeature(Box::new(n))
             })
             .parse(input)?,
-            None if named_in_out_missing_type(input) => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-            None => {
-                map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
-            }
+            // The keyword-less `Feature` alternative is the remaining production under this
+            // KerML TypeBody dispatcher: `in value : T;`, `out result;`, and `in :>> inherited;`
+            // are `BasicFeaturePrefix FeatureDeclaration` (KerML BNF 562-569, 577-608), not the
+            // SysML action-body parameter shorthand. Re-parse from the original input through
+            // the transactional feature parser so every prefix/declaration clause owns its
+            // source-backed span. `calculation_body` keeps its separate ActionBody dispatch and
+            // therefore retains `InOutDecl` for SysML calculation members.
+            None => map(kerml_feature, |n| {
+                CalcDefBodyElement::KermlFeature(Box::new(n))
+            })
+            .parse(input)?,
         }
     } else if calc_def_follows_visibility(input) {
         // Nested `(private|protected|public)? calc def Name { ... }` rollup helper (Domain

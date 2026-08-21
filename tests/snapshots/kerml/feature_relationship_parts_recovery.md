@@ -29,8 +29,9 @@ package P {
 ~~~sexpr
 (parsed-document
   (references
-    (reference r0 (scope relative) (span (offset 108) (line 4) (column 42) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 108) (line 4) (column 42) (len 1)))))
+    (reference r0 (scope relative) (span (offset 94) (line 4) (column 28) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 94) (line 4) (column 28) (len 1)))))
+    (reference r1 (scope relative) (span (offset 108) (line 4) (column 42) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 108) (line 4) (column 42) (len 1)))))
   )
-  (root (package (name "P") (body brace (kerml-classifier (keyword class) (abstract false) (name "C") (specializes none) (body brace (malformed (code "unrecognized_declaration_in_scope") (found "feature broken : T featured by ;") (span (offset 34) (line 3) (column 9) (len 41))) (kerml-feature (name "retained") (relationships (featured-by (ref r0))) (value none) (body semicolon)))))))
+  (root (package (name "P") (body brace (kerml-classifier (keyword class) (abstract false) (name "C") (specializes none) (body brace (malformed (code "unrecognized_declaration_in_scope") (found "feature broken : T featured by ;") (span (offset 34) (line 3) (column 9) (len 41))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "retained") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (relationships (featured-by (ref r1))) (value none) (body semicolon)))))))
 )
 ~~~

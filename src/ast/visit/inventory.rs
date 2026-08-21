@@ -7202,9 +7202,6 @@ macro_rules! ast_traversal {
                     visitor.visit_membership(&$($mutability)? field_0.membership);
                     visitor.visit_library_package(&$($mutability)? field_0.package);
                 }
-                CalcDefBodyElement::InOutDecl(field_0) => {
-                    visitor.visit_in_out_decl(&$($mutability)? **field_0);
-                }
                 CalcDefBodyElement::KermlFeature(field_0) => {
                     visitor.visit_kerml_feature(&$($mutability)? **field_0);
                 }

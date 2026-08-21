@@ -234,7 +234,6 @@ pub enum CalcDefBodyElement {
     /// entry point is the only one that dispatches it. Splitting the two scopes into their own
     /// element enums is Phase-4 work; this variant does not make that debt worse.
     ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
-    InOutDecl(Box<Node<InOutDecl>>),
     /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
     /// s: Occurrence subsets a inverse of b { ... }`); see
     /// [`crate::ast::KermlFeature`].

@@ -263,7 +263,6 @@ fn emit_calc_body_element(
         CalcDefBodyElement::ActionMember(n) => {
             super::behavior::emit_action_def_body_element(w, path, &n.value)
         }
-        CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature(w, path, &f.value),
         CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),

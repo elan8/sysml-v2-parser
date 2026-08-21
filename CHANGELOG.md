@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **KerML directed keyword-less Features retain their own production.** In KerML type/classifier/
+  function bodies, `in value : T;`, `out result;`, and `in :>> inherited;` now route through the
+  existing source-backed `KermlFeature` parser (`BasicFeaturePrefix FeatureDeclaration`) rather
+  than the SysML-only `InOutDecl` state. `CalcDefBodyElement::InOutDecl` is removed; the separate
+  SysML `CalculationBody` action dispatcher retains it. Semantic snapshots now expose the complete
+  KerML feature prefix, declaration typing/multiplicity, relationship clauses, and value/body.
+  **AST version 222.**
+
 - **KerML TypeBody packages retain their owning membership.** `CalcDefBodyElement` now has
   distinct source-backed `Package` and `LibraryPackage` members, each carrying the authored
   `MemberPrefix` visibility beside its typed package node. This admits nested packages in KerML
