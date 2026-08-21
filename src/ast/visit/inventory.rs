@@ -782,6 +782,16 @@ macro_rules! ast_traversal {
                 walk_for_loop(self, node)
             }
 
+            /// Visits [`ForVariableDeclaration`]; the default implementation walks its children.
+            fn visit_for_variable_declaration(&mut self, node: &$($mutability)? Node<ForVariableDeclaration>) {
+                walk_for_variable_declaration(self, node)
+            }
+
+            /// Visits [`ForLoopInParameter`]; the default implementation walks its children.
+            fn visit_for_loop_in_parameter(&mut self, node: &$($mutability)? ForLoopInParameter) {
+                walk_for_loop_in_parameter(self, node)
+            }
+
             /// Visits [`ThenAction`]; the default implementation walks its children.
             fn visit_then_action(&mut self, node: &$($mutability)? Node<ThenAction>) {
                 walk_then_action(self, node)
@@ -4898,11 +4908,63 @@ macro_rules! ast_traversal {
         pub fn walk_for_loop<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForLoop>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ForLoop { var, range, body } = &$($mutability)? node.value;
-            visitor.visit_text(var);
-            visitor.visit_expression(range);
-            visitor.visit_action_def_body(body);
+            let ForLoop { prefix, variable, in_parameter, body } = &$($mutability)? node.value;
+            visitor.visit_action_node_prefix(prefix);
+            visitor.visit_for_variable_declaration(variable);
+            visitor.visit_for_loop_in_parameter(in_parameter);
+            visitor.visit_action_body_parameter(body);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_for_variable_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForVariableDeclaration>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let ForVariableDeclaration {
+                identification,
+                identification_span,
+                typing,
+                multiplicity,
+                multiplicity_modifiers,
+                subsets,
+                redefines,
+                references,
+                crosses,
+                intersects,
+            } = &$($mutability)? node.value;
+            visitor.visit_identification(identification);
+            visitor.visit_span(identification_span);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some((relationship, value)) = subsets {
+                visitor.visit_subsetting_relationship(relationship);
+                if let Some(value) = value {
+                    visitor.visit_expression(value);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_for_loop_in_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ForLoopInParameter) {
+            let ForLoopInParameter { in_span, expression } = node;
+            visitor.visit_span(in_span);
+            visitor.visit_expression(expression);
         }
 
         pub fn walk_then_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ThenAction>) {

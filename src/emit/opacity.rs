@@ -912,9 +912,7 @@ fn walk_in_out_decl(report: &mut OpacityReport, path: &str, decl: &crate::ast::I
 }
 
 /// `ActionNodePrefix` contains only typed prefix/declaration facts (no nested body or recovery
-/// carrier), while the mandatory `ActionBody` below is where opacity can occur. Keeping this
-/// boundary explicit means the future `ForLoopNode` adoption shares the same decision rather than
-/// silently bypassing a newly added body-bearing prefix alternative.
+/// carrier), while the mandatory `ActionBody` below is where opacity can occur.
 fn walk_action_node_body(
     report: &mut OpacityReport,
     path: &str,
@@ -963,6 +961,32 @@ fn walk_action_node_body(
         } = &declaration.value;
     }
     walk_action_def_body(report, path, body);
+}
+
+fn walk_for_loop(report: &mut OpacityReport, path: &str, for_loop: &crate::ast::ForLoop) {
+    let crate::ast::ForLoop {
+        prefix,
+        variable,
+        in_parameter,
+        body,
+    } = for_loop;
+    let crate::ast::ForVariableDeclaration {
+        identification: _,
+        identification_span: _,
+        typing: _,
+        multiplicity: _,
+        multiplicity_modifiers: _,
+        subsets: _,
+        redefines: _,
+        references: _,
+        crosses: _,
+        intersects: _,
+    } = &variable.value;
+    let crate::ast::ForLoopInParameter {
+        in_span: _,
+        expression: _,
+    } = in_parameter;
+    walk_action_node_body(report, path, prefix, body);
 }
 
 fn walk_action_def_body_elements(
@@ -1020,7 +1044,7 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::OccurrenceUsage(n) => {
                 walk_occurrence_usage_body(report, &p, &n.value.body)
             }
-            ActionDefBodyElement::ForLoop(n) => walk_action_def_body(report, &p, &n.value.body),
+            ActionDefBodyElement::ForLoop(n) => walk_for_loop(report, &p, &n.value),
             ActionDefBodyElement::ThenAction(n) => walk_then_target(report, &p, &n.value.target),
             ActionDefBodyElement::FirstStmt(first) => {
                 walk_first_merge_body(report, &p, &first.value.body)
@@ -1131,7 +1155,7 @@ fn walk_action_usage_body_elements(
             ActionUsageBodyElement::OccurrenceUsage(n) => {
                 walk_occurrence_usage_body(report, &p, &n.value.body)
             }
-            ActionUsageBodyElement::ForLoop(n) => walk_action_def_body(report, &p, &n.value.body),
+            ActionUsageBodyElement::ForLoop(n) => walk_for_loop(report, &p, &n.value),
             ActionUsageBodyElement::ThenAction(n) => walk_then_target(report, &p, &n.value.target),
             ActionUsageBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             ActionUsageBodyElement::FirstStmt(first) => {
@@ -1300,7 +1324,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::ReturnRef(n) => {
                 walk_return_ref_body(report, &p, &n.value.body.value)
             }
-            UseCaseDefBodyElement::ForLoop(n) => walk_action_def_body(report, &p, &n.value.body),
+            UseCaseDefBodyElement::ForLoop(n) => walk_for_loop(report, &p, &n.value),
             UseCaseDefBodyElement::ThenAction(n) => walk_then_target(report, &p, &n.value.target),
             UseCaseDefBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)

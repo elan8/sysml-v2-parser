@@ -865,14 +865,7 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::AssertConstraint(assert) => {
             crate::emit::view::emit_assert_constraint(w, path, &assert.value)
         }
-        UseCaseDefBodyElement::ForLoop(f) => {
-            w.push_str("for ");
-            w.push_str(&format_name(&f.value.var));
-            w.push_str(" in ");
-            emit_expression(w, &f.value.range.value)?;
-            w.push_char(' ');
-            super::behavior::emit_action_def_body(w, path, &f.value.body)
-        }
+        UseCaseDefBodyElement::ForLoop(f) => super::behavior::emit_for_loop(w, path, &f.value),
         UseCaseDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
         UseCaseDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)

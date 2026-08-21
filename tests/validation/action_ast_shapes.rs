@@ -92,7 +92,7 @@ fn scan_use_case_body(body: &UseCaseDefBody, for_loops: &mut usize, then_assigns
         match &el.value {
             UseCaseDefBodyElement::ForLoop(fl) => {
                 *for_loops += 1;
-                scan_action_def_body(&fl.value.body, for_loops, then_assigns);
+                scan_action_def_body(&fl.value.body.body, for_loops, then_assigns);
             }
             UseCaseDefBodyElement::Assign(a) if a.value.is_then => *then_assigns += 1,
             _ => {}

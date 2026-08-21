@@ -152,7 +152,9 @@ action def Iterate {
     };
     assert_eq!(elements.len(), 3, "recovery must keep both valid siblings");
     let range = match &elements[0].value {
-        sysml_v2_parser::ast::ActionDefBodyElement::ForLoop(for_loop) => &for_loop.value.range,
+        sysml_v2_parser::ast::ActionDefBodyElement::ForLoop(for_loop) => {
+            &for_loop.value.in_parameter.expression
+        }
         other => panic!("expected valid for-loop, got {other:?}"),
     };
     let (base, member) = match &range.value {
@@ -160,12 +162,12 @@ action def Iterate {
             let sysml_v2_parser::ast::Expression::FeatureRef(base) = base.value else {
                 panic!("expected feature-ref base")
             };
-            (base, *member)
+            (base, member)
         }
         other => panic!("expected member-access range, got {other:?}"),
     };
     assert_eq!(resolved(&result.document, base), "Domain::fleet");
-    assert_eq!(resolved(&result.document, member), "activeMembers");
+    assert_eq!(resolved(&result.document, *member), "activeMembers");
     assert!(matches!(
         elements[1].value,
         sysml_v2_parser::ast::ActionDefBodyElement::Error(_)

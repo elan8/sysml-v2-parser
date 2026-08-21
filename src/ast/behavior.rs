@@ -125,13 +125,42 @@ pub struct AssignStmt {
     pub rhs: Node<Expression>,
 }
 
-/// For-loop node (SysML v2 ForLoopNode) - modeled minimally.
+/// `ForVariableDeclarationMember`'s typed `UsageDeclaration`.
+///
+/// This is a declaration label and feature-specialization header, not a string reconstructed from
+/// the `for` text. The aggregate identification span preserves authored names for emission.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ForVariableDeclaration {
+    pub identification: Identification,
+    pub identification_span: Span,
+    pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: MultiplicityModifiers,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
+}
+
+/// The `in` node parameter of `ForLoopNode`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ForLoopInParameter {
+    pub in_span: Span,
+    pub expression: Node<Expression>,
+}
+
+/// `ForLoopNode = ActionNodePrefix 'for' ForVariableDeclarationMember 'in'
+/// NodeParameterMember ActionBodyParameter` (SysML textual BNF 1151-1155).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForLoop {
-    pub var: String,
-    pub range: Node<Expression>,
-    pub body: ActionDefBody,
+    pub prefix: ActionNodePrefix,
+    pub variable: Node<ForVariableDeclaration>,
+    pub in_parameter: ForLoopInParameter,
+    pub body: ActionBodyParameter,
 }
 
 /// Succession to a following node: `then action ...`, `then perform ...`, a control node, or
@@ -727,8 +756,6 @@ pub struct TerminateStmt {
 /// `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` (SysML textual BNF
 /// 957-958; pinned Pilot `SysML.xtext` 1438-1439).  `WhileLoopNode` and `ForLoopNode` both name
 /// this production, so it is one component rather than a collection of loop-specific flags.
-/// `ForLoop` has not migrated yet, but can adopt this exact component without changing its
-/// grammar boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionNodePrefix {

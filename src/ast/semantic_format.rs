@@ -2003,12 +2003,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_for_loop(&mut self, for_loop: &super::ForLoop) -> io::Result<()> {
-        self.writer.write_str("(for-loop (variable ")?;
-        write_quoted(self.writer, &for_loop.var)?;
-        self.writer.write_str(") (range ")?;
-        self.write_expression(&for_loop.range)?;
+        self.writer.write_str("(for-loop (prefix ")?;
+        self.write_action_node_prefix(&for_loop.prefix)?;
+        self.writer.write_str(") (variable ")?;
+        self.write_for_variable_declaration(&for_loop.variable.value)?;
+        self.writer.write_str(") (in ")?;
+        self.write_expression(&for_loop.in_parameter.expression)?;
         self.writer.write_str(") ")?;
-        self.write_action_body(&for_loop.body)?;
+        self.write_action_body_parameter(&for_loop.body)?;
         self.writer.write_char(')')
     }
 
@@ -2074,6 +2076,59 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_for_variable_declaration(
+        &mut self,
+        declaration: &super::ForVariableDeclaration,
+    ) -> io::Result<()> {
+        self.writer.write_str("(for-variable (name ")?;
+        write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(
+            self.writer,
+            declaration.identification.short_name.as_deref(),
+        )?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &declaration.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+        self.writer.write_str(" (subsets ")?;
+        if let Some((subsets, value)) = &declaration.subsets {
+            self.write_subsetting(&subsets.value)?;
+            self.writer.write_str(" (value ")?;
+            if let Some(value) = value {
+                self.write_expression(value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_char(')')?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", declaration.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
+        self.writer.write_char(')')
+    }
+
+    fn write_action_body_parameter(&mut self, body: &super::ActionBodyParameter) -> io::Result<()> {
+        self.writer.write_str("(body-parameter ")?;
+        self.write_action_node_declaration(body.action_declaration.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_action_body(&body.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_loop_node(
         &mut self,
         kind: &str,
@@ -2093,11 +2148,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_str("none")?;
         }
         self.writer.write_str(") ")?;
-        self.writer.write_str("(body-parameter ")?;
-        self.write_action_node_declaration(body.action_declaration.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_action_body(&body.body)?;
-        self.writer.write_char(')')?;
+        self.write_action_body_parameter(body)?;
         self.writer.write_str(" (until ")?;
         if let Some(until) = until {
             self.write_expression(&until.expression)?;

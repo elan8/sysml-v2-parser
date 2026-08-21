@@ -4,8 +4,9 @@ use crate::ast::{
     ActionBodyParameter, ActionDef, ActionDefBody, ActionDefBodyElement, ActionNodePrefix,
     ActionNodeUsageDeclaration, ActionUsage, ActionUsageBody, ActionUsageBodyElement, AssignStmt,
     ControlNodeDeclaration, DecisionStmt, FirstMergeBody, FirstMergeBodyElement, FirstStmt,
-    ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node,
-    ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, UntilParameter, WhileStmt,
+    ForLoop, ForLoopInParameter, ForVariableDeclaration, ForkStmt, IfStmt, InOut, InOutDecl,
+    JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction,
+    ThenTarget, UntilParameter, WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -607,20 +608,64 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
 
 fn for_loop_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let start = input;
+    let (input, prefix) = action_node_prefix(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, variable) = for_variable_declaration(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"for"[..]).parse(input)?;
+    let (input, (in_span, _)) = with_span(tag(&b"in"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, var) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"in"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    // A successfully parsed loop always owns a typed expression. If the range is malformed, the
+    // A successfully parsed loop always owns a typed node parameter. If it is malformed, the
     // complete production fails so the containing editor body inserts an explicit recovery node;
     // `reference_transaction` also discards any references allocated before that failure.
-    let (input, range) = expression(input)?;
-    let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+    let (input, expression) = expression(input)?;
+    let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, ForLoop { var, range, body }),
+        node_from_to(
+            start,
+            input,
+            ForLoop {
+                prefix,
+                variable,
+                in_parameter: ForLoopInParameter {
+                    in_span,
+                    expression,
+                },
+                body,
+            },
+        ),
+    ))
+}
+
+/// `ForVariableDeclarationMember = UsageDeclaration` (SysML textual BNF 1153).  The feature
+/// header is retained at this declaration boundary, rather than reducing an authored variable
+/// name to display text before the `in` node parameter is parsed.
+fn for_variable_declaration(input: Input<'_>) -> IResult<Input<'_>, Node<ForVariableDeclaration>> {
+    let start = input;
+    let (input, identification) = identification(input)?;
+    let identification_span = span_from_to(start, input);
+    let (input, header) = parse_feature_usage_header(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ForVariableDeclaration {
+                identification,
+                identification_span,
+                typing: header.typing,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                subsets: header
+                    .subsets
+                    .map(|relationship| (relationship, header.subsetting_value)),
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
+            },
+        ),
     ))
 }
 
@@ -743,6 +788,15 @@ pub(crate) fn action_def_body_element(
         let (next, member) = annotating_member_stmt(start)?;
         let elem = ActionDefBodyElement::Annotating(member);
         return Ok((next, node_from_to(start, next, elem)));
+    }
+    // `ActionNodePrefix` may begin with `ref`, which the generic action/ref declaration arms
+    // below would otherwise claim before the complete `for` production gets a chance to commit.
+    // The transactional parse keeps ordinary `ref` members as their existing fallback.
+    if let Ok((next, node)) = for_loop(start) {
+        return Ok((
+            next,
+            node_from_to(start, next, ActionDefBodyElement::ForLoop(node)),
+        ));
     }
     // `ActionNodePrefix` may begin with a contended occurrence slot (`ref`, `#tag`, etc.) or an
     // optional `action` declaration. Claim a complete loop node before a generic reference,
@@ -1125,7 +1179,7 @@ fn terminate_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
 /// `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` (SysML textual BNF
 /// 957-958; pinned Pilot `SysML.xtext` 1438-1439).  The production is shared by while and for
 /// loop nodes, so it is parsed once at their owning grammar boundary rather than turned into
-/// loop-specific flags. `ForLoop` has not adopted the typed component yet.
+/// loop-specific flags.
 fn action_node_prefix(input: Input<'_>) -> IResult<Input<'_>, ActionNodePrefix> {
     let (input, occurrence_prefix) =
         crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;

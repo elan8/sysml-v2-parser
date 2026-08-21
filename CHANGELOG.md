@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **For action nodes retain their complete pinned grammar structure.** `ForLoopNode` now shares
+  `ActionNodePrefix` with its loop/while siblings, owns a source-backed typed
+  `ForVariableDeclaration` (including the full usage header), a structured `in` node parameter,
+  and the mandatory `ActionBodyParameter`. Action definition, action usage, and use-case bodies
+  all dispatch and emit the same typed node. Semantic snapshots, recovery, visitors, opacity, and
+  serde cover this complete production (SysML textual BNF 954-965 and 1151-1155; pinned Pilot
+  `SysML.xtext` 1438-1439 and 1624-1628). **AST version 211.**
+
 - **Loop and while action nodes retain their shared prefix and termination parameter.** The
   grammar-owned `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` now serves
   both `loop` and `while` forms, retaining the optional source-backed `action`

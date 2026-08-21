@@ -106,8 +106,8 @@ pub(crate) fn emit_action_def(
 }
 
 /// Stream the shared `ActionNodePrefix` before a loop-node keyword. The prefix owns its optional
-/// `action` declaration and complete feature-specialization header; `while`, `loop`, and the
-/// future `for` migration merely choose the following node alternative.
+/// `action` declaration and complete feature-specialization header; `while`, `loop`, and `for`
+/// merely choose the following node alternative.
 fn emit_action_node_prefix(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -176,6 +176,58 @@ fn emit_action_body_parameter(
         emit_action_node_usage_declaration(w, path, &declaration.value)?;
     }
     emit_action_def_body(w, path, &body.body)
+}
+
+/// Emit the complete `ForLoopNode` production.  Its variable is a declaration, so its name is
+/// streamed from the aggregate authored span rather than re-escaped from the decoded label.
+pub(crate) fn emit_for_loop(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    for_loop: &crate::ast::ForLoop,
+) -> Result<(), EmitError> {
+    emit_action_node_prefix(w, path, &for_loop.prefix)?;
+    w.push_str("for ");
+    emit_for_variable_declaration(w, path, &for_loop.variable.value)?;
+    w.push_str(" in ");
+    emit_expression(w, &for_loop.in_parameter.expression.value)?;
+    emit_action_body_parameter(w, path, &for_loop.body)
+}
+
+fn emit_for_variable_declaration(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    declaration: &crate::ast::ForVariableDeclaration,
+) -> Result<(), EmitError> {
+    w.push_authored_name(
+        &format!("{path}/for-variable/identification"),
+        &declaration.identification_span,
+    )?;
+    if let Some(typing) = &declaration.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+    if let Some((subsets, value)) = &declaration.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+        if let Some(value) = value {
+            w.push_str(" = ");
+            emit_expression(w, &value.value)?;
+        }
+    }
+    for relationship in [
+        declaration.redefines.as_ref(),
+        declaration.references.as_ref(),
+        declaration.crosses.as_ref(),
+        declaration.intersects.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        emit_subsetting_clause(w, &relationship.value)?;
+    }
+    Ok(())
 }
 
 fn emit_until_parameter(
@@ -423,14 +475,7 @@ pub(crate) fn emit_action_def_body_element(
             }
             Ok(())
         }
-        ActionDefBodyElement::ForLoop(f) => {
-            w.push_str("for ");
-            w.push_str(&format_name(&f.value.var));
-            w.push_str(" in ");
-            emit_expression(w, &f.value.range.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &f.value.body)
-        }
+        ActionDefBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         ActionDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
@@ -544,10 +589,7 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::TerminateStmt(terminate) => {
             emit_terminate_stmt(w, &terminate.value)
         }
-        other @ ActionUsageBodyElement::ForLoop(_) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        ActionUsageBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
     }
 }
 

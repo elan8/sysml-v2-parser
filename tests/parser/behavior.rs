@@ -262,52 +262,6 @@ action def Compute {
     }
 }
 
-#[test]
-fn test_for_loop_range_uses_structured_collection_operator() {
-    // A successful for-loop always owns a typed expression. Arrow invocation is represented by
-    // the dedicated collection-operator form rather than copied range text.
-    let input = r#"package P {
-action def Iterate {
-  in powerProfile;
-  for x in powerProfile->size() {
-    assign x := x + 1;
-  }
-}
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => p,
-        other => panic!("expected package, got {:?}", other),
-    };
-    let elements = match &pkg.value.body {
-        PackageBody::Brace { elements, .. } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let action_def = match &elements[0].value {
-        PackageBodyElement::ActionDef(a) => a,
-        other => panic!("expected action def, got {:?}", other),
-    };
-    let body_elements = match &action_def.value.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. } => elements,
-        other => panic!("expected action def brace body, got {:?}", other),
-    };
-    let for_loop = body_elements
-        .iter()
-        .find_map(|el| match &el.value {
-            sysml_v2_parser::ast::ActionDefBodyElement::ForLoop(f) => Some(&f.value),
-            _ => None,
-        })
-        .expect("action def body should contain a ForLoop");
-    match &for_loop.range.value {
-        // PAR-005 item 2: `->size()` is now a dedicated `CollectionOp`, not a generic
-        // `Invocation` wrapping `MemberAccess`.
-        Expression::CollectionOp { op, .. } => {
-            assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
-        }
-        other => panic!("expected structured CollectionOp range, got {:?}", other),
-    }
-}
-
 fn action_def_body_elements(
     result: &sysml_v2_parser::ast::RootNamespace,
 ) -> Vec<sysml_v2_parser::ast::ActionDefBodyElement> {
