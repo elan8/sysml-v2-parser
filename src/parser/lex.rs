@@ -308,6 +308,11 @@ pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"return",
     b"calc",
     b"part",
+    // KerML `TypeBodyElement` owns `AliasMember` directly (textual BNF 431-438), while a
+    // SysML `CalculationBody` reaches it through `ActionBodyItem -> NonBehaviorBodyItem`
+    // (SysML textual BNF 1359-1368, 901-917). Keep recovery from swallowing a valid alias
+    // after malformed content in either owner.
+    b"alias",
     // `TypeBodyElement -> FeatureMember -> OwnedFeatureMember -> FeatureElement -> Flow` (KerML
     // BNF 434, 519, 526, 360/369, 1303): a KerML type body owns a `flow` member, so recovery
     // resynchronizes on the keyword rather than swallowing the flow after a malformed sibling.

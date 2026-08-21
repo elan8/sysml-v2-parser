@@ -238,6 +238,13 @@ pub enum CalcDefBodyElement {
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
+    /// `AliasMember`, admitted directly by KerML `TypeBodyElement` and by a SysML calculation
+    /// body through `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem`.
+    ///
+    /// The source-backed [`crate::ast::AliasDef`] already owns its identification, target,
+    /// relationship body, and membership. Keeping that grammar-owned node here avoids the
+    /// expression fallback splitting `alias name for Target;` into unrelated members.
+    AliasDef(Node<crate::ast::AliasDef>),
     /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
     /// Systems Library `Interfaces.sysml`; previously captured opaquely).
     ///

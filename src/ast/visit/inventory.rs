@@ -6930,6 +6930,9 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::Import(field_0) => {
                     visitor.visit_import(&$($mutability)? **field_0);
                 }
+                CalcDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 CalcDefBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(&$($mutability)? **field_0);
                 }

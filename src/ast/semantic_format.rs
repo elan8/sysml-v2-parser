@@ -2362,6 +2362,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Import(_member) => {
                             self.write_marker(&mut first, "import")?;
                         }
+                        super::CalcDefBodyElement::AliasDef(alias) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_alias_definition(&alias.value)?;
+                        }
                         super::CalcDefBodyElement::AttributeUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;

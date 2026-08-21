@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **KerML type and SysML calculation bodies retain aliases.** KerML `TypeBodyElement` admits
+  `AliasMember` directly (textual BNF 431-438; pinned Pilot `KerML.xtext` 363-370 agrees), and
+  SysML `CalculationBody` reaches the same member through `CalculationBodyItem -> ActionBodyItem
+  -> NonBehaviorBodyItem` (SysML textual BNF 1359-1368 and 901-917; pinned Pilot
+  `SysML.xtext` 1368-1381 and 1947-1959 agrees). `CalcDefBodyElement` now owns the existing
+  source-backed `AliasDef` rather than letting the expression fallback split it into bare
+  expressions; emission, semantic projection, traversal, opacity inspection, and recovery
+  synchronization are exhaustive. Semantic/recovery fixtures and both affected upstream KerML
+  examples cover this. **AST version 204.**
+
 - **End declarations retain their immediate `ref` / KerML `feature` introducer.** The pinned
   `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` production (SysML textual BNF
   285-286 and 335-337; pinned Pilot `SysML.xtext` agrees) now stores `EndDeclIntroducer` with the

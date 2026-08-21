@@ -1427,6 +1427,17 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::Import(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"alias") {
+        // KerML `TypeBodyElement` admits `AliasMember` directly (textual BNF 431-438), and a
+        // SysML `CalculationBody` reaches the same member through `ActionBodyItem ->
+        // NonBehaviorBodyItem` (SysML textual BNF 1359-1368, 901-917). `alias_def` owns the
+        // source-backed target and runs its qualified-reference allocation transaction before
+        // this scope accepts the member.
+        map(
+            crate::parser::alias::alias_def,
+            CalcDefBodyElement::AliasDef,
+        )
+        .parse(input)?
     } else if starts_with_keyword(after_visibility, b"connector") {
         map(kerml_connector_member, |n| {
             CalcDefBodyElement::Connector(Box::new(n))

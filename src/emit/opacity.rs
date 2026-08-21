@@ -349,6 +349,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             CalcDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            CalcDefBodyElement::AliasDef(n) => walk_relationship_body(report, &p, &n.value.body),
             CalcDefBodyElement::DefaultReferenceUsage(n) => {
                 walk_default_reference_usage(report, &p, &n.value)
             }
