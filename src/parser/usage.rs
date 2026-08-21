@@ -79,14 +79,18 @@ pub(crate) struct UsageHeader {
     /// so scopes whose emitter must reproduce what was written read this instead.
     pub typing: Option<Node<TypingRelationship>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional `= expression` written as part of a `Subsettings` clause. The shared grammar
+    /// consumes this before the ordinary `FeatureValue` position, so callers that own a typed
+    /// value must carry it forward rather than silently losing the expression.
+    pub subsetting_value: Option<Node<Expression>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
     pub had_specialization: bool,
-    /// Post-typing multiplicity clause, captured by [`feature_usage_header`] (the pre-typing
-    /// clause position is typically consumed by the caller before the header). `None` for
-    /// [`usage_header`], which has no multiplicity grammar.
+    /// Multiplicity clause captured by [`feature_usage_header`], whether it was written before
+    /// or after a specialization group. `None` for [`usage_header`], which has no multiplicity
+    /// grammar.
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `MultiplicityPart`'s ordering and uniqueness keyword slots (BNF §8.2.2.6.6), with the
     /// authored spellings and their exact spans.
@@ -746,10 +750,15 @@ fn merge_usage_header(
     // Clauses may be written both before and after the typing (`:> a : T :> b`). The two groups
     // are the same relationship for the same feature, so they merge on the same grounds as a
     // repeat within one group -- see `specialization_clauses`.
-    let subsets = merge_groups(
-        leading.subsets.map(|(target, _value)| target),
-        trailing.subsets.map(|(target, _value)| target),
-    );
+    let (leading_subsets, leading_subsetting_value) = match leading.subsets {
+        Some((relationship, value)) => (Some(relationship), value),
+        None => (None, None),
+    };
+    let (trailing_subsets, trailing_subsetting_value) = match trailing.subsets {
+        Some((relationship, value)) => (Some(relationship), value),
+        None => (None, None),
+    };
+    let subsets = merge_groups(leading_subsets, trailing_subsets);
     let redefines = merge_groups(leading.redefines, trailing.redefines);
     let references = merge_groups(leading.references, trailing.references);
     let crosses = merge_groups(leading.crosses, trailing.crosses);
@@ -760,6 +769,7 @@ fn merge_usage_header(
         type_reference,
         typing,
         subsets,
+        subsetting_value: leading_subsetting_value.or(trailing_subsetting_value),
         redefines,
         references,
         crosses,
@@ -771,17 +781,20 @@ fn merge_usage_header(
 }
 
 /// Usage header for library-style feature usages: optional leading multiplicity,
-/// typing, trailing multiplicity, `ordered` / `nonunique`, subsetting/redefinition,
-/// and `intersects` (folded into `specialization_clauses`, called for both the leading and
-/// trailing position) before the body.
+/// typing, multiplicity, and a second typing/specialization group before the body. This follows
+/// `FeatureSpecializationPart`'s `FeatureSpecialization+ MultiplicityPart?
+/// FeatureSpecialization* | MultiplicityPart FeatureSpecialization*` ordering (SysML BNF
+/// 424-426): a typing may appear on either side of the multiplicity just like every other
+/// specialization alternative.
 pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> {
     let (input, leading_multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (input, trailing_multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, modifiers) = multiplicity_modifier_slots(input)?;
+    let (input, trailing_type_result) = optional_typings(input)?;
     let (input, trailing) = specialization_clauses(input)?;
-    let mut header = merge_usage_header(leading, trailing, type_result);
+    let mut header = merge_usage_header(leading, trailing, type_result.or(trailing_type_result));
     header.multiplicity = trailing_multiplicity.or(leading_multiplicity);
     header.multiplicity_modifiers = modifiers;
     Ok((input, header))

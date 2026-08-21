@@ -348,9 +348,8 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
         w.push_char(' ');
         w.push_str(&format_name(&subject.name));
     }
-    if let Some(type_name) = subject.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference("subject/type", type_name)?;
+    if let Some(typing) = &subject.typing {
+        emit_typing_clause(w, &typing.value)?;
     }
     // Multiplicity before the subsetting clause: it binds to the declared feature, and emitting
     // it after the target produced `:>> RequirementCheck::subj[1]`, which reparses as a
@@ -358,8 +357,21 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     if let Some(mult) = &subject.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    emit_multiplicity_modifiers(w, &subject.multiplicity_modifiers);
+    if let Some(subsets) = &subject.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
     if let Some(redefines) = &subject.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(references) = &subject.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(crosses) = &subject.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
+    }
+    if let Some(intersects) = &subject.intersects {
+        emit_subsetting_clause(w, &intersects.value)?;
     }
     if let Some(value) = &subject.value {
         super::expr::emit_feature_value(w, value)?;

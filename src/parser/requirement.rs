@@ -11,6 +11,7 @@ use crate::parser::body::{
     BraceMemberSkip,
 };
 use crate::parser::constraint::{constraint_def_body, constraint_usage};
+use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_;
 use crate::parser::lex::{
@@ -21,7 +22,7 @@ use crate::parser::node_from_to;
 use crate::parser::occurrence_prefix::{
     keyword_token, next_word_is_reserved, occurrence_usage_prefix, optional_keyword_token,
 };
-use crate::parser::usage::{feature_usage_header, multiplicity_node, specialization_clauses};
+use crate::parser::usage::{feature_usage_header, specialization_clauses};
 use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
@@ -457,9 +458,9 @@ fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<Stakeho
             start,
             input,
             StakeholderMember {
-                declaration_name: decl.value.name,
+                declaration_name: decl.name,
                 target: None,
-                type_name: decl.value.type_name,
+                type_name: Some(decl.type_name),
                 is_redefinition: false,
             },
         ),
@@ -591,7 +592,9 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
 
-    // `subject` name? redefines? (`:` type)? redefines? multiplicity? value? `;`
+    // `UsageDeclaration`'s `Identification` is optional. The complete shared
+    // `FeatureSpecializationPart` follows it and owns all legal specialization positions around
+    // the multiplicity (SysML textual BNF 308, 424-480; Pilot `SysML.xtext` 592-605, 365-467).
     // Reject bare `subject;` — that is [`subject_ref`]. The anonymous forms start directly at
     // `:`/`:>>`/`[`/`=`/`default` (`subject = expr;`, `subject :>> vehicle = vehicle_large;`,
     // spec42 Gap 35).
@@ -600,7 +603,18 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
             || input.fragment().starts_with(b"[")
             || input.fragment().starts_with(b"=")
             || input.fragment().starts_with(b";")
-            || crate::parser::lex::starts_with_keyword(input.fragment(), b"default")
+            || [
+                b"default".as_slice(),
+                b"subsets".as_slice(),
+                b"redefines".as_slice(),
+                b"references".as_slice(),
+                b"crosses".as_slice(),
+                b"intersects".as_slice(),
+                b"typed by".as_slice(),
+                b"defined by".as_slice(),
+            ]
+            .iter()
+            .any(|keyword| crate::parser::lex::starts_with_keyword(input.fragment(), keyword))
         {
             (input, String::new())
         } else {
@@ -610,30 +624,30 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     };
     // `:>>` may be authored before the typing (`subject subj :>> Case::subj;`, Systems Library
     // `UseCases.sysml`) or after it; capture either spelling on the same field (spec42 Gap 35).
-    let (input, leading_redefines) = opt(crate::parser::usage::redefinition).parse(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    // Multiplicity binds to the type and so is written before a trailing `:>>`:
-    // `subject subj : View[1] :>> RequirementCheck::subj;` (Systems Library `Views.sysml`).
-    // Parsing the redefinition first left the `[1]` in front of it and the whole member failed.
-    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
-    let (input, trailing_redefines) = if leading_redefines.is_none() {
-        opt(crate::parser::usage::redefinition).parse(input)?
-    } else {
-        (input, None)
-    };
-    let redefines = leading_redefines.or(trailing_redefines);
+    let (input, header) = parse_feature_usage_header(input)?;
     // `= expr`, `default expr`, and `default = expr` all land on the shared `FeatureValue`
     // clause (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A).
-    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let subsetting_value = header
+        .subsetting_value
+        .map(crate::parser::feature_value::wrap_bind_expression);
+    let (input, explicit_value) =
+        opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let value = subsetting_value.or(explicit_value);
     // `SubjectUsage` completes through `UsageBody = DefinitionBody` (SysML textual BNF 1419,
     // 305-315; Pilot `SysML.xtext` 2053, 592-605). The body is part of this member's syntax,
     // so retain it rather than parsing a constraint-body surrogate and discarding its members.
     let (input, body) = semicolon_or_structured_definition_body(input)?;
-    if n.is_empty() && type_name.is_none() && value.is_none() && redefines.is_none() {
+    if n.is_empty()
+        && header.typing.is_none()
+        && header.subsets.is_none()
+        && header.redefines.is_none()
+        && header.references.is_none()
+        && header.crosses.is_none()
+        && header.intersects.is_none()
+        && header.multiplicity.is_none()
+        && !header.multiplicity_modifiers.is_authored()
+        && value.is_none()
+    {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
@@ -647,9 +661,14 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
             SubjectDecl {
                 name: n,
                 short_name,
-                type_name,
-                redefines,
-                multiplicity,
+                typing: header.typing,
+                subsets: header.subsets,
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
                 value,
                 body,
             },
@@ -658,33 +677,35 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
 }
 
 pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementActorDecl>> {
+    let start = input;
     let (input, decl) = requirement_parameter_decl(input, b"actor", "actor")?;
-    let Some(type_name) = decl.value.type_name else {
-        return Err(nom::Err::Failure(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
-    };
     Ok((
         input,
-        Node::new(
-            decl.span,
+        node_from_to(
+            start,
+            input,
             RequirementActorDecl {
-                name: decl.value.name,
-                short_name: decl.value.short_name,
-                type_name,
-                multiplicity: decl.value.multiplicity,
+                name: decl.name,
+                short_name: decl.short_name,
+                type_name: decl.type_name,
+                multiplicity: decl.multiplicity,
             },
         ),
     ))
+}
+
+struct RequirementParameterDecl {
+    name: String,
+    short_name: Option<String>,
+    type_name: crate::ast::QualifiedReferenceId,
+    multiplicity: Option<Node<crate::ast::Multiplicity>>,
 }
 
 fn requirement_parameter_decl<'a>(
     input: Input<'a>,
     keyword: &'a [u8],
     default_name: &'a str,
-) -> IResult<Input<'a>, Node<SubjectDecl>> {
-    let start = input;
+) -> IResult<Input<'a>, RequirementParameterDecl> {
     let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, n) = {
@@ -704,22 +725,15 @@ fn requirement_parameter_decl<'a>(
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, body) = semicolon_or_structured_definition_body(input)?;
+    let (input, _body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            SubjectDecl {
-                name: n,
-                short_name,
-                type_name: Some(type_name),
-                redefines: None,
-                multiplicity,
-                value: None,
-                body,
-            },
-        ),
+        RequirementParameterDecl {
+            name: n,
+            short_name,
+            type_name,
+            multiplicity,
+        },
     ))
 }
 
@@ -1287,18 +1301,6 @@ mod typed_reference_tests {
         assert_eq!(
             reference.segments[1].separator_before,
             Some(ReferenceSeparator::ColonColon)
-        );
-    }
-
-    #[test]
-    fn subject_type_is_an_absolute_source_backed_reference() {
-        let (subject, source, arena) =
-            parse_node("subject vehicle : $::Domain::Vehicle;", subject_decl);
-        assert_absolute_two_segment_reference(
-            &source,
-            &arena,
-            subject.value.type_name.expect("subject type"),
-            "$::Domain::Vehicle",
         );
     }
 

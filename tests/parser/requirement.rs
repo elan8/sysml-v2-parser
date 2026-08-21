@@ -536,50 +536,6 @@ fn test_parse_require_constraint_keeps_inner_members() {
 }
 
 #[test]
-fn test_parse_requirement_subject_shorthand_without_name() {
-    let input = "package P {\nrequirement def R {\nsubject: Laptop;\nrequire constraint { }\n}\n}";
-    let result = parse(input).expect("subject shorthand should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let req = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::RequirementDef(r) => Some(&r.value),
-            _ => None,
-        })
-        .expect("requirement def should be present");
-    let body_elements = match &req.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected requirement brace body"),
-    };
-    let subject = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::RequirementDefBodyElement::SubjectDecl(s) => Some(&s.value),
-            _ => None,
-        })
-        .expect("subject decl should be present");
-    assert_eq!(subject.name, "");
-    assert_eq!(
-        subject.type_name.map(|id| reference_text(&result, id)),
-        Some("Laptop")
-    );
-    assert!(
-        body_elements.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
-        )),
-        "later requirement members should still parse after subject shorthand"
-    );
-}
-
-#[test]
 fn test_requirement_usage_accepts_subsets_keyword_alias() {
     let input = r#"package P {
 requirement VehicleReq; subsets BaseReq;

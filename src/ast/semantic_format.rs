@@ -4281,18 +4281,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_quoted(self.writer, &subject.name)?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, subject.short_name.as_deref())?;
-        self.writer.write_str(") (type ")?;
-        if let Some(reference) = subject.type_name {
-            self.write_reference(reference)?;
-        } else {
-            self.writer.write_str("none")?;
-        }
-        self.writer.write_str(") (redefines ")?;
-        match &subject.redefines {
-            Some(redefines) => self.write_subsetting(&redefines.value)?,
+        self.writer.write_str(") (typing ")?;
+        match &subject.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
-        self.writer.write_str(") (value ")?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(subject.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&subject.multiplicity_modifiers)?;
+        for (role, clause) in [
+            ("subsets", subject.subsets.as_ref()),
+            ("redefines", subject.redefines.as_ref()),
+            ("references", subject.references.as_ref()),
+            ("crosses", subject.crosses.as_ref()),
+            ("intersects", subject.intersects.as_ref()),
+        ] {
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting(role, clause)?;
+        }
+        self.writer.write_str(" (value ")?;
         if let Some(value) = &subject.value {
             self.write_feature_value(&value.value)?;
         } else {

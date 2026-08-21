@@ -793,47 +793,6 @@ fn test_parse_part_def_connection_usage_multiline_connect_clause() {
 }
 
 #[test]
-fn test_parse_use_case_subject_shorthand_without_name() {
-    let input = "package P {\nuse case def U {\nsubject: Laptop;\nobjective { }\n}\n}";
-    let result = parse(input).expect("subject shorthand should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let use_case = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::UseCaseDef(u) => Some(&u.value),
-            _ => None,
-        })
-        .expect("use case def should be present");
-    let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected use case brace body"),
-    };
-    let subject = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::UseCaseDefBodyElement::SubjectDecl(s) => Some(&s.value),
-            _ => None,
-        })
-        .expect("subject decl should be present");
-    assert_eq!(subject.name, "");
-    assert!(subject.type_name.is_some());
-    assert!(
-        body_elements.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::UseCaseDefBodyElement::Objective(_)
-        )),
-        "later use case members should still parse after subject shorthand"
-    );
-}
-
-#[test]
 fn test_part_def_accepts_specializes_keyword_as_specialization() {
     let input = r#"package P {
 part def A specializes B;

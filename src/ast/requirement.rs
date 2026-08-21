@@ -164,12 +164,14 @@ impl PartialEq for PurposeMember {
     }
 }
 
-/// Subject declaration: `subject` name? (`:` type)? multiplicity? (`=` value)? `UsageBody`.
+/// Subject declaration: `subject` `UsageDeclaration` `UsageCompletion`.
 ///
 /// `SubjectUsage` is a `ReferenceUsage`, so its completion is the shared `UsageBody =
 /// DefinitionBody` production (SysML textual BNF 1419, 305-315; Pilot `SysML.xtext` 2053,
 /// 592-605). In particular, a braced subject body owns its annotating members rather than
-/// treating them as trivia.
+/// treating them as trivia. Its declaration uses the complete `FeatureSpecializationPart`
+/// (SysML textual BNF 424-480), so its typed header keeps each relationship kind and the
+/// multiplicity slot rather than reducing a `:` clause to one reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
@@ -177,11 +179,22 @@ pub struct SubjectDecl {
     /// `Identification`'s `( '<' declaredShortName '>' )?`, reached through `UsageDeclaration`
     /// (SysML BNF 42/308). See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<String>,
-    pub type_name: Option<QualifiedReferenceId>,
-    /// `:>>`/`redefines` redefinition clause (`subject subj :>> Case::subj;`, or the type-less
-    /// anonymous form `subject :>> vehicle = vehicle_large;`; spec42 Gap 35).
+    /// Complete `Typings` relationship (`:`, `typed by`, or `defined by`) from
+    /// `FeatureSpecializationPart`, including all targets and its authored spelling.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// `:>` / `subsets` relationship from `FeatureSpecializationPart`.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` / `redefines` relationship from `FeatureSpecializationPart`.
     pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `::>` / `references` relationship from `FeatureSpecializationPart`.
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// `=>` / `crosses` relationship from `FeatureSpecializationPart`.
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// `intersects` relationship accepted by the shared feature-header production.
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored ordering/uniqueness slots belonging to `MultiplicityPart`.
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `= expr` / `default expr` value clause (`subject generateTorque default
     /// engine1.generateTorque;`, OMG spec Annex A; spec42 Gap 35 widened this from a bare
     /// `=`-only `Expression`).

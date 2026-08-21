@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Subject usages retain their complete feature-specialization header.** `SubjectUsage` reaches
+  `UsageDeclaration FeatureSpecializationPart? UsageCompletion`, including every `Typings`,
+  `Subsettings`, `References`, `Crosses`, and `Redefinitions` alternative and a
+  `MultiplicityPart` before or after those relationships (SysML textual BNF 305-315 and
+  424-480; pinned Pilot `SysML.xtext` 365-467 and 592-605). `SubjectDecl` now owns the complete
+  typed relationships and multiplicity modifiers rather than a lossy single type reference and
+  redefinition slot; emission, semantic projection, visitors, and opacity traversal retain the
+  grammar-owned header together with the existing typed `DefinitionBody` and value. Focused
+  semantic/recovery fixtures and separate upstream-context fixtures cover the six reported
+  corpus forms. **AST version 200.**
+
 - **Interface-definition bodies retain constraint usages.** `InterfaceBodyItem` admits
   `InterfaceOccurrenceUsageMember -> InterfaceOccurrenceUsageElement -> BehaviorUsageElement ->
   ConstraintUsage` (SysML textual BNF 727-750, 374-389, and 1382-1395; the pinned Pilot
