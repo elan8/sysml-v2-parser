@@ -507,7 +507,7 @@ pub(crate) fn emit_concern_usage(
     if concern.is_definition {
         w.push_str("def ");
     }
-    w.push_str(&format_name(&concern.name));
+    w.push_authored_name(&format!("{path}/name"), &concern.name_span)?;
     if let Some(mult) = &concern.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }

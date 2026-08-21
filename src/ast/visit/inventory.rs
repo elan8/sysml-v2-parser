@@ -6234,8 +6234,9 @@ macro_rules! ast_traversal {
         pub fn walk_concern_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConcernUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConcernUsage { name, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
+            let ConcernUsage { name, name_span, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            visitor.visit_span(name_span);
             let _ = is_abstract;
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);

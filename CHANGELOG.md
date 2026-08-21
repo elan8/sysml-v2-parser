@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Concern usage names retain their authored spelling.** `ConcernUsage` now records the exact
+  `NAME` span alongside its decoded name and emits it directly, preserving intentional quotes
+  around a BASIC_NAME and `\\'` escapes in an UNRESTRICTED_NAME at both package and nested
+  requirement-body positions. Its semantic projection is structured rather than a contentless
+  marker, and visitor/serde traversal includes the source-backed span. Focused and Training 42
+  snapshots cover the package and nested cases. **AST version 206.**
+
 - **Constraint calculation bodies retain aliases.** `ConstraintDefinition` and
   `ConstraintUsage` both own `CalculationBody`, whose `CalculationBodyItem -> ActionBodyItem ->
   NonBehaviorBodyItem` alternative includes `AliasMember` (SysML textual BNF 1359-1368,

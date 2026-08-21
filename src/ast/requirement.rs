@@ -520,7 +520,12 @@ pub struct FrameMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
+    /// Decoded `NAME`; [`Self::name_span`] retains the exact authored BASIC_NAME or
+    /// UNRESTRICTED_NAME token for source-faithful emission.
     pub name: String,
+    /// Exact source span of [`Self::name`], including quotes and escapes when authored as an
+    /// UNRESTRICTED_NAME.
+    pub name_span: Span,
     /// `abstract` keyword, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
     /// (Systems Library `Requirements.sysml`). The parser has always accepted it; this struct
     /// had nowhere to put it, so emission dropped the keyword.

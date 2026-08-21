@@ -1225,11 +1225,12 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, ident) = name(input)?;
+    let (input, (name_span, ident)) = with_span(name).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
+        name_span,
         is_abstract: abstract_kw.is_some(),
         type_name: header.type_reference,
         multiplicity: header.multiplicity,

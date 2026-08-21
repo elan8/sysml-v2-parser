@@ -947,8 +947,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::AllocationUsage(_usage) => {
                             self.write_marker(&mut first, "allocation-usage")?;
                         }
-                        RequirementDefBodyElement::ConcernUsage(_usage) => {
-                            self.write_marker(&mut first, "concern-usage")?;
+                        RequirementDefBodyElement::ConcernUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_concern_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::CalcUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -4375,6 +4376,36 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// `ConcernUsage` shares `RequirementBody` at namespace and requirement-body positions.
+    /// Project its declaration rather than a contentless marker so snapshots prove a decoded
+    /// name and its typed header/body survive the source-backed name spelling used by emission.
+    fn write_concern_usage(&mut self, usage: &super::ConcernUsage) -> io::Result<()> {
+        self.writer.write_str("(concern-usage (name ")?;
+        write_quoted(self.writer, &usage.name)?;
+        write!(
+            self.writer,
+            ") (visibility {}) (abstract {}) (definition {}) (type ",
+            visibility_name(usage.membership.visibility),
+            usage.is_abstract,
+            usage.is_definition,
+        )?;
+        if let Some(type_name) = usage.type_name {
+            self.write_reference(type_name)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_char(')')?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_requirement_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     /// `ViewDefinition` (SysML 8.2.2.26.1).
     ///
     /// Was a contentless `(view-def)` marker in all three scopes that own one, so a snapshot
@@ -5192,7 +5223,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_flow_definition(&definition.value)
             }
             PackageBodyElement::FlowUsage(_usage) => self.write_marker(first, "flow-usage"),
-            PackageBodyElement::ConcernUsage(_usage) => self.write_marker(first, "concern-usage"),
+            PackageBodyElement::ConcernUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_concern_usage(&usage.value)
+            }
             PackageBodyElement::CaseDef(definition) => self.write_definition_prefix_marker(
                 first,
                 "case-def",
