@@ -71,6 +71,9 @@ pub enum ActionDefBodyElement {
     Perform(Node<Perform>),
     Bind(Node<Bind>),
     FlowUsage(Node<FlowUsage>),
+    /// `first <feature-chain> if <guard> then <connector-end>`, the action-only
+    /// `GuardedSuccession` production (SysML BNF 1180-1185).
+    GuardedSuccession(Node<GuardedSuccession>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
     DecisionStmt(Node<DecisionStmt>),
@@ -459,6 +462,8 @@ pub enum ActionUsageBodyElement {
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),
     FlowUsage(Node<FlowUsage>),
+    /// See [`ActionDefBodyElement::GuardedSuccession`].
+    GuardedSuccession(Node<GuardedSuccession>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
     DecisionStmt(Node<DecisionStmt>),
@@ -598,6 +603,36 @@ pub struct FirstStmt {
     /// Multiplicity on the `then` end, e.g. `then [0..1] self`.
     pub then_multiplicity: Option<Node<Multiplicity>>,
     pub body: FirstMergeBody,
+}
+
+/// The optional `succession` declaration owned by a [`GuardedSuccession`].
+///
+/// This remains distinct from the `SuccessionAsUsage` prefix on [`FirstStmt`]: the guarded
+/// production owns an actual `UsageDeclaration`, while the older node predates that shared
+/// source-backed component and has its own endpoint grammar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GuardedSuccessionDeclaration {
+    pub keyword_span: Span,
+    pub declaration: Node<UsageDeclaration>,
+}
+
+/// Action-only guarded succession.
+///
+/// `('succession' UsageDeclaration)? 'first' FeatureChainMember 'if' OwnedExpression 'then'
+/// TransitionSuccessionMember UsageBody` (SysML BNF 1180-1185; Pilot `SysML.xtext` 1719-1725).
+/// The reference-chain source and connector-end target are deliberately not expressions: those
+/// are the exact grammar-owned member productions and retain their arena-backed identities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GuardedSuccession {
+    pub succession: Option<GuardedSuccessionDeclaration>,
+    pub first: QualifiedReferenceId,
+    pub if_span: Span,
+    pub guard: Node<Expression>,
+    pub then_span: Span,
+    pub target: Node<crate::ast::KermlConnectorEnd>,
+    pub body: DefinitionBody,
 }
 
 /// The optional declaration following a control-node keyword.

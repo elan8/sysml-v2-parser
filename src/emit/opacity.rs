@@ -1010,6 +1010,9 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
             ActionDefBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             ActionDefBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
+            ActionDefBodyElement::GuardedSuccession(n) => {
+                walk_definition_body(report, &p, &n.value.body)
+            }
             ActionDefBodyElement::WhileStmt(n) => {
                 walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
             }
@@ -1121,6 +1124,9 @@ fn walk_action_usage_body_elements(
             ActionUsageBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             ActionUsageBodyElement::FlowUsage(n) => walk_flow_usage(report, &p, &n.value),
+            ActionUsageBodyElement::GuardedSuccession(n) => {
+                walk_definition_body(report, &p, &n.value.body)
+            }
             ActionUsageBodyElement::WhileStmt(n) => {
                 walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
             }

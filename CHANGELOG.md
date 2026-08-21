@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Action bodies retain guarded successions as their own production.** The pinned
+  `GuardedSuccession = ('succession' UsageDeclaration)? 'first' FeatureChainMember
+  GuardExpressionMember 'then' TransitionSuccessionMember UsageBody` now has a distinct,
+  source-backed AST node in action definition and action usage bodies. It retains the optional
+  succession declaration, feature-chain reference, authored `if`/`then` spans, guard expression,
+  typed connector-end target, and definition body rather than collapsing them into `FirstStmt`.
+  Transactional dispatch precedes that legacy alternative; emission, semantic projection,
+  visitors, opacity inspection, recovery, and serde cover the complete shape (SysML textual BNF
+  1180-1185; pinned Pilot `SysML.xtext` 1719-1725). **AST version 214.**
+
 - **Collection-operator parameters retain their full usage declaration.** Body-expression
   parameters now carry source-backed feature specialization, including `:>` subsetting, rather
   than a second name-and-typing-only header. **AST version 213.**

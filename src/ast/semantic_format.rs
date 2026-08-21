@@ -1965,6 +1965,75 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// Semantic projection of the action-only `GuardedSuccession` production. The optional
+    /// declaration, feature-chain source, guard, and connector-end target remain distinct so
+    /// snapshots cannot confuse this production with the older expression-based `FirstStmt`.
+    fn write_guarded_succession(
+        &mut self,
+        succession: &super::GuardedSuccession,
+    ) -> io::Result<()> {
+        self.writer.write_str("(guarded-succession (succession ")?;
+        if let Some(succession_declaration) = &succession.succession {
+            let declaration = &succession_declaration.declaration.value;
+            self.writer.write_str("(keyword ")?;
+            write_span(self.writer, &succession_declaration.keyword_span)?;
+            self.writer.write_str(") (declaration (name ")?;
+            write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+            self.writer.write_str(") (short-name ")?;
+            write_optional_quoted(
+                self.writer,
+                declaration.identification.short_name.as_deref(),
+            )?;
+            self.writer.write_str(") (typing ")?;
+            if let Some(typing) = &declaration.typing {
+                self.write_typing(&typing.value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") (multiplicity ")?;
+            self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+            self.writer.write_str(") ")?;
+            self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+            self.writer.write_str(" (subsets ")?;
+            if let Some((relationship, value)) = &declaration.subsets {
+                self.write_subsetting(&relationship.value)?;
+                self.writer.write_str(" (value ")?;
+                if let Some(value) = value {
+                    self.write_expression(value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_char(')')?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") ")?;
+            self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("references", declaration.references.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (first ")?;
+        self.write_reference(succession.first)?;
+        self.writer.write_str(") (if ")?;
+        write_span(self.writer, &succession.if_span)?;
+        self.writer.write_str(") (guard ")?;
+        self.write_expression(&succession.guard)?;
+        self.writer.write_str(") (then ")?;
+        write_span(self.writer, &succession.then_span)?;
+        self.writer.write_str(") (target ")?;
+        self.write_kerml_connector_end(&succession.target.value)?;
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&succession.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_control_node_declaration(
         &mut self,
         declaration: &super::ControlNodeDeclaration,
@@ -2743,6 +2812,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::Perform(perform) => self.write_perform(&perform.value),
             ActionDefBodyElement::Bind(_bind) => self.writer.write_str("(bind)"),
             ActionDefBodyElement::FlowUsage(flow) => self.write_flow_usage(&flow.value),
+            ActionDefBodyElement::GuardedSuccession(succession) => {
+                self.write_guarded_succession(&succession.value)
+            }
             ActionDefBodyElement::FirstStmt(first) => self.write_first_statement(&first.value),
             ActionDefBodyElement::MergeStmt(merge) => {
                 self.write_control_node("merge", &merge.value.declaration, &merge.value.body)
@@ -3479,6 +3551,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::FlowUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::GuardedSuccession(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_guarded_succession(&member.value)?;
                         }
                         super::ActionUsageBodyElement::FirstStmt(_member) => {
                             self.write_marker(&mut first, "first")?;

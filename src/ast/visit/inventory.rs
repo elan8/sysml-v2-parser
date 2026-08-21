@@ -878,6 +878,11 @@ macro_rules! ast_traversal {
                 walk_flow_usage(self, node)
             }
 
+            /// Visits [`GuardedSuccession`]; the default implementation walks its children.
+            fn visit_guarded_succession(&mut self, node: &$($mutability)? Node<GuardedSuccession>) {
+                walk_guarded_succession(self, node)
+            }
+
             /// Visits [`FirstStmt`]; the default implementation walks its children.
             fn visit_first_stmt(&mut self, node: &$($mutability)? Node<FirstStmt>) {
                 walk_first_stmt(self, node)
@@ -4813,6 +4818,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
+                ActionDefBodyElement::GuardedSuccession(field_0) => {
+                    visitor.visit_guarded_succession(field_0);
+                }
                 ActionDefBodyElement::FirstStmt(field_0) => {
                     visitor.visit_first_stmt(field_0);
                 }
@@ -5218,6 +5226,9 @@ macro_rules! ast_traversal {
                 ActionUsageBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
+                ActionUsageBodyElement::GuardedSuccession(field_0) => {
+                    visitor.visit_guarded_succession(field_0);
+                }
                 ActionUsageBodyElement::FirstStmt(field_0) => {
                     visitor.visit_first_stmt(field_0);
                 }
@@ -5351,6 +5362,23 @@ macro_rules! ast_traversal {
             }
             visitor.visit_definition_body(body);
             visitor.visit_membership(membership);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_guarded_succession<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<GuardedSuccession>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let GuardedSuccession { succession, first, if_span, guard, then_span, target, body } = &$($mutability)? node.value;
+            if let Some(declaration) = succession {
+                visitor.visit_span(&$($mutability)? declaration.keyword_span);
+                visitor.visit_usage_declaration(&$($mutability)? declaration.declaration);
+            }
+            visitor.visit_qualified_reference(first);
+            visitor.visit_span(if_span);
+            visitor.visit_expression(guard);
+            visitor.visit_span(then_span);
+            visitor.visit_kerml_connector_end(target);
+            visitor.visit_definition_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

@@ -451,6 +451,9 @@ pub(crate) fn emit_action_def_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         ActionDefBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
+        ActionDefBodyElement::GuardedSuccession(succession) => {
+            emit_guarded_succession(w, path, &succession.value)
+        }
         ActionDefBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
         ActionDefBodyElement::MergeStmt(m) => emit_merge_stmt(w, path, &m.value),
         ActionDefBodyElement::DecisionStmt(d) => emit_decision_stmt(w, path, &d.value),
@@ -551,6 +554,9 @@ pub(crate) fn emit_action_usage_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         ActionUsageBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
+        ActionUsageBodyElement::GuardedSuccession(succession) => {
+            emit_guarded_succession(w, path, &succession.value)
+        }
         ActionUsageBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
         ActionUsageBodyElement::MergeStmt(m) => emit_merge_stmt(w, path, &m.value),
         ActionUsageBodyElement::DecisionStmt(d) => emit_decision_stmt(w, path, &d.value),
@@ -1442,6 +1448,61 @@ pub(crate) fn emit_first_stmt(
         emit_expression(w, &then.value)?;
     }
     emit_first_merge_body(w, path, &first.body)
+}
+
+/// Emit the action-only `GuardedSuccession` production from its grammar-owned parts.
+///
+/// This deliberately does not reuse `FirstStmt`: its source is an arena-backed feature-chain
+/// reference and its target is a typed connector end, not expression placeholders.
+pub(crate) fn emit_guarded_succession(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    succession: &crate::ast::GuardedSuccession,
+) -> Result<(), EmitError> {
+    if let Some(declaration) = &succession.succession {
+        w.push_str("succession");
+        let declaration = &declaration.declaration.value;
+        if declaration.identification_span.len != 0 {
+            w.push_char(' ');
+            w.push_authored_name(
+                &format!("{path}/succession-declaration/identification"),
+                &declaration.identification_span,
+            )?;
+        }
+        if let Some(typing) = &declaration.typing {
+            emit_typing_clause(w, &typing.value)?;
+        }
+        if let Some(multiplicity) = &declaration.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+        emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+        if let Some((subsets, value)) = &declaration.subsets {
+            emit_subsetting_clause(w, &subsets.value)?;
+            if let Some(value) = value {
+                w.push_str(" = ");
+                emit_expression(w, &value.value)?;
+            }
+        }
+        for relationship in [
+            declaration.redefines.as_ref(),
+            declaration.references.as_ref(),
+            declaration.crosses.as_ref(),
+            declaration.intersects.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            emit_subsetting_clause(w, &relationship.value)?;
+        }
+        w.push_char(' ');
+    }
+    w.push_str("first ");
+    w.push_qualified_reference(&format!("{path}/first"), succession.first)?;
+    w.push_str(" if ");
+    emit_expression(w, &succession.guard.value)?;
+    w.push_str(" then ");
+    super::view::emit_kerml_connector_end(w, &format!("{path}/target"), &succession.target.value)?;
+    emit_definition_body(w, path, &succession.body)
 }
 
 fn emit_first_merge_body(

@@ -4,11 +4,14 @@ use crate::ast::{
     ActionBodyParameter, ActionDef, ActionDefBody, ActionDefBodyElement, ActionNodePrefix,
     ActionNodeUsageDeclaration, ActionUsage, ActionUsageBody, ActionUsageBodyElement, AssignStmt,
     ControlNodeDeclaration, DecisionStmt, FirstMergeBody, FirstMergeBodyElement, FirstStmt,
-    ForLoop, ForLoopInParameter, ForVariableDeclaration, ForkStmt, IfStmt, InOut, InOutDecl,
-    JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction,
-    ThenTarget, UntilParameter, WhileStmt,
+    ForLoop, ForLoopInParameter, ForVariableDeclaration, ForkStmt, GuardedSuccession,
+    GuardedSuccessionDeclaration, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt,
+    Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, UntilParameter,
+    WhileStmt,
 };
-use crate::parser::body::parse_structured_brace_members;
+use crate::parser::body::{
+    parse_structured_brace_members, semicolon_or_structured_definition_body,
+};
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::{expression, path_expression};
@@ -21,6 +24,7 @@ use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{
     multiplicity_modifier_slots, multiplicity_node, redefinition, usage_declaration,
+    usage_declaration_without_identification,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -289,6 +293,7 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::Perform(_)
         | ActionDefBodyElement::Bind(_)
         | ActionDefBodyElement::FlowUsage(_)
+        | ActionDefBodyElement::GuardedSuccession(_)
         | ActionDefBodyElement::FirstStmt(_)
         | ActionDefBodyElement::MergeStmt(_)
         | ActionDefBodyElement::DecisionStmt(_)
@@ -867,12 +872,18 @@ pub(crate) fn action_def_body_element(
             crate::parser::flow::flow_usage_member,
             ActionDefBodyElement::FlowUsage,
         ),
-        map(first_stmt, ActionDefBodyElement::FirstStmt),
-        map(merge_stmt, ActionDefBodyElement::MergeStmt),
-        map(decision_stmt, ActionDefBodyElement::DecisionStmt),
-        map(join_stmt, ActionDefBodyElement::JoinStmt),
-        map(fork_stmt, ActionDefBodyElement::ForkStmt),
-        map(state_usage, ActionDefBodyElement::StateUsage),
+        // These adjacent ActionBody alternatives are intentionally grouped only to stay below
+        // nom's 21-branch tuple limit. Their ordering remains the grammar ordering: the richer
+        // guarded form must claim `first … if … then …` before the legacy `FirstStmt`.
+        nom::branch::alt((
+            map(guarded_succession, ActionDefBodyElement::GuardedSuccession),
+            map(first_stmt, ActionDefBodyElement::FirstStmt),
+            map(merge_stmt, ActionDefBodyElement::MergeStmt),
+            map(decision_stmt, ActionDefBodyElement::DecisionStmt),
+            map(join_stmt, ActionDefBodyElement::JoinStmt),
+            map(fork_stmt, ActionDefBodyElement::ForkStmt),
+            map(state_usage, ActionDefBodyElement::StateUsage),
+        )),
         // nom's alt() caps out at 21 branches; nest the newer control nodes plus the
         // remaining fallbacks in a sub-alt() to stay under that limit.
         nom::branch::alt((
@@ -1008,6 +1019,76 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     Ok((
         input,
         (succession_name, succession_type, succession_multiplicity),
+    ))
+}
+
+/// `GuardedSuccession` is action-body-only and must not be folded into [`FirstStmt`]: its source
+/// is a `FeatureChainMember`, its target is a `TransitionSuccessionMember`, and it owns a required
+/// `if` guard plus a regular `DefinitionBody` (SysML BNF 1180-1185; Pilot 1719-1725).
+pub(crate) fn guarded_succession(input: Input<'_>) -> IResult<Input<'_>, Node<GuardedSuccession>> {
+    crate::parser::span::reference_transaction(input, guarded_succession_inner)
+}
+
+fn guarded_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<GuardedSuccession>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, succession) = if starts_with_keyword(input.fragment(), b"succession") {
+        let (input, (keyword_span, _)) = with_span(tag(&b"succession"[..])).parse(input)?;
+        let (input, _) = ws1(input)?;
+        let (peek, _) = ws_and_comments(input)?;
+        // `UsageDeclaration`'s identification is optional in the Pilot grammar and its pinned
+        // shape can begin directly with a specialization or multiplicity. Keep that zero-width
+        // authored declaration explicit rather than fabricating one after parsing the tail.
+        let (input, declaration) = if starts_with_keyword(peek.fragment(), b"first")
+            || peek.fragment().starts_with(b"[")
+            || peek.fragment().starts_with(b":")
+        {
+            usage_declaration_without_identification(input)?
+        } else {
+            usage_declaration(input)?
+        };
+        (
+            input,
+            Some(GuardedSuccessionDeclaration {
+                keyword_span,
+                declaration,
+            }),
+        )
+    } else {
+        (input, None)
+    };
+    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, first) =
+        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
+    let (input, (if_span, _)) =
+        preceded(ws_and_comments, with_span(tag(&b"if"[..]))).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, guard) = preceded(ws_and_comments, expression).parse(input)?;
+    let (input, (then_span, _)) =
+        preceded(ws_and_comments, with_span(tag(&b"then"[..]))).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, target) = preceded(
+        ws_and_comments,
+        crate::parser::constraint::kerml_connector_end,
+    )
+    .parse(input)?;
+    let (input, body) = semicolon_or_structured_definition_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            GuardedSuccession {
+                succession,
+                first,
+                if_span,
+                guard,
+                then_span,
+                target,
+                body,
+            },
+        ),
     ))
 }
 
@@ -1612,6 +1693,10 @@ fn action_usage_body_behavior_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, ActionUsageBodyElement> {
     alt((
+        map(
+            guarded_succession,
+            ActionUsageBodyElement::GuardedSuccession,
+        ),
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
         map(decision_stmt, ActionUsageBodyElement::DecisionStmt),
