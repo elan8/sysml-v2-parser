@@ -248,7 +248,7 @@ fn emit_kerml_bare_declaration(
     w.push_str(declaration.keyword.as_str());
     if let Some(name_span) = &declaration.name_span {
         w.push_char(' ');
-        w.push_span_name("kerml-bare-declaration/name", name_span)?;
+        w.push_authored_name("kerml-bare-declaration/name", name_span)?;
     }
     if let Some(multiplicity) = &declaration.multiplicity {
         w.push_char(' ');

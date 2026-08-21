@@ -167,7 +167,10 @@ pub(crate) fn emit_action_usage(
     }
     if !usage.name.is_empty() {
         w.push_char(' ');
-        w.push_str(&format_name(&usage.name));
+        let Some(name_span) = &usage.name_span else {
+            return w.unsupported(path, "action usage name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -211,7 +214,7 @@ fn emit_payload_clause(
     path: &str,
     payload: &crate::ast::PayloadClause,
 ) -> Result<(), EmitError> {
-    w.push_str(&format_name(&payload.name));
+    w.push_authored_name(&format!("{path}/name"), &payload.name_span)?;
     if let Some(ty) = payload.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(path, ty)?;
@@ -848,7 +851,7 @@ fn emit_state_def_body_element(
         }
         StateDefBodyElement::FinalState(f) => {
             w.push_str("final ");
-            w.push_str(&format_name(&f.value.state_name));
+            w.push_authored_name(&format!("{path}/final-name"), &f.value.name_span)?;
             w.push_char(';');
             Ok(())
         }

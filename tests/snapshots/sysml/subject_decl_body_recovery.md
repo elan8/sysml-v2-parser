@@ -24,15 +24,8 @@ package SubjectDeclarationBodyRecovery {
 )
 ~~~
 # FORMAT
-~~~sysml
-package SubjectDeclarationBodyRecovery {
-    requirement def R {
-        subject vehicle : Vehicle {
-            bogus ???;
-            part 'after' : Vehicle;
-        }
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

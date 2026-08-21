@@ -939,7 +939,13 @@ fn emit_case_return_decl(
         w.push_str(":>> ");
         w.push_qualified_reference("case-return/target", target)?;
     } else if !decl.declaration_name.is_empty() {
-        w.push_str(&format_name(&decl.declaration_name));
+        let Some(name_span) = &decl.name_span else {
+            return w.unsupported(
+                "case-return",
+                "return declaration name without an authored source span",
+            );
+        };
+        w.push_authored_name("case-return/name", name_span)?;
     }
     if let Some(ty) = &decl.type_name {
         let has_head = decl.target.is_some() || !decl.declaration_name.is_empty();

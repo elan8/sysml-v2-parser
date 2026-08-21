@@ -62,7 +62,10 @@ pub(crate) fn emit_part_usage(
         w.push_str("> ");
     }
     if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+        let Some(name_span) = &usage.name_span else {
+            return w.unsupported(path, "part usage name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     }
     let target_only = usage.name.is_empty() && usage.redefines.is_some();
     if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
@@ -187,8 +190,10 @@ pub(crate) fn emit_attribute_usage(
     // reparses as the *unrelated* anonymous-colon-typed form instead of a redefines clause).
     // Mirrors `emit_part_usage`'s `redefines_only` handling.
     let target_only = usage.name_span.is_none();
-    if !target_only {
-        w.push_str(&format_name(&usage.name));
+    if let Some(name_span) = &usage.name_span {
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
+    } else if !usage.name.is_empty() {
+        return w.unsupported(path, "attribute usage name without an authored source span");
     }
     if !target_only {
         if let Some(typing) = &usage.typing {
@@ -644,7 +649,10 @@ pub(crate) fn emit_port_usage(
         w.push_str("> ");
     }
     if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+        let Some(name_span) = &usage.name_span else {
+            return w.unsupported(path, "port usage name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     }
     let target_only = usage.name.is_empty() && usage.redefines.is_some();
     if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
@@ -923,7 +931,9 @@ pub(crate) fn emit_end_decl(
         w.push_str("> ");
     }
     match &end.identity {
-        EndIdentity::Declaration(name) => w.push_str(&format_name(&name.value)),
+        EndIdentity::Declaration(name) => {
+            w.push_authored_name(&format!("{path}/identity"), &name.span)?
+        }
         EndIdentity::Derivation(role) => match role.value {
             DerivationEndRole::Original => w.push_str("#original"),
             DerivationEndRole::Derive => w.push_str("#derive"),
@@ -1182,7 +1192,10 @@ pub(crate) fn emit_ref_decl(
     // `''` fabricated a quoted empty name the author never wrote (spec42 Gap 49d fallout).
     if !decl.name.is_empty() {
         w.push_char(' ');
-        w.push_str(&format_name(&decl.name));
+        let Some(name_span) = &decl.name_span else {
+            return w.unsupported(path, "ref declaration name without an authored source span");
+        };
+        w.push_authored_name(&format!("{path}/name"), name_span)?;
     } else if decl.kind_keyword.is_some() && decl.multiplicity.is_some() {
         // Keep the anonymous kind keyword lexically separate from its leading multiplicity.
         // `ref requirement[1..*]` parses `requirement` as a declaration name; the authored
@@ -1284,7 +1297,7 @@ pub(crate) fn emit_binding_connector_usage(
     }
     if let Some(name_span) = &usage.name_span {
         w.push_char(' ');
-        w.push_span_name("binding-connector-usage/name", name_span)?;
+        w.push_authored_name("binding-connector-usage/name", name_span)?;
     }
     if let Some(mult) = &usage.multiplicity {
         if usage.name_span.is_none() {

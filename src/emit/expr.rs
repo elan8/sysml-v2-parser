@@ -220,7 +220,7 @@ fn emit_body_expression_bare(
         if parameter.value.reference_keyword_span.is_some() {
             w.push_str("ref ");
         }
-        w.push_str(&parameter.value.name);
+        w.push_authored_name("collection body parameter/name", &parameter.value.name_span)?;
         if let Some(typing) = &parameter.value.typing {
             w.push_str(" : ");
             w.push_qualified_reference("collection body parameter type", typing.target)?;

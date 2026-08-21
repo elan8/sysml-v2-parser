@@ -29,21 +29,8 @@ package UpstreamGapShortNames {
 )
 ~~~
 # FORMAT
-~~~sysml
-package UpstreamGapShortNames {
-    action <act> run;
-    occurrence <occ> happening;
-    constraint <con> check;
-    connection def Link {
-        ref <reference> 'subject' : Thing;
-        end <source> source : Thing;
-        end <target> target : Thing;
-    }
-    calc def Calculation {
-        return <result> result : Thing;
-    }
-    view <vw> overview;
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
