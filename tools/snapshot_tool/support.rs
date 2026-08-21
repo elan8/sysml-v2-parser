@@ -397,20 +397,15 @@ fn comparison_projection(
 /// both ways. It is not an intra-doc link: it lives in this file's `#[cfg(test)]` module, which
 /// rustdoc cannot resolve from a non-test build.
 const CANONICAL_OUTPUT_DEBT: &[(&str, u64)] = &[
-    // Containment references change semantic shape after emission.
-    (
-        "tests/snapshots/spec42/sysml/validation/13a_model_containment.md",
-        0x5b3f_9624_f3ce_3342,
-    ),
     // The emitted KerML type body does not strictly reparse.
     (
         "tests/snapshots/kerml/type_body_relationship_members.md",
         0xa337_2e6d_d744_3f8d,
     ),
-    // Removed as their owning formatter paths were repaired: `sysml/ref_declaration_scopes.md`
-    // and `spec42/sysml.library/derivation_connections.md`. Both now satisfy the canonical-output
-    // gate outright, and `ref_declaration_scopes.md` had additionally drifted out of sync with its
-    // pinned fingerprint, which is what the liveness half of the test above now catches.
+    // Removed as their owning formatter paths were repaired: `sysml/ref_declaration_scopes.md`,
+    // `spec42/sysml.library/derivation_connections.md`, and
+    // `spec42/sysml/validation/13a_model_containment.md`. They now satisfy the canonical-output
+    // gate outright; stale fingerprints are caught by the liveness half of the test above.
 ];
 
 fn canonical_output_fingerprint(source: &str, emitted: &str) -> u64 {

@@ -105,6 +105,91 @@ pub(crate) fn emit_action_def(
     emit_action_def_body(w, path, &def.body)
 }
 
+/// Stream the shared `ActionNodePrefix` before a loop-node keyword. The prefix owns its optional
+/// `action` declaration and complete feature-specialization header; `while`, `loop`, and the
+/// future `for` migration merely choose the following node alternative.
+fn emit_action_node_prefix(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    prefix: &crate::ast::ActionNodePrefix,
+) -> Result<(), EmitError> {
+    structure::emit_occurrence_usage_prefix(
+        w,
+        &format!("{path}/occurrence-prefix"),
+        &prefix.occurrence_prefix,
+    )?;
+    if let Some(declaration) = &prefix.action_declaration {
+        emit_action_node_usage_declaration(w, path, &declaration.value)?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
+fn emit_action_node_usage_declaration(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    declaration: &crate::ast::ActionNodeUsageDeclaration,
+) -> Result<(), EmitError> {
+    w.push_str("action");
+    if declaration.identification_span.len != 0 {
+        w.push_char(' ');
+        w.push_authored_name(
+            &format!("{path}/action-declaration/identification"),
+            &declaration.identification_span,
+        )?;
+    }
+    if let Some(typing) = &declaration.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+    if let Some((subsets, value)) = &declaration.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+        if let Some(value) = value {
+            w.push_str(" = ");
+            emit_expression(w, &value.value)?;
+        }
+    }
+    for relationship in [
+        declaration.redefines.as_ref(),
+        declaration.references.as_ref(),
+        declaration.crosses.as_ref(),
+        declaration.intersects.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        emit_subsetting_clause(w, &relationship.value)?;
+    }
+    Ok(())
+}
+
+fn emit_action_body_parameter(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &crate::ast::ActionBodyParameter,
+) -> Result<(), EmitError> {
+    if let Some(declaration) = &body.action_declaration {
+        w.push_char(' ');
+        emit_action_node_usage_declaration(w, path, &declaration.value)?;
+    }
+    emit_action_def_body(w, path, &body.body)
+}
+
+fn emit_until_parameter(
+    w: &mut EmitWriter<'_>,
+    until: Option<&crate::ast::UntilParameter>,
+) -> Result<(), EmitError> {
+    if let Some(until) = until {
+        w.push_str(" until ");
+        emit_expression(w, &until.expression.value)?;
+        w.push_char(';');
+    }
+    Ok(())
+}
+
 pub(crate) fn emit_action_usage(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -316,14 +401,17 @@ pub(crate) fn emit_action_def_body_element(
         ActionDefBodyElement::JoinStmt(j) => emit_join_stmt(w, path, &j.value),
         ActionDefBodyElement::ForkStmt(f) => emit_fork_stmt(w, path, &f.value),
         ActionDefBodyElement::LoopStmt(l) => {
-            w.push_str("loop ");
-            emit_action_def_body(w, path, &l.value.body)
+            emit_action_node_prefix(w, path, &l.value.prefix)?;
+            w.push_str("loop");
+            emit_action_body_parameter(w, path, &l.value.body)?;
+            emit_until_parameter(w, l.value.until.as_ref())
         }
         ActionDefBodyElement::WhileStmt(wh) => {
+            emit_action_node_prefix(w, path, &wh.value.prefix)?;
             w.push_str("while ");
             emit_expression(w, &wh.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &wh.value.body)
+            emit_action_body_parameter(w, path, &wh.value.body)?;
+            emit_until_parameter(w, wh.value.until.as_ref())
         }
         ActionDefBodyElement::IfStmt(i) => {
             w.push_str("if ");
@@ -420,14 +508,17 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::JoinStmt(j) => emit_join_stmt(w, path, &j.value),
         ActionUsageBodyElement::ForkStmt(f) => emit_fork_stmt(w, path, &f.value),
         ActionUsageBodyElement::LoopStmt(l) => {
-            w.push_str("loop ");
-            emit_action_def_body(w, path, &l.value.body)
+            emit_action_node_prefix(w, path, &l.value.prefix)?;
+            w.push_str("loop");
+            emit_action_body_parameter(w, path, &l.value.body)?;
+            emit_until_parameter(w, l.value.until.as_ref())
         }
         ActionUsageBodyElement::WhileStmt(wh) => {
+            emit_action_node_prefix(w, path, &wh.value.prefix)?;
             w.push_str("while ");
             emit_expression(w, &wh.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &wh.value.body)
+            emit_action_body_parameter(w, path, &wh.value.body)?;
+            emit_until_parameter(w, wh.value.until.as_ref())
         }
         ActionUsageBodyElement::IfStmt(i) => {
             w.push_str("if ");

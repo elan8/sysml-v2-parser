@@ -912,6 +912,28 @@ macro_rules! ast_traversal {
                 walk_terminate_stmt(self, node)
             }
 
+            /// Visits the grammar-owned [`ActionNodePrefix`]; the default implementation walks
+            /// its occurrence prefix and optional action usage declaration.
+            fn visit_action_node_prefix(&mut self, node: &$($mutability)? ActionNodePrefix) {
+                walk_action_node_prefix(self, node)
+            }
+
+            /// Visits [`ActionNodeUsageDeclaration`]; the default implementation walks its
+            /// identification and complete feature-specialization header.
+            fn visit_action_node_usage_declaration(&mut self, node: &$($mutability)? Node<ActionNodeUsageDeclaration>) {
+                walk_action_node_usage_declaration(self, node)
+            }
+
+            /// Visits the optional `until` parameter of a loop node.
+            fn visit_until_parameter(&mut self, node: &$($mutability)? UntilParameter) {
+                walk_until_parameter(self, node)
+            }
+
+            /// Visits the mandatory braced body parameter of a loop node.
+            fn visit_action_body_parameter(&mut self, node: &$($mutability)? ActionBodyParameter) {
+                walk_action_body_parameter(self, node)
+            }
+
             /// Visits [`WhileStmt`]; the default implementation walks its children.
             fn visit_while_stmt(&mut self, node: &$($mutability)? Node<WhileStmt>) {
                 walk_while_stmt(self, node)
@@ -5446,20 +5468,98 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_action_node_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionNodePrefix) {
+            let ActionNodePrefix { occurrence_prefix, action_declaration } = node;
+            visitor.visit_occurrence_usage_prefix(occurrence_prefix);
+            if let Some(declaration) = action_declaration {
+                visitor.visit_action_node_usage_declaration(declaration);
+            }
+        }
+
+        pub fn walk_action_node_usage_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionNodeUsageDeclaration>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let ActionNodeUsageDeclaration {
+                action_span,
+                identification,
+                identification_span,
+                typing,
+                multiplicity,
+                multiplicity_modifiers,
+                subsets,
+                redefines,
+                references,
+                crosses,
+                intersects,
+            } = &$($mutability)? node.value;
+            visitor.visit_span(action_span);
+            visitor.visit_identification(identification);
+            visitor.visit_span(identification_span);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some((relationship, value)) = subsets {
+                visitor.visit_subsetting_relationship(relationship);
+                if let Some(value) = value {
+                    visitor.visit_expression(value);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_until_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? UntilParameter) {
+            let UntilParameter { until_span, expression, semicolon_span } = node;
+            visitor.visit_span(until_span);
+            visitor.visit_expression(expression);
+            visitor.visit_span(semicolon_span);
+        }
+
+        pub fn walk_action_body_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionBodyParameter) {
+            let ActionBodyParameter { action_declaration, body } = node;
+            if let Some(declaration) = action_declaration {
+                visitor.visit_action_node_usage_declaration(declaration);
+            }
+            visitor.visit_action_def_body(body);
+        }
+
         pub fn walk_while_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<WhileStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let WhileStmt { condition, body } = &$($mutability)? node.value;
+            let WhileStmt { prefix, condition, body, until } = &$($mutability)? node.value;
+            visitor.visit_action_node_prefix(prefix);
             visitor.visit_expression(condition);
-            visitor.visit_action_def_body(body);
+            visitor.visit_action_body_parameter(body);
+            if let Some(until) = until {
+                visitor.visit_until_parameter(until);
+            }
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_loop_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<LoopStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let LoopStmt { body } = &$($mutability)? node.value;
-            visitor.visit_action_def_body(body);
+            let LoopStmt { prefix, body, until } = &$($mutability)? node.value;
+            visitor.visit_action_node_prefix(prefix);
+            visitor.visit_action_body_parameter(body);
+            if let Some(until) = until {
+                visitor.visit_until_parameter(until);
+            }
             visitor.leave_node(&$($mutability)? node.span);
         }
 

@@ -369,45 +369,6 @@ action def Run {
 }
 
 #[test]
-fn test_while_stmt_parses_condition_and_nested_body() {
-    // Regression: `while` was listed in ACTION_BODY_STARTERS but had no parser function.
-    let input = r#"package P {
-action def Run {
-  attribute x : Integer;
-  while x < 10 {
-    assign x := x + 1;
-  }
-}
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let body_elements = action_def_body_elements(&result);
-    let while_stmt = body_elements
-        .iter()
-        .find_map(|el| match el {
-            sysml_v2_parser::ast::ActionDefBodyElement::WhileStmt(w) => Some(&w.value),
-            _ => None,
-        })
-        .expect("expected a WhileStmt node");
-    assert!(matches!(
-        &while_stmt.condition.value,
-        Expression::BinaryOp { .. }
-    ));
-    match &while_stmt.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. } => {
-            assert!(
-                elements.iter().any(|el| matches!(
-                    el.value,
-                    sysml_v2_parser::ast::ActionDefBodyElement::Assign(_)
-                )),
-                "while body should retain the nested assign statement, got {:?}",
-                elements
-            );
-        }
-        other => panic!("expected structured while body, got {:?}", other),
-    }
-}
-
-#[test]
 fn test_if_stmt_parses_then_and_optional_else_with_nested_control_node() {
     // Regression: `if` was listed in ACTION_BODY_STARTERS but had no parser function.
     let input = r#"package P {

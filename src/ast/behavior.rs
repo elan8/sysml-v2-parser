@@ -9,8 +9,8 @@ use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
 use crate::ast::feature_value::FeatureValue;
-use crate::ast::DefinitionPrefix;
 use crate::ast::QualifiedReferenceId;
+use crate::ast::{DefinitionPrefix, MultiplicityModifiers, OccurrenceUsagePrefix};
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -722,20 +722,87 @@ pub struct TerminateStmt {
     pub target: Option<Node<Expression>>,
 }
 
-/// While-loop control node: `while` condition `{` ActionDefBodyElement* `}`.
+/// The prefix shared by every action-node alternative.
+///
+/// `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` (SysML textual BNF
+/// 957-958; pinned Pilot `SysML.xtext` 1438-1439).  `WhileLoopNode` and `ForLoopNode` both name
+/// this production, so it is one component rather than a collection of loop-specific flags.
+/// `ForLoop` has not migrated yet, but can adopt this exact component without changing its
+/// grammar boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct WhileStmt {
-    pub condition: Node<Expression>,
+pub struct ActionNodePrefix {
+    /// The complete occurrence prefix in its grammar-defined order.
+    pub occurrence_prefix: OccurrenceUsagePrefix,
+    /// The optional `action` usage declaration immediately before the node keyword.
+    pub action_declaration: Option<Node<ActionNodeUsageDeclaration>>,
+}
+
+/// `ActionNodeUsageDeclaration = 'action' UsageDeclaration?`.
+///
+/// The declaration owns the complete `UsageDeclaration` / `FeatureSpecializationPart` surface,
+/// not a display string or an action-usage-shaped compatibility mirror.  Its optional
+/// identification has an aggregate source span so emission preserves authored spelling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ActionNodeUsageDeclaration {
+    pub action_span: Span,
+    pub identification: Identification,
+    pub identification_span: Span,
+    pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: MultiplicityModifiers,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
+}
+
+/// The optional `until` parameter tail of a `WhileLoopNode`.
+///
+/// The two keyword/delimiter spans keep this grammar-owned clause distinct from a bare expression
+/// and let provenance validation reject a serialized tree that points them at unrelated text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct UntilParameter {
+    pub until_span: Span,
+    pub expression: Node<Expression>,
+    pub semicolon_span: Span,
+}
+
+/// `ActionBodyParameter = ('action' UsageDeclaration?)? '{' ActionBodyItem* '}'`.
+///
+/// The optional declaration is grammatically after the loop/while condition, not part of
+/// [`ActionNodePrefix`]. It reuses [`ActionNodeUsageDeclaration`] because both spell precisely
+/// `'action' UsageDeclaration?`; retaining that distinction is what keeps `loop action charging
+/// { ... }` from becoming a malformed loop or an invented prefix declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ActionBodyParameter {
+    pub action_declaration: Option<Node<ActionNodeUsageDeclaration>>,
     pub body: ActionDefBody,
 }
 
-/// Loop control node: `loop` `{` body `}` (§6 G14) — a `while` with no condition. Closed alongside
-/// `decide`/`join`/`fork`/`if`/`while` in the §5 audit's family, which missed `loop`.
+/// While-loop control node: `ActionNodePrefix while` condition action-body (`until` condition
+/// `;`)? (SysML textual BNF 1143-1149).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WhileStmt {
+    pub prefix: ActionNodePrefix,
+    pub condition: Node<Expression>,
+    pub body: ActionBodyParameter,
+    pub until: Option<UntilParameter>,
+}
+
+/// Loop control node: `ActionNodePrefix loop` action-body (`until` condition `;`)? (SysML textual
+/// BNF 1143-1149) — the empty-parameter alternative of `WhileLoopNode`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LoopStmt {
-    pub body: ActionDefBody,
+    pub prefix: ActionNodePrefix,
+    pub body: ActionBodyParameter,
+    pub until: Option<UntilParameter>,
 }
 
 /// If control node: `if` condition `{` thenBody `}` (`else` `{` elseBody `}`)?.

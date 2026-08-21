@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Loop and while action nodes retain their shared prefix and termination parameter.** The
+  grammar-owned `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` now serves
+  both `loop` and `while` forms, retaining the optional source-backed `action`
+  `UsageDeclaration` and its complete feature-specialization header ahead of the node keyword.
+  `WhileLoopNode`'s empty-parameter `loop` alternative and conditional `while` alternative now
+  both retain their mandatory `ActionBodyParameter`, including its separate optional `action`
+  declaration before the braces, and optional source-spanned `until` expression tail
+  (SysML textual BNF 954-965 and 1143-1149; pinned Pilot `SysML.xtext` 1438-1439 and
+  1615-1621). Emission, semantic projection, visitors, opacity inspection, recovery dispatch,
+  and serde cover the shared shape; `ForLoopNode` remains a separate follow-up migration despite
+  naming the same prefix production. **AST version 210.**
+
 - **Reference-prefixed action and state usages retain their typed owner.** Complete `ref action`
   and `ref state` forms now dispatch to the existing `ActionUsage` and `StateUsage` nodes ahead
   of generic `ReferenceUsage` in action-definition, action-usage, state, package, and requirement

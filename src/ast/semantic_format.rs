@@ -2012,6 +2012,101 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// Projection of `ActionNodePrefix`, shared by loop/while now and intentionally ready for
+    /// the sibling `ForLoopNode` migration. It names both the occurrence-prefix slots and the
+    /// complete optional action usage declaration, so a snapshot can distinguish a bare loop
+    /// from `ref action step : Step loop ...`.
+    fn write_action_node_prefix(&mut self, prefix: &super::ActionNodePrefix) -> io::Result<()> {
+        self.writer.write_str("(action-node-prefix ")?;
+        self.write_occurrence_usage_prefix(&prefix.occurrence_prefix)?;
+        self.writer.write_char(' ')?;
+        self.write_action_node_declaration(prefix.action_declaration.as_ref())?;
+        self.writer.write_char(')')
+    }
+
+    fn write_action_node_declaration(
+        &mut self,
+        declaration: Option<&Node<super::ActionNodeUsageDeclaration>>,
+    ) -> io::Result<()> {
+        self.writer.write_str("(action-declaration ")?;
+        let Some(declaration) = declaration else {
+            return self.writer.write_str("none)");
+        };
+        let declaration = &declaration.value;
+        self.writer.write_str("(name ")?;
+        write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(
+            self.writer,
+            declaration.identification.short_name.as_deref(),
+        )?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &declaration.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&declaration.multiplicity_modifiers)?;
+        self.writer.write_str(" (subsets ")?;
+        if let Some((subsets, value)) = &declaration.subsets {
+            self.write_subsetting(&subsets.value)?;
+            self.writer.write_str(" (value ")?;
+            if let Some(value) = value {
+                self.write_expression(value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_char(')')?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", declaration.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", declaration.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("intersects", declaration.intersects.as_ref())?;
+        self.writer.write_char(')')
+    }
+
+    fn write_loop_node(
+        &mut self,
+        kind: &str,
+        prefix: &super::ActionNodePrefix,
+        condition: Option<&Node<Expression>>,
+        body: &super::ActionBodyParameter,
+        until: Option<&super::UntilParameter>,
+    ) -> io::Result<()> {
+        self.writer.write_char('(')?;
+        self.writer.write_str(kind)?;
+        self.writer.write_str(" (prefix ")?;
+        self.write_action_node_prefix(prefix)?;
+        self.writer.write_str(") (condition ")?;
+        if let Some(condition) = condition {
+            self.write_expression(condition)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.writer.write_str("(body-parameter ")?;
+        self.write_action_node_declaration(body.action_declaration.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_action_body(&body.body)?;
+        self.writer.write_char(')')?;
+        self.writer.write_str(" (until ")?;
+        if let Some(until) = until {
+            self.write_expression(&until.expression)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
+    }
+
     fn write_extended_definition(
         &mut self,
         definition: &super::ExtendedDefinition,
@@ -2581,8 +2676,20 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::TerminateStmt(terminate) => {
                 self.write_terminate_statement(&terminate.value)
             }
-            ActionDefBodyElement::WhileStmt(_while) => self.writer.write_str("(while)"),
-            ActionDefBodyElement::LoopStmt(_loop) => self.writer.write_str("(loop)"),
+            ActionDefBodyElement::WhileStmt(while_stmt) => self.write_loop_node(
+                "while-loop",
+                &while_stmt.value.prefix,
+                Some(&while_stmt.value.condition),
+                &while_stmt.value.body,
+                while_stmt.value.until.as_ref(),
+            ),
+            ActionDefBodyElement::LoopStmt(loop_stmt) => self.write_loop_node(
+                "loop",
+                &loop_stmt.value.prefix,
+                None,
+                &loop_stmt.value.body,
+                loop_stmt.value.until.as_ref(),
+            ),
             ActionDefBodyElement::IfStmt(_if) => self.writer.write_str("(if)"),
             ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
             ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
@@ -3203,11 +3310,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_terminate_statement(&member.value)?;
                         }
-                        super::ActionUsageBodyElement::WhileStmt(_member) => {
-                            self.write_marker(&mut first, "while")?;
+                        super::ActionUsageBodyElement::WhileStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_loop_node(
+                                "while-loop",
+                                &member.value.prefix,
+                                Some(&member.value.condition),
+                                &member.value.body,
+                                member.value.until.as_ref(),
+                            )?;
                         }
-                        super::ActionUsageBodyElement::LoopStmt(_member) => {
-                            self.write_marker(&mut first, "loop")?;
+                        super::ActionUsageBodyElement::LoopStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_loop_node(
+                                "loop",
+                                &member.value.prefix,
+                                None,
+                                &member.value.body,
+                                member.value.until.as_ref(),
+                            )?;
                         }
                         super::ActionUsageBodyElement::IfStmt(_member) => {
                             self.write_marker(&mut first, "if")?;

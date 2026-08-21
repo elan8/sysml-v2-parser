@@ -911,6 +911,60 @@ fn walk_in_out_decl(report: &mut OpacityReport, path: &str, decl: &crate::ast::I
     }
 }
 
+/// `ActionNodePrefix` contains only typed prefix/declaration facts (no nested body or recovery
+/// carrier), while the mandatory `ActionBody` below is where opacity can occur. Keeping this
+/// boundary explicit means the future `ForLoopNode` adoption shares the same decision rather than
+/// silently bypassing a newly added body-bearing prefix alternative.
+fn walk_action_node_body(
+    report: &mut OpacityReport,
+    path: &str,
+    prefix: &crate::ast::ActionNodePrefix,
+    body: &crate::ast::ActionBodyParameter,
+) {
+    let crate::ast::ActionNodePrefix {
+        occurrence_prefix: _,
+        action_declaration,
+    } = prefix;
+    match action_declaration {
+        None => {}
+        Some(declaration) => {
+            let crate::ast::ActionNodeUsageDeclaration {
+                action_span: _,
+                identification: _,
+                identification_span: _,
+                typing: _,
+                multiplicity: _,
+                multiplicity_modifiers: _,
+                subsets: _,
+                redefines: _,
+                references: _,
+                crosses: _,
+                intersects: _,
+            } = &declaration.value;
+        }
+    }
+    let crate::ast::ActionBodyParameter {
+        action_declaration,
+        body,
+    } = body;
+    if let Some(declaration) = action_declaration {
+        let crate::ast::ActionNodeUsageDeclaration {
+            action_span: _,
+            identification: _,
+            identification_span: _,
+            typing: _,
+            multiplicity: _,
+            multiplicity_modifiers: _,
+            subsets: _,
+            redefines: _,
+            references: _,
+            crosses: _,
+            intersects: _,
+        } = &declaration.value;
+    }
+    walk_action_def_body(report, path, body);
+}
+
 fn walk_action_def_body_elements(
     report: &mut OpacityReport,
     path: &str,
@@ -942,8 +996,12 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
             ActionDefBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             ActionDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
-            ActionDefBodyElement::WhileStmt(n) => walk_action_def_body(report, &p, &n.value.body),
-            ActionDefBodyElement::LoopStmt(n) => walk_action_def_body(report, &p, &n.value.body),
+            ActionDefBodyElement::WhileStmt(n) => {
+                walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
+            }
+            ActionDefBodyElement::LoopStmt(n) => {
+                walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
+            }
             ActionDefBodyElement::IfStmt(n) => {
                 walk_action_branch_body(report, &format!("{p}/then"), &n.value.then_body);
                 if let Some(body) = &n.value.else_body {
@@ -1049,8 +1107,12 @@ fn walk_action_usage_body_elements(
             ActionUsageBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             ActionUsageBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
-            ActionUsageBodyElement::WhileStmt(n) => walk_action_def_body(report, &p, &n.value.body),
-            ActionUsageBodyElement::LoopStmt(n) => walk_action_def_body(report, &p, &n.value.body),
+            ActionUsageBodyElement::WhileStmt(n) => {
+                walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
+            }
+            ActionUsageBodyElement::LoopStmt(n) => {
+                walk_action_node_body(report, &p, &n.value.prefix, &n.value.body)
+            }
             ActionUsageBodyElement::IfStmt(n) => {
                 walk_action_branch_body(report, &format!("{p}/then"), &n.value.then_body);
                 if let Some(body) = &n.value.else_body {

@@ -1,26 +1,27 @@
 //! Action definition and action usage parsing (function-based behavior).
 
 use crate::ast::{
-    ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, ControlNodeDeclaration, DecisionStmt, FirstMergeBody,
-    FirstMergeBodyElement, FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt,
-    LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget,
-    WhileStmt,
+    ActionBodyParameter, ActionDef, ActionDefBody, ActionDefBodyElement, ActionNodePrefix,
+    ActionNodeUsageDeclaration, ActionUsage, ActionUsageBody, ActionUsageBodyElement, AssignStmt,
+    ControlNodeDeclaration, DecisionStmt, FirstMergeBody, FirstMergeBodyElement, FirstStmt,
+    ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node,
+    ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, UntilParameter, WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
+use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::lex::{
-    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
-    ws1, ws_and_comments,
+    identification, name, qualified_reference, starts_with_any_keyword, starts_with_keyword,
+    take_until_terminator, ws1, ws_and_comments,
 };
-use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{multiplicity_modifier_slots, multiplicity_node, redefinition};
 use crate::parser::with_span;
 use crate::parser::Input;
+use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -743,6 +744,22 @@ pub(crate) fn action_def_body_element(
         let elem = ActionDefBodyElement::Annotating(member);
         return Ok((next, node_from_to(start, next, elem)));
     }
+    // `ActionNodePrefix` may begin with a contended occurrence slot (`ref`, `#tag`, etc.) or an
+    // optional `action` declaration. Claim a complete loop node before a generic reference,
+    // metadata prefix, or action usage can consume only its first part. Both parsers are
+    // transactional, so failed probes cannot leak prefix references into the document arena.
+    if let Ok((next, node)) = while_stmt(start) {
+        return Ok((
+            next,
+            node_from_to(start, next, ActionDefBodyElement::WhileStmt(node)),
+        ));
+    }
+    if let Ok((next, node)) = loop_stmt(start) {
+        return Ok((
+            next,
+            node_from_to(start, next, ActionDefBodyElement::LoopStmt(node)),
+        ));
+    }
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
@@ -1105,27 +1122,182 @@ fn terminate_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
     Ok((input, node_from_to(start, input, TerminateStmt { target })))
 }
 
-/// While-loop control node: `while` condition `{` ... `}` (bare condition, no `decide`/`join`/`fork`-style parens).
-fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"while"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, condition) = expression(input)?;
-    let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+/// `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` (SysML textual BNF
+/// 957-958; pinned Pilot `SysML.xtext` 1438-1439).  The production is shared by while and for
+/// loop nodes, so it is parsed once at their owning grammar boundary rather than turned into
+/// loop-specific flags. `ForLoop` has not adopted the typed component yet.
+fn action_node_prefix(input: Input<'_>) -> IResult<Input<'_>, ActionNodePrefix> {
+    let (input, occurrence_prefix) =
+        crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    if !starts_with_keyword(input.fragment(), b"action") {
+        return Ok((
+            input,
+            ActionNodePrefix {
+                occurrence_prefix,
+                action_declaration: None,
+            },
+        ));
+    }
+
+    let (input, action_declaration) = action_node_usage_declaration(input)?;
     Ok((
         input,
-        node_from_to(start, input, WhileStmt { condition, body }),
+        ActionNodePrefix {
+            occurrence_prefix,
+            action_declaration: Some(action_declaration),
+        },
     ))
 }
 
-/// Loop control node: `loop` `{` body `}` (§6 G14) — `while_stmt` without a condition.
-fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
+/// The one shared `action UsageDeclaration?` spelling used by both
+/// [`ActionNodePrefix`](crate::ast::ActionNodePrefix) and `ActionBodyParameter`. The following
+/// node/body starter may make the declaration anonymous, so it is checked before optional
+/// `Identification` can consume a keyword as a declaration label.
+fn action_node_usage_declaration(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ActionNodeUsageDeclaration>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"loop"[..]).parse(input)?;
+    let (input, (action_span, _)) = with_span(tag(&b"action"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    // `UsageDeclaration` is optional after `action`, and `while`/`loop`/`for` are the three
+    // following ActionNode alternatives. Do not let its optional name slot claim that next
+    // node keyword as an invented declaration label.
+    let identification_start = input;
+    let (input, identification) =
+        if starts_with_any_keyword(input.fragment(), &[b"while", b"loop", b"for"]) {
+            (
+                input,
+                crate::ast::Identification {
+                    short_name: None,
+                    name: None,
+                },
+            )
+        } else {
+            identification(input)?
+        };
+    let identification_span = span_from_to(identification_start, input);
+    let (input, header) = parse_feature_usage_header(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ActionNodeUsageDeclaration {
+                action_span,
+                identification,
+                identification_span,
+                typing: header.typing,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                subsets: header
+                    .subsets
+                    .map(|relationship| (relationship, header.subsetting_value)),
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
+            },
+        ),
+    ))
+}
+
+/// `ActionBodyParameter` owns the optional declaration immediately before its mandatory braced
+/// body. This is deliberately separate from `ActionNodePrefix`: `loop action charging { ... }`
+/// has an empty node prefix and a named body parameter.
+fn action_body_parameter(input: Input<'_>) -> IResult<Input<'_>, ActionBodyParameter> {
+    let (input, action_declaration) = if starts_with_keyword(input.fragment(), b"action") {
+        let (input, declaration) = action_node_usage_declaration(input)?;
+        (input, Some(declaration))
+    } else {
+        (input, None)
+    };
     let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
-    Ok((input, node_from_to(start, input, LoopStmt { body })))
+    Ok((
+        input,
+        ActionBodyParameter {
+            action_declaration,
+            body,
+        },
+    ))
+}
+
+/// Parse the optional `until` tail as a complete grammar-owned parameter. Once the keyword is
+/// present its expression and terminator are mandatory; accepting only the keyword would split a
+/// malformed loop across unrelated recovery nodes.
+fn optional_until_parameter(input: Input<'_>) -> IResult<Input<'_>, Option<UntilParameter>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(peek.fragment(), b"until") {
+        return Ok((input, None));
+    }
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (until_span, _)) = with_span(tag(&b"until"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, expression) = expression(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (semicolon_span, _)) = with_span(tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        Some(UntilParameter {
+            until_span,
+            expression,
+            semicolon_span,
+        }),
+    ))
+}
+
+/// While-loop control node: `ActionNodePrefix while` expression action-body (`until` expression
+/// `;`)? (SysML textual BNF 1143-1149).
+fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
+    crate::parser::span::reference_transaction(input, while_stmt_inner)
+}
+
+fn while_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
+    let start = input;
+    let (input, prefix) = action_node_prefix(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"while"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, condition) = expression(input)?;
+    let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+    let (input, until) = optional_until_parameter(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            WhileStmt {
+                prefix,
+                condition,
+                body,
+                until,
+            },
+        ),
+    ))
+}
+
+/// `loop` is the empty-parameter alternative of `WhileLoopNode`; it owns the same prefix, body,
+/// and optional `until` parameter as the `while` spelling.
+fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
+    crate::parser::span::reference_transaction(input, loop_stmt_inner)
+}
+
+fn loop_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
+    let start = input;
+    let (input, prefix) = action_node_prefix(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"loop"[..])).parse(input)?;
+    let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+    let (input, until) = optional_until_parameter(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            LoopStmt {
+                prefix,
+                body,
+                until,
+            },
+        ),
+    ))
 }
 
 /// A single `then <target>;`/`else <target>;` shorthand statement (GH-86): a branch member with
