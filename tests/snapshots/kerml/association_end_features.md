@@ -30,6 +30,6 @@ package AssociationEndFeatures {
 (parsed-document
   (references
   )
-  (root (package (name "AssociationEndFeatures") (body brace (kerml-classifier (keyword assoc struct) (abstract false) (name "C") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature))))))
+  (root (package (name "AssociationEndFeatures") (body brace (kerml-classifier (keyword assoc struct) (abstract false) (name "C") (specializes none) (body brace (kerml-feature (name "x") (relationships) (value none) (body semicolon)) (kerml-feature (name "a") (relationships) (value none) (body semicolon)) (kerml-feature (name "b") (relationships) (value none) (body semicolon)))))))
 )
 ~~~

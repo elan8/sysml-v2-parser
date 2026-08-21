@@ -106,7 +106,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::KermlConnector(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlRelationship(_) => {}
         PackageBodyElement::KermlInvariant(n) => walk_calc_def_body(report, path, &n.value.body),
-        PackageBodyElement::KermlFeature(n) => walk_calc_def_body(report, path, &n.value.body),
+        PackageBodyElement::KermlFeature(n) => walk_kerml_feature(report, path, &n.value),
         // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
         // an opaque/recovery node.
         PackageBodyElement::KermlBareDeclaration(_) => {}
@@ -236,6 +236,21 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
     }
 }
 
+/// `FeatureRelationshipPart` is fully typed, so it contributes no opacity on
+/// its own. Matching it exhaustively keeps that policy explicit when the
+/// grammar-owned tail grows; the feature body still needs normal recursion.
+fn walk_kerml_feature(report: &mut OpacityReport, path: &str, feature: &crate::ast::KermlFeature) {
+    for part in &feature.relationship_parts {
+        match &part.value {
+            crate::ast::FeatureRelationshipPart::TypeRelationship(_) => {}
+            crate::ast::FeatureRelationshipPart::Chaining { .. } => {}
+            crate::ast::FeatureRelationshipPart::Inverting { .. } => {}
+            crate::ast::FeatureRelationshipPart::TypeFeaturing(_) => {}
+        }
+    }
+    walk_calc_def_body(report, path, &feature.body);
+}
+
 fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &InterfaceDefBody) {
     let InterfaceDefBody::Brace { elements, .. } = body else {
         return;
@@ -343,7 +358,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
             CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            CalcDefBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::KermlFeature(n) => walk_kerml_feature(report, &p, &n.value),
             CalcDefBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Connector(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::AssertConstraint(n) => {
@@ -724,7 +739,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::Unsupported(_) => {
                 hit(report, &p, OpacityKind::UnsupportedGrammar)
             }
-            AttributeBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
+            AttributeBodyElement::KermlFeature(n) => walk_kerml_feature(report, &p, &n.value),
             AttributeBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
             AttributeBodyElement::KermlConnector(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
@@ -1509,9 +1524,7 @@ fn walk_relationship_body_elements(
         let p = format!("{path}/body[{i}]");
         match &element.value {
             RelationshipBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            RelationshipBodyElement::KermlFeature(n) => {
-                walk_calc_def_body(report, &p, &n.value.body)
-            }
+            RelationshipBodyElement::KermlFeature(n) => walk_kerml_feature(report, &p, &n.value),
             RelationshipBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }

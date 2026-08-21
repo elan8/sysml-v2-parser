@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **KerML feature relationship tails retain ordered `featured by` clauses.** `KermlFeature` now
+  owns the complete ordered `FeatureRelationshipPart*` tail from `FeatureDeclaration`, including
+  source-backed, comma-separated `TypeFeaturingPart` targets. This replaces the lossy fixed
+  `chains`, `inverse_of`, and type-relationship slots, so repeated and interleaved `chains`,
+  type relationships, `inverse of`, and `featured by` clauses emit in authored order. The slice
+  covers the typed Feature/Step/Expression/BooleanExpression owners; connector declarations keep
+  their separate, optional `FeatureDeclaration` alternative for the follow-up shared-declaration
+  migration. Semantic formatting, visitors, opacity traversal, and serde now cover the exhaustive
+  relationship-part representation. **AST version 207.**
+
 - **Concern usage names retain their authored spelling.** `ConcernUsage` now records the exact
   `NAME` span alongside its decoded name and emits it directly, preserving intentional quotes
   around a BASIC_NAME and `\\'` escapes in an UNRESTRICTED_NAME at both package and nested

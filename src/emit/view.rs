@@ -419,32 +419,51 @@ pub(crate) fn emit_kerml_feature(
     if let Some(crosses) = &feature.crosses {
         emit_subsetting_clause(w, &crosses.value)?;
     }
-    if let Some(chains) = feature.chains {
-        w.push_str(" chains ");
-        w.push_qualified_reference(&format!("{path}/chains"), chains)?;
-    }
-    for (index, clause) in feature.type_relationships.iter().enumerate() {
-        w.push_char(' ');
-        w.push_str(clause.value.keyword.as_str());
-        w.push_char(' ');
-        for (target_index, target) in clause.value.targets.iter().copied().enumerate() {
-            if target_index > 0 {
-                w.push_str(", ");
-            }
-            w.push_qualified_reference(
-                &format!("{path}/type-relationship[{index}][{target_index}]"),
-                target,
-            )?;
-        }
-    }
-    if let Some(inverse_of) = feature.inverse_of {
-        w.push_str(" inverse of ");
-        w.push_qualified_reference(&format!("{path}/inverse-of"), inverse_of)?;
+    for (index, part) in feature.relationship_parts.iter().enumerate() {
+        emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
     }
     if let Some(value) = &feature.value {
         emit_feature_value(w, value)?;
     }
     emit_calc_body(w, path, &feature.body)
+}
+
+fn emit_feature_relationship_part(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    part: &crate::ast::FeatureRelationshipPart,
+) -> Result<(), EmitError> {
+    match part {
+        crate::ast::FeatureRelationshipPart::TypeRelationship(relationship) => {
+            w.push_char(' ');
+            w.push_str(relationship.value.keyword.as_str());
+            w.push_char(' ');
+            for (index, target) in relationship.value.targets.iter().copied().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference(&format!("{path}/target[{index}]"), target)?;
+            }
+        }
+        crate::ast::FeatureRelationshipPart::Chaining { target } => {
+            w.push_str(" chains ");
+            w.push_qualified_reference(&format!("{path}/target"), *target)?;
+        }
+        crate::ast::FeatureRelationshipPart::Inverting { target } => {
+            w.push_str(" inverse of ");
+            w.push_qualified_reference(&format!("{path}/target"), *target)?;
+        }
+        crate::ast::FeatureRelationshipPart::TypeFeaturing(featuring) => {
+            w.push_str(" featured by ");
+            for (index, target) in featuring.value.targets.iter().copied().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference(&format!("{path}/target[{index}]"), target)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn emit_kerml_invariant_member(

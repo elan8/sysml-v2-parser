@@ -29,6 +29,6 @@ in newX : Real;
 (parsed-document
   (references
   )
-  (root (package (name "MyPkg") (body brace)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (kerml-feature (name "newX") (body semicolon)))
+  (root (package (name "MyPkg") (body brace)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (kerml-feature (name "newX") (relationships) (value none) (body semicolon)))
 )
 ~~~

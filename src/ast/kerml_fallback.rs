@@ -259,6 +259,46 @@ pub enum KermlTypeRelationshipKeyword {
     Differences,
 }
 
+/// One ordered [`FeatureRelationshipPart`](https://www.omg.org/spec/KerML/)
+/// on a [`KermlFeature`]'s declaration tail.
+///
+/// KerML `FeatureDeclaration` ends in `FeatureRelationshipPart*`.  Keeping the
+/// alternatives in one ordered list is therefore essential: `featured by B
+/// inverse of A::f` is not two independent optional slots, and any alternative
+/// may repeat.  References remain identities in the document's packed
+/// [`QualifiedReferenceArena`](crate::ast::QualifiedReferenceArena); this enum
+/// deliberately owns no copied spelling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FeatureRelationshipPart {
+    /// `TypeRelationshipPart` (`unions`, `intersects`, `disjoint from`, or
+    /// `differences`).
+    TypeRelationship(Node<KermlTypeRelationship>),
+    /// `chains` followed by its feature chain.
+    Chaining {
+        target: crate::ast::QualifiedReferenceId,
+    },
+    /// `inverse of` followed by its feature chain.
+    Inverting {
+        target: crate::ast::QualifiedReferenceId,
+    },
+    /// `featured by` followed by one or more `OwnedTypeFeaturing` targets.
+    TypeFeaturing(Node<TypeFeaturingPart>),
+}
+
+/// The source-backed target sequence of one `featured by` relationship part.
+///
+/// `TypeFeaturingPart = 'featured' 'by' OwnedTypeFeaturing ( ','
+/// OwnedTypeFeaturing )*` in the pinned KerML grammar.  Each target is a
+/// document-local qualified-reference identity; its spelling, separators, and
+/// source span live in the document arena rather than in a copied string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TypeFeaturingPart {
+    /// Nonempty, authored-order `OwnedTypeFeaturing` targets.
+    pub targets: Vec<crate::ast::QualifiedReferenceId>,
+}
+
 impl KermlTypeRelationshipKeyword {
     /// The authored keyword spelling.
     pub fn as_str(self) -> &'static str {
@@ -318,15 +358,10 @@ pub struct KermlFeature {
     /// redefines sourceOccurrence crosses longerOccurrence.timeEnclosedOccurrences;`
     /// (spec42 gap 32). Mirrors `ConnectionEnd`/`EndDecl`/`OccurrenceUsage`.
     pub crosses: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `chains` clause target, e.g. `feature self: Anything[1] subsets things chains
-    /// things.that { ... }` (Kernel Semantic Library `Base.kerml`).
-    pub chains: Option<crate::ast::QualifiedReferenceId>,
-    /// `inverse of` target chain.
-    pub inverse_of: Option<crate::ast::QualifiedReferenceId>,
-    /// KerML type relationship clauses on the feature (`unions a, b`, `intersects a, b`,
-    /// `disjoint from a`), e.g. `feature withoutOccurrences: Occurrence[0..*] unions
-    /// successors, predecessors, outsideOfOccurrences` (`Occurrences.kerml`).
-    pub type_relationships: Vec<Node<KermlTypeRelationship>>,
+    /// Ordered `FeatureRelationshipPart*` declaration tail. This replaces the
+    /// superseded fixed `chains`, `inverse_of`, and `type_relationships` slots:
+    /// the grammar permits any alternative to repeat and interleave.
+    pub relationship_parts: Vec<Node<FeatureRelationshipPart>>,
     /// Value clause: `= expr` / `:= expr` / `default (=|:=)? expr`.
     pub value: Option<Node<crate::ast::FeatureValue>>,
     /// Body following the shared type-body member grammar: `;` or `{ ... }`.

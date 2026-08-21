@@ -30,7 +30,8 @@ package BareCommentMemberRecovery {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 162) (line 5) (column 37) (len 1)) (segments (segment 0 (token "h") (name "h") (separator none) (span (offset 162) (line 5) (column 37) (len 1)))))
   )
-  (root (package (name "BareCommentMemberRecovery") (body brace (kerml-classifier (keyword behavior) (abstract false) (name "Recovering") (specializes none) (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 72) (line 3) (column 11) (len 29)) (normalized "before the malformed member "))) (malformed (code "unrecognized_declaration_in_scope") (found "feature f : ;") (span (offset 112) (line 4) (column 9) (len 22))) (kerml-feature))))))
+  (root (package (name "BareCommentMemberRecovery") (body brace (kerml-classifier (keyword behavior) (abstract false) (name "Recovering") (specializes none) (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 72) (line 3) (column 11) (len 29)) (normalized "before the malformed member "))) (malformed (code "unrecognized_declaration_in_scope") (found "feature f : ;") (span (offset 112) (line 4) (column 9) (len 22))) (kerml-feature (name "g") (relationships (type-relationship (keyword unions) (targets (ref r0)))) (value none) (body semicolon)))))))
 )
 ~~~

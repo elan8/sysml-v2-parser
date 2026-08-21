@@ -58,6 +58,6 @@ package Classes {
 (parsed-document
   (references
   )
-  (root (package (name "Classes") (body brace (kerml-classifier (keyword class) (abstract false) (name "A") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (invariant) (connector) (kerml-classifier (keyword class) (abstract false) (name "Inner") (specializes none) (body brace (kerml-feature))))) (kerml-classifier (keyword behavior) (abstract false) (name "B2") (specializes none) (body brace (in-out-declaration))) (package (name "Q") (body brace (kerml-connector))))))
+  (root (package (name "Classes") (body brace (kerml-classifier (keyword class) (abstract false) (name "A") (specializes none) (body brace (kerml-feature (name "innerSpaceDimension") (relationships) (value none) (body semicolon)) (kerml-feature (name "x") (relationships) (value none) (body semicolon)) (kerml-feature (name "engine") (relationships) (value none) (body semicolon)) (kerml-feature (name "portions") (relationships) (value none) (body semicolon)) (kerml-feature (name "t") (relationships) (value none) (body semicolon)) (invariant) (connector) (kerml-classifier (keyword class) (abstract false) (name "Inner") (specializes none) (body brace (kerml-feature (name "y") (relationships) (value none) (body semicolon)))))) (kerml-classifier (keyword behavior) (abstract false) (name "B2") (specializes none) (body brace (in-out-declaration))) (package (name "Q") (body brace (kerml-connector))))))
 )
 ~~~

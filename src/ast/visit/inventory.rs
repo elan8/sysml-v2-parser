@@ -1407,6 +1407,18 @@ macro_rules! ast_traversal {
                 walk_kerml_type_relationship_keyword(self, node)
             }
 
+            /// Visits one ordered KerML `FeatureRelationshipPart`; the default implementation
+            /// walks its source-backed targets.
+            fn visit_feature_relationship_part(&mut self, node: &$($mutability)? Node<FeatureRelationshipPart>) {
+                walk_feature_relationship_part(self, node)
+            }
+
+            /// Visits a KerML `TypeFeaturingPart`; the default implementation walks every
+            /// authored-order target.
+            fn visit_type_featuring_part(&mut self, node: &$($mutability)? Node<TypeFeaturingPart>) {
+                walk_type_featuring_part(self, node)
+            }
+
             /// Visits [`KermlFeature`]; the default implementation walks its children.
             fn visit_kerml_feature(&mut self, node: &$($mutability)? Node<KermlFeature>) {
                 walk_kerml_feature(self, node)
@@ -7477,10 +7489,40 @@ macro_rules! ast_traversal {
             }
         }
 
+        pub fn walk_feature_relationship_part<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureRelationshipPart>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            match &$($mutability)? node.value {
+                FeatureRelationshipPart::TypeRelationship(inner) => {
+                    visitor.visit_kerml_type_relationship(inner);
+                }
+                FeatureRelationshipPart::Chaining { target } => {
+                    visitor.visit_qualified_reference(target);
+                }
+                FeatureRelationshipPart::Inverting { target } => {
+                    visitor.visit_qualified_reference(target);
+                }
+                FeatureRelationshipPart::TypeFeaturing(inner) => {
+                    visitor.visit_type_featuring_part(inner);
+                }
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_type_featuring_part<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<TypeFeaturingPart>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let TypeFeaturingPart { targets } = &$($mutability)? node.value;
+            for target in targets {
+                visitor.visit_qualified_reference(target);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
         pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, relationship_parts, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {
@@ -7507,14 +7549,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = crosses {
                 visitor.visit_subsetting_relationship(inner);
             }
-            if let Some(inner) = chains {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = inverse_of {
-                visitor.visit_qualified_reference(inner);
-            }
-            for inner in type_relationships {
-                visitor.visit_kerml_type_relationship(inner);
+            for inner in relationship_parts {
+                visitor.visit_feature_relationship_part(inner);
             }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);

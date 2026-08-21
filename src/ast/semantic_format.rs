@@ -1909,8 +1909,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::RelationshipBodyElement::Error(error) => {
                             self.write_malformed(&error.value, &element.span)?
                         }
-                        super::RelationshipBodyElement::KermlFeature(_) => {
-                            self.writer.write_str("(kerml-feature)")?
+                        super::RelationshipBodyElement::KermlFeature(member) => {
+                            self.write_kerml_feature(&member.value)?
                         }
                     }
                 }
@@ -2163,6 +2163,58 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// A KerML feature member with its ordered `FeatureRelationshipPart*` tail.
+    ///
+    /// This names each relationship alternative and streams targets in source
+    /// order, making repeated and interleaved parts observable in snapshots.
+    fn write_kerml_feature(&mut self, feature: &super::KermlFeature) -> io::Result<()> {
+        self.writer.write_str("(kerml-feature (name ")?;
+        self.write_usage_declaration_name(&feature.name)?;
+        self.writer.write_str(") (relationships")?;
+        for part in &feature.relationship_parts {
+            self.writer.write_char(' ')?;
+            match &part.value {
+                super::FeatureRelationshipPart::TypeRelationship(relationship) => {
+                    self.writer.write_str("(type-relationship (keyword ")?;
+                    self.writer.write_str(relationship.value.keyword.as_str())?;
+                    self.writer.write_str(") (targets")?;
+                    for target in &relationship.value.targets {
+                        self.writer.write_char(' ')?;
+                        self.write_reference(*target)?;
+                    }
+                    self.writer.write_str("))")?;
+                }
+                super::FeatureRelationshipPart::Chaining { target } => {
+                    self.writer.write_str("(chains ")?;
+                    self.write_reference(*target)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureRelationshipPart::Inverting { target } => {
+                    self.writer.write_str("(inverse-of ")?;
+                    self.write_reference(*target)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureRelationshipPart::TypeFeaturing(featuring) => {
+                    self.writer.write_str("(featured-by")?;
+                    for target in &featuring.value.targets {
+                        self.writer.write_char(' ')?;
+                        self.write_reference(*target)?;
+                    }
+                    self.writer.write_char(')')?;
+                }
+            }
+        }
+        self.writer.write_str(") (value ")?;
+        if let Some(value) = &feature.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&feature.body)?;
+        self.writer.write_char(')')
+    }
+
     /// `ConstraintDefBody`, with its members.
     ///
     /// `ConstraintDefinition` and `ConstraintUsage` own a `CalculationBody`, and no scope that
@@ -2345,8 +2397,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
                         }
-                        super::CalcDefBodyElement::KermlFeature(_member) => {
-                            self.write_marker(&mut first, "kerml-feature")?;
+                        super::CalcDefBodyElement::KermlFeature(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_feature(&member.value)?;
                         }
                         super::CalcDefBodyElement::Invariant(_member) => {
                             self.write_marker(&mut first, "invariant")?;
@@ -3527,8 +3580,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::AttributeBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
-                        super::AttributeBodyElement::KermlFeature(_member) => {
-                            self.write_marker(&mut first, "kerml-feature")?;
+                        super::AttributeBodyElement::KermlFeature(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_feature(&member.value)?;
                         }
                         super::AttributeBodyElement::Invariant(_member) => {
                             self.write_marker(&mut first, "invariant")?;
@@ -5298,11 +5352,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::KermlFeature(feature) => {
                 self.write_item_prefix(first)?;
-                self.writer.write_str("(kerml-feature (name ")?;
-                self.write_usage_declaration_name(&feature.value.name)?;
-                self.writer.write_str(") ")?;
-                self.write_calc_def_body(&feature.value.body)?;
-                self.writer.write_char(')')
+                self.write_kerml_feature(&feature.value)
             }
             PackageBodyElement::KermlClassifier(declaration) => {
                 self.write_item_prefix(first)?;

@@ -1070,6 +1070,153 @@ fn owned_cross_feature(
     ))
 }
 
+/// One `TypeRelationshipPart` in a KerML feature declaration tail.
+///
+/// This deliberately consumes one clause only. Its caller owns
+/// `FeatureRelationshipPart*`, where type relationships can interleave with
+/// `chains`, `inverse of`, and `featured by`.
+fn kerml_feature_type_relationship_part(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlTypeRelationship>> {
+    let start = input;
+    let (input, keyword) = if starts_with_keyword(input.fragment(), b"disjoint") {
+        let (input, _) = tag(&b"disjoint"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        let (input, _) = tag(&b"from"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (
+            input,
+            crate::ast::KermlTypeRelationshipKeyword::DisjointFrom,
+        )
+    } else if starts_with_keyword(input.fragment(), b"unions") {
+        let (input, _) = tag(&b"unions"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, crate::ast::KermlTypeRelationshipKeyword::Unions)
+    } else if starts_with_keyword(input.fragment(), b"intersects") {
+        let (input, _) = tag(&b"intersects"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, crate::ast::KermlTypeRelationshipKeyword::Intersects)
+    } else if starts_with_keyword(input.fragment(), b"differences") {
+        let (input, _) = tag(&b"differences"[..]).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, crate::ast::KermlTypeRelationshipKeyword::Differences)
+    } else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    };
+    let (input, first) = qualified_reference(input)?;
+    let (input, more) = nom::multi::many0(preceded(
+        preceded(ws_and_comments, tag(&b","[..])),
+        preceded(ws_and_comments, qualified_reference),
+    ))
+    .parse(input)?;
+    let mut targets = vec![first];
+    targets.extend(more);
+    let span = crate::parser::span_from_to(start, input);
+    Ok((
+        input,
+        Node::new(
+            span.clone(),
+            crate::ast::KermlTypeRelationship {
+                keyword,
+                targets,
+                span,
+            },
+        ),
+    ))
+}
+
+/// `FeatureRelationshipPart*` on a KerML `FeatureDeclaration`.
+///
+/// KerML permits all alternatives in arbitrary authored order and permits
+/// repetitions. The AST therefore retains one ordered, exhaustive list rather
+/// than independent fixed slots for selected alternatives.
+fn kerml_feature_relationship_parts(
+    input: Input<'_>,
+    intersecting: Option<Node<crate::ast::SubsettingRelationship>>,
+) -> IResult<Input<'_>, Vec<Node<crate::ast::FeatureRelationshipPart>>> {
+    let mut parts = Vec::new();
+    if let Some(intersecting) = intersecting {
+        let span = intersecting.span.clone();
+        let relationship = Node::new(
+            span.clone(),
+            crate::ast::KermlTypeRelationship {
+                keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
+                targets: intersecting.value.target,
+                span: span.clone(),
+            },
+        );
+        parts.push(Node::new(
+            span,
+            crate::ast::FeatureRelationshipPart::TypeRelationship(relationship),
+        ));
+    }
+
+    let mut input = input;
+    loop {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if starts_with_keyword(after_ws.fragment(), b"chains") {
+            let start = after_ws;
+            let (rest, _) = tag(&b"chains"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, target) = crate::parser::lex::reference_path(rest)?;
+            parts.push(Node::new(
+                crate::parser::span_from_to(start, rest),
+                crate::ast::FeatureRelationshipPart::Chaining { target },
+            ));
+            input = rest;
+        } else if starts_with_keyword(after_ws.fragment(), b"inverse") {
+            let start = after_ws;
+            let (rest, _) = tag(&b"inverse"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, _) = tag(&b"of"[..]).parse(rest)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, target) = crate::parser::lex::reference_path(rest)?;
+            parts.push(Node::new(
+                crate::parser::span_from_to(start, rest),
+                crate::ast::FeatureRelationshipPart::Inverting { target },
+            ));
+            input = rest;
+        } else if starts_with_keyword(after_ws.fragment(), b"featured") {
+            let start = after_ws;
+            let (rest, _) = tag(&b"featured"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, _) = tag(&b"by"[..]).parse(rest)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, first) = qualified_reference(rest)?;
+            let (rest, more) = nom::multi::many0(preceded(
+                preceded(ws_and_comments, tag(&b","[..])),
+                preceded(ws_and_comments, qualified_reference),
+            ))
+            .parse(rest)?;
+            let mut targets = vec![first];
+            targets.extend(more);
+            let span = crate::parser::span_from_to(start, rest);
+            let featuring = Node::new(span.clone(), crate::ast::TypeFeaturingPart { targets });
+            parts.push(Node::new(
+                span,
+                crate::ast::FeatureRelationshipPart::TypeFeaturing(featuring),
+            ));
+            input = rest;
+        } else if starts_with_any_keyword(
+            after_ws.fragment(),
+            &[b"disjoint", b"unions", b"intersects", b"differences"],
+        ) {
+            let (rest, relationship) = kerml_feature_type_relationship_part(after_ws)?;
+            let span = relationship.span.clone();
+            parts.push(Node::new(
+                span,
+                crate::ast::FeatureRelationshipPart::TypeRelationship(relationship),
+            ));
+            input = rest;
+        } else {
+            return Ok((input, parts));
+        }
+    }
+}
+
 pub(crate) fn kerml_feature(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
@@ -1183,79 +1330,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     let redefines = leading_redefines.or(clauses.redefines);
     let references = clauses.references;
     let crosses = clauses.crosses;
-    // `chains <chain>`: `feature self: Anything[1] subsets things chains things.that { ... }`
-    // (`Base.kerml`).
-    let (input, chains) = opt(preceded(
-        (ws_and_comments, tag(&b"chains"[..]), ws1),
-        crate::parser::lex::reference_path,
-    ))
-    .parse(input)?;
-    // `inverse of <chain>`: `feature all spaceShotOf: Occurrence[0..*] subsets spaceSliceOf
-    // inverse of spaceShots { ... }` (`Occurrences.kerml`).
-    let (input, inverse_of) = opt(preceded(
-        (
-            ws_and_comments,
-            tag(&b"inverse"[..]),
-            ws1,
-            tag(&b"of"[..]),
-            ws1,
-        ),
-        crate::parser::lex::reference_path,
-    ))
-    .parse(input)?;
-    // `unions a, b` / `intersects a, b` / `disjoint from a` type relationship clauses:
-    // `feature withoutOccurrences: Occurrence[0..*] unions successors, predecessors, ...`
-    // (`Occurrences.kerml`).
-    let (input, type_relationships) =
-        crate::parser::package::kerml_type_relationship_clauses(input)?;
-    // `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
-    // `TypeRelationshipPart` alternatives (KerML BNF 408, 424), so it belongs in the same list as
-    // the three siblings just parsed. `specialization_clauses` above claims it first, because the
-    // SysML usage headers that helper also serves model it as a subsetting-family clause; this
-    // scope then read every other clause it returns and dropped this one. An authored `feature f
-    // : T intersects g;` lost the whole clause -- no relationship, no subsetting, no diagnostic,
-    // and nothing to emit.
-    //
-    // Positioned by its authored span rather than appended, so the list's documented source order
-    // still holds when `intersects` is written ahead of another clause.
-    let type_relationships = match clauses.intersects {
-        None => type_relationships,
-        Some(intersecting) => {
-            let span = intersecting.span.clone();
-            let node = crate::ast::Node::new(
-                span.clone(),
-                crate::ast::KermlTypeRelationship {
-                    keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
-                    targets: intersecting.value.target,
-                    span,
-                },
-            );
-            let mut merged = type_relationships;
-            let at = merged
-                .iter()
-                .position(|existing| existing.span.offset > node.span.offset)
-                .unwrap_or(merged.len());
-            merged.insert(at, node);
-            merged
-        }
-    };
-    // `inverse of` may also trail the type relationships (`... unions successors, ... inverse
-    // of withoutOccurrences { ... }`, `Occurrences.kerml`).
-    let (input, inverse_of) = if inverse_of.is_none() {
-        opt(preceded(
-            (
-                ws_and_comments,
-                tag(&b"inverse"[..]),
-                ws1,
-                tag(&b"of"[..]),
-                ws1,
-            ),
-            crate::parser::lex::reference_path,
-        ))
-        .parse(input)?
-    } else {
-        (input, inverse_of)
-    };
+    let (input, relationship_parts) = kerml_feature_relationship_parts(input, clauses.intersects)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -1278,9 +1353,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 redefines,
                 references,
                 crosses,
-                chains,
-                inverse_of,
-                type_relationships,
+                relationship_parts,
                 value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
