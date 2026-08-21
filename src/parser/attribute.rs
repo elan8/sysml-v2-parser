@@ -101,6 +101,9 @@ const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
     b":>>",
     b":>",
     b"attribute",
+    // `MetadataFeature` is an `AnnotatingElement` in AttributeBody. Keep its literal introducer
+    // in the recovery FIRST set so a malformed annotation synchronizes before a valid sibling.
+    b"metadata",
 ];
 
 const METADATA_BODY_STARTERS: &[&[u8]] = &[
@@ -292,7 +295,7 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
     }
     let (input, elem) = alt((
         map(
-            crate::parser::body::annotating_member,
+            crate::parser::body::attribute_annotating_member,
             AttributeBodyElement::Annotating,
         ),
         map(attribute_def, AttributeBodyElement::AttributeDef),

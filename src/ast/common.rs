@@ -641,6 +641,7 @@ pub enum AnnotatingMember {
     Comment(Node<CommentAnnotation>),
     /// `rep [name] language "..." /* ... */`.
     TextualRep(Node<TextualRepresentation>),
-    /// The `@Name [about ...]` spelling of a metadata feature.
+    /// The `@Name [about ...]` spelling, or AttributeBody's literal `metadata Name [about ...]`
+    /// spelling, of a metadata feature.
     MetadataAnnotation(Node<crate::ast::MetadataAnnotation>),
 }
