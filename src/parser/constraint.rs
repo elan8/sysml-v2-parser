@@ -4,7 +4,7 @@ use crate::ast::{
     ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
-use crate::parser::body::parse_structured_brace_members;
+use crate::parser::body::{parse_structured_brace_members, semicolon_body};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
@@ -922,7 +922,9 @@ fn calc_named_binding_inner(
             nom::error::ErrorKind::Verify,
         )));
     }
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    // This production accepts only the semicolon body alternative. Delegate its token capture to
+    // the shared body parser so the serialized body delimiter remains source-backed.
+    let (input, body) = semicolon_body(input)?;
     let typing_span = typing.as_ref().map(|t| t.span.clone());
     Ok((
         input,
@@ -945,9 +947,7 @@ fn calc_named_binding_inner(
                 name_span: Some(name_span),
                 typing_span,
                 membership: Membership::feature(visibility, visibility_span),
-                body: crate::ast::AttributeBody::Semicolon {
-                    semicolon_span: crate::ast::Span::dummy(),
-                },
+                body,
             },
         ),
     ))
@@ -1978,6 +1978,31 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod calc_named_binding_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// This keyword-less type-body binding owns an `AttributeBody`; its semicolon must retain the
+    /// authored delimiter for serialized provenance validation.
+    #[test]
+    fn calc_named_binding_keeps_its_semicolon_body_span() {
+        let source = "private thisClock : Clock :>> self;";
+        let (rest, binding) = calc_named_binding(input(source)).expect("named binding");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let crate::ast::AttributeBody::Semicolon { semicolon_span } = &binding.value.body else {
+            panic!("expected a semicolon body");
+        };
+        assert_eq!(
+            &source[semicolon_span.offset..semicolon_span.offset + semicolon_span.len],
+            ";"
+        );
+    }
 }
 
 #[cfg(test)]
