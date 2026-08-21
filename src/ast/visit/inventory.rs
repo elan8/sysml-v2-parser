@@ -7194,6 +7194,14 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                CalcDefBodyElement::Package(field_0) => {
+                    visitor.visit_membership(&$($mutability)? field_0.membership);
+                    visitor.visit_package(&$($mutability)? field_0.package);
+                }
+                CalcDefBodyElement::LibraryPackage(field_0) => {
+                    visitor.visit_membership(&$($mutability)? field_0.membership);
+                    visitor.visit_library_package(&$($mutability)? field_0.package);
+                }
                 CalcDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
                 }

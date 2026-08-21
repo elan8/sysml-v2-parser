@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **KerML TypeBody packages retain their owning membership.** `CalcDefBodyElement` now has
+  distinct source-backed `Package` and `LibraryPackage` members, each carrying the authored
+  `MemberPrefix` visibility beside its typed package node. This admits nested packages in KerML
+  type/classifier/function bodies without treating `private package` as expressions. **AST version
+  221.**
+
 ### Fixed
 
 - **Occurrence usages stop at their grammar-owned body.** `OccurrenceUsage` no longer consumes

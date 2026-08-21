@@ -381,6 +381,10 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
+            CalcDefBodyElement::Package(n) => walk_package(report, &p, &n.package.value),
+            CalcDefBodyElement::LibraryPackage(n) => {
+                walk_library_package(report, &p, &n.package.value)
+            }
             CalcDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }

@@ -2686,6 +2686,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
                         }
+                        super::CalcDefBodyElement::Package(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            write!(
+                                self.writer,
+                                "(package-member (visibility {}) ",
+                                visibility_name(member.membership.visibility)
+                            )?;
+                            self.write_package(&member.package.value)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::CalcDefBodyElement::LibraryPackage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            write!(
+                                self.writer,
+                                "(library-package-member (visibility {}) ",
+                                visibility_name(member.membership.visibility)
+                            )?;
+                            self.write_library_package(&member.package.value)?;
+                            self.writer.write_char(')')?;
+                        }
                         super::CalcDefBodyElement::ActionMember(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_first_merge_member(&member.value, &member.span)?;

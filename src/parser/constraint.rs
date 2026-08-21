@@ -1,5 +1,6 @@
 use crate::ast::{
-    CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef, ConstraintDefBody,
+    CalcDef, CalcDefBody, CalcDefBodyElement, CalcDefBodyLibraryPackageMember,
+    CalcDefBodyPackageMember, CalcUsage, ConstraintDef, ConstraintDefBody,
     ConstraintDefBodyElement, ConstraintUsage, Expression, Membership, Node, ParseErrorNode,
     ReturnDecl,
 };
@@ -465,6 +466,39 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
     );
     let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
     node_from_to(start, end, CalcDefBodyElement::Error(node))
+}
+
+/// KerML `TypeBodyElement -> NonFeatureMember -> MemberPrefix Package|LibraryPackage`.
+///
+/// `Package` itself has no membership slot: visibility belongs to the containing type-body
+/// member. Parse the prefix once, then invoke the existing source-backed package parser from the
+/// exact remainder. The enclosing transaction makes a refused library/package alternative leave
+/// no qualified-reference arena entries behind.
+fn calc_def_body_package_member(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
+    crate::parser::span::reference_transaction(input, |input| {
+        let (input, _) = ws_and_comments(input)?;
+        let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+        let membership = Membership::owning(visibility, visibility_span);
+        if starts_with_keyword(input.fragment(), b"package") {
+            let (input, package) = crate::parser::package::package_(input)?;
+            Ok((
+                input,
+                CalcDefBodyElement::Package(CalcDefBodyPackageMember {
+                    membership,
+                    package,
+                }),
+            ))
+        } else {
+            let (input, package) = crate::parser::package::library_package_(input)?;
+            Ok((
+                input,
+                CalcDefBodyElement::LibraryPackage(CalcDefBodyLibraryPackageMember {
+                    membership,
+                    package,
+                }),
+            ))
+        }
+    })
 }
 
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
@@ -1495,6 +1529,12 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
                 annotation,
             )),
         )
+    } else if starts_with_keyword(after_visibility, b"package")
+        || starts_with_keyword(after_visibility, b"library")
+        || starts_with_keyword(after_visibility, b"standard")
+    {
+        let (next, member) = calc_def_body_package_member(input)?;
+        (next, member)
     } else if starts_with_keyword(input.fragment(), b"doc")
         || starts_with_keyword(input.fragment(), b"comment")
         || starts_with_keyword(input.fragment(), b"rep")
