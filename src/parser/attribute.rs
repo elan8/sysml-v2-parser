@@ -12,8 +12,8 @@ use crate::parser::lex::{
 };
 use crate::parser::node_from_to;
 use crate::parser::usage::{
-    multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    typing_node, typing_relationship_node,
+    feature_usage_header, multiplicity_node, optional_typings, prefix_redefinition_target,
+    specialization_clauses, typing_node, typing_relationship_node,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -565,26 +565,19 @@ fn default_reference_usage_inner(
         .map(|_| crate::parser::span_from_to(identification_start, input));
     let name = identification.name.unwrap_or_default();
     let short_name = identification.short_name;
-    let (input, typing_result) = optional_typings(input)?;
-    let (typing_span, typing) = typing_result
-        .map(|(span, conjugated, targets, spelling)| {
-            (
-                Some(span.clone()),
-                Some(typing_node(span, conjugated, targets, spelling)),
-            )
-        })
-        .unwrap_or((None, None));
-    let (input, modifiers) = feature_modifiers(input)?;
-    let (input, leading) = specialization_clauses(input)?;
-    let leading_value = leading
-        .subsets
-        .as_ref()
-        .and_then(|(_, value)| value.clone())
+    // `UsageDeclaration` accepts an empty Identification, so a keyword-less usage can begin
+    // immediately with a `FeatureSpecializationPart`, for example
+    // `:>> unitConversion : ConversionByConvention { ... }`.  Keep its ordering in the shared
+    // header rather than making DefaultReferenceUsage a second, narrower specialization parser:
+    // the pinned grammar admits leading relationships, typing, multiplicity, modifiers, a second
+    // typing, and trailing relationships (SysML BNF 424--426).
+    let (input, header) = feature_usage_header(input)?;
+    let typing_span = header.typing.as_ref().map(|typing| typing.span.clone());
+    let leading_value = header
+        .subsetting_value
         .map(crate::parser::feature_value::wrap_bind_expression);
     let (input, value) =
         opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
-    let (input, trailing) = specialization_clauses(input)?;
-    let (input, modifiers) = feature_modifiers_after(modifiers, input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -595,18 +588,15 @@ fn default_reference_usage_inner(
                 prefix,
                 name,
                 short_name,
-                typing,
-                subsets: trailing
-                    .subsets
-                    .or(leading.subsets)
-                    .map(|(relationship, _)| relationship),
-                redefines: trailing.redefines.or(leading.redefines),
-                references: trailing.references.or(leading.references),
-                crosses: trailing.crosses.or(leading.crosses),
-                intersects: trailing.intersects.or(leading.intersects),
+                typing: header.typing,
+                subsets: header.subsets,
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
                 value: value.or(leading_value),
-                multiplicity: modifiers.multiplicity,
-                multiplicity_modifiers: modifiers.modifiers,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
                 name_span,
                 typing_span,
                 membership: Membership::feature(visibility, visibility_span),
