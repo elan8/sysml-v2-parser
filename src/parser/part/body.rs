@@ -135,11 +135,7 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
     // §8.2.2.18.2: `ExhibitStateUsage` shares `StateUsageBody` with plain `state` usages, so the
     // same `parallel`/`initial` modifier is legal here too (OMG spec Annex `exhibit state
     // vehicleStates parallel { ... }` in `5-State-based Behavior-2.sysml`) -- GH-17.
-    let (input, _) = opt(alt((
-        preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
-        preceded(preceded(ws_and_comments, tag(&b"initial"[..])), ws1),
-    )))
-    .parse(input)?;
+    let (input, body_modifier) = crate::parser::state::state_body_modifier(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = crate::parser::state::state_def_body(input)?;
     // `:>>` may also come *after* the body -- this predates the before-body support above (via
@@ -167,6 +163,7 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
             start,
             input,
             ExhibitState {
+                body_modifier,
                 direction,
                 is_derived: is_derived.is_some(),
                 is_abstract: is_abstract.is_some(),

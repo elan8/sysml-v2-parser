@@ -2821,7 +2821,7 @@ macro_rules! ast_traversal {
         pub fn walk_exhibit_state<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExhibitState>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExhibitState { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, typing, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let ExhibitState { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, typing, multiplicity, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
@@ -2844,6 +2844,11 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = body_modifier {
+                visitor.enter_node(&$($mutability)? inner.span);
+                visitor.visit_span(&$($mutability)? inner.span);
+                visitor.leave_node(&$($mutability)? inner.span);
             }
             visitor.visit_state_def_body(body);
             visitor.visit_membership(membership);
@@ -5773,7 +5778,7 @@ macro_rules! ast_traversal {
         pub fn walk_state_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let StateDef { definition_prefix, is_individual, identification, specializes, body_modifier, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
@@ -5781,6 +5786,11 @@ macro_rules! ast_traversal {
             visitor.visit_identification(identification);
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = body_modifier {
+                visitor.enter_node(&$($mutability)? inner.span);
+                visitor.visit_span(&$($mutability)? inner.span);
+                visitor.leave_node(&$($mutability)? inner.span);
             }
             visitor.visit_state_def_body(body);
             visitor.visit_membership(membership);
@@ -5961,7 +5971,7 @@ macro_rules! ast_traversal {
         pub fn walk_state_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
@@ -5988,6 +5998,11 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = body_modifier {
+                visitor.enter_node(&$($mutability)? inner.span);
+                visitor.visit_span(&$($mutability)? inner.span);
+                visitor.leave_node(&$($mutability)? inner.span);
             }
             visitor.visit_state_def_body(body);
             visitor.visit_membership(membership);

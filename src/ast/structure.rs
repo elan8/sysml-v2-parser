@@ -284,6 +284,10 @@ pub struct ExhibitState {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause, from before or after the body.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored `parallel`/`initial` modifier before the body, with its keyword span:
+    /// `ExhibitStateUsage` shares `StateUsageBody` with a plain state usage. See
+    /// [`crate::ast::StateBodyModifier`].
+    pub body_modifier: Option<Node<crate::ast::StateBodyModifier>>,
     pub body: StateDefBody,
     pub membership: Membership,
 }
