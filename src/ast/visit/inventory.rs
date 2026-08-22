@@ -6771,8 +6771,19 @@ macro_rules! ast_traversal {
         pub fn walk_include_use_case<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<IncludeUseCase>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let IncludeUseCase { target, multiplicity, body } = &$($mutability)? node.value;
-            visitor.visit_qualified_reference(target);
+            let IncludeUseCase { use_case_keyword_span, name, typing, target, multiplicity, body } = &$($mutability)? node.value;
+            if let Some(span) = use_case_keyword_span {
+                visitor.visit_span(span);
+            }
+            if let Some(inner) = name {
+                visitor.visit_text(inner);
+            }
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = target {
+                visitor.visit_qualified_reference(inner);
+            }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }

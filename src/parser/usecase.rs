@@ -103,7 +103,31 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, target) = qualified_reference(input)?;
+    // `'include' ( OwnedReferenceSubsetting FeatureSpecializationPart? | UseCaseUsageKeyword
+    // UsageDeclaration? )` (SysML BNF 2300-2306) is a choice. The `use case` keyword pair selects
+    // the second alternative, whose declaration *declares* a usage rather than referencing one.
+    let use_case_keyword: IResult<Input<'_>, (crate::ast::Span, ())> =
+        crate::parser::span::with_span(|i| {
+            let (i, _) = tag(&b"use"[..]).parse(i)?;
+            let (i, _) = ws1(i)?;
+            let (i, _) = tag(&b"case"[..]).parse(i)?;
+            Ok((i, ()))
+        })
+        .parse(input);
+    let (input, use_case_keyword_span) = match use_case_keyword {
+        Ok((rest, (span, ()))) => (rest, Some(span)),
+        Err(_) => (input, None),
+    };
+    let (input, name, target, typing) = if use_case_keyword_span.is_some() {
+        let (input, _) = ws1(input)?;
+        let (input, declared) = opt(preceded(ws_and_comments, name)).parse(input)?;
+        let (input, result) = crate::parser::usage::optional_typings(input)?;
+        let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(result);
+        (input, declared, None, typing)
+    } else {
+        let (input, reference) = qualified_reference(input)?;
+        (input, None, Some(reference), None)
+    };
     let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = use_case_def_body(input)?;
@@ -113,6 +137,9 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
             start,
             input,
             IncludeUseCase {
+                use_case_keyword_span,
+                name,
+                typing,
                 target,
                 multiplicity: mult,
                 body,

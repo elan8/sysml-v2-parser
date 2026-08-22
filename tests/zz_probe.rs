@@ -90,4 +90,9 @@ fn t() {
         "if-g",
         "package P { action def Q { if true { action a1; } else if false { action a2; } } }",
     );
+    probe("61b", "calc def C { message m of T; }");
+    probe("61c", "package P { part def D { message m of T; } }");
+    probe("69b", "package P { binding b of x = y; }");
+    probe("69c", "binding b { end e1 : A; end e2 : B; }");
+    probe("69d", "package P { part def D { binding b of x = y; } }");
 }

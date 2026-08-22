@@ -69,7 +69,8 @@ fn a_declared_require_constraint_carries_its_typing() {
     parses_clean("package P { requirement def R { require c; } }");
     parses_clean("package P { requirement def R { require constraint c { true } } }");
 
-    let result = parse_with_diagnostics("package P { requirement def R { require constraint c : C; } }");
+    let result =
+        parse_with_diagnostics("package P { requirement def R { require constraint c : C; } }");
     assert!(
         format!("{:?}", result.document.root).contains("TypingRelationship"),
         "the typing clause must be retained, not consumed and dropped"
@@ -100,4 +101,48 @@ fn the_reference_spelling_of_if_else_parses() {
     parses_clean(
         "package P { action def Q { if true { action a1; } else if false { action a2; } } }",
     );
+}
+
+/// Gap 73. `IncludeUseCaseUsage = OccurrenceUsagePrefix 'include' ( OwnedReferenceSubsetting
+/// FeatureSpecializationPart? | UseCaseUsageKeyword UsageDeclaration? ) ValuePart? CaseBody`
+/// (`SysML.xtext:2300-2306`) is a choice, and only the reference alternative was parsed. The
+/// `use case` spelling shredded into a bare `Expression::FeatureRef` naming the keyword `include`
+/// plus a sibling use-case usage -- a keyword turned into a reference to a feature nobody
+/// declared, and with no diagnostic at all.
+#[test]
+fn include_use_case_reaches_one_typed_node() {
+    parses_clean("use case def U { include use case v; }");
+    parses_clean("use case def U { include use case v : V; }");
+    // The reference alternative is unaffected.
+    parses_clean("use case def U { include v; }");
+
+    let result = parse_with_diagnostics("use case def U { include use case v; }");
+    let dump = format!("{:?}", result.document.root);
+    assert!(
+        !dump.contains("FeatureRef"),
+        "no keyword may reach the AST as a feature reference: {dump}"
+    );
+    assert_eq!(
+        dump.matches("IncludeUseCase {").count(),
+        1,
+        "the member must be one node, not a keyword plus a sibling usage"
+    );
+}
+
+/// The `use case` alternative declares a usage; the bare form references one. Re-emitting the
+/// declaration as a reference would rewrite the member into the other production.
+#[test]
+fn the_two_include_alternatives_stay_distinguishable() {
+    let declared = parse_with_diagnostics("use case def U { include use case v : V; }");
+    let dump = format!("{:?}", declared.document.root);
+    assert!(dump.contains("use_case_keyword_span: Some"));
+    assert!(
+        dump.contains("target: None"),
+        "the declaration form names no reference"
+    );
+
+    let referenced = parse_with_diagnostics("use case def U { include v; }");
+    let dump = format!("{:?}", referenced.document.root);
+    assert!(dump.contains("use_case_keyword_span: None"));
+    assert!(dump.contains("target: Some"));
 }

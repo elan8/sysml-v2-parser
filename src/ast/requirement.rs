@@ -741,7 +741,27 @@ pub struct ThenDone {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IncludeUseCase {
-    pub target: QualifiedReferenceId,
+    /// Span of the authored `use case` keyword pair.
+    ///
+    /// `IncludeUseCaseUsage = OccurrenceUsagePrefix 'include' ( ownedRelationship +=
+    /// OwnedReferenceSubsetting FeatureSpecializationPart? | UseCaseUsageKeyword UsageDeclaration?
+    /// ) ValuePart? CaseBody` (SysML BNF 2300-2306; reference `SysML.xtext:2300-2306`) is a
+    /// *choice*, and only the first alternative was parsed. `include use case v;` therefore
+    /// shredded into a bare `Expression::FeatureRef` naming the keyword `include` plus a sibling
+    /// use-case usage -- a keyword turned into a reference to a feature nobody declared.
+    ///
+    /// `Some` selects the second alternative, in which [`Self::name`] *declares* a usage and
+    /// [`Self::target`] is `None`; `None` selects the first, in which `target` *references* an
+    /// existing use case. Mirrors how [`crate::ast::RequireConstraint`] models the same shape of
+    /// choice.
+    pub use_case_keyword_span: Option<Span>,
+    /// Declared name of the `use case` form. `None` for the reference form and for an anonymous
+    /// declaration.
+    pub name: Option<String>,
+    /// Typing clause of the `use case` form's `UsageDeclaration`, e.g. `include use case v : V;`.
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
+    /// Referenced use case of the `OwnedReferenceSubsetting` form. `None` for the `use case` form.
+    pub target: Option<QualifiedReferenceId>,
     /// Optional multiplicity suffix like `[0..*]`, parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: UseCaseDefBody,

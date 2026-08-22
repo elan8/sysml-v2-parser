@@ -1143,7 +1143,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::ThenIncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(then-include (target ")?;
-                            self.write_reference(include.value.include.value.target)?;
+                            self.write_include_use_case_target(&include.value.include.value)?;
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::ThenUseCaseUsage(_usage) => {
@@ -1185,7 +1185,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::IncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(include (target ")?;
-                            self.write_reference(include.value.target)?;
+                            self.write_include_use_case_target(&include.value)?;
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::Ref(declaration) => {
@@ -5548,6 +5548,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    /// `IncludeUseCaseUsage`'s two alternatives: a reference to an existing use case, or a
+    /// declaration introduced by the `use case` keyword pair. Projected as one slot so the
+    /// spellings stay distinguishable without a second shape in every owning scope.
+    fn write_include_use_case_target(&mut self, include: &super::IncludeUseCase) -> io::Result<()> {
+        match include.target {
+            Some(reference) => self.write_reference(reference),
+            None => {
+                self.writer.write_str("(use-case (name ")?;
+                write_optional_quoted(self.writer, include.name.as_deref())?;
+                self.writer.write_str(") (typing ")?;
+                match &include.typing {
+                    Some(typing) => self.write_typing(&typing.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")
+            }
+        }
+    }
+
     fn write_direction(&mut self, direction: Option<InOut>) -> io::Result<()> {
         match direction {
             Some(InOut::In) => self.writer.write_str("in"),
@@ -6305,7 +6324,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::IncludeUseCase(include) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(include (target ")?;
-                self.write_reference(include.value.target)?;
+                self.write_include_use_case_target(&include.value)?;
                 self.writer.write_str("))")
             }
         }

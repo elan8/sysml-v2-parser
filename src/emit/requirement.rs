@@ -697,7 +697,22 @@ pub(crate) fn emit_include_use_case(
     include: &crate::ast::IncludeUseCase,
 ) -> Result<(), EmitError> {
     w.push_str("include ");
-    w.push_qualified_reference(&format!("{path}/target"), include.target)?;
+    // The `use case` keyword pair selects `IncludeUseCaseUsage`'s declaration alternative; the
+    // reference alternative writes its target directly. Re-emitting the declaration form as a
+    // reference would rewrite the member into a different production.
+    match include.target {
+        Some(target) => w.push_qualified_reference(&format!("{path}/target"), target)?,
+        None => {
+            w.push_str("use case");
+            if let Some(name) = &include.name {
+                w.push_char(' ');
+                w.push_str(&format_name(name));
+            }
+            if let Some(typing) = &include.typing {
+                super::structure::emit_typing_clause(w, &typing.value)?;
+            }
+        }
+    }
     if let Some(mult) = &include.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
@@ -778,15 +793,8 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::IncludeUseCase(i) => emit_include_use_case(w, path, &i.value),
         UseCaseDefBodyElement::ThenIncludeUseCase(t) => {
-            w.push_str("then include ");
-            w.push_qualified_reference(
-                &format!("{path}/include/target"),
-                t.value.include.value.target,
-            )?;
-            if let Some(mult) = &t.value.include.value.multiplicity {
-                emit_multiplicity(w, &mult.value)?;
-            }
-            emit_use_case_body(w, path, &t.value.include.value.body)
+            w.push_str("then ");
+            emit_include_use_case(w, &format!("{path}/include"), &t.value.include.value)
         }
         UseCaseDefBodyElement::ThenUseCaseUsage(t) => {
             w.push_str("then ");
