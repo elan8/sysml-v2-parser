@@ -498,6 +498,77 @@ fn definition_header_has_invalid_specialization_colon(header: &[u8]) -> bool {
     false
 }
 
+/// `end` combined with a slot that only `BasicFeaturePrefix` owns.
+///
+/// ```text
+/// FeaturePrefix       = ( EndFeaturePrefix … | BasicFeaturePrefix ) …           -- KerML BNF 584
+/// EndFeaturePrefix    = ( isConstant ?= 'const' )? isEnd ?= 'end'               -- 573
+/// BasicFeaturePrefix  = FeatureDirection? 'derived'? 'abstract'?
+///                       ( 'composite' | 'portion' )? ( 'var' | 'const' )?       -- 577
+/// ```
+///
+/// The two are alternatives of one choice, so `in end feature f;` and `derived end feature f;`
+/// have no derivation: `const` is the only modifier `end` may be spelled with. Recognized here so
+/// the violation is *reported as what it is*, naming the offending keyword, instead of reaching a
+/// scope's generic recovery as "`composite` is not a SysML keyword" -- which is both wrong and
+/// unusable to a consumer that wants to surface the authored modifier.
+pub(crate) fn invalid_end_feature_prefix_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    /// Every `BasicFeaturePrefix` slot keyword except `const`, which both alternatives admit.
+    const BASIC_ONLY: &[&[u8]] = &[
+        b"in",
+        b"out",
+        b"inout",
+        b"derived",
+        b"abstract",
+        b"composite",
+        b"portion",
+        b"var",
+    ];
+
+    let mut rest = trim_ascii_start(fragment);
+    let mut offender: Option<&[u8]> = None;
+    let mut saw_end = false;
+    // Walk the leading keyword run only: the first word that is neither a prefix slot nor `end`
+    // ends the prefix, and anything after it is the declaration rather than a modifier.
+    loop {
+        let word_len = rest
+            .iter()
+            .position(|b| !(b.is_ascii_alphanumeric() || *b == b'_'))
+            .unwrap_or(rest.len());
+        if word_len == 0 {
+            break;
+        }
+        let (word, tail) = rest.split_at(word_len);
+        if word == b"end" {
+            saw_end = true;
+        } else if BASIC_ONLY.contains(&word) {
+            offender = offender.or(Some(word));
+        } else if word != b"const" {
+            break;
+        }
+        rest = trim_ascii_start(tail);
+    }
+
+    let offender = offender.filter(|_| saw_end)?;
+    let offender = String::from_utf8_lossy(offender).into_owned();
+    let slot = if matches!(offender.as_str(), "in" | "out" | "inout") {
+        "direction"
+    } else {
+        "restriction modifier"
+    };
+    Some((
+        crate::parser::diagnostic_catalog::END_FEATURE_INVALID_PREFIX,
+        format!(
+            "`end` feature prefix cannot carry the {slot} `{offender}`: \
+             `EndFeaturePrefix` (KerML BNF 573) admits only `const`"
+        ),
+        "`end`, optionally preceded by `const`".to_string(),
+        format!("Remove `{offender}`, or drop `end` to declare an ordinary feature."),
+    ))
+}
+
 pub(crate) fn invalid_typing_operator_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
@@ -913,7 +984,8 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("recovery_cascade_suppressed")
         | Some("unexpected_keyword_in_scope")
         | Some("unrecognized_declaration_in_scope")
-        | Some("bare_comma_in_feature_value") => 5,
+        | Some("bare_comma_in_feature_value")
+        | Some("end_feature_invalid_prefix") => 5,
         Some(code) if code.starts_with("recovered_") => 2,
         Some("expected_end_of_input") | Some("expected_keyword") => 1,
         _ => 3,

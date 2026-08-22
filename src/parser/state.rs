@@ -1,6 +1,7 @@
 use crate::ast::{
-    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateDef,
-    StateBodyModifier, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
+    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateBodyModifier,
+    StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition,
+    TransitionEffect,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
