@@ -72,7 +72,7 @@ package 'Car Mass Rollup 1' {
         part :>> engine {
             attribute :>> simpleMass = 100[kg];
         }
-        part :>> transmission {
+        part redefines transmission {
             attribute :>> simpleMass = 50[kg];
         }
     }

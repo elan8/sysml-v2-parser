@@ -175,7 +175,7 @@ package '1a-Parts Tree' {
             /*
 			 * 'vehicle1' is a package-owned part of type Vehicle.
 			 */
-            attribute mass :>> Vehicle::mass = 1750[kg] {
+            attribute mass redefines Vehicle::mass = 1750[kg] {
                 /*
 				 * This redefines the 'mass' attribute property from 'Vehicle' to 
 				 * give it a fixed attribute.
@@ -211,7 +211,7 @@ package '1a-Parts Tree' {
 			 * connection between this copy and the original version in the
 			 * model.
 			 */
-            attribute mass :>> Vehicle::mass = 2000[kg] {
+            attribute mass redefines Vehicle::mass = 2000[kg] {
                 /*
 				 * The mass attribute has been modified.
 				 */
@@ -230,8 +230,8 @@ package '1a-Parts Tree' {
 					 * each of the two wheels, as given by their defining expressions.
 					 */
                 }
-                part frontWheel_1 :> frontWheel = frontWheel#(1);
-                part frontWheel_2 :> frontWheel = frontWheel#(2);
+                part frontWheel_1 subsets frontWheel = frontWheel#(1);
+                part frontWheel_2 subsets frontWheel = frontWheel#(2);
             }
             part rearAxleAssembly : AxleAssembly {
                 /*
@@ -240,8 +240,8 @@ package '1a-Parts Tree' {
 				 */
                 part rearAxle : Axle;
                 part rearWheel : Wheel[2] ordered;
-                part rearWheel_1 :> rearWheel = rearWheel#(1);
-                part rearWheel_2 :> rearWheel = rearWheel#(2);
+                part rearWheel_1 subsets rearWheel = rearWheel#(1);
+                part rearWheel_2 subsets rearWheel = rearWheel#(2);
             }
         }
     }

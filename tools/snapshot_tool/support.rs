@@ -397,10 +397,12 @@ fn comparison_projection(
 /// both ways. It is not an intra-doc link: it lives in this file's `#[cfg(test)]` module, which
 /// rustdoc cannot resolve from a non-test build.
 const CANONICAL_OUTPUT_DEBT: &[(&str, u64)] = &[
-    // The emitted KerML type body does not strictly reparse.
+    // The emitted KerML type body does not strictly reparse: a multi-line `connector` declaration
+    // is re-emitted on one line. Re-pinned when the subsetting-clause spelling fix changed the
+    // emitted text (`::>` -> the authored `references`); the wrapping difference is unchanged.
     (
         "tests/snapshots/kerml/type_body_relationship_members.md",
-        0xa337_2e6d_d744_3f8d,
+        0xccc2_f267_46d4_5318,
     ),
     // Removed as their owning formatter paths were repaired: `sysml/ref_declaration_scopes.md`,
     // `spec42/sysml.library/derivation_connections.md`, and

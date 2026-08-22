@@ -34,7 +34,7 @@ package Features {
     classifier B;
     feature f;
     feature g;
-    feature x typed by A, B :> g ::> f;
+    feature x typed by A, B subsets g references f;
     classifier C;
     feature y;
     featuring F of y by C;

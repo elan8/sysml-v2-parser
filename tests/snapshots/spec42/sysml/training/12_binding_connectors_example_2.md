@@ -49,9 +49,9 @@ package 'Binding Connectors Example-2' {
     part def FuelTank;
     part vehicle : Vehicle {
         part tank : FuelTankAssembly {
-            port :>> fuelTankPort {
-                out item :>> fuelSupply;
-                in item :>> fuelReturn;
+            port redefines fuelTankPort {
+                out item redefines fuelSupply;
+                in item redefines fuelReturn;
             }
             part pump : FuelPump {
                 out item pumpOut : Fuel = fuelTankPort.fuelSupply;

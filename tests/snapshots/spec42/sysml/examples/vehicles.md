@@ -60,18 +60,18 @@ package VehicleMasses {
         attribute serialNumber : String;
     }
     part car : CarPart :> compositeThing {
-        attribute vin :>> serialNumber;
-        part carParts : CarPart[*] :>> subcomponents;
+        attribute vin redefines serialNumber;
+        part carParts : CarPart[*] redefines subcomponents;
         part engine :> simpleThing, carParts {}
         part transmission :> simpleThing, carParts {}
     }
     private import SI::*;
     part c :> car {
         attribute :>> mass = 1000[kg];
-        part :>> engine {
+        part redefines engine {
             attribute :>> mass = 100[kg];
         }
-        part :>> transmission {
+        part redefines transmission {
             attribute :>> mass = 50[kg];
         }
     }

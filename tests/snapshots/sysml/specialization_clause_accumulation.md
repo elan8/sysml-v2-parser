@@ -28,11 +28,11 @@ package SpecializationClauseAccumulation {
 ~~~sysml
 package SpecializationClauseAccumulation {
     part def D {
-        attribute repeatedSubsets : T[0..*] ordered :> a, b, c;
-        attribute repeatedRedefines : T :>> a, b;
-        attribute mixedSpellings : T :> base, latest;
-        attribute differentKinds : T :> a :>> b;
-        attribute libraryShape : ActionUsage[0..*] ordered :> step, usage, Metadata::metadataItems;
+        attribute repeatedSubsets : T[0..*] ordered subsets a, b, c;
+        attribute repeatedRedefines : T redefines a, b;
+        attribute mixedSpellings : T subsets base, latest;
+        attribute differentKinds : T subsets a redefines b;
+        attribute libraryShape : ActionUsage[0..*] ordered subsets step, usage, Metadata::metadataItems;
         item aroundTheTyping : T :> base, latest;
     }
 }

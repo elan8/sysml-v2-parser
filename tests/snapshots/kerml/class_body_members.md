@@ -34,7 +34,7 @@ package Classes {
     class A {
         feature innerSpaceDimension : Natural[1];
         member feature x : B;
-        composite feature engine :> carParts;
+        composite feature engine subsets carParts;
         portion feature all portions : Occurrence[1..*];
         var t : Integer;
         inv checkIt {

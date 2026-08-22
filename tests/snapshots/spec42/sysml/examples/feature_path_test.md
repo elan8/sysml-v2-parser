@@ -76,8 +76,8 @@ package Q {
             connect f.a to a.g;
             bind f.a = a.g;
         }
-        part c :> b.f {
-            part aa :> a;
+        part c subsets b.f {
+            part aa subsets a;
         }
         flow from b.f.a to c.aa;
     }

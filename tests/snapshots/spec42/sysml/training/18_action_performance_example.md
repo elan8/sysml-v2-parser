@@ -43,7 +43,7 @@ package 'Action Performance Example' {
     part def AutoFocus;
     part def Imager;
     part camera : Camera {
-        perform action takePhoto[*] ordered ::> takePicture;
+        perform action takePhoto[*] ordered references takePicture;
         part f : AutoFocus {
             perform takePhoto.focus;
         }

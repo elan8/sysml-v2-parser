@@ -1585,12 +1585,31 @@ pub(crate) fn emit_subsetting_clause(
     w: &mut EmitWriter<'_>,
     rel: &SubsettingRelationship,
 ) -> Result<(), EmitError> {
-    match rel.kind {
-        SubsettingKind::Subsets => w.push_str(" :> "),
-        SubsettingKind::References => w.push_str(" ::> "),
-        SubsettingKind::Redefines => w.push_str(" :>> "),
-        SubsettingKind::Crosses => w.push_str(" => "),
-        SubsettingKind::Intersects => w.push_str(" intersects "),
+    // Each kind has two interchangeable spellings and the author picked one; writing the operator
+    // unconditionally rewrote `feature f crosses a;` into `feature f => a;`.
+    match (rel.kind, rel.spelling) {
+        (SubsettingKind::Subsets, crate::ast::SubsettingSpelling::Operator) => w.push_str(" :> "),
+        (SubsettingKind::Subsets, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" subsets ")
+        }
+        (SubsettingKind::References, crate::ast::SubsettingSpelling::Operator) => {
+            w.push_str(" ::> ")
+        }
+        (SubsettingKind::References, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" references ")
+        }
+        (SubsettingKind::Redefines, crate::ast::SubsettingSpelling::Operator) => {
+            w.push_str(" :>> ")
+        }
+        (SubsettingKind::Redefines, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" redefines ")
+        }
+        (SubsettingKind::Crosses, crate::ast::SubsettingSpelling::Operator) => w.push_str(" => "),
+        (SubsettingKind::Crosses, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" crosses ")
+        }
+        // `Intersecting` has only the keyword spelling.
+        (SubsettingKind::Intersects, _) => w.push_str(" intersects "),
     }
     for (index, target) in rel.target.iter().enumerate() {
         if index > 0 {

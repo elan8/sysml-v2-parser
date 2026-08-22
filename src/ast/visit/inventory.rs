@@ -1880,11 +1880,12 @@ macro_rules! ast_traversal {
         pub fn walk_subsetting_relationship<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SubsettingRelationship>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let SubsettingRelationship { target, kind, span, is_implied } = &$($mutability)? node.value;
+            let SubsettingRelationship { target, kind, spelling, span, is_implied } = &$($mutability)? node.value;
             for inner in target {
                 visitor.visit_qualified_reference(inner);
             }
             visitor.visit_subsetting_kind(kind);
+            let _ = spelling;
             visitor.visit_span(span);
             let _ = is_implied;
             visitor.leave_node(&$($mutability)? node.span);

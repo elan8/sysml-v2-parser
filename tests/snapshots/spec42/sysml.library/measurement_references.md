@@ -857,7 +857,7 @@ standard library package MeasurementReferences {
 		 * Examples: kilometre for conversion factor 1000 with reference unit metre, nanofarad for 1E-9 farad.
 		 */
         attribute prefix : UnitPrefix[1];
-        attribute conversionFactor :>> UnitConversion::conversionFactor = prefix.conversionFactor;
+        attribute conversionFactor redefines UnitConversion::conversionFactor = prefix.conversionFactor;
     }
     attribute def UnitPrefix {
         doc

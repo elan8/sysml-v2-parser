@@ -352,7 +352,7 @@ package '8-Requirements' {
 		 * This models a "requirement group" as a requirement that references other requirements.
 		 */
             subject vehicle : Vehicle;
-            requirement  ::> vehicleMass1 {
+            requirement  references vehicleMass1 {
                 /*
 				 * This is a reference to a requirement defined outside the group.
 				 * By default, the subject of the requirement is bound to that of the group.

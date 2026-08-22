@@ -36,7 +36,7 @@ package ThatSelfReference {
 ~~~sysml
 package ThatSelfReference {
     type Anything {
-        feature self : Anything[1] :> things chains things.that;
+        feature self : Anything[1] subsets things chains things.that;
     }
     abstract feature things : Anything[1..*] nonunique {
         feature that : Anything[1];

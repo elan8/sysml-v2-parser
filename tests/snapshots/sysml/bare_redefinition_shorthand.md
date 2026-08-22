@@ -29,7 +29,7 @@ package BareRedefinitionShorthand {
          :>> ThermodynamicTemperatureUnit::quantityDimension::quantityPowerFactors, TemperatureDifferenceUnit::quantityDimension::quantityPowerFactors;
     }
     item def I {
-        private ref :>> Item::incomingTransferSort, subobjects::incomingTransferSort;
+        private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort;
     }
 }
 ~~~

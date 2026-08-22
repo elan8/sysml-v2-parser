@@ -146,3 +146,30 @@ fn the_two_include_alternatives_stay_distinguishable() {
     assert!(dump.contains("use_case_keyword_span: None"));
     assert!(dump.contains("target: Some"));
 }
+
+/// Gap 66, the half that was losing data outright. `Crossings = ( '=>' | 'crosses' )
+/// OwnedCrossSubsetting` and `ReferencesKeyword = '::>' | 'references'` (`KerML.xtext:615-621`):
+/// each kind has two interchangeable spellings, and which one was authored is emission
+/// information the AST did not carry. The formatter therefore rewrote every authored keyword into
+/// its operator, so `feature f crosses a;` came back as `feature f => a;` -- a silent rewrite of
+/// legal input, visible in the corpus fixtures this fix corrected.
+#[test]
+fn a_subsetting_clause_keeps_its_authored_spelling() {
+    for source in [
+        "feature f crosses a;\n",
+        "feature f => a;\n",
+        "feature f references a;\n",
+        "feature f ::> a;\n",
+        "feature f subsets a;\n",
+        "feature f :> a;\n",
+        "feature f redefines a;\n",
+        "feature f :>> a;\n",
+    ] {
+        let document = sysml_v2_parser::parse(source).expect("parses");
+        let emitted = sysml_v2_parser::emit::emit_sysml(&document).expect("emits");
+        assert_eq!(
+            emitted, source,
+            "the authored spelling must survive a round trip"
+        );
+    }
+}

@@ -121,8 +121,8 @@ package Expressions {
                 succession decrement then update;
                 step update : FeatureReferencingPerformances::FeatureWritePerformance {
                     in onOccurrence = w::self {
-                        feature : w :>> startingAt {
-                            inout feature :>> accessedFeature;
+                        feature : w redefines startingAt {
+                            inout feature redefines accessedFeature;
                         }
                     }
                     inout replacementValues = decrement.v_decr;

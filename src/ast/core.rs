@@ -745,9 +745,9 @@ impl PartialEq for TypingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
             && self.kind == other.kind
+            && self.spelling == other.spelling
             && self.is_conjugated == other.is_conjugated
             && self.is_implied == other.is_implied
-            && self.spelling == other.spelling
     }
 }
 
@@ -760,6 +760,22 @@ impl TypingRelationship {
     pub fn first_target(&self) -> Option<QualifiedReferenceId> {
         self.target.first().copied()
     }
+}
+
+/// Which of a subsetting clause's two interchangeable spellings the author wrote.
+///
+/// The grammar gives each kind both an operator and a keyword -- `Crossings = ( '=>' | 'crosses' )
+/// OwnedCrossSubsetting` and `ReferencesKeyword = '::>' | 'references'` (KerML BNF 615-621) -- and
+/// they mean the same thing, so this is emission and provenance information, exactly like
+/// [`TypingSpelling`]. Without it the formatter rewrote every authored keyword into its operator:
+/// `feature f crosses a;` came back as `feature f => a;`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SubsettingSpelling {
+    /// The symbolic operator: `:>`, `::>`, `:>>`, `=>`.
+    Operator,
+    /// The keyword: `subsets`, `references`, `redefines`, `crosses`, `intersects`.
+    Keyword,
 }
 
 /// Which subsetting-family clause a [`SubsettingRelationship`] came from (PAR-004 item 2).
@@ -793,6 +809,9 @@ pub struct SubsettingRelationship {
     /// [`SubsettingRelationship::first_target`] for that common case.
     pub target: Vec<QualifiedReferenceId>,
     pub kind: SubsettingKind,
+    /// Which of the clause's two interchangeable spellings was authored. See
+    /// [`SubsettingSpelling`].
+    pub spelling: SubsettingSpelling,
     /// Span of the whole relationship fragment (operator/keyword through target).
     pub span: Span,
     /// True for a relationship the parser infers rather than one explicitly written in source.
@@ -801,10 +820,13 @@ pub struct SubsettingRelationship {
 }
 
 /// Equality ignores `span`, matching [`TypingRelationship`]'s convention.
+/// `spelling` is compared, for the reason [`TypingRelationship`]'s equality states: excluding it
+/// would let a formatter that swapped `crosses` for `=>` pass every whole-AST comparison.
 impl PartialEq for SubsettingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
             && self.kind == other.kind
+            && self.spelling == other.spelling
             && self.is_implied == other.is_implied
     }
 }

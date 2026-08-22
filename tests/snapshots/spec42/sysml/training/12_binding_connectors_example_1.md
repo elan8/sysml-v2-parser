@@ -52,9 +52,9 @@ package 'Binding Connectors Example-1' {
     part def FuelTank;
     part vehicle : Vehicle {
         part tank : FuelTankAssembly {
-            port :>> fuelTankPort {
-                out item :>> fuelSupply;
-                in item :>> fuelReturn;
+            port redefines fuelTankPort {
+                out item redefines fuelSupply;
+                in item redefines fuelReturn;
             }
             bind fuelTankPort.fuelSupply = pump.pumpOut;
             bind fuelTankPort.fuelReturn = tank.fuelIn;

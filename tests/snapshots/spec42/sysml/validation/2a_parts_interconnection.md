@@ -368,7 +368,7 @@ package '2a-Parts Interconnection' {
             }
             bind rearAxleAssembly.leftWheel.wheelToRoadPort = vehicleToRoadPort.leftWheelToRoadPort;
             bind rearAxleAssembly.rightWheel.wheelToRoadPort = vehicleToRoadPort.rightWheelToRoadPort;
-            port vehicleToRoadPort :>> VehicleA::vehicleToRoadPort {
+            port vehicleToRoadPort redefines VehicleA::vehicleToRoadPort {
                 port leftWheelToRoadPort :> wheelToRoadPort = wheelToRoadPort#(1);
                 port rightWheelToRoadPort :> wheelToRoadPort = wheelToRoadPort#(2);
             }

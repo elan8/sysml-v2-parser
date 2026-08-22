@@ -24,16 +24,8 @@ package EnumeratedValueFullUsage {
 )
 ~~~
 # FORMAT
-~~~sysml
-package EnumeratedValueFullUsage {
-    enum def Level {
-        private enum <lo> low : Level[0..1] ordered nonunique = 0;
-        enum 'quoted';
-        enum 'can\'t';
-        protected medium : Level :> low = 1;
-        public high : Level :>> medium ::> low => medium intersects low = 2;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
