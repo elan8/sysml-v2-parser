@@ -3128,6 +3128,9 @@ macro_rules! ast_traversal {
                 MetadataBodyElement::Error(error) => visitor.visit_parse_error_node(error),
                 MetadataBodyElement::Annotating(member) => visitor.visit_annotating_member(member),
                 MetadataBodyElement::Usage(usage) => visitor.visit_metadata_body_usage(usage),
+                MetadataBodyElement::Definition(member) => visitor.visit_attribute_body_element(member),
+                MetadataBodyElement::Alias(alias) => visitor.visit_alias_def(alias),
+                MetadataBodyElement::Import(import) => visitor.visit_import(import),
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

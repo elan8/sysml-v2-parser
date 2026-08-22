@@ -760,57 +760,53 @@ fn walk_default_reference_usage(
     walk_attribute_body(report, path, &usage.body);
 }
 
+/// One `AttributeBody` member, walked on its own so `MetadataBody`'s `DefinitionMember`
+/// alternative reports through the same rules rather than a second copy of them.
+fn walk_attribute_body_element(report: &mut OpacityReport, p: &str, el: &AttributeBodyElement) {
+    match el {
+        AttributeBodyElement::Error(_) => hit(report, p, OpacityKind::ParseError),
+        AttributeBodyElement::Unsupported(_) => hit(report, p, OpacityKind::UnsupportedGrammar),
+        AttributeBodyElement::KermlFeature(n) => walk_kerml_feature(report, p, &n.value),
+        AttributeBodyElement::Invariant(n) => walk_calc_def_body(report, p, &n.value.body),
+        AttributeBodyElement::KermlConnector(n) => walk_calc_def_body(report, p, &n.value.body),
+        AttributeBodyElement::Bind(n) => walk_bind(report, p, &n.value),
+        AttributeBodyElement::Connection(n) => walk_connection_def_body(report, p, &n.value.body),
+        AttributeBodyElement::CalcDef(n) => walk_calc_def_body(report, p, &n.value.body),
+        AttributeBodyElement::CalcUsage(n) => walk_calc_def_body(report, p, &n.value.body),
+        AttributeBodyElement::ConstraintUsage(n) => {
+            walk_constraint_def_body(report, p, &n.value.body)
+        }
+        AttributeBodyElement::KermlClassifier(n) => walk_calc_def_body(report, p, &n.value.body),
+        AttributeBodyElement::Connect(c) => walk_ref_body(report, p, &c.value.body),
+        AttributeBodyElement::AttributeDef(n) => walk_attribute_body(report, p, &n.value.body),
+        AttributeBodyElement::AttributeUsage(n) => walk_attribute_body(report, p, &n.value.body),
+        AttributeBodyElement::DefaultReferenceUsage(n) => {
+            walk_default_reference_usage(report, p, &n.value)
+        }
+        AttributeBodyElement::OccurrenceUsage(n) => {
+            walk_occurrence_usage_body(report, p, &n.value.body)
+        }
+        AttributeBodyElement::MetadataKeywordUsage(n) => {
+            walk_optional_attribute_body(report, p, &n.value.body)
+        }
+        AttributeBodyElement::AssertConstraint(n) => {
+            walk_constraint_def_body(report, p, &n.value.body)
+        }
+        AttributeBodyElement::RefDecl(n) => walk_ref_body(report, p, &n.value.body),
+        AttributeBodyElement::PartUsage(n) => walk_part_usage_body(report, p, &n.value.body),
+        AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, p, &n.value.body),
+        AttributeBodyElement::VariantUsage(n) => walk_variant_usage(report, p, &n.value),
+        AttributeBodyElement::Annotating(member) => walk_annotating_member(report, p, member),
+    }
+}
+
 fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeBody) {
     let AttributeBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
         let p = format!("{path}/body[{i}]");
-        match &el.value {
-            AttributeBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            AttributeBodyElement::Unsupported(_) => {
-                hit(report, &p, OpacityKind::UnsupportedGrammar)
-            }
-            AttributeBodyElement::KermlFeature(n) => walk_kerml_feature(report, &p, &n.value),
-            AttributeBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
-            AttributeBodyElement::KermlConnector(n) => {
-                walk_calc_def_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
-            AttributeBodyElement::Connection(n) => {
-                walk_connection_def_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::CalcDef(n) => walk_calc_def_body(report, &p, &n.value.body),
-            AttributeBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
-            AttributeBodyElement::ConstraintUsage(n) => {
-                walk_constraint_def_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::KermlClassifier(n) => {
-                walk_calc_def_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::Connect(c) => walk_ref_body(report, &p, &c.value.body),
-            AttributeBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
-            AttributeBodyElement::AttributeUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::DefaultReferenceUsage(n) => {
-                walk_default_reference_usage(report, &p, &n.value)
-            }
-            AttributeBodyElement::OccurrenceUsage(n) => {
-                walk_occurrence_usage_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::MetadataKeywordUsage(n) => {
-                walk_optional_attribute_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::AssertConstraint(n) => {
-                walk_constraint_def_body(report, &p, &n.value.body)
-            }
-            AttributeBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
-            AttributeBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
-            AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
-            AttributeBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
-            AttributeBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
-        }
+        walk_attribute_body_element(report, &p, &el.value);
     }
 }
 
@@ -830,6 +826,13 @@ fn walk_metadata_body(report: &mut OpacityReport, path: &str, body: &crate::ast:
             crate::ast::MetadataBodyElement::Usage(usage) => {
                 walk_metadata_body(report, &member_path, &usage.value.body)
             }
+            // A nested declaration is projected by the attribute-body walk it shares; an alias
+            // and an import own no body, so neither can be opaque.
+            crate::ast::MetadataBodyElement::Definition(member) => {
+                walk_attribute_body_element(report, &member_path, &member.value)
+            }
+            crate::ast::MetadataBodyElement::Alias(_)
+            | crate::ast::MetadataBodyElement::Import(_) => {}
         }
     }
 }

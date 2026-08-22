@@ -271,7 +271,9 @@ enum MetadataBindingPrefix {
     Redefines,
 }
 
-fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
+pub(crate) fn attribute_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.

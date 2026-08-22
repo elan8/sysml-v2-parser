@@ -596,6 +596,19 @@ pub enum MetadataBodyElement {
     Annotating(AnnotatingMember),
     /// `MetadataBodyUsage`, a reference redefinition owned by the metadata type.
     Usage(Node<MetadataBodyUsage>),
+    /// `MetadataBody`'s `DefinitionMember` alternative (SysML BNF 1677): a nested declaration
+    /// owned by the metadata type rather than a redefinition of one of its features.
+    ///
+    /// Carried as an [`AttributeBodyElement`], the shared type-body member the crate already uses
+    /// for `metadata def` bodies. That dispatcher is a *superset* of `DefinitionMember` -- it also
+    /// admits usages -- so this variant over-accepts against the production in exactly the way
+    /// `metadata def` bodies already did, rather than in a new way. Rejecting the member outright,
+    /// which is what happened before, lost the declaration and its span entirely.
+    Definition(Box<Node<AttributeBodyElement>>),
+    /// `MetadataBody`'s `AliasMember` alternative (SysML BNF 1677).
+    Alias(Node<AliasDef>),
+    /// `MetadataBody`'s `Import` alternative (SysML BNF 1677).
+    Import(Box<Node<crate::ast::Import>>),
 }
 
 /// The optional authored redefinition introducer before a metadata-body target.

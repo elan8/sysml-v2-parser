@@ -267,6 +267,15 @@ pub(crate) fn emit_metadata_body(
                     MetadataBodyElement::Usage(usage) => {
                         emit_metadata_body_usage(w, &member_path, &usage.value)?
                     }
+                    MetadataBodyElement::Definition(member) => {
+                        emit_attribute_body_element(w, &member_path, &member.value)?
+                    }
+                    MetadataBodyElement::Alias(alias) => {
+                        emit_alias_def(w, &member_path, &alias.value)?
+                    }
+                    MetadataBodyElement::Import(import) => {
+                        super::root::emit_import(w, &import.value)?
+                    }
                 }
                 w.newline();
             }
