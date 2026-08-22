@@ -5808,6 +5808,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;
                         }
+                        super::PortBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
+                        }
                         super::PortBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;
                         }
@@ -5877,6 +5880,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         PortDefBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;
+                        }
+                        PortDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         PortDefBodyElement::EnumerationUsage(_usage) => {
                             self.write_marker(&mut first, "enumeration-usage")?;

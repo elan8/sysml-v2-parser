@@ -400,6 +400,10 @@ pub(crate) fn emit_require_constraint(
         w.push_char(' ');
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     }
+    // `ConstraintUsageDeclaration`'s specialization part, authored between the name and the body.
+    if let Some(typing) = &req.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
+    }
     match &req.body {
         crate::ast::ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');

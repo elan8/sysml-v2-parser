@@ -851,6 +851,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
             PortDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::ItemDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
+            PortDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             PortDefBodyElement::EnumerationUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
@@ -880,6 +881,7 @@ fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
             PortBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             PortBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
+            PortBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             PortBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PortBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PortBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),

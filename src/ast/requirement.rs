@@ -231,6 +231,19 @@ pub struct RequireConstraint {
     /// document's qualified-reference table. `None` for the `constraint`-keyword declaration
     /// form, whose `name` declares rather than references.
     pub target: Option<crate::ast::QualifiedReferenceId>,
+    /// Typing clause of the declared form, `require constraint c : C;`.
+    ///
+    /// `RequirementConstraintUsage`'s second alternative is
+    /// `( UsageExtensionKeyword* ConstraintUsageKeyword | UsageExtensionKeyword+ )
+    /// ConstraintUsageDeclaration CalculationBody` (SysML BNF 2066-2071; reference
+    /// `SysML.xtext:2066-2071`), and `ConstraintUsageDeclaration` is an ordinary
+    /// `UsageDeclaration` -- so the `constraint`-keyword form declares a name *and* may specialize
+    /// it. Only a bare name was parsed before, so `require constraint c : C;` reached
+    /// `recovered_requirement_body_element` and lost the whole member.
+    ///
+    /// Distinct from [`Self::target`]: that is the keyword-less shorthand's *reference* to an
+    /// existing constraint, this is the declared usage's type.
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub body: ConstraintDefBody,
 }
 

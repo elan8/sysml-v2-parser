@@ -623,7 +623,18 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         // accept the `calc` prefix of an ordinary parameter name before this production gets a
         // chance to retain the declaration. The grammar-owned parameter parser is already
         // transactional and supplies the exact `ActionDefBodyElement` alternative directly.
-        let (next, declaration) = in_out_decl(input)?;
+        //
+        // A *kinded* directed parameter -- `in expr p : Boolean;`, `in bool redefines a;`,
+        // `in feature p : Boolean;` -- is neither an `InOutDecl` nor a keyword-less `Feature`:
+        // it is a KerML `Feature` whose kind keyword names its production
+        // (`FeaturePrefix ( 'feature' | 'expr' | 'bool' | 'step' ) FeatureDeclaration`, KerML BNF
+        // 562/863/895/908). `in_out_decl` deliberately refuses to read a kind keyword as a
+        // parameter name, so it fails here rather than mis-parsing -- and committing to it with
+        // `?` dropped the whole member to recovery. Fall through to the KerML route this body
+        // already owns, which is what `behavior B { in expr p : Boolean; }` has always taken.
+        let Ok((next, declaration)) = in_out_decl(input) else {
+            return calc_def_body_element(input);
+        };
         let member = node_from_to(
             start,
             next,

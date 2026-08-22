@@ -46,8 +46,8 @@ fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
     .parse(input)
 }
 
-/// Transition-level `accept` trigger. Unlike an action-node accept parameter, this additionally
-/// admits the three `TriggerKind` alternatives.
+/// Transition-level `accept` trigger. Shares `AcceptParameterPart` with an action-node accept,
+/// including the three `TriggerKind` alternatives.
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     crate::parser::span::reference_transaction(input, transition_accept_inner)
 }
@@ -59,10 +59,17 @@ fn transition_accept_inner(input: Input<'_>) -> IResult<Input<'_>, TransitionAcc
 
 /// `AcceptParameterPart` after its authored `accept` keyword. Both a direct `accept` action
 /// node and an inline `then action ... accept ...` use this boundary, so a bare payload reference
-/// stays a source-backed expression rather than becoming a decoded name string. `TriggerKind` is
-/// transition-only; action nodes admit only payload parameters (SysML textual BNF 1002-1020).
+/// stays a source-backed expression rather than becoming a decoded name string.
+///
+/// A trigger *is* admitted here. `AcceptNodeDeclaration = ActionNodeUsageDeclaration? 'accept'
+/// AcceptParameterPart`, `AcceptParameterPart = PayloadParameterMember ( 'via'
+/// NodeParameterMember )?`, and `PayloadParameter = Payload | Identification?
+/// PayloadFeatureSpecializationPart? TriggerValuePart` (SysML BNF 1446-1461; reference
+/// `SysML.xtext:1446-1484`) -- so `accept when <expr>;` and `accept at <expr>;` reach an accept
+/// node through `TriggerValuePart`, exactly as they reach a transition. This previously read
+/// `TriggerKind` as transition-only and recovered the whole member.
 pub(crate) fn action_accept_parameter(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
-    crate::parser::span::reference_transaction(input, |input| accept_parameter_part(input, false))
+    crate::parser::span::reference_transaction(input, |input| accept_parameter_part(input, true))
 }
 
 fn accept_parameter_part(
@@ -163,10 +170,10 @@ fn control_node_payload_stmt<'a>(
                 (payload.name_span.clone(), payload.type_span.clone())
             }
             TransitionAccept::Shorthand(expression, _) => (expression.span.clone(), None),
-            // `action_accept_parameter` deliberately rejects transition-only time triggers.
-            TransitionAccept::TimeTrigger(_, _) => {
-                unreachable!("action accept cannot be a time trigger")
-            }
+            // A trigger replaces the payload entirely (`PayloadParameter`'s `TriggerValuePart`
+            // alternative), so the node has no payload name or type to point at; the trigger
+            // expression carries its own span inside the `accept` value.
+            TransitionAccept::TimeTrigger(_, expression) => (expression.span.clone(), None),
         };
         (input, name_span, type_ref_span, Some(accept), None)
     };

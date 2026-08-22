@@ -1187,6 +1187,15 @@ pub enum PortDefBodyElement {
     RefDecl(Node<RefDecl>),
     /// `variant` member via this scope's `DefinitionBodyItem` grammar.
     VariantUsage(Node<VariantUsage>),
+    /// `PortDefinition = DefinitionPrefix PortDefKeyword Definition …` (SysML BNF 955), so a port
+    /// body is an ordinary `DefinitionBody` and its `DefinitionBodyItem` (514) reaches
+    /// `OccurrenceUsageMember -> StructureUsageMember -> PartUsage` like every other definition
+    /// body. The scope modelled no part member, so `port def PD { part x : T; }` was rejected as
+    /// `unexpected_keyword_in_scope` -- the composite modifier and the declaration with it.
+    ///
+    /// Boxed: `PartUsage` carries the shared `OccurrenceUsagePrefix` and is much the largest
+    /// member of this scope.
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1289,6 +1298,11 @@ pub enum PortBodyElement {
     RefDecl(Node<RefDecl>),
     /// `variant` member via `UsageBody = DefinitionBody`.
     VariantUsage(Node<VariantUsage>),
+    /// Part usage nested in a port usage body. `UsageBody = DefinitionBody` (SysML BNF 604), so
+    /// this scope reaches `DefinitionBodyItem -> OccurrenceUsageMember -> StructureUsageMember ->
+    /// PartUsage` (514, 623) exactly as [`PortDefBodyElement::PartUsage`] does on the definition
+    /// side. Boxed for the same reason: `PartUsage` carries the shared `OccurrenceUsagePrefix`.
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2

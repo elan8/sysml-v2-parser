@@ -818,6 +818,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortDefBodyElement::ItemDef(i) => emit_item_def(w, path, &i.value),
         PortDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        PortDefBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PortDefBodyElement::EnumerationUsage(e) => {
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
@@ -869,6 +870,7 @@ fn emit_port_body_element(
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        PortBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PortBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         PortBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }

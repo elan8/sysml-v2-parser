@@ -785,6 +785,16 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
             let (input, reference) = qualified_reference(input)?;
             (input, None, Some(reference))
         };
+    // `ConstraintUsageDeclaration` is an ordinary `UsageDeclaration`, so the declared form may
+    // carry a typing clause: `require constraint c : C;`. Only reachable behind the keyword --
+    // the shorthand's qualified reference has already consumed the name position.
+    let (input, typing) = if has_constraint_keyword {
+        let (input, result) = crate::parser::usage::optional_typings(input)?;
+        let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(result);
+        (input, typing)
+    } else {
+        (input, None)
+    };
     let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
@@ -796,6 +806,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
                 has_constraint_keyword,
                 name,
                 target,
+                typing,
                 body,
             },
         ),

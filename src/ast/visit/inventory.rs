@@ -3639,6 +3639,9 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::ItemUsage(field_0) => {
                     visitor.visit_item_usage(field_0);
                 }
+                PortDefBodyElement::PartUsage(field_0) => {
+                    visitor.visit_part_usage(field_0);
+                }
                 PortDefBodyElement::EnumerationUsage(field_0) => {
                     visitor.visit_enumeration_usage(field_0);
                 }
@@ -3748,6 +3751,9 @@ macro_rules! ast_traversal {
                 }
                 PortBodyElement::ItemUsage(field_0) => {
                     visitor.visit_item_usage(field_0);
+                }
+                PortBodyElement::PartUsage(field_0) => {
+                    visitor.visit_part_usage(field_0);
                 }
                 PortBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -6261,7 +6267,7 @@ macro_rules! ast_traversal {
         pub fn walk_require_constraint<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequireConstraint>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequireConstraint { is_assume, has_constraint_keyword, name, target, body } = &$($mutability)? node.value;
+            let RequireConstraint { is_assume, has_constraint_keyword, name, target, typing, body } = &$($mutability)? node.value;
             let _ = is_assume;
             let _ = has_constraint_keyword;
             if let Some(inner) = name {
@@ -6269,6 +6275,9 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = target {
                 visitor.visit_qualified_reference(inner);
+            }
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             visitor.visit_constraint_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
