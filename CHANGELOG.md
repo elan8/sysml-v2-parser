@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Five member forms the reference grammar spells.** Each verified against the Pilot
+  Implementation before implementation, not the published BNF alone: the `perform` reference form in
+  an action body (`SysML.xtext:1411-1417`), a part member in either port body (604/514/623), the
+  declared `require constraint c : C;` with its typing (2066-2071), a trigger on an accept *node*
+  (1459-1484), and the `include use case` alternative of `IncludeUseCaseUsage` (2300-2306), which
+  previously shredded into a `FeatureRef` naming the keyword `include`. **AST version 229.**
+
+- **A kinded directed parameter parses in a calc body again.** `calculation_body_element`'s
+  directed branch committed to `in_out_decl`, so `calc def C { in expr p : Boolean; }` fell to
+  recovery; it now falls through to the KerML route the same function already ends in. Regression
+  from the previous wave.
+
+### Fixed
+
+- **A subsetting clause keeps its authored spelling.** Each kind has an operator and a keyword
+  spelling and the AST carried neither, so the formatter rewrote every authored keyword into its
+  operator -- `feature f crosses a;` came back as `feature f => a;`, and corpus fixtures were
+  affected. `SubsettingRelationship` gains `spelling`, compared by equality so a formatter that
+  swaps spellings cannot pass a whole-AST comparison. **AST version 230.**
+
+### Added
+
 - **`MetadataBody` admits every member the grammar spells.** `MetadataBody = ';' | '{'
   ( DefinitionMember | MetadataBodyUsageMember | AliasMember | Import )* '}'` (SysML BNF 1677) has
   four alternatives and the parser dispatched two, so a nested declaration, an alias and an import

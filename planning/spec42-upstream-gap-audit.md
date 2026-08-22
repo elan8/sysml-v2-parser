@@ -438,6 +438,92 @@ set instead of two that drift. The keyword-less usage member is tried first, bec
 semantic projection and the opacity walk each factor their attribute-body arm into one function
 both scopes call. Pinned by `tests/metadata_body_members.rs`.
 
+## Wave 2 -- gaps re-probed at the wave-1 pin
+
+Every entry in this section was checked against the **reference implementation**
+(`SysML-v2-Pilot-Implementation`, `org.omg.sysml.xtext/.../SysML.xtext` and
+`org.omg.kerml.xtext/.../KerML.xtext`) before any code was written, not against the published
+`.kebnf` alone. Gap 59 records why: the two artifacts agree on the KerML prefix productions but
+not everywhere, and a claim checked only against the published BNF was wrong once already.
+
+Corpus silence is *not* evidence here. Of the 403 official `.sysml`/`.kerml` files, several of the
+constructs below appear zero times -- including ones that are unambiguously legal -- so "the corpus
+never writes it" was treated as no information rather than as refutation.
+
+### Fixed
+
+- **Gap 81 (regression), calc bodies.** `calculation_body_element`'s directed-parameter branch
+  committed to `in_out_decl` with `?`. A *kinded* parameter (`in expr p : T;`, `in bool redefines
+  a;`, `in feature p : T;`) is a KerML `Feature` whose kind keyword names its production, and
+  `in_out_decl` refuses to read a kind keyword as a parameter name, so the whole member fell to
+  recovery. It now falls through to the KerML route the same function already ends in.
+
+  The `constraint def` half is **not** fixed, deliberately: that dispatcher has no KerML
+  delegation, `ConstraintBody` is a `CalculationBody`, and `'expr'` occurs zero times in
+  `SysML.xtext` (which inherits only `KerMLExpressions`). Rejecting it there is conformant.
+
+- **Gap 72.** `PerformActionUsage`'s declaration is `OwnedReferenceSubsetting
+  FeatureSpecializationPart?` *or* `ActionUsageKeyword UsageDeclaration?` (`SysML.xtext:1411-1417`).
+  Only the second reached an action body, so `action def G { perform L::doIt; }` was recovered while
+  the part body -- the same production -- accepted it.
+
+- **Gap 73.** `IncludeUseCaseUsage` is a choice (`SysML.xtext:2300-2306`) and only the reference
+  alternative was parsed, so `include use case v;` shredded into a bare `FeatureRef` naming the
+  keyword `include` plus a sibling usage, with no diagnostic. `IncludeUseCase` now carries the
+  keyword span, declared name and typing, with an optional `target`.
+
+- **Gap 74.** `ConstraintUsageDeclaration` is an ordinary `UsageDeclaration`
+  (`SysML.xtext:2066-2071`), so `require constraint c : C;` declares *and* specializes.
+  `RequireConstraint` gains `typing`, re-emitted by the formatter.
+
+- **Gap 75.** `UsageBody = DefinitionBody` (604), so both port bodies reach `DefinitionBodyItem ->
+  OccurrenceUsageMember -> StructureUsageMember -> PartUsage`. Both sides now accept a part member.
+  The gap's `composite` modifier is **not** part of this: `'composite'` occurs zero times in
+  `SysML.xtext`.
+
+- **Gap 76, the trigger half.** `PayloadParameter`'s third alternative is `TriggerValuePart`
+  (1459-1461), whose kinds are `'at' | 'after'` and `'when'`, so an accept *node* admits a trigger
+  exactly as a transition does. The parser treated triggers as transition-only and carried an
+  `unreachable!` justified by that assumption.
+
+- **Gap 66, the spelling half.** Each subsetting kind has two interchangeable spellings and the AST
+  carried none, so the formatter rewrote every authored keyword into its operator. Corpus fixtures
+  were affected. `SubsettingRelationship` gains `spelling`.
+
+### Not upstream gaps -- the reference grammar does not spell them
+
+- **Gap 61, `message` in a KerML body.** `'message'` occurs only in `SysML.xtext`; a `classifier`
+  body is a KerML `TypeBody`. The SysML scopes where `Message` is legal (`calc def`, `part def`)
+  already accept it.
+- **Gap 76, the `if ... then ... else` half.** `IfNode = ActionNodePrefix 'if'
+  ExpressionParameterMember ActionBodyParameterMember ( 'else' … )?` (1596-1608) has no `then`, and
+  `ActionBodyParameter` is always braced. The braced spellings, including `else if` chains, parse.
+- **Gap 77, a `transition` member in an action body.** `TransitionUsageMember` appears only in
+  `StateBodyItem` (1754-1770). The state-body transition-effect forms the gap also names already
+  parse at this revision.
+- **Gap 78, `abstract variation`.** `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation
+  ?= 'variation'` (490-492) is a *choice*; no order spells both.
+- **Gap 79, `expose` in a package body and `verify`/`render` in a part-definition body.** `Expose`
+  is admitted only by `ViewBodyItem`, `ViewRenderingMember` only by `ViewDefinitionBodyItem` and
+  `ViewBodyItem` (2325-2365). Admitting them elsewhere so semantics can report the owner is an
+  error-tolerance policy question, not a grammar gap; see Gap 59's note on that trade-off.
+- **Gap 52, the `var` spelling.** `'var'` occurs zero times in `SysML.xtext`, and `occurrence def`
+  is a SysML production. `var` is the KerML variability keyword and is accepted in KerML bodies.
+
+### Still open
+
+- **Gap 66, clause count.** `specialization_clauses` merges repeated clauses of one kind, which is
+  correct and corpus-backed for `subsets` and wrong only for `crosses`/`references`, whose KerML
+  rules are "at most one *clause*". One relationship per authored clause touches ~112 read sites.
+- **Gap 69, a binding connector with a `TypeBody` of ends.** `BindingConnector = FeaturePrefix
+  'binding' BindingConnectorDeclaration TypeBody` and the `of … = …` clause is *optional*
+  (`KerML.xtext:870-878`), so `binding b { end e1 : A; end e2 : B; }` is legal and is refused. The
+  parser requires `left = right` unconditionally and gives the member a SysML usage body rather
+  than a KerML `TypeBody`.
+- **Gap 62, a repeated payload clause.** `FlowDeclaration`'s `( 'of' PayloadFeatureMember )?` is
+  singular, so `flow of Thing of Thing …` is correctly refused; what it lacks is a *precise*
+  diagnostic naming the at-most-one rule, as `end_feature_invalid_prefix` does for Gap 59.
+
 ## Deferred neighbouring debt
 
 Found during the audit, out of scope for these commits, recorded so it is not rediscovered:
