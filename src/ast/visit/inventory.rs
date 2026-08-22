@@ -1465,6 +1465,11 @@ macro_rules! ast_traversal {
                 walk_kerml_classifier_keyword(self, node)
             }
 
+            /// Visits a [`Conjugation`]; the default implementation walks its children.
+            fn visit_conjugation(&mut self, node: &$($mutability)? Node<Conjugation>) {
+                walk_conjugation(self, node)
+            }
+
             /// Visits [`KermlTypeRelationship`]; the default implementation walks its children.
             fn visit_kerml_type_relationship(&mut self, node: &$($mutability)? Node<KermlTypeRelationship>) {
                 walk_kerml_type_relationship(self, node)
@@ -7722,7 +7727,7 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_classifier_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlClassifierDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlClassifierDecl { is_abstract, keyword, is_all, identification, multiplicity, specializes, type_relationships, body, membership } = &$($mutability)? node.value;
+            let KermlClassifierDecl { is_abstract, keyword, is_all, identification, multiplicity, specializes, conjugates, type_relationships, body, membership } = &$($mutability)? node.value;
             let _ = is_abstract;
             visitor.visit_kerml_classifier_keyword(keyword);
             let _ = is_all;
@@ -7732,6 +7737,9 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = conjugates {
+                visitor.visit_conjugation(inner);
             }
             for inner in type_relationships {
                 visitor.visit_kerml_type_relationship(inner);
@@ -7758,6 +7766,16 @@ macro_rules! ast_traversal {
                 KermlClassifierKeyword::Class => {}
                 KermlClassifierKeyword::AssocStruct => {}
             }
+        }
+
+        pub fn walk_conjugation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Conjugation>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let Conjugation { target, spelling, span } = &$($mutability)? node.value;
+            visitor.visit_qualified_reference(target);
+            let _ = spelling;
+            visitor.visit_span(span);
+            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_kerml_type_relationship<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlTypeRelationship>) {
