@@ -498,20 +498,37 @@ fn definition_header_has_invalid_specialization_colon(header: &[u8]) -> bool {
     false
 }
 
-/// `end` combined with a slot that only `BasicFeaturePrefix` owns.
+/// `end` combined with a slot that no production lets it carry *in that position*.
 ///
 /// ```text
-/// FeaturePrefix       = ( EndFeaturePrefix … | BasicFeaturePrefix ) …           -- KerML BNF 584
-/// EndFeaturePrefix    = ( isConstant ?= 'const' )? isEnd ?= 'end'               -- 573
-/// BasicFeaturePrefix  = FeatureDirection? 'derived'? 'abstract'?
-///                       ( 'composite' | 'portion' )? ( 'var' | 'const' )?       -- 577
+/// FeaturePrefix        = ( EndFeaturePrefix … | BasicFeaturePrefix ) …          -- KerML BNF 584
+/// EndFeaturePrefix     = ( isConstant ?= 'const' )? isEnd ?= 'end'              -- 573
+/// BasicFeaturePrefix   = FeatureDirection? 'derived'? 'abstract'?
+///                        ( 'composite' | 'portion' )? ( 'var' | 'const' )?      -- 577
+/// UnextendedUsagePrefix = EndUsagePrefix | BasicUsagePrefix                     -- SysML 298
+/// DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration …      -- SysML 630
 /// ```
 ///
-/// The two are alternatives of one choice, so `in end feature f;` and `derived end feature f;`
-/// have no derivation: `const` is the only modifier `end` may be spelled with. Recognized here so
-/// the violation is *reported as what it is*, naming the offending keyword, instead of reaching a
-/// scope's generic recovery as "`composite` is not a SysML keyword" -- which is both wrong and
-/// unusable to a consumer that wants to surface the authored modifier.
+/// Two of these are exclusive choices, and one is not, so the position of the modifier decides:
+///
+/// - **Before `end`** -- `in end feature f;`, `derived end x;` -- has no derivation anywhere.
+///   Every production that spells both puts `end` first.
+/// - **After `end`, before a declaration keyword** -- `end derived feature f;`, `end in part p;` --
+///   is the exclusive choice: `FeaturePrefix` and `UnextendedUsagePrefix` each pick one alternative.
+/// - **After `end`, before a plain name** -- `end derived x : T;` -- is **legal**. SysML's
+///   keyword-less `DefaultReferenceUsage` spells `'end'? RefPrefix`, the one production that
+///   combines them, so this must not be reported. It is the spelling that makes
+///   `validateFeatureEndNoDirection` and `validateFeatureEndNotDerivedAbstractCompositeOrPortion`
+///   reachable from textual notation at all, which is why the Pilot's own textual validator
+///   (`KerMLValidator.xtend:669-677`) checks them.
+///
+/// Verified against the reference implementation, not only the published BNF:
+/// `org.omg.kerml.xtext/.../KerML.xtext:510-526` and `org.omg.sysml.xtext/.../SysML.xtext:568-574,
+/// 630-633`.
+///
+/// Recognized here so a genuine violation is *reported as what it is*, naming the offending
+/// keyword, instead of reaching a scope's generic recovery as "`composite` is not a SysML
+/// keyword" -- which is both wrong and unusable to a consumer that wants the authored modifier.
 pub(crate) fn invalid_end_feature_prefix_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
@@ -528,44 +545,90 @@ pub(crate) fn invalid_end_feature_prefix_diagnostic(
     ];
 
     let mut rest = trim_ascii_start(fragment);
-    let mut offender: Option<&[u8]> = None;
+    let mut before_end: Option<&[u8]> = None;
+    let mut after_end: Option<&[u8]> = None;
     let mut saw_end = false;
     // Walk the leading keyword run only: the first word that is neither a prefix slot nor `end`
-    // ends the prefix, and anything after it is the declaration rather than a modifier.
-    loop {
+    // ends the prefix, and that word decides whether a modifier after `end` is legal.
+    let terminator = loop {
         let word_len = rest
             .iter()
             .position(|b| !(b.is_ascii_alphanumeric() || *b == b'_'))
             .unwrap_or(rest.len());
         if word_len == 0 {
-            break;
+            break None;
         }
         let (word, tail) = rest.split_at(word_len);
         if word == b"end" {
             saw_end = true;
         } else if BASIC_ONLY.contains(&word) {
-            offender = offender.or(Some(word));
+            let slot = if saw_end {
+                &mut after_end
+            } else {
+                &mut before_end
+            };
+            *slot = slot.or(Some(word));
         } else if word != b"const" {
-            break;
+            break Some(word);
         }
         rest = trim_ascii_start(tail);
-    }
+    };
 
-    let offender = offender.filter(|_| saw_end)?;
+    if !saw_end {
+        return None;
+    }
+    // A modifier after `end` is only wrong when a declaration keyword follows the run: that is the
+    // exclusive `FeaturePrefix`/`UnextendedUsagePrefix` choice. Followed by a plain name it is
+    // `DefaultReferenceUsage`, which spells `'end'? RefPrefix` and is legal.
+    //
+    // `is_reserved_keyword` alone is not the test: its table is the SysML reserved-word list and
+    // carries none of KerML's feature-kind keywords, so `end derived feature f;` would read as a
+    // usage named `feature`.
+    let introduces_a_keyworded_declaration = |word: &[u8]| {
+        const KERML_FEATURE_KEYWORDS: &[&[u8]] =
+            &[b"feature", b"step", b"expr", b"bool", b"inv", b"invariant"];
+        KERML_FEATURE_KEYWORDS.contains(&word) || lex::is_reserved_keyword(word)
+    };
+    let after_end =
+        after_end.filter(|_| terminator.is_some_and(introduces_a_keyworded_declaration));
+    let wrote_modifier_first = before_end.is_some();
+    let offender = before_end.or(after_end)?;
     let offender = String::from_utf8_lossy(offender).into_owned();
     let slot = if matches!(offender.as_str(), "in" | "out" | "inout") {
         "direction"
     } else {
         "restriction modifier"
     };
+    // Two different rules are broken depending on where the modifier sits, and naming the wrong
+    // one sends the author to the wrong part of the grammar.
+    let (message, expected, suggestion) = if wrote_modifier_first {
+        (
+            format!(
+                "the {slot} `{offender}` cannot precede `end`: every production that spells both \
+                 writes `end` first"
+            ),
+            "`end` before any prefix keyword".to_string(),
+            format!("Write `end {offender} ...`, or remove `end`."),
+        )
+    } else {
+        let keyword = String::from_utf8_lossy(terminator.unwrap_or_default()).into_owned();
+        (
+            format!(
+                "`end {keyword}` cannot carry the {slot} `{offender}`: `end` and the prefix \
+                 keywords are exclusive alternatives of one choice (SysML BNF 298, KerML BNF 584)"
+            ),
+            format!("`end {keyword}` with no prefix keyword"),
+            format!(
+                "Drop `{keyword}` -- the keyword-less `end {offender} <name> : <Type>;` is legal \
+                 -- or remove `{offender}`."
+            ),
+        )
+    };
     Some((
         crate::parser::diagnostic_catalog::END_FEATURE_INVALID_PREFIX,
-        format!(
-            "`end` feature prefix cannot carry the {slot} `{offender}`: \
-             `EndFeaturePrefix` (KerML BNF 573) admits only `const`"
-        ),
-        "`end`, optionally preceded by `const`".to_string(),
-        format!("Remove `{offender}`, or drop `end` to declare an ordinary feature."),
+        message,
+        expected,
+        suggestion,
     ))
 }
 

@@ -82,6 +82,13 @@ pub(crate) fn end_decl(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration …` (SysML BNF 630):
+    // the keyword-less reference usage is the one production that spells `end` beside a
+    // `RefPrefix`, so `end derived x : T;` and `end in x : T;` are legal here. Never fails and
+    // consumes nothing when the next token already starts the declaration.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, ref_prefix) = crate::parser::occurrence_prefix::ref_prefix(input);
+    let (input, _) = ws_and_comments(input)?;
     // GH-85: a `#tag` metadata-prefix annotation may precede the rest of the end declaration,
     // e.g. `end #cause cause1 : Causer1;` (OMG spec Annex `Cause and Effect Examples/
     // CauseAndEffectExample.sysml`), `end #original r1 : Req1;` (`Requirements Examples/
@@ -166,6 +173,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    ref_prefix: ref_prefix.clone(),
                     introducer,
                     short_name,
                     identity,
@@ -196,6 +204,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    ref_prefix: ref_prefix.clone(),
                     introducer,
                     short_name,
                     identity,
@@ -218,6 +227,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    ref_prefix: ref_prefix.clone(),
                     introducer,
                     short_name,
                     identity,
@@ -246,6 +256,7 @@ pub(crate) fn end_decl(
                     start,
                     rest,
                     EndDecl {
+                        ref_prefix: ref_prefix.clone(),
                         introducer,
                         short_name,
                         identity,
@@ -292,6 +303,7 @@ pub(crate) fn end_decl(
             start,
             input,
             EndDecl {
+                ref_prefix: ref_prefix.clone(),
                 introducer,
                 short_name,
                 identity,

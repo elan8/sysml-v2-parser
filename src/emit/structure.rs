@@ -1001,6 +1001,18 @@ pub(crate) fn emit_end_decl(
         );
     }
     w.push_str("end ");
+    // `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix …` (SysML BNF 630): the prefix is
+    // authored between `end` and the declaration, so it must be re-emitted there. Dropping it
+    // silently rewrote `end derived x : T;` as `end x : T;`, changing the model.
+    if let Some(direction) = &end.ref_prefix.direction {
+        emit_direction(w, direction.value);
+    }
+    emit_ref_prefix(
+        w,
+        end.ref_prefix.derived_span.is_some(),
+        end.ref_prefix.variance.as_ref().map(|node| &node.value),
+        end.ref_prefix.constant_span.is_some(),
+    );
     match &end.introducer {
         EndDeclIntroducer::Bare => {}
         EndDeclIntroducer::Reference { .. } => w.push_str("ref "),

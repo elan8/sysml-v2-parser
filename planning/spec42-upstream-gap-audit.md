@@ -38,10 +38,10 @@ unrelated work and needed only a pinning fixture.
 | 56 | Every body member family already retained | Already closed; pinned by fixture |
 | 57 | No declared name published | Already closed; pinned by fixture |
 | 58 | Prefix kept but spanless; `variation` rejected | Fixed: spanned prefix, `variation` accepted |
-| 59 | Direction beside `end` rejected | Split: unauthorable per the pin; the diagnostic is fixed |
+| 59 | Direction beside `end` rejected | Split: keyword-less `end` + `RefPrefix` fixed; keyworded forms conformantly refused |
 | 64 | `conjugates` reports `unsupported_grammar_form` | Fixed: `Conjugation` node and `ConjugationPart` |
 | 65 | `state def S parallel { … }` rejected outright | Fixed: shared body-modifier production |
-| 67 | Restriction modifiers beside `end` rejected | Split: unauthorable per the pin; the diagnostic is fixed |
+| 67 | Restriction modifiers beside `end` rejected | Split: as Gap 59 -- keyword-less form fixed, diagnostic corrected |
 | 70 | Declaration, alias and import members rejected | Fixed: all four `MetadataBody` alternatives dispatched |
 | 80 | Usage-side modifier consumed and discarded | Fixed with Gap 65: `StateBodyModifier` with its span |
 
@@ -285,7 +285,9 @@ spell. Pinned by `tests/snapshots/sysml/definition_prefix_alternatives.md` and
 **Claim.** No spelling authors an end feature that also carries a direction, so KerML 8.3.3.3.1's
 prohibition has no authorable violation; the direction prefix should be accepted alongside `end`.
 
-**Evidence.** The pin makes the combination unauthorable by construction, in both languages:
+**Evidence.** *(Corrected — the original evidence for this entry was wrong. See "What the reference
+implementation actually says" below.)* The published BNF makes the combination unauthorable in the
+**keyworded** forms of both languages:
 
 ```text
 SysML BNF 284  EndUsagePrefix : Usage = isEnd ?= 'end' ( ownedRelationship += OwnedCrossFeatureMember )?
@@ -295,14 +297,49 @@ KerML BNF 585  FeaturePrefix = ( EndFeaturePrefix ( ... )? | BasicFeaturePrefix 
 ```
 
 `direction` lives only in `RefPrefix`/`BasicFeaturePrefix`, and those are the *other* alternative of
-the same choice. There is no normative prefix order that spells both, which is why KerML states the
-restriction as a metamodel constraint: an end feature acquires a direction by redefinition, never by
-notation. Accepting `in end port p : T;` would be a deliberate deviation from
-`docs/conformance-target`.
+the same choice, so `in end port p : T;` and `end in port p : T;` are both correctly refused.
 
-**Disposition. Split.**
+### What the reference implementation actually says
 
-- The direction-beside-`end` half is **not an upstream gap**. Rejecting it is conformant. The
+This entry previously concluded that the combination is unauthorable "by construction, in both
+languages", and that the KerML constraints therefore have no authorable violation. **That conclusion
+was false**, and the published BNF alone does not show why. Checked against the Pilot
+Implementation:
+
+- `org.omg.kerml.xtext/src/org/omg/kerml/xtext/KerML.xtext:510-526` is *identical* to the pinned
+  `.kebnf`, including after the `OwnedCrossFeatureMember` -> `OwnedCrossingFeatureMember` rename the
+  Pilot has since made. The KerML half of the conclusion holds.
+- `org.omg.sysml.xtext/src/org/omg/sysml/xtext/SysML.xtext:630-633` does not:
+
+  ```text
+  DefaultReferenceUsage returns SysML::ReferenceUsage :
+      ( isEnd ?= 'end' )? RefPrefix
+      UsageDeclaration ValuePart? UsageBody
+  ```
+
+  The **keyword-less** reference usage spells `end` *and* a full `RefPrefix`. So
+  `end derived x : T;`, `end in x : T;` and `end constant x : T;` are legal SysML, and the parser
+  rejected all three.
+- `org.omg.kerml.xtext/.../validation/KerMLValidator.xtend:669-677` implements both
+  `validateFeatureEndNoDirection` and `validateFeatureEndNotDerivedAbstractCompositeOrPortion` as
+  Xtext `@Check`s on the **textual** model -- which is only coherent because the production above
+  makes them reachable from text.
+
+So the gaps' underlying need was real; only the spelling they proposed (modifier *before* `end`, or
+with a `feature`/`part` keyword) was not. The corpus is silent either way: of 403 official
+`.sysml`/`.kerml` files, zero author any of these combinations, so corpus evidence neither confirmed
+nor refuted the claim and must not be read as confirming it.
+
+**Disposition. Split three ways.**
+
+- **Fixed**: the keyword-less `DefaultReferenceUsage` form. `EndDecl` now carries a `RefPrefix`
+  parsed between `end` and the declaration, retained with its spans, re-emitted by the formatter,
+  and projected as `(prefix ...)`. Before this it was rejected outright; briefly, it was worse than
+  that -- an earlier revision of the `end_feature_invalid_prefix` classification reported this
+  *legal* syntax as a prefix violation. Pinned by `tests/snapshots/spec42/end_ref_prefix.md` and
+  `tests/end_feature_prefix_diagnostic.rs`.
+- The direction-beside-`end` half **in the keyworded forms** is not an upstream gap. Rejecting it is
+  conformant. The
   reachable and testable half of the gap's acceptance criterion -- "retain stable recovery for
   invalid combinations" -- is pinned by `tests/snapshots/spec42/end_prefix_recovery.md`, which
   authors both orders in a connection definition body and in a KerML type body and shows a stable
@@ -356,13 +393,15 @@ was written is the fact lowering needs. The keyword must be a whole word, so
 **Claim.** `derived`/`abstract`/`composite`/`portion`/`var` should be accepted with `end`, so
 `validateFeatureEndNotDerivedAbstractCompositeOrPortion` has an authorable violation.
 
-**Evidence.** Same structure as Gap 59: `EndFeaturePrefix` (KerML BNF 573) spells only
-`( 'const' )? 'end'`, and every restriction slot lives in `BasicFeaturePrefix` (577), the *other*
-alternative of the same choice (584). No spelling authors both. Accepting one would deviate from
-`docs/conformance-target`.
+**Evidence.** Same structure as Gap 59, and the same correction applies: `EndFeaturePrefix` (KerML
+BNF 573) spells only `( 'const' )? 'end'` and every restriction slot lives in `BasicFeaturePrefix`
+(577), the *other* alternative of the same choice (584) -- but SysML's keyword-less
+`DefaultReferenceUsage` (630) spells `'end'? RefPrefix`, so `end derived x : T;` and
+`end constant x : T;` are legal and were being rejected. See Gap 59's "What the reference
+implementation actually says".
 
-**Disposition. Split, like Gap 59.** Accepting the combination is **not** an upstream gap. What was
-a real defect is what the parser *said*: `composite`, `portion` and `var` were reported as
+**Disposition. Split, like Gap 59.** The keyword-less form is **fixed** (see Gap 59). Accepting the
+*keyworded* combination is not an upstream gap. The other real defect was what the parser *said*: `composite`, `portion` and `var` were reported as
 "`composite` is not a SysML keyword" -- flatly false -- and a direction as an anonymous "unexpected
 token in calc body", naming a scope the author never wrote. Neither identified the keyword with no
 derivation, so the violation was not observable from the diagnostic even though the syntax was

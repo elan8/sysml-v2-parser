@@ -4548,7 +4548,22 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_end(&mut self, end: &super::EndDecl) -> io::Result<()> {
-        self.writer.write_str("(end (introducer ")?;
+        // `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix …` (SysML BNF 630). Projected so
+        // an authored `end derived x : T;` is observable here and not only through `FORMAT`.
+        self.writer.write_str("(end (prefix (direction ")?;
+        self.write_direction(end.ref_prefix.direction.as_ref().map(|node| node.value))?;
+        write!(
+            self.writer,
+            ") (derived {}) (constant {}) (variance ",
+            end.ref_prefix.derived_span.is_some(),
+            end.ref_prefix.constant_span.is_some()
+        )?;
+        match end.ref_prefix.variance.as_ref().map(|node| node.value) {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(")) (introducer ")?;
         match &end.introducer {
             EndDeclIntroducer::Bare => self.writer.write_str("bare")?,
             EndDeclIntroducer::Reference { keyword_span } => {

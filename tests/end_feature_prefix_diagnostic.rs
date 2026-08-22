@@ -61,9 +61,11 @@ fn the_diagnostic_names_the_offending_keyword_and_the_rule() {
     let result = parse_with_diagnostics("classifier C { composite end feature f : T; }");
     let error = &result.errors[0];
     let message = error.message.as_str();
+    // Modifier-before-`end`: the rule broken is the ordering every production shares, not the
+    // exclusive-choice rule, so the message must say that and not cite the wrong production.
     assert!(
-        message.contains("`composite`") && message.contains("573"),
-        "the message must name the keyword and its production: {message}"
+        message.contains("`composite`") && message.contains("cannot precede `end`"),
+        "the message must name the keyword and the rule it breaks: {message}"
     );
     assert!(
         !message.contains("not a SysML keyword"),
@@ -71,8 +73,8 @@ fn the_diagnostic_names_the_offending_keyword_and_the_rule() {
     );
     let suggestion = error.suggestion.as_deref().unwrap_or_default();
     assert!(
-        suggestion.contains("Remove `composite`"),
-        "the suggestion must be actionable: {suggestion}"
+        suggestion.contains("end composite"),
+        "the suggestion must point at the ordering that would be legal: {suggestion}"
     );
 }
 
@@ -110,5 +112,102 @@ fn end_as_part_of_a_name_does_not_trip_the_classification() {
         "package P { part def A { part x; } }",
     ] {
         assert_eq!(sole_diagnostic_code(source), None, "`{source}` is legal");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration …` (SysML BNF 630)
+// ---------------------------------------------------------------------------
+//
+// Verified against the reference implementation, not only the published BNF:
+// `org.omg.sysml.xtext/src/org/omg/sysml/xtext/SysML.xtext:630-633`. This is the one production
+// that spells `end` beside a `RefPrefix`, and it is what makes the two end-feature constraints
+// reachable from textual notation -- the Pilot's own textual validator
+// (`KerMLValidator.xtend:669-677`) checks both, which it could not do if no text could violate
+// them.
+
+use sysml_v2_parser::ast::{
+    Body, ConnectionDefBodyElement, InOut, PackageBody, PackageBodyElement, RootElement,
+};
+
+fn sole_end_decl(body_source: &str) -> sysml_v2_parser::ast::EndDecl {
+    let source = format!("package P {{ connection def C {{ {body_source} }} }}");
+    let result = parse_with_diagnostics(&source);
+    assert!(
+        result.errors.is_empty(),
+        "`{body_source}` is legal SysML: {:?}",
+        result.errors
+    );
+    let RootElement::Package(pkg) = &result.document.root.elements[0].value else {
+        panic!("expected package");
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.value.body else {
+        panic!("expected brace body");
+    };
+    let PackageBodyElement::ConnectionDef(def) = &elements[0].value else {
+        panic!("expected connection def, got {:?}", elements[0].value);
+    };
+    let Body::Brace { elements, .. } = &def.value.body else {
+        panic!("expected brace body");
+    };
+    match &elements[0].value {
+        ConnectionDefBodyElement::EndDecl(end) => end.value.clone(),
+        other => panic!("expected an end declaration, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_end_carries_a_ref_prefix_with_its_spans() {
+    let end = sole_end_decl("end derived x : T;");
+    let span = end
+        .ref_prefix
+        .derived_span
+        .expect("`derived` must be retained, not consumed and dropped");
+    assert_eq!(span.len, "derived".len());
+
+    let end = sole_end_decl("end in x : T;");
+    let direction = end.ref_prefix.direction.expect("direction retained");
+    assert_eq!(direction.value, InOut::In);
+
+    let end = sole_end_decl("end constant x : T;");
+    assert!(end.ref_prefix.constant_span.is_some());
+}
+
+#[test]
+fn an_end_without_a_prefix_records_none() {
+    let end = sole_end_decl("end x : T;");
+    assert!(
+        !end.ref_prefix.is_authored(),
+        "an unprefixed end must stay distinguishable from a prefixed one"
+    );
+}
+
+#[test]
+fn a_modifier_after_end_is_reported_only_before_a_declaration_keyword() {
+    // Keyworded: `UnextendedUsagePrefix = EndUsagePrefix | BasicUsagePrefix` is exclusive.
+    assert_eq!(
+        sole_diagnostic_code("package P { connection def C { end derived part p : T; } }")
+            .as_deref(),
+        Some(END_FEATURE_INVALID_PREFIX)
+    );
+    // Keyword-less: `DefaultReferenceUsage` spells both, so this is legal and must be silent.
+    assert_eq!(
+        sole_diagnostic_code("package P { connection def C { end derived x : T; } }"),
+        None
+    );
+}
+
+#[test]
+fn a_modifier_before_end_has_no_derivation_in_either_language() {
+    // Every production that spells both puts `end` first, so this order is always wrong.
+    for source in [
+        "package P { connection def C { derived end x : T; } }",
+        "classifier C { in end feature f : T; }",
+    ] {
+        assert_eq!(
+            sole_diagnostic_code(source).as_deref(),
+            Some(END_FEATURE_INVALID_PREFIX),
+            "`{source}`"
+        );
     }
 }

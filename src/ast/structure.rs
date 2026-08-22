@@ -1401,6 +1401,21 @@ pub enum EndDeclIntroducer {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
+    /// `RefPrefix` between `end` and the declaration.
+    ///
+    /// `DefaultReferenceUsage : ReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration
+    /// ValuePart? UsageBody` (SysML BNF 630; reference `SysML.xtext:630-633`) is the one
+    /// production that spells `end` *and* a `RefPrefix`, so `end derived x : T;` and
+    /// `end in x : T;` are legal where `end derived part p : T;` is not --
+    /// `UnextendedUsagePrefix = EndUsagePrefix | BasicUsagePrefix` (298) makes the keyworded
+    /// forms an exclusive choice.
+    ///
+    /// This is the spelling that makes `validateFeatureEndNoDirection` and
+    /// `validateFeatureEndNotDerivedAbstractCompositeOrPortion` reachable from textual notation,
+    /// which is why the Pilot's own textual validator checks them. Retaining the prefix here is
+    /// therefore what lets a semantic layer report those rules against authored text rather than
+    /// treating them as unreachable.
+    pub ref_prefix: crate::ast::RefPrefix,
     /// `Bare`, source-backed `ref`, or source-backed KerML `feature` immediately after `end`.
     pub introducer: EndDeclIntroducer,
     pub short_name: Option<String>,
@@ -1461,7 +1476,8 @@ pub enum DerivationEndRole {
 
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.introducer == other.introducer
+        self.ref_prefix == other.ref_prefix
+            && self.introducer == other.introducer
             && self.short_name == other.short_name
             && self.identity == other.identity
             && self.typing == other.typing

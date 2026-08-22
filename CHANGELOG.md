@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StateUsage::isSubstateUsage` and the parallel-subaction library specialization have something to
   read (spec42 Gaps 65 and 80). **AST version 224.**
 
+### Added
+
+- **`end` carries its `RefPrefix` in the keyword-less reference usage.** `DefaultReferenceUsage =
+  ( isEnd ?= 'end' )? RefPrefix UsageDeclaration ValuePart? UsageBody` (SysML BNF 630; reference
+  `SysML.xtext:630-633`) is the one production that spells `end` beside a `RefPrefix`, so
+  `end derived x : T;`, `end in x : T;` and `end constant x : T;` are legal -- and were rejected.
+  `EndDecl` gains `ref_prefix`, retained with its spans, re-emitted by the formatter (it was
+  silently rewriting `end derived x : T;` as `end x : T;`) and projected as `(prefix ...)`.
+  This is the spelling that makes `validateFeatureEndNoDirection` and
+  `validateFeatureEndNotDerivedAbstractCompositeOrPortion` reachable from textual notation, which
+  is why the Pilot's own textual validator checks them (spec42 Gaps 59/67). **AST version 227.**
+
 ### Changed
 
 - **An invalid `end` feature prefix is reported as itself.** `FeaturePrefix` is a choice and
@@ -42,7 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anonymous "unexpected token in calc body". Both now report the new
   `end_feature_invalid_prefix`, naming the offending keyword and the production that excludes it.
   Two `connection def` port ends previously lost to `recovery_cascade_suppressed` now each report
-  their real cause (spec42 Gaps 59 and 67).
+  their real cause. The classification fires only where no production spells the combination: a
+  modifier *before* `end` (wrong in both languages), or a modifier after `end` followed by a
+  declaration keyword (the exclusive `UnextendedUsagePrefix`/`FeaturePrefix` choice). Followed by a
+  plain name it is the legal `DefaultReferenceUsage` above and is not reported, and each case names
+  the rule it actually breaks (spec42 Gaps 59 and 67).
 
 ### Changed
 
