@@ -22,14 +22,8 @@ package MetadataBodyMembers {
 )
 ~~~
 # FORMAT
-~~~sysml
-package MetadataBodyMembers {
-    metadata def MetadataItem :> Metaobject, Item {
-        ref self : MetadataItem :>> Metaobject::self, Item::self;
-        item picture : Picture;
-        attribute rationale : String;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

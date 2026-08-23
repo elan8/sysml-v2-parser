@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Five member forms the reference grammar spells.** Each verified against the Pilot
+  Implementation before implementation, not the published BNF alone: the `perform` reference form in
+  an action body (`SysML.xtext:1411-1417`), a part member in either port body (604/514/623), the
+  declared `require constraint c : C;` with its typing (2066-2071), a trigger on an accept *node*
+  (1459-1484), and the `include use case` alternative of `IncludeUseCaseUsage` (2300-2306), which
+  previously shredded into a `FeatureRef` naming the keyword `include`. **AST version 229.**
+
+- **A kinded directed parameter parses in a calc body again.** `calculation_body_element`'s
+  directed branch committed to `in_out_decl`, so `calc def C { in expr p : Boolean; }` fell to
+  recovery; it now falls through to the KerML route the same function already ends in. Regression
+  from the previous wave.
+
+### Fixed
+
+- **A subsetting clause keeps its authored spelling.** Each kind has an operator and a keyword
+  spelling and the AST carried neither, so the formatter rewrote every authored keyword into its
+  operator -- `feature f crosses a;` came back as `feature f => a;`, and corpus fixtures were
+  affected. `SubsettingRelationship` gains `spelling`, compared by equality so a formatter that
+  swaps spellings cannot pass a whole-AST comparison. **AST version 230.**
+
+### Added
+
+- **`MetadataBody` admits every member the grammar spells.** `MetadataBody = ';' | '{'
+  ( DefinitionMember | MetadataBodyUsageMember | AliasMember | Import )* '}'` (SysML BNF 1677) has
+  four alternatives and the parser dispatched two, so a nested declaration, an alias and an import
+  in a metadata body reached recovery with their declarations and spans lost.
+  `MetadataBodyElement` gains `Definition`, `Alias` and `Import`; the declaration member reuses the
+  shared `AttributeBodyElement`, as `metadata def` bodies already did. The keyword-less
+  `MetadataBodyUsage` is still tried first, so `q = 5;` stays a redefinition (spec42 Gap 70).
+  **AST version 226.**
+
+- **KerML conjugation declarations are modelled.** `ConjugationPart = ( 'conjugates' | '~' )
+  OwnedConjugation` (KerML BNF 462) had no node -- conjugation existed only as
+  `TypingRelationship::is_conjugated`, the `~T` flag on the type a feature is *typed by* -- so
+  `classifier One conjugates A;` reported `unsupported_grammar_form`. `ast::Conjugation` is carried
+  on `KermlClassifierDecl` beside `specializes`, which `TypeDeclaration` makes its exclusive
+  alternative, and `ConjugationSpelling` records which of the two interchangeable spellings was
+  authored (spec42 Gap 64). **AST version 225.**
+
+- **The state body modifier is preserved.** `StateDefBody = ';' | ( isParallel ?= 'parallel' )?
+  '{' StateBodyItem* '}'` (SysML BNF 1192) was rejected outright on a `state def` and
+  accepted-then-discarded on a `state` usage and an `exhibit state`. `ast::StateBodyModifier` is
+  now carried on all three as `Option<Node<_>>` over the authored keyword, so
+  `StateUsage::isSubstateUsage` and the parallel-subaction library specialization have something to
+  read (spec42 Gaps 65 and 80). **AST version 224.**
+
+### Added
+
+- **`end` carries its `RefPrefix` in the keyword-less reference usage.** `DefaultReferenceUsage =
+  ( isEnd ?= 'end' )? RefPrefix UsageDeclaration ValuePart? UsageBody` (SysML BNF 630; reference
+  `SysML.xtext:630-633`) is the one production that spells `end` beside a `RefPrefix`, so
+  `end derived x : T;`, `end in x : T;` and `end constant x : T;` are legal -- and were rejected.
+  `EndDecl` gains `ref_prefix`, retained with its spans, re-emitted by the formatter (it was
+  silently rewriting `end derived x : T;` as `end x : T;`) and projected as `(prefix ...)`.
+  This is the spelling that makes `validateFeatureEndNoDirection` and
+  `validateFeatureEndNotDerivedAbstractCompositeOrPortion` reachable from textual notation, which
+  is why the Pilot's own textual validator checks them (spec42 Gaps 59/67). **AST version 227.**
+
+### Changed
+
+- **An invalid `end` feature prefix is reported as itself.** `FeaturePrefix` is a choice and
+  `EndFeaturePrefix` (KerML BNF 573) spells only `( 'const' )? 'end'`, so `in end feature f;` and
+  `derived end feature f;` are correctly refused -- but `composite`/`portion`/`var` beside `end`
+  were reported as "`composite` is not a SysML keyword", which is false, and a direction as an
+  anonymous "unexpected token in calc body". Both now report the new
+  `end_feature_invalid_prefix`, naming the offending keyword and the production that excludes it.
+  Two `connection def` port ends previously lost to `recovery_cascade_suppressed` now each report
+  their real cause. The classification fires only where no production spells the combination: a
+  modifier *before* `end` (wrong in both languages), or a modifier after `end` followed by a
+  declaration keyword (the exclusive `UnextendedUsagePrefix`/`FeaturePrefix` choice). Followed by a
+  plain name it is the legal `DefaultReferenceUsage` above and is not reported, and each case names
+  the rule it actually breaks (spec42 Gaps 59 and 67).
+
 ### Changed
 
 - **Flow AST alternatives use proportional indirection.** `FlowDeclaration` boxes only its

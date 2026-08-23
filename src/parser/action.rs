@@ -910,6 +910,17 @@ fn action_def_body_relationship_element(
         ),
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
         map(perform_action_decl, ActionDefBodyElement::Perform),
+        // `PerformActionUsage = OccurrenceUsagePrefix 'perform' PerformActionUsageDeclaration
+        // ActionBody`, whose declaration is `OwnedReferenceSubsetting FeatureSpecializationPart?`
+        // *or* `ActionUsageKeyword UsageDeclaration?` (SysML BNF 1411-1417). The keyword-less
+        // reference form is the first alternative, and only the second reached this scope, so
+        // `action def G { perform L::doIt; }` was recovered while `part def H { perform L::doIt; }`
+        // -- the same production, dispatched from `part/body.rs` -- parsed. Ordered after the
+        // `perform action` declaration form, exactly as the part body orders them.
+        map(
+            crate::parser::part::perform_usage,
+            ActionDefBodyElement::Perform,
+        ),
         map(bind_, ActionDefBodyElement::Bind),
         map(
             crate::parser::flow::flow_usage_member,

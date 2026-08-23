@@ -141,14 +141,14 @@ package VehicleIndividuals {
             /*
 			 * This is an individual Vehicle with a mass of 1800 kg.
 			 */
-            attribute :>> mass = 1800[kg];
+            attribute redefines mass = 1800[kg];
         }
         individual part def Vehicle2 :> Vehicle {
             doc
             /*
 			 * This is an individual Vehicle with a mass of 1700 kg.
 			 */
-            attribute :>> mass = 1700[kg];
+            attribute redefines mass = 1700[kg];
         }
         individual part def AxleAssembly1 :> AxleAssembly;
         individual part def Wheel1 :> Wheel;

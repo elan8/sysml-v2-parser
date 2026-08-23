@@ -6,9 +6,8 @@ use crate::ast::{
 };
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    crosses_operator, identification, qualified_reference, redefine_operator, reference_path,
-    references_operator, starts_with_keyword, subset_operator, typed_by_operator, ws1,
-    ws_and_comments,
+    identification, qualified_reference, reference_path, starts_with_keyword, typed_by_operator,
+    ws1, ws_and_comments,
 };
 use crate::parser::{node_from_to, span_from_to, Input};
 use nom::bytes::complete::tag;
@@ -447,6 +446,25 @@ pub(crate) fn single_target_subsetting(
     subsetting_relationship_node(vec![target], kind, span)
 }
 
+/// [`subsetting_relationship_node`] for a clause whose authored spelling is known.
+pub(crate) fn spelled_subsetting_relationship_node(
+    target: Vec<QualifiedReferenceId>,
+    kind: SubsettingKind,
+    spelling: crate::ast::SubsettingSpelling,
+    span: Span,
+) -> Node<SubsettingRelationship> {
+    Node::new(
+        span.clone(),
+        SubsettingRelationship {
+            target,
+            kind,
+            spelling,
+            span,
+            is_implied: false,
+        },
+    )
+}
+
 /// Build a `SubsettingRelationship` node from target(s) and the span of the whole clause
 /// (operator/keyword through target).
 pub(crate) fn subsetting_relationship_node(
@@ -459,6 +477,11 @@ pub(crate) fn subsetting_relationship_node(
         SubsettingRelationship {
             target,
             kind,
+            // Callers that know the authored spelling use
+            // [`spelled_subsetting_relationship_node`]; the operator is the default because every
+            // *synthesised* relationship (a redefinition implied by a shorthand, say) is emitted
+            // in operator form.
+            spelling: crate::ast::SubsettingSpelling::Operator,
             span,
             is_implied: false,
         },
@@ -470,7 +493,8 @@ pub(crate) fn subsetting(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (Node<SubsettingRelationship>, Option<Node<Expression>>)> {
     let before = input;
-    let (input, _) = preceded(ws_and_comments, subset_operator).parse(input)?;
+    let (input, spelling) =
+        preceded(ws_and_comments, crate::parser::lex::spelled_subset_operator).parse(input)?;
     let (input, (target, value)) = preceded(
         ws_and_comments,
         (
@@ -483,22 +507,26 @@ pub(crate) fn subsetting(
     )
     .parse(input)?;
     let span = span_from_to(before, input);
-    let node = subsetting_relationship_node(target, SubsettingKind::Subsets, span);
+    let node =
+        spelled_subsetting_relationship_node(target, SubsettingKind::Subsets, spelling, span);
     Ok((input, (node, value)))
 }
 
 /// Redefinitions: `:>>` / `redefines` target.
 pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
     let before = input;
-    let (input, target) = preceded(
-        preceded(ws_and_comments, redefine_operator),
+    let (input, (spelling, target)) = (
+        preceded(
+            ws_and_comments,
+            crate::parser::lex::spelled_redefine_operator,
+        ),
         preceded(ws_and_comments, specialization_targets),
     )
-    .parse(input)?;
+        .parse(input)?;
     let span = span_from_to(before, input);
     Ok((
         input,
-        subsetting_relationship_node(target, SubsettingKind::Redefines, span),
+        spelled_subsetting_relationship_node(target, SubsettingKind::Redefines, spelling, span),
     ))
 }
 
@@ -534,15 +562,18 @@ pub(crate) fn reference_subsetting(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
     let before = input;
-    let (input, target) = preceded(
-        preceded(ws_and_comments, references_operator),
+    let (input, (spelling, target)) = (
+        preceded(
+            ws_and_comments,
+            crate::parser::lex::spelled_references_operator,
+        ),
         preceded(ws_and_comments, specialization_targets),
     )
-    .parse(input)?;
+        .parse(input)?;
     let span = span_from_to(before, input);
     Ok((
         input,
-        subsetting_relationship_node(target, SubsettingKind::References, span),
+        spelled_subsetting_relationship_node(target, SubsettingKind::References, spelling, span),
     ))
 }
 
@@ -551,15 +582,18 @@ pub(crate) fn cross_subsetting(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
     let before = input;
-    let (input, target) = preceded(
-        preceded(ws_and_comments, crosses_operator),
+    let (input, (spelling, target)) = (
+        preceded(
+            ws_and_comments,
+            crate::parser::lex::spelled_crosses_operator,
+        ),
         preceded(ws_and_comments, specialization_targets),
     )
-    .parse(input)?;
+        .parse(input)?;
     let span = span_from_to(before, input);
     Ok((
         input,
-        subsetting_relationship_node(target, SubsettingKind::Crosses, span),
+        spelled_subsetting_relationship_node(target, SubsettingKind::Crosses, spelling, span),
     ))
 }
 

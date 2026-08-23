@@ -45,7 +45,7 @@ package RefPrefixCoverage {
     }
     metadata def M {
         derived ref item receiverArgument : Expression[0..1] :> Metadata::metadataItems;
-        derived ref item 'action' : ActionUsage[0..*] ordered :> step, usage, Metadata::metadataItems;
+        derived ref item 'action' : ActionUsage[0..*] ordered subsets step, usage, Metadata::metadataItems;
         derived item ownedActorParameter :>> ownedMemberParameter : PartUsage[1];
         derived abstract constant ref item everything : T;
     }

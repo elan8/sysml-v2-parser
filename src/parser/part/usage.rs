@@ -1723,6 +1723,7 @@ pub(crate) fn exhibit_state_as_state_usage(
         // §6 G18: previously dropped, which silently lost the redefinition target of
         // `exhibit <name> :>> <target>;`.
         redefines: exhibit.value.redefines,
+        body_modifier: exhibit.value.body_modifier,
         body: exhibit.value.body,
         // GH-27: `ExhibitState` now carries its own `membership` (visibility prefix), so thread
         // it through instead of the previous ad hoc `visibility: None`.

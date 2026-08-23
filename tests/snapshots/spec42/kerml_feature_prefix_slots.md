@@ -68,7 +68,7 @@ package KermlFeaturePrefixSlots {
         inout feature t;
     }
     type SpecializationTail {
-        inout feature replacementValues : Anything[*] nonunique :>> values;
+        inout feature replacementValues : Anything[*] nonunique redefines values;
     }
     type DirectedKinds {
         in expr e;

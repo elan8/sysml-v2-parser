@@ -163,6 +163,14 @@ pub struct KermlClassifierDecl {
     /// `bool`/`expr` feature forms -- the relationship's kind records which operator was
     /// authored.
     pub specializes: Option<Node<crate::ast::TypingRelationship>>,
+    /// `ConjugationPart = ( 'conjugates' | '~' ) ownedRelationship += OwnedConjugation`
+    /// (KerML BNF 462; clause 8.2.4.1.3). `TypeDeclaration` spells `( SpecializationPart |
+    /// ConjugationPart )?`, so this and [`Self::specializes`] are alternatives of one choice and
+    /// the parser fills at most one of them. Kept apart from the `~T` *typing* flag
+    /// ([`crate::ast::TypingRelationship::is_conjugated`]), which is a different production:
+    /// that one conjugates the type a feature is typed by, this one conjugates the declared type
+    /// itself.
+    pub conjugates: Option<Node<Conjugation>>,
     /// KerML type relationship clauses following the header: `disjoint from A, B`,
     /// `unions A, B`, `intersects A, B` (Kernel Semantic Library `Occurrences.kerml`,
     /// Kernel Data Type Library `VectorValues.kerml`). Authored order preserved.
@@ -232,6 +240,35 @@ impl KermlClassifierKeyword {
             Self::AssocStruct => "assoc struct",
         }
     }
+}
+
+/// One `ConjugationPart` on a type declaration: `classifier C conjugates A;` or `classifier C ~ A;`.
+///
+/// `ConjugationPart : Type = ( 'conjugates' | '~' ) ownedRelationship += OwnedConjugation`
+/// (KerML BNF 462). The `Conjugation` relationship's *source* is the declared type, so only the
+/// target is carried here; the owning declaration is the source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Conjugation {
+    /// The conjugated type, `OwnedConjugation`'s single `[QualifiedName]`.
+    pub target: crate::ast::QualifiedReferenceId,
+    /// Which of the production's two alternatives was authored.
+    pub spelling: ConjugationSpelling,
+    /// Span of the whole clause, operator/keyword through target.
+    pub span: Span,
+}
+
+/// Which spelling of [`Conjugation`] the author wrote.
+///
+/// The two are interchangeable in the grammar, so this is emission and provenance information,
+/// not a semantic distinction -- exactly like [`crate::ast::TypingSpelling`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ConjugationSpelling {
+    /// The `conjugates` keyword.
+    Keyword,
+    /// The `~` operator.
+    Operator,
 }
 
 /// One KerML type relationship clause on a [`KermlClassifierDecl`] header: `disjoint from`,

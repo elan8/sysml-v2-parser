@@ -54,13 +54,13 @@ standard library package Occurrences {
         connector :Without from [0..*] separateOccurrenceToo references elements.notIntersection to [1] separateOccurrence references intersection;
         binding [1] startShot = [1] endShot;
         binding oSelf of sourceOccurrence.portionOfLife = targetOccurrence.portionOfLife;
-        end happensDuring [1..*] feature longerOccurrence : Occurrence :>> targetOccurrence;
-        end [1] feature transferSource ::> source;
+        end happensDuring [1..*] feature longerOccurrence : Occurrence redefines targetOccurrence;
+        end [1] feature transferSource references source;
         private succession all [*] trigger then [*] guard;
         private succession triggerAfter[taNum] first [0..1] transitionLinkSource then [*] trigger.endShot;
-        feature self : Anything[1] :> things chains things.that;
+        feature self : Anything[1] subsets things chains things.that;
         feature withoutOccurrences : Occurrence[0..*] unions successors, predecessors inverse of withoutOccurrences;
-        portion :>> portionOfLife = (that as Occurrence).portionOfLife;
+        portion redefines portionOfLife = (that as Occurrence).portionOfLife;
         private instantNum : Natural[1] = if isInstant ? 1 else 0;
         private thisClock : Clock :>> self;
         struct StructuredSurface specializes StructuredSpaceObject, Surface {

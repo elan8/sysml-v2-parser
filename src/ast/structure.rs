@@ -284,6 +284,10 @@ pub struct ExhibitState {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause, from before or after the body.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored `parallel`/`initial` modifier before the body, with its keyword span:
+    /// `ExhibitStateUsage` shares `StateUsageBody` with a plain state usage. See
+    /// [`crate::ast::StateBodyModifier`].
+    pub body_modifier: Option<Node<crate::ast::StateBodyModifier>>,
     pub body: StateDefBody,
     pub membership: Membership,
 }
@@ -592,6 +596,19 @@ pub enum MetadataBodyElement {
     Annotating(AnnotatingMember),
     /// `MetadataBodyUsage`, a reference redefinition owned by the metadata type.
     Usage(Node<MetadataBodyUsage>),
+    /// `MetadataBody`'s `DefinitionMember` alternative (SysML BNF 1677): a nested declaration
+    /// owned by the metadata type rather than a redefinition of one of its features.
+    ///
+    /// Carried as an [`AttributeBodyElement`], the shared type-body member the crate already uses
+    /// for `metadata def` bodies. That dispatcher is a *superset* of `DefinitionMember` -- it also
+    /// admits usages -- so this variant over-accepts against the production in exactly the way
+    /// `metadata def` bodies already did, rather than in a new way. Rejecting the member outright,
+    /// which is what happened before, lost the declaration and its span entirely.
+    Definition(Box<Node<AttributeBodyElement>>),
+    /// `MetadataBody`'s `AliasMember` alternative (SysML BNF 1677).
+    Alias(Node<AliasDef>),
+    /// `MetadataBody`'s `Import` alternative (SysML BNF 1677).
+    Import(Box<Node<crate::ast::Import>>),
 }
 
 /// The optional authored redefinition introducer before a metadata-body target.
@@ -1170,6 +1187,15 @@ pub enum PortDefBodyElement {
     RefDecl(Node<RefDecl>),
     /// `variant` member via this scope's `DefinitionBodyItem` grammar.
     VariantUsage(Node<VariantUsage>),
+    /// `PortDefinition = DefinitionPrefix PortDefKeyword Definition …` (SysML BNF 955), so a port
+    /// body is an ordinary `DefinitionBody` and its `DefinitionBodyItem` (514) reaches
+    /// `OccurrenceUsageMember -> StructureUsageMember -> PartUsage` like every other definition
+    /// body. The scope modelled no part member, so `port def PD { part x : T; }` was rejected as
+    /// `unexpected_keyword_in_scope` -- the composite modifier and the declaration with it.
+    ///
+    /// Boxed: `PartUsage` carries the shared `OccurrenceUsagePrefix` and is much the largest
+    /// member of this scope.
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1272,6 +1298,11 @@ pub enum PortBodyElement {
     RefDecl(Node<RefDecl>),
     /// `variant` member via `UsageBody = DefinitionBody`.
     VariantUsage(Node<VariantUsage>),
+    /// Part usage nested in a port usage body. `UsageBody = DefinitionBody` (SysML BNF 604), so
+    /// this scope reaches `DefinitionBodyItem -> OccurrenceUsageMember -> StructureUsageMember ->
+    /// PartUsage` (514, 623) exactly as [`PortDefBodyElement::PartUsage`] does on the definition
+    /// side. Boxed for the same reason: `PartUsage` carries the shared `OccurrenceUsagePrefix`.
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2
@@ -1384,6 +1415,21 @@ pub enum EndDeclIntroducer {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
+    /// `RefPrefix` between `end` and the declaration.
+    ///
+    /// `DefaultReferenceUsage : ReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration
+    /// ValuePart? UsageBody` (SysML BNF 630; reference `SysML.xtext:630-633`) is the one
+    /// production that spells `end` *and* a `RefPrefix`, so `end derived x : T;` and
+    /// `end in x : T;` are legal where `end derived part p : T;` is not --
+    /// `UnextendedUsagePrefix = EndUsagePrefix | BasicUsagePrefix` (298) makes the keyworded
+    /// forms an exclusive choice.
+    ///
+    /// This is the spelling that makes `validateFeatureEndNoDirection` and
+    /// `validateFeatureEndNotDerivedAbstractCompositeOrPortion` reachable from textual notation,
+    /// which is why the Pilot's own textual validator checks them. Retaining the prefix here is
+    /// therefore what lets a semantic layer report those rules against authored text rather than
+    /// treating them as unreachable.
+    pub ref_prefix: crate::ast::RefPrefix,
     /// `Bare`, source-backed `ref`, or source-backed KerML `feature` immediately after `end`.
     pub introducer: EndDeclIntroducer,
     pub short_name: Option<String>,
@@ -1444,7 +1490,8 @@ pub enum DerivationEndRole {
 
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.introducer == other.introducer
+        self.ref_prefix == other.ref_prefix
+            && self.introducer == other.introducer
             && self.short_name == other.short_name
             && self.identity == other.identity
             && self.typing == other.typing

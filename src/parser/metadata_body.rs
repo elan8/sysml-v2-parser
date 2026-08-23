@@ -14,7 +14,15 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-const METADATA_BODY_STARTERS: &[&[u8]] = &[b"@", b"metadata", b"ref", b"redefines", b":>>"];
+const METADATA_BODY_STARTERS: &[&[u8]] = &[
+    b"@",
+    b"metadata",
+    b"ref",
+    b"redefines",
+    b":>>",
+    b"alias",
+    b"import",
+];
 
 /// `MetadataBodyUsage = 'ref'? ( ':>>' | 'redefines' )? OwnedRedefinition ValuePart?
 /// MetadataBody` (SysML textual BNF 1690-1693).
@@ -79,12 +87,23 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataBo
             node_from_to(start, next, MetadataBodyElement::Annotating(member)),
         ));
     }
+    // `MetadataBody = ';' | '{' ( DefinitionMember | MetadataBodyUsageMember | AliasMember
+    // | Import )* '}'` (SysML BNF 1677). The keyword-less usage member is tried before the
+    // declaration dispatcher because `OwnedRedefinition` is a bare qualified name, which the
+    // declaration parsers would otherwise read as the start of a keyword-less usage.
     let (input, element) = nom::branch::alt((
         map(
             crate::parser::body::attribute_annotating_member,
             MetadataBodyElement::Annotating,
         ),
+        map(crate::parser::alias::alias_def, MetadataBodyElement::Alias),
+        map(crate::parser::import::import_, |import| {
+            MetadataBodyElement::Import(Box::new(import))
+        }),
         map(metadata_body_usage, MetadataBodyElement::Usage),
+        map(crate::parser::attribute::attribute_body_element, |member| {
+            MetadataBodyElement::Definition(Box::new(member))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, element)))

@@ -38,7 +38,12 @@ unrelated work and needed only a pinning fixture.
 | 56 | Every body member family already retained | Already closed; pinned by fixture |
 | 57 | No declared name published | Already closed; pinned by fixture |
 | 58 | Prefix kept but spanless; `variation` rejected | Fixed: spanned prefix, `variation` accepted |
-| 59 | Direction beside `end` rejected | Split: unauthorable per the pin; the reachable half is fixed |
+| 59 | Direction beside `end` rejected | Split: keyword-less `end` + `RefPrefix` fixed; keyworded forms conformantly refused |
+| 64 | `conjugates` reports `unsupported_grammar_form` | Fixed: `Conjugation` node and `ConjugationPart` |
+| 65 | `state def S parallel { … }` rejected outright | Fixed: shared body-modifier production |
+| 67 | Restriction modifiers beside `end` rejected | Split: as Gap 59 -- keyword-less form fixed, diagnostic corrected |
+| 70 | Declaration, alias and import members rejected | Fixed: all four `MetadataBody` alternatives dispatched |
+| 80 | Usage-side modifier consumed and discarded | Fixed with Gap 65: `StateBodyModifier` with its span |
 
 ## Gap 41 -- implicit `that` self-reference
 
@@ -280,7 +285,9 @@ spell. Pinned by `tests/snapshots/sysml/definition_prefix_alternatives.md` and
 **Claim.** No spelling authors an end feature that also carries a direction, so KerML 8.3.3.3.1's
 prohibition has no authorable violation; the direction prefix should be accepted alongside `end`.
 
-**Evidence.** The pin makes the combination unauthorable by construction, in both languages:
+**Evidence.** *(Corrected — the original evidence for this entry was wrong. See "What the reference
+implementation actually says" below.)* The published BNF makes the combination unauthorable in the
+**keyworded** forms of both languages:
 
 ```text
 SysML BNF 284  EndUsagePrefix : Usage = isEnd ?= 'end' ( ownedRelationship += OwnedCrossFeatureMember )?
@@ -290,24 +297,232 @@ KerML BNF 585  FeaturePrefix = ( EndFeaturePrefix ( ... )? | BasicFeaturePrefix 
 ```
 
 `direction` lives only in `RefPrefix`/`BasicFeaturePrefix`, and those are the *other* alternative of
-the same choice. There is no normative prefix order that spells both, which is why KerML states the
-restriction as a metamodel constraint: an end feature acquires a direction by redefinition, never by
-notation. Accepting `in end port p : T;` would be a deliberate deviation from
-`docs/conformance-target`.
+the same choice, so `in end port p : T;` and `end in port p : T;` are both correctly refused.
 
-**Disposition. Split.**
+### What the reference implementation actually says
 
-- The direction-beside-`end` half is **not an upstream gap**. Rejecting it is conformant. The
+This entry previously concluded that the combination is unauthorable "by construction, in both
+languages", and that the KerML constraints therefore have no authorable violation. **That conclusion
+was false**, and the published BNF alone does not show why. Checked against the Pilot
+Implementation:
+
+- `org.omg.kerml.xtext/src/org/omg/kerml/xtext/KerML.xtext:510-526` is *identical* to the pinned
+  `.kebnf`, including after the `OwnedCrossFeatureMember` -> `OwnedCrossingFeatureMember` rename the
+  Pilot has since made. The KerML half of the conclusion holds.
+- `org.omg.sysml.xtext/src/org/omg/sysml/xtext/SysML.xtext:630-633` does not:
+
+  ```text
+  DefaultReferenceUsage returns SysML::ReferenceUsage :
+      ( isEnd ?= 'end' )? RefPrefix
+      UsageDeclaration ValuePart? UsageBody
+  ```
+
+  The **keyword-less** reference usage spells `end` *and* a full `RefPrefix`. So
+  `end derived x : T;`, `end in x : T;` and `end constant x : T;` are legal SysML, and the parser
+  rejected all three.
+- `org.omg.kerml.xtext/.../validation/KerMLValidator.xtend:669-677` implements both
+  `validateFeatureEndNoDirection` and `validateFeatureEndNotDerivedAbstractCompositeOrPortion` as
+  Xtext `@Check`s on the **textual** model -- which is only coherent because the production above
+  makes them reachable from text.
+
+So the gaps' underlying need was real; only the spelling they proposed (modifier *before* `end`, or
+with a `feature`/`part` keyword) was not. The corpus is silent either way: of 403 official
+`.sysml`/`.kerml` files, zero author any of these combinations, so corpus evidence neither confirmed
+nor refuted the claim and must not be read as confirming it.
+
+**Disposition. Split three ways.**
+
+- **Fixed**: the keyword-less `DefaultReferenceUsage` form. `EndDecl` now carries a `RefPrefix`
+  parsed between `end` and the declaration, retained with its spans, re-emitted by the formatter,
+  and projected as `(prefix ...)`. Before this it was rejected outright; briefly, it was worse than
+  that -- an earlier revision of the `end_feature_invalid_prefix` classification reported this
+  *legal* syntax as a prefix violation. Pinned by `tests/snapshots/spec42/end_ref_prefix.md` and
+  `tests/end_feature_prefix_diagnostic.rs`.
+- The direction-beside-`end` half **in the keyworded forms** is not an upstream gap. Rejecting it is
+  conformant. The
   reachable and testable half of the gap's acceptance criterion -- "retain stable recovery for
   invalid combinations" -- is pinned by `tests/snapshots/spec42/end_prefix_recovery.md`, which
   authors both orders in a connection definition body and in a KerML type body and shows a stable
-  diagnostic, an exact malformed span, and an untouched valid sibling after each.
+  diagnostic, an exact malformed span, and an untouched valid sibling after each. That diagnostic
+  is now `end_feature_invalid_prefix` and names the offending keyword; see Gap 67 below.
 - The audit did find a *reachable* direction gap next to it, and that half is **fixed**: `class`
   was the one KerML classifier keyword routed to a legacy `ClassDef` node with an attribute body
   instead of to the shared `KermlClassifierDecl`, so `class C { in feature x : T; }` reached
   recovery while `struct`, `behavior` and `type` accepted the same member, and `class C` was
   re-emitted as `class def C`, inventing a keyword no production spells. `ClassDef` is deleted and
   `class` joins its siblings.
+
+## Gap 64 -- conjugation declarations
+
+**Claim.** Only the `~T` conjugated-typing flag is modelled; `ConjugationPart` and the
+`Conjugation` relationship have no node, so `classifier One conjugates A;` is
+`unsupported_grammar_form`.
+
+**Evidence.** Confirmed. `TypeDeclaration = … ( SpecializationPart | ConjugationPart )?` (KerML BNF
+455) and `ConjugationPart : Type = ( 'conjugates' | '~' ) ownedRelationship += OwnedConjugation`
+(462) are a different production from `FeatureTyping`'s `~`: one conjugates the declared type, the
+other the type a feature is typed by. Both KerML conjugation constraints
+(`validateTypeAtMostOneConjugator`, `validateSpecializationSpecificNotConjugated`) were unauthorable.
+
+**Disposition. Fixed.** `ast::Conjugation` is carried on `KermlClassifierDecl` as
+`Option<Node<_>>`, with one target (`OwnedConjugation` is a single `[QualifiedName]`, unlike
+`SpecializationPart`'s comma-separated list) and a `ConjugationSpelling` recording which of the two
+interchangeable spellings was authored. Because the two parts are alternatives of one choice, the
+parser reaches the conjugation only where no specialization was authored, so no declaration can
+carry both. Pinned by `tests/kerml_conjugation_part.rs`.
+
+## Gap 65 / Gap 80 -- the state body modifier
+
+**Claim.** `parallel` is rejected on a `state def` body and accepted-then-discarded on a `state`
+usage, so `StateUsage::isSubstateUsage` has nothing to read.
+
+**Evidence.** Confirmed, and the two halves had different causes. `state def Machine parallel { … }`
+failed with `missing_body_or_semicolon` across the whole declaration, while `src/parser/state.rs`
+consumed the usage-side modifier and bound it to `_`.
+
+**Disposition. Fixed.** `StateDefBody = ';' | ( isParallel ?= 'parallel' )? '{' StateBodyItem* '}'`
+(SysML BNF 1192) is parsed by one shared combinator for the definition, the usage and
+`ExhibitStateUsage`, which shares `StateUsageBody`. The result is `ast::StateBodyModifier` as
+`Option<Node<_>>` over the authored keyword -- a node rather than a boolean, because which keyword
+was written is the fact lowering needs. The keyword must be a whole word, so
+`state initialState { … }` stays a usage named `initialState`. Pinned by
+`tests/state_body_modifier.rs`.
+
+## Gap 67 -- restriction modifiers alongside `end`
+
+**Claim.** `derived`/`abstract`/`composite`/`portion`/`var` should be accepted with `end`, so
+`validateFeatureEndNotDerivedAbstractCompositeOrPortion` has an authorable violation.
+
+**Evidence.** Same structure as Gap 59, and the same correction applies: `EndFeaturePrefix` (KerML
+BNF 573) spells only `( 'const' )? 'end'` and every restriction slot lives in `BasicFeaturePrefix`
+(577), the *other* alternative of the same choice (584) -- but SysML's keyword-less
+`DefaultReferenceUsage` (630) spells `'end'? RefPrefix`, so `end derived x : T;` and
+`end constant x : T;` are legal and were being rejected. See Gap 59's "What the reference
+implementation actually says".
+
+**Disposition. Split, like Gap 59.** The keyword-less form is **fixed** (see Gap 59). Accepting the
+*keyworded* combination is not an upstream gap. The other real defect was what the parser *said*: `composite`, `portion` and `var` were reported as
+"`composite` is not a SysML keyword" -- flatly false -- and a direction as an anonymous "unexpected
+token in calc body", naming a scope the author never wrote. Neither identified the keyword with no
+derivation, so the violation was not observable from the diagnostic even though the syntax was
+correctly refused.
+
+Both now report `end_feature_invalid_prefix`, naming the offending keyword, the slot it belongs to
+and the production that excludes it. The classification runs before the keyword-in-scope
+classifications and walks the leading keyword run only, so a feature named `end2` and a
+`var connector` are untouched. This also closes the "`abstract end feature x;` splits into two
+members" item recorded under *Deferred neighbouring debt* below: the whole member is now one
+recovery node with one precise diagnostic, so no keyword is turned into a reference to a feature
+nobody declared. Two `connection def` port ends previously swallowed by
+`recovery_cascade_suppressed` now each report their real cause. Pinned by
+`tests/end_feature_prefix_diagnostic.rs` and the regenerated
+`tests/snapshots/spec42/end_prefix_recovery.md`.
+
+## Gap 70 -- named members in a metadata body
+
+**Claim.** Named members in a metadata-feature body are rejected before lowering.
+
+**Evidence.** Confirmed, and wider than the claim. `MetadataBody : Type = ';' | '{'
+( DefinitionMember | MetadataBodyUsageMember | AliasMember | Import )* '}'` (SysML BNF 1677) has
+four alternatives; the parser dispatched the annotating and usage members only, so
+`attribute def X;`, `alias a for b;` and `import X::*;` all reached recovery inside `@M { … }`.
+A *named* member is only reachable through `DefinitionMember`: `MetadataBodyUsage`'s
+`OwnedRedefinition` is a reference to an existing feature, not a declaration.
+
+**Disposition. Fixed.** `MetadataBodyElement` gains `Definition`, `Alias` and `Import`. The
+declaration member carries an `AttributeBodyElement`, the shared type-body member set the crate
+already uses for `metadata def` bodies -- a superset of `DefinitionMember`, so this over-accepts
+exactly as those bodies already did rather than in a new way, and the two scopes keep one member
+set instead of two that drift. The keyword-less usage member is tried first, because
+`OwnedRedefinition` is a bare qualified name the declaration parsers would otherwise claim. The
+semantic projection and the opacity walk each factor their attribute-body arm into one function
+both scopes call. Pinned by `tests/metadata_body_members.rs`.
+
+## Wave 2 -- gaps re-probed at the wave-1 pin
+
+Every entry in this section was checked against the **reference implementation**
+(`SysML-v2-Pilot-Implementation`, `org.omg.sysml.xtext/.../SysML.xtext` and
+`org.omg.kerml.xtext/.../KerML.xtext`) before any code was written, not against the published
+`.kebnf` alone. Gap 59 records why: the two artifacts agree on the KerML prefix productions but
+not everywhere, and a claim checked only against the published BNF was wrong once already.
+
+Corpus silence is *not* evidence here. Of the 403 official `.sysml`/`.kerml` files, several of the
+constructs below appear zero times -- including ones that are unambiguously legal -- so "the corpus
+never writes it" was treated as no information rather than as refutation.
+
+### Fixed
+
+- **Gap 81 (regression), calc bodies.** `calculation_body_element`'s directed-parameter branch
+  committed to `in_out_decl` with `?`. A *kinded* parameter (`in expr p : T;`, `in bool redefines
+  a;`, `in feature p : T;`) is a KerML `Feature` whose kind keyword names its production, and
+  `in_out_decl` refuses to read a kind keyword as a parameter name, so the whole member fell to
+  recovery. It now falls through to the KerML route the same function already ends in.
+
+  The `constraint def` half is **not** fixed, deliberately: that dispatcher has no KerML
+  delegation, `ConstraintBody` is a `CalculationBody`, and `'expr'` occurs zero times in
+  `SysML.xtext` (which inherits only `KerMLExpressions`). Rejecting it there is conformant.
+
+- **Gap 72.** `PerformActionUsage`'s declaration is `OwnedReferenceSubsetting
+  FeatureSpecializationPart?` *or* `ActionUsageKeyword UsageDeclaration?` (`SysML.xtext:1411-1417`).
+  Only the second reached an action body, so `action def G { perform L::doIt; }` was recovered while
+  the part body -- the same production -- accepted it.
+
+- **Gap 73.** `IncludeUseCaseUsage` is a choice (`SysML.xtext:2300-2306`) and only the reference
+  alternative was parsed, so `include use case v;` shredded into a bare `FeatureRef` naming the
+  keyword `include` plus a sibling usage, with no diagnostic. `IncludeUseCase` now carries the
+  keyword span, declared name and typing, with an optional `target`.
+
+- **Gap 74.** `ConstraintUsageDeclaration` is an ordinary `UsageDeclaration`
+  (`SysML.xtext:2066-2071`), so `require constraint c : C;` declares *and* specializes.
+  `RequireConstraint` gains `typing`, re-emitted by the formatter.
+
+- **Gap 75.** `UsageBody = DefinitionBody` (604), so both port bodies reach `DefinitionBodyItem ->
+  OccurrenceUsageMember -> StructureUsageMember -> PartUsage`. Both sides now accept a part member.
+  The gap's `composite` modifier is **not** part of this: `'composite'` occurs zero times in
+  `SysML.xtext`.
+
+- **Gap 76, the trigger half.** `PayloadParameter`'s third alternative is `TriggerValuePart`
+  (1459-1461), whose kinds are `'at' | 'after'` and `'when'`, so an accept *node* admits a trigger
+  exactly as a transition does. The parser treated triggers as transition-only and carried an
+  `unreachable!` justified by that assumption.
+
+- **Gap 66, the spelling half.** Each subsetting kind has two interchangeable spellings and the AST
+  carried none, so the formatter rewrote every authored keyword into its operator. Corpus fixtures
+  were affected. `SubsettingRelationship` gains `spelling`.
+
+### Not upstream gaps -- the reference grammar does not spell them
+
+- **Gap 61, `message` in a KerML body.** `'message'` occurs only in `SysML.xtext`; a `classifier`
+  body is a KerML `TypeBody`. The SysML scopes where `Message` is legal (`calc def`, `part def`)
+  already accept it.
+- **Gap 76, the `if ... then ... else` half.** `IfNode = ActionNodePrefix 'if'
+  ExpressionParameterMember ActionBodyParameterMember ( 'else' … )?` (1596-1608) has no `then`, and
+  `ActionBodyParameter` is always braced. The braced spellings, including `else if` chains, parse.
+- **Gap 77, a `transition` member in an action body.** `TransitionUsageMember` appears only in
+  `StateBodyItem` (1754-1770). The state-body transition-effect forms the gap also names already
+  parse at this revision.
+- **Gap 78, `abstract variation`.** `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation
+  ?= 'variation'` (490-492) is a *choice*; no order spells both.
+- **Gap 79, `expose` in a package body and `verify`/`render` in a part-definition body.** `Expose`
+  is admitted only by `ViewBodyItem`, `ViewRenderingMember` only by `ViewDefinitionBodyItem` and
+  `ViewBodyItem` (2325-2365). Admitting them elsewhere so semantics can report the owner is an
+  error-tolerance policy question, not a grammar gap; see Gap 59's note on that trade-off.
+- **Gap 52, the `var` spelling.** `'var'` occurs zero times in `SysML.xtext`, and `occurrence def`
+  is a SysML production. `var` is the KerML variability keyword and is accepted in KerML bodies.
+
+### Still open
+
+- **Gap 66, clause count.** `specialization_clauses` merges repeated clauses of one kind, which is
+  correct and corpus-backed for `subsets` and wrong only for `crosses`/`references`, whose KerML
+  rules are "at most one *clause*". One relationship per authored clause touches ~112 read sites.
+- **Gap 69, a binding connector with a `TypeBody` of ends.** `BindingConnector = FeaturePrefix
+  'binding' BindingConnectorDeclaration TypeBody` and the `of … = …` clause is *optional*
+  (`KerML.xtext:870-878`), so `binding b { end e1 : A; end e2 : B; }` is legal and is refused. The
+  parser requires `left = right` unconditionally and gives the member a SysML usage body rather
+  than a KerML `TypeBody`.
+- **Gap 62, a repeated payload clause.** `FlowDeclaration`'s `( 'of' PayloadFeatureMember )?` is
+  singular, so `flow of Thing of Thing …` is correctly refused; what it lacks is a *precise*
+  diagnostic naming the at-most-one rule, as `end_feature_invalid_prefix` does for Gap 59.
 
 ## Deferred neighbouring debt
 
@@ -326,14 +541,13 @@ Found during the audit, out of scope for these commits, recorded so it is not re
   Pre-existing and independent of any gap here; it is a body-dispatch question.
 - `EndFeaturePrefix = ( isConstant ?= 'const' )? isEnd ?= 'end'` (KerML BNF 578) spells no other
   slot, and the `FeaturePrefix` merge closed most of the over-acceptance: `derived end feature x;`
-  now reaches recovery with an exact span and a surviving sibling. **`abstract end feature x;` does
-  not.** It splits into two members -- the keyword becomes a bare `(expression (ref ...))` naming
-  `abstract`, followed by a `kerml-feature` for the rest -- so a keyword is silently turned into a
-  reference to a feature nobody declared. That is the fabrication class `AGENTS.md` forbids, worse
-  than the plain over-acceptance this entry used to describe. The same shape affects `abstract`
-  followed by any other prefix keyword (`abstract derived feature c;`); it is recorded in
-  `planning/kerml-feature-prefix-matrix.md` §5.2 as pre-existing. Needs its own slice: the fix is a
-  dispatch question about where `abstract` is tried, not a prefix-model question.
+  now reaches recovery with an exact span and a surviving sibling. `abstract end feature x;` did
+  not: it split into two members, the keyword becoming a bare `(expression (ref ...))` naming
+  `abstract`. **Closed by Gap 67 above** -- the whole member is now one recovery node carrying one
+  `end_feature_invalid_prefix` diagnostic, so no keyword becomes a reference to a feature nobody
+  declared. `abstract` followed by a *non-`end`* prefix keyword (`abstract derived feature c;`) is
+  a separate dispatch question and remains open; it is recorded in
+  `planning/kerml-feature-prefix-matrix.md` §5.2 as pre-existing.
 - The `(kerml-feature)` semantic projection is still a bare marker, so the merged node's prefix
   slots, specialization clauses and multiplicity are observable only through `FORMAT`.
   `(typed-parameter)` is gone with the node it projected.

@@ -267,6 +267,15 @@ pub(crate) fn emit_metadata_body(
                     MetadataBodyElement::Usage(usage) => {
                         emit_metadata_body_usage(w, &member_path, &usage.value)?
                     }
+                    MetadataBodyElement::Definition(member) => {
+                        emit_attribute_body_element(w, &member_path, &member.value)?
+                    }
+                    MetadataBodyElement::Alias(alias) => {
+                        emit_alias_def(w, &member_path, &alias.value)?
+                    }
+                    MetadataBodyElement::Import(import) => {
+                        super::root::emit_import(w, &import.value)?
+                    }
                 }
                 w.newline();
             }
@@ -809,6 +818,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortDefBodyElement::ItemDef(i) => emit_item_def(w, path, &i.value),
         PortDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        PortDefBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PortDefBodyElement::EnumerationUsage(e) => {
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
@@ -860,6 +870,7 @@ fn emit_port_body_element(
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        PortBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PortBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         PortBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }
@@ -992,6 +1003,18 @@ pub(crate) fn emit_end_decl(
         );
     }
     w.push_str("end ");
+    // `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix …` (SysML BNF 630): the prefix is
+    // authored between `end` and the declaration, so it must be re-emitted there. Dropping it
+    // silently rewrote `end derived x : T;` as `end x : T;`, changing the model.
+    if let Some(direction) = &end.ref_prefix.direction {
+        emit_direction(w, direction.value);
+    }
+    emit_ref_prefix(
+        w,
+        end.ref_prefix.derived_span.is_some(),
+        end.ref_prefix.variance.as_ref().map(|node| &node.value),
+        end.ref_prefix.constant_span.is_some(),
+    );
     match &end.introducer {
         EndDeclIntroducer::Bare => {}
         EndDeclIntroducer::Reference { .. } => w.push_str("ref "),
@@ -1562,12 +1585,31 @@ pub(crate) fn emit_subsetting_clause(
     w: &mut EmitWriter<'_>,
     rel: &SubsettingRelationship,
 ) -> Result<(), EmitError> {
-    match rel.kind {
-        SubsettingKind::Subsets => w.push_str(" :> "),
-        SubsettingKind::References => w.push_str(" ::> "),
-        SubsettingKind::Redefines => w.push_str(" :>> "),
-        SubsettingKind::Crosses => w.push_str(" => "),
-        SubsettingKind::Intersects => w.push_str(" intersects "),
+    // Each kind has two interchangeable spellings and the author picked one; writing the operator
+    // unconditionally rewrote `feature f crosses a;` into `feature f => a;`.
+    match (rel.kind, rel.spelling) {
+        (SubsettingKind::Subsets, crate::ast::SubsettingSpelling::Operator) => w.push_str(" :> "),
+        (SubsettingKind::Subsets, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" subsets ")
+        }
+        (SubsettingKind::References, crate::ast::SubsettingSpelling::Operator) => {
+            w.push_str(" ::> ")
+        }
+        (SubsettingKind::References, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" references ")
+        }
+        (SubsettingKind::Redefines, crate::ast::SubsettingSpelling::Operator) => {
+            w.push_str(" :>> ")
+        }
+        (SubsettingKind::Redefines, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" redefines ")
+        }
+        (SubsettingKind::Crosses, crate::ast::SubsettingSpelling::Operator) => w.push_str(" => "),
+        (SubsettingKind::Crosses, crate::ast::SubsettingSpelling::Keyword) => {
+            w.push_str(" crosses ")
+        }
+        // `Intersecting` has only the keyword spelling.
+        (SubsettingKind::Intersects, _) => w.push_str(" intersects "),
     }
     for (index, target) in rel.target.iter().enumerate() {
         if index > 0 {

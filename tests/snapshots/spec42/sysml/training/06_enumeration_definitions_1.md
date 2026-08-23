@@ -44,7 +44,7 @@ package 'Enumeration Definitions-1' {
         attribute currentColor : TrafficLightColor;
     }
     part def TrafficLightGo specializes TrafficLight {
-        attribute :>> currentColor = TrafficLightColor::green;
+        attribute redefines currentColor = TrafficLightColor::green;
     }
 }
 ~~~

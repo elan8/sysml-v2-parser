@@ -1,6 +1,7 @@
 use crate::ast::{
-    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateDef,
-    StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
+    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateBodyModifier,
+    StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition,
+    TransitionEffect,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -24,6 +25,33 @@ use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
+/// `parallel`/`initial` body modifier, kept with its keyword span.
+///
+/// `StateDefBody` (SysML BNF 1192) admits `parallel` before the body; the usage spelling and
+/// `ExhibitStateUsage`, which shares `StateUsageBody`, also admit `initial`. Callers that only
+/// accept `parallel` still parse both and let the semantic layer reject the wrong keyword, so an
+/// authored modifier is never silently dropped.
+pub(crate) fn state_body_modifier(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Node<StateBodyModifier>>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let keyword: IResult<Input<'_>, StateBodyModifier> = alt((
+        map(tag(&b"parallel"[..]), |_| StateBodyModifier::Parallel),
+        map(tag(&b"initial"[..]), |_| StateBodyModifier::Initial),
+    ))
+    .parse(input);
+    let Ok((after_keyword, modifier)) = keyword else {
+        return Ok((input, None));
+    };
+    // A modifier keyword must be a whole word: `initialState { ... }` is a body-less usage named
+    // `initialState`, not an `initial` modifier.
+    let Ok((rest, ())) = ws1(after_keyword) else {
+        return Ok((input, None));
+    };
+    Ok((rest, Some(node_from_to(start, after_keyword, modifier))))
+}
+
 pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(
@@ -33,6 +61,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
             .individual_allowed()
             .with_captured_visibility(),
     )?;
+    let (input, body_modifier) = state_body_modifier(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -44,6 +73,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
+                body_modifier,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
@@ -601,11 +631,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
         .map(|(target, _)| target);
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
     // Optional modifier before body: `parallel` or `initial` (SysML state usage)
-    let (input, _) = opt(alt((
-        preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
-        preceded(preceded(ws_and_comments, tag(&b"initial"[..])), ws1),
-    )))
-    .parse(input)?;
+    let (input, body_modifier) = state_body_modifier(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
@@ -627,6 +653,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                body_modifier,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

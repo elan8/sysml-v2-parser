@@ -45,7 +45,7 @@ standard library package Occurrences {
 ~~~sysml
 standard library package Occurrences {
     metaclass AnnotatingElement specializes Element {
-        derived var feature annotatedElement : Element[1..*] ordered :>> annotatedElement;
+        derived var feature annotatedElement : Element[1..*] ordered redefines annotatedElement;
         member feature 'in' : FeatureDirectionKind[1];
     }
     datatype UnitBoundedReal :> Real {
@@ -54,8 +54,8 @@ standard library package Occurrences {
         }
     }
     assoc all HappensBefore specializes HappensLink, Without {
-        end feature source : Occurrence[1] :> participant;
-        feature all spaceShotOf : Occurrence[0..*] :> spaceSliceOf inverse of spaceShots;
+        end feature source : Occurrence[1] subsets participant;
+        feature all spaceShotOf : Occurrence[0..*] subsets spaceSliceOf inverse of spaceShots;
         inv {
             isClosed == true;
         }
@@ -65,13 +65,13 @@ standard library package Occurrences {
         /* A LinkObject is both a Link and an Object. */
     }
     abstract class Occurrence specializes Anything disjoint from DataValue {
-        portion feature[1] :>> spaceBoundary;
+        portion feature[1] redefines spaceBoundary;
     }
-    abstract step performances : Performance[0..*] nonunique :> occurrences {
+    abstract step performances : Performance[0..*] nonunique subsets occurrences {
         doc
         /* performances is the base feature of all performances. */
     }
-    abstract expr evaluations : Evaluation[0..*] nonunique :> performances;
+    abstract expr evaluations : Evaluation[0..*] nonunique subsets performances;
     private struct UniversalClockLife[1] :> Clock, Life {
         feature universalClock : UniversalClockLife[1];
     }

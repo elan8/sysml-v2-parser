@@ -968,6 +968,22 @@ pub struct AllocationUsage {
 // Requirements
 // ---------------------------------------------------------------------------
 
+/// The body modifier written immediately before a state body, e.g. `state def S parallel { … }`.
+///
+/// `StateDefBody = ';' | ( isParallel ?= 'parallel' )? '{' StateBodyItem* '}'` (SysML BNF 1192)
+/// and the usage-side `StateUsage` spelling additionally admit `initial`. Which keyword was
+/// written is a grammatical fact -- `StateUsage::isSubstateUsage` and the parallel-subaction
+/// library specialization both depend on it -- so it is kept as its own node rather than a
+/// discarded token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum StateBodyModifier {
+    /// `parallel` -- `isParallel = true`.
+    Parallel,
+    /// `initial` -- the state usage is the initial substate of its owner.
+    Initial,
+}
+
 /// State definition: `state def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -982,6 +998,9 @@ pub struct StateDef {
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
+    /// Authored `parallel` modifier before the body, with its keyword span. See
+    /// [`StateBodyModifier`].
+    pub body_modifier: Option<Node<StateBodyModifier>>,
     pub body: StateDefBody,
     pub membership: Membership,
 }
@@ -1162,6 +1181,9 @@ pub struct StateUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored `parallel`/`initial` modifier before the body, with its keyword span. See
+    /// [`StateBodyModifier`].
+    pub body_modifier: Option<Node<StateBodyModifier>>,
     pub body: StateDefBody,
     pub membership: Membership,
 }

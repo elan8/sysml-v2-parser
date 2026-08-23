@@ -42,7 +42,7 @@ package P2 {
 private import P2::*;
 
 package P3 {
-    part b :> a;
+    part b subsets a;
 }
 ~~~
 # AST

@@ -1798,9 +1798,17 @@ pub(crate) fn specialization_operator(
 /// Parse subsetting marker in SysML concrete syntax:
 /// either symbolic `:>` or keyword `subsets`.
 pub(crate) fn subset_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    value((), spelled_subset_operator).parse(input)
+}
+
+/// [`subset_operator`], reporting which of the two interchangeable spellings was authored.
+pub(crate) fn spelled_subset_operator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::SubsettingSpelling> {
+    use crate::ast::SubsettingSpelling as S;
     alt((
-        value((), tag(&b":>"[..])),
-        value((), terminated(tag(&b"subsets"[..]), ws1)),
+        value(S::Operator, tag(&b":>"[..])),
+        value(S::Keyword, terminated(tag(&b"subsets"[..]), ws1)),
     ))
     .parse(input)
 }
@@ -1808,9 +1816,17 @@ pub(crate) fn subset_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// Parse redefinition marker in SysML concrete syntax:
 /// either symbolic `:>>` or keyword `redefines`.
 pub(crate) fn redefine_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    value((), spelled_redefine_operator).parse(input)
+}
+
+/// [`redefine_operator`], reporting which of the two interchangeable spellings was authored.
+pub(crate) fn spelled_redefine_operator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::SubsettingSpelling> {
+    use crate::ast::SubsettingSpelling as S;
     alt((
-        value((), tag(&b":>>"[..])),
-        value((), terminated(tag(&b"redefines"[..]), ws1)),
+        value(S::Operator, tag(&b":>>"[..])),
+        value(S::Keyword, terminated(tag(&b"redefines"[..]), ws1)),
     ))
     .parse(input)
 }
@@ -1835,19 +1851,37 @@ pub(crate) fn typed_by_operator(
 }
 
 /// Reference subsetting: `::>` or keyword `references`.
+#[allow(dead_code)] // BNF lexical conformance surface; the spelled variant is what parsers use.
 pub(crate) fn references_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    value((), spelled_references_operator).parse(input)
+}
+
+/// [`references_operator`], reporting which of the two interchangeable spellings was authored.
+pub(crate) fn spelled_references_operator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::SubsettingSpelling> {
+    use crate::ast::SubsettingSpelling as S;
     alt((
-        value((), tag(&b"::>"[..])),
-        value((), (tag(&b"references"[..]), ws1)),
+        value(S::Operator, tag(&b"::>"[..])),
+        value(S::Keyword, (tag(&b"references"[..]), ws1)),
     ))
     .parse(input)
 }
 
 /// Cross subsetting: `=>` or keyword `crosses`.
+#[allow(dead_code)] // BNF lexical conformance surface; the spelled variant is what parsers use.
 pub(crate) fn crosses_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    value((), spelled_crosses_operator).parse(input)
+}
+
+/// [`crosses_operator`], reporting which of the two interchangeable spellings was authored.
+pub(crate) fn spelled_crosses_operator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::SubsettingSpelling> {
+    use crate::ast::SubsettingSpelling as S;
     alt((
-        value((), tag(&b"=>"[..])),
-        value((), (tag(&b"crosses"[..]), ws1)),
+        value(S::Operator, tag(&b"=>"[..])),
+        value(S::Keyword, (tag(&b"crosses"[..]), ws1)),
     ))
     .parse(input)
 }

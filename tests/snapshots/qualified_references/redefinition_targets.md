@@ -34,11 +34,11 @@ package RedefinitionTargets {
         attribute :>> name = "My Laptop";
         attribute :>> researchAndDevelopmentCost = 5E9['$'];
         attribute :> electricGrid.outlets :>> outlet;
-        attribute :>> architecture = EeArchitecture::arm;
-        port :>> rotationSpeedIn;
+        attribute redefines architecture = EeArchitecture::arm;
+        port redefines rotationSpeedIn;
     }
     port def SuctionLevelPort :> Base::PowerOutPort {
-        out attribute :> ISQ::power :>> suctionPower;
+        out attribute :> ISQ::power redefines suctionPower;
     }
 }
 ~~~

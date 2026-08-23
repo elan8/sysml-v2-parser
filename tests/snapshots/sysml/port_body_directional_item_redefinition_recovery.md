@@ -22,13 +22,8 @@ package P {
 )
 ~~~
 # FORMAT
-~~~sysml
-package P {
-    port p {
-        out item redefines ;
-        in item :>> fuelReturn;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

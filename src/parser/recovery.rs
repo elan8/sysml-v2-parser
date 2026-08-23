@@ -2,10 +2,11 @@
 
 use super::diagnostics::{
     bare_comma_sequence_diagnostic, category_from_code, invalid_bare_identifier_in_body_diagnostic,
-    invalid_bracket_expression_diagnostic, invalid_expose_separator_diagnostic,
-    invalid_typing_operator_diagnostic, missing_expression_after_operator_diagnostic,
-    missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
-    trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
+    invalid_bracket_expression_diagnostic, invalid_end_feature_prefix_diagnostic,
+    invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
+    missing_expression_after_operator_diagnostic, missing_semicolon_or_body_diagnostic,
+    missing_type_diagnostic, trim_ascii_end, trim_ascii_start,
+    unexpected_keyword_in_scope_diagnostic,
 };
 use super::lex;
 use super::Input;
@@ -96,6 +97,13 @@ enum RecoveryClassification {
         expected: String,
         suggestion: String,
     },
+    /// `end` spelled with a slot only `BasicFeaturePrefix` owns (KerML BNF 573/577/584).
+    InvalidEndFeaturePrefix {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
     InvalidTypingOperator {
         code: String,
         message: String,
@@ -159,6 +167,19 @@ fn classify_recovery(
         invalid_expose_separator_diagnostic(trimmed)
     {
         return RecoveryClassification::InvalidQualifiedNameSeparator {
+            code: code.to_string(),
+            message,
+            expected,
+            suggestion,
+        };
+    }
+
+    // Ahead of the keyword-in-scope classifications: those would report the *scope* as the
+    // problem, when the authored prefix is what has no derivation.
+    if let Some((code, message, expected, suggestion)) =
+        invalid_end_feature_prefix_diagnostic(trimmed)
+    {
+        return RecoveryClassification::InvalidEndFeaturePrefix {
             code: code.to_string(),
             message,
             expected,
@@ -330,6 +351,12 @@ pub(crate) fn build_recovery_error_node_from_span(
             suggestion,
         }
         | RecoveryClassification::BareCommaSequence {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
+        | RecoveryClassification::InvalidEndFeaturePrefix {
             code,
             message,
             expected,

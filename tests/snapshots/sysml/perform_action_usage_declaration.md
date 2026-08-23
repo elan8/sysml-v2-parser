@@ -22,14 +22,8 @@ package PerformActionUsageDeclaration {
 )
 ~~~
 # FORMAT
-~~~sysml
-package PerformActionUsageDeclaration {
-    part host {
-        perform action <shot> takePhoto[*] ordered ::> Camera::takePhoto = selectedPhoto;
-        perform action :>> inheritedAction = selectedAction;
-        perform source.perform :>> replacementAction;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

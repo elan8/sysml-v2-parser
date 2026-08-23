@@ -139,46 +139,46 @@ package VehicleUsages {
         doc
         /* Basic Vehicle configuration showing a part hierarchy. */
         part frontAxleAssembly : AxleAssembly {
-            part frontWheel[2] :> narrowRimWheel {
-                part :>> lugbolt[4] {
-                    attribute :>> tighteningTorque = T1;
+            part frontWheel[2] subsets narrowRimWheel {
+                part redefines lugbolt[4] {
+                    attribute redefines tighteningTorque = T1;
                 }
             }
             part frontAxle : Axle;
         }
         part rearAxleAssembly : AxleAssembly {
-            part rearWheel[2] :> wideRimWheel {
-                part :>> lugbolt[6] {
-                    attribute :>> tighteningTorque = T2;
+            part rearWheel[2] subsets wideRimWheel {
+                part redefines lugbolt[6] {
+                    attribute redefines tighteningTorque = T2;
                 }
             }
             part rearAxle : Axle;
         }
     }
-    part vehicle_C2 :> vehicle_C1 {
+    part vehicle_C2 subsets vehicle_C1 {
         doc
         /* Specialized configuration with part-specific ports. */
-        part :>> frontAxleAssembly {
-            part leftFrontWheel :> frontWheel = frontWheel#(1);
-            part rightFrontWheel :> frontWheel = frontWheel#(2);
+        part redefines frontAxleAssembly {
+            part leftFrontWheel subsets frontWheel = frontWheel#(1);
+            part rightFrontWheel subsets frontWheel = frontWheel#(2);
             interface leftFrontMount : Mounting connect frontAxle.leftMountingPoint to leftFrontWheel.hub;
             interface rightFrontMount : Mounting connect frontAxle.rightMountingPoint to rightFrontWheel.hub;
         }
-        part rearAxleAssembly :>> vehicle_C1::rearAxleAssembly {
-            part leftRearWheel :> rearWheel = rearWheel#(1);
-            part rightRearWheel :> rearWheel = rearWheel#(2);
+        part rearAxleAssembly redefines vehicle_C1::rearAxleAssembly {
+            part leftRearWheel subsets rearWheel = rearWheel#(1);
+            part rightRearWheel subsets rearWheel = rearWheel#(2);
             interface leftRearMount : Mounting connect rearAxle.leftMountingPoint to leftRearWheel.hub;
             interface rightRearMount : Mounting connect rearAxle.rightMountingPoint to rightRearWheel.hub;
         }
     }
-    part vehicle_C3 :> vehicle_C2 {
+    part vehicle_C3 subsets vehicle_C2 {
         doc
         /* Further specialized configuration with a connection to a deeply-nested port. */
         part transmission : Transmission {
             port drive : ~DriveIF;
         }
-        part :>> rearAxleAssembly {
-            part :>> rearAxle {
+        part redefines rearAxleAssembly {
+            part redefines rearAxle {
                 port drive : DriveIF;
             }
         }

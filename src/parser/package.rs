@@ -981,10 +981,18 @@ fn kerml_classifier_structured_inner(
     .parse(input)?;
     let (input, specializes) =
         crate::parser::specialization::parse_optional_definition_specialization(input)?;
+    // `TypeDeclaration` spells `( SpecializationPart | ConjugationPart )?` (KerML BNF 455/462), so
+    // a conjugation is only reachable where no specialization was authored, and a declaration can
+    // never carry both.
+    let (input, conjugates) = if specializes.is_none() {
+        kerml_conjugation_part(input)?
+    } else {
+        (input, None)
+    };
     // The `bool`/`expr` feature forms type with `:` instead of specializing:
     // `bool earlierFirstIncomingTransferSort : IncomingTransferSort { ... }`
     // (`Occurrences.kerml`). The relationship kind distinguishes the authored operator.
-    let (input, specializes) = if specializes.is_none() {
+    let (input, specializes) = if specializes.is_none() && conjugates.is_none() {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let before = input;
@@ -1028,11 +1036,58 @@ fn kerml_classifier_structured_inner(
                 identification,
                 multiplicity,
                 specializes,
+                conjugates,
                 type_relationships,
                 body,
                 membership: crate::ast::Membership::owning(visibility, visibility_span),
             },
         ),
+    ))
+}
+
+/// `ConjugationPart : Type = ( 'conjugates' | '~' ) ownedRelationship += OwnedConjugation`
+/// (KerML BNF 462).
+///
+/// One target, not a list: `OwnedConjugation` is a single `[QualifiedName]`, unlike
+/// `SpecializationPart`'s comma-separated `OwnedSubclassification`s. Both spellings are accepted
+/// and which one was authored is recorded, because they are interchangeable in the grammar and
+/// only emission cares.
+fn kerml_conjugation_part(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Node<crate::ast::Conjugation>>> {
+    let (peek, _) = ws_and_comments(input)?;
+    // The clause span starts at the keyword, not at the trivia before it.
+    let before = peek;
+    let spelling = if starts_with_keyword(peek.fragment(), b"conjugates") {
+        crate::ast::ConjugationSpelling::Keyword
+    } else if peek.fragment().starts_with(b"~") {
+        crate::ast::ConjugationSpelling::Operator
+    } else {
+        return Ok((input, None));
+    };
+    let (input, _) = match spelling {
+        crate::ast::ConjugationSpelling::Keyword => {
+            let (input, _) = tag(&b"conjugates"[..]).parse(peek)?;
+            ws1(input)?
+        }
+        crate::ast::ConjugationSpelling::Operator => {
+            let (input, _) = tag(&b"~"[..]).parse(peek)?;
+            (input, ())
+        }
+    };
+    let (input, target) =
+        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+    let span = crate::parser::span_from_to(before, input);
+    Ok((
+        input,
+        Some(Node::new(
+            span.clone(),
+            crate::ast::Conjugation {
+                target,
+                spelling,
+                span,
+            },
+        )),
     ))
 }
 

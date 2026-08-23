@@ -1143,7 +1143,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::ThenIncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(then-include (target ")?;
-                            self.write_reference(include.value.include.value.target)?;
+                            self.write_include_use_case_target(&include.value.include.value)?;
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::ThenUseCaseUsage(_usage) => {
@@ -1185,7 +1185,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::IncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(include (target ")?;
-                            self.write_reference(include.value.target)?;
+                            self.write_include_use_case_target(&include.value)?;
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::Ref(declaration) => {
@@ -4146,94 +4146,109 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::AttributeBody::Brace { elements, .. } => {
                 let mut first = self.open_brace_body()?;
                 for element in elements {
-                    match &element.value {
-                        super::AttributeBodyElement::Error(error) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_malformed(&error.value, &element.span)?;
-                        }
-                        super::AttributeBodyElement::Unsupported(unsupported) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_unsupported(&unsupported.value, &element.span)?;
-                        }
-                        super::AttributeBodyElement::Annotating(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_annotating_member(member)?;
-                        }
-                        super::AttributeBodyElement::AttributeUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_attribute_usage(&usage.value)?;
-                        }
-                        super::AttributeBodyElement::DefaultReferenceUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_default_reference_usage(&usage.value)?;
-                        }
-                        super::AttributeBodyElement::PartUsage(member) => {
-                            self.write_part_usage_member(&mut first, &member.value)?;
-                        }
-                        super::AttributeBodyElement::ItemUsage(usage) => {
-                            self.write_item_usage_member(&mut first, &usage.value)?;
-                        }
-                        super::AttributeBodyElement::OccurrenceUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_occurrence(&member.value)?;
-                        }
-                        super::AttributeBodyElement::RefDecl(declaration) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_ref_declaration(&declaration.value)?;
-                        }
-                        super::AttributeBodyElement::MetadataKeywordUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_metadata_keyword_usage(&member.value)?;
-                        }
-                        super::AttributeBodyElement::AttributeDef(definition) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_attribute_definition(&definition.value)?;
-                        }
-                        super::AttributeBodyElement::Connect(_member) => {
-                            self.write_marker(&mut first, "connect")?;
-                        }
-                        super::AttributeBodyElement::AssertConstraint(_member) => {
-                            self.write_marker(&mut first, "assert-constraint")?;
-                        }
-                        super::AttributeBodyElement::KermlFeature(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_kerml_feature(&member.value)?;
-                        }
-                        super::AttributeBodyElement::Invariant(_member) => {
-                            self.write_marker(&mut first, "invariant")?;
-                        }
-                        super::AttributeBodyElement::KermlConnector(_member) => {
-                            self.write_marker(&mut first, "kerml-connector")?;
-                        }
-                        super::AttributeBodyElement::KermlClassifier(declaration) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_kerml_classifier(&declaration.value)?;
-                        }
-                        super::AttributeBodyElement::Bind(_member) => {
-                            self.write_marker(&mut first, "bind")?;
-                        }
-                        super::AttributeBodyElement::Connection(_member) => {
-                            self.write_marker(&mut first, "connection")?;
-                        }
-                        super::AttributeBodyElement::CalcDef(_member) => {
-                            self.write_marker(&mut first, "calc-def")?;
-                        }
-                        super::AttributeBodyElement::CalcUsage(_member) => {
-                            self.write_marker(&mut first, "calc-usage")?;
-                        }
-                        super::AttributeBodyElement::ConstraintUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_constraint_usage(&usage.value)?;
-                        }
-                        super::AttributeBodyElement::VariantUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_variant_usage(&usage.value)?;
-                        }
-                    }
+                    self.write_attribute_body_element(&mut first, element)?;
                 }
                 self.writer.write_char(')')
             }
         }
+    }
+
+    /// One `AttributeBody` member, projected on its own so `MetadataBody` -- whose
+    /// `DefinitionMember` alternative reuses this same member set -- projects it identically
+    /// rather than through a second, drifting copy of the match.
+    ///
+    /// `first` is the caller's separator state: several arms write their own marker rather than
+    /// a plain item prefix, so it is threaded rather than handled once here.
+    fn write_attribute_body_element(
+        &mut self,
+        first: &mut bool,
+        element: &Node<super::AttributeBodyElement>,
+    ) -> io::Result<()> {
+        match &element.value {
+            super::AttributeBodyElement::Error(error) => {
+                self.write_item_prefix(first)?;
+                self.write_malformed(&error.value, &element.span)?;
+            }
+            super::AttributeBodyElement::Unsupported(unsupported) => {
+                self.write_item_prefix(first)?;
+                self.write_unsupported(&unsupported.value, &element.span)?;
+            }
+            super::AttributeBodyElement::Annotating(member) => {
+                self.write_item_prefix(first)?;
+                self.write_annotating_member(member)?;
+            }
+            super::AttributeBodyElement::AttributeUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_attribute_usage(&usage.value)?;
+            }
+            super::AttributeBodyElement::DefaultReferenceUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_default_reference_usage(&usage.value)?;
+            }
+            super::AttributeBodyElement::PartUsage(member) => {
+                self.write_part_usage_member(first, &member.value)?;
+            }
+            super::AttributeBodyElement::ItemUsage(usage) => {
+                self.write_item_usage_member(first, &usage.value)?;
+            }
+            super::AttributeBodyElement::OccurrenceUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_occurrence(&member.value)?;
+            }
+            super::AttributeBodyElement::RefDecl(declaration) => {
+                self.write_item_prefix(first)?;
+                self.write_ref_declaration(&declaration.value)?;
+            }
+            super::AttributeBodyElement::MetadataKeywordUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_metadata_keyword_usage(&member.value)?;
+            }
+            super::AttributeBodyElement::AttributeDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_attribute_definition(&definition.value)?;
+            }
+            super::AttributeBodyElement::Connect(_member) => {
+                self.write_marker(first, "connect")?;
+            }
+            super::AttributeBodyElement::AssertConstraint(_member) => {
+                self.write_marker(first, "assert-constraint")?;
+            }
+            super::AttributeBodyElement::KermlFeature(member) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_feature(&member.value)?;
+            }
+            super::AttributeBodyElement::Invariant(_member) => {
+                self.write_marker(first, "invariant")?;
+            }
+            super::AttributeBodyElement::KermlConnector(_member) => {
+                self.write_marker(first, "kerml-connector")?;
+            }
+            super::AttributeBodyElement::KermlClassifier(declaration) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_classifier(&declaration.value)?;
+            }
+            super::AttributeBodyElement::Bind(_member) => {
+                self.write_marker(first, "bind")?;
+            }
+            super::AttributeBodyElement::Connection(_member) => {
+                self.write_marker(first, "connection")?;
+            }
+            super::AttributeBodyElement::CalcDef(_member) => {
+                self.write_marker(first, "calc-def")?;
+            }
+            super::AttributeBodyElement::CalcUsage(_member) => {
+                self.write_marker(first, "calc-usage")?;
+            }
+            super::AttributeBodyElement::ConstraintUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_constraint_usage(&usage.value)?;
+            }
+            super::AttributeBodyElement::VariantUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_variant_usage(&usage.value)?;
+            }
+        }
+        Ok(())
     }
 
     /// `ItemDefinition = OccurrenceDefinitionPrefix 'item' 'def' Definition` (SysML BNF 613).
@@ -4409,6 +4424,19 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_body_usage(&usage.value)?;
                         }
+                        super::MetadataBodyElement::Definition(member) => {
+                            self.write_attribute_body_element(&mut first, member)?;
+                        }
+                        super::MetadataBodyElement::Alias(alias) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_alias_definition(&alias.value)?;
+                        }
+                        super::MetadataBodyElement::Import(import) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(import ")?;
+                            self.write_import_target(&import.value.target)?;
+                            self.writer.write_char(')')?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -4520,7 +4548,22 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_end(&mut self, end: &super::EndDecl) -> io::Result<()> {
-        self.writer.write_str("(end (introducer ")?;
+        // `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix …` (SysML BNF 630). Projected so
+        // an authored `end derived x : T;` is observable here and not only through `FORMAT`.
+        self.writer.write_str("(end (prefix (direction ")?;
+        self.write_direction(end.ref_prefix.direction.as_ref().map(|node| node.value))?;
+        write!(
+            self.writer,
+            ") (derived {}) (constant {}) (variance ",
+            end.ref_prefix.derived_span.is_some(),
+            end.ref_prefix.constant_span.is_some()
+        )?;
+        match end.ref_prefix.variance.as_ref().map(|node| node.value) {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(")) (introducer ")?;
         match &end.introducer {
             EndDeclIntroducer::Bare => self.writer.write_str("bare")?,
             EndDeclIntroducer::Reference { keyword_span } => {
@@ -5505,6 +5548,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    /// `IncludeUseCaseUsage`'s two alternatives: a reference to an existing use case, or a
+    /// declaration introduced by the `use case` keyword pair. Projected as one slot so the
+    /// spellings stay distinguishable without a second shape in every owning scope.
+    fn write_include_use_case_target(&mut self, include: &super::IncludeUseCase) -> io::Result<()> {
+        match include.target {
+            Some(reference) => self.write_reference(reference),
+            None => {
+                self.writer.write_str("(use-case (name ")?;
+                write_optional_quoted(self.writer, include.name.as_deref())?;
+                self.writer.write_str(") (typing ")?;
+                match &include.typing {
+                    Some(typing) => self.write_typing(&typing.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")
+            }
+        }
+    }
+
     fn write_direction(&mut self, direction: Option<InOut>) -> io::Result<()> {
         match direction {
             Some(InOut::In) => self.writer.write_str("in"),
@@ -5765,6 +5827,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;
                         }
+                        super::PortBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
+                        }
                         super::PortBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;
                         }
@@ -5834,6 +5899,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         PortDefBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;
+                        }
+                        PortDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         PortDefBodyElement::EnumerationUsage(_usage) => {
                             self.write_marker(&mut first, "enumeration-usage")?;
@@ -6256,7 +6324,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::IncludeUseCase(include) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(include (target ")?;
-                self.write_reference(include.value.target)?;
+                self.write_include_use_case_target(&include.value)?;
                 self.writer.write_str("))")
             }
         }

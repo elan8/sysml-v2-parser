@@ -66,6 +66,11 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
         // `port pwr : DevicePower { :>> maxCurrent = 0.02 [A]; }`. Attribute and item bodies
         // already accept this prefix-redefinition form; port bodies rejected it.
         map(attribute_feature_binding, PortBodyElement::AttributeUsage),
+        // `UsageBody = DefinitionBody`, so a part member reaches this scope through the same
+        // chain it reaches the definition side by. Beside `item_usage`, its sibling there.
+        map(crate::parser::part::part_usage, |usage| {
+            PortBodyElement::PartUsage(Box::new(usage))
+        }),
         map(item_usage, PortBodyElement::ItemUsage),
         // After `port_usage` so `ref port …` reaches the kind-keyword form, exactly as in
         // `port_def_body_element`. `ref_decl` owns the keyword-less `ref` members the Systems
@@ -294,6 +299,12 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
             crate::parser::part::variant_usage,
             PortDefBodyElement::VariantUsage,
         ),
+        // `DefinitionBodyItem -> OccurrenceUsageMember -> StructureUsageMember -> PartUsage`
+        // (SysML BNF 514, 623): a port body is a `DefinitionBody` and owns part members like any
+        // other. Beside `item_usage`, which reaches this scope through the same chain.
+        map(crate::parser::part::part_usage, |usage| {
+            PortDefBodyElement::PartUsage(Box::new(usage))
+        }),
         map(item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
         map(in_out_decl, PortDefBodyElement::InOutDecl),
