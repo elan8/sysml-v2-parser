@@ -35,6 +35,6 @@ package ConcernUsageAuthoredNames {
 (parsed-document
   (references
   )
-  (root (package (name "ConcernUsageAuthoredNames") (body brace (concern-usage (name "modularity") (visibility none) (abstract false) (definition false) (type none) (multiplicity none) (subsets none) (redefines none) (body semicolon)) (requirement-def (name "OwningRequirement") (modifiers) (body brace (concern-usage (name "owner's concern") (visibility none) (abstract false) (definition false) (type none) (multiplicity none) (subsets none) (redefines none) (body semicolon)))))))
+  (root (package (name "ConcernUsageAuthoredNames") (body brace (concern-usage (name "modularity") (visibility none) (abstract false) (individual false) (definition false) (type none) (multiplicity none) (subsets none) (redefines none) (body semicolon)) (requirement-def (name "OwningRequirement") (modifiers) (body brace (concern-usage (name "owner's concern") (visibility none) (abstract false) (individual false) (definition false) (type none) (multiplicity none) (subsets none) (redefines none) (body semicolon)))))))
 )
 ~~~

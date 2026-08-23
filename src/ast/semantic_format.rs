@@ -2420,7 +2420,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_calc_definition(&mut self, definition: &super::CalcDef) -> io::Result<()> {
         self.writer.write_str("(calc-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&definition.body)?;
         self.writer.write_char(')')
@@ -2659,7 +2662,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_constraint_definition(&mut self, definition: &super::ConstraintDef) -> io::Result<()> {
         self.writer.write_str("(constraint-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") (specializes ")?;
         match &definition.specializes {
             Some(typing) => self.write_typing(&typing.value)?,
@@ -5207,7 +5213,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     ) -> io::Result<()> {
         self.writer.write_str("(requirement-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_requirement_body(&definition.body)?;
         self.writer.write_char(')')
@@ -5221,9 +5230,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_quoted(self.writer, &usage.name)?;
         write!(
             self.writer,
-            ") (visibility {}) (abstract {}) (definition {}) (type ",
+            ") (visibility {}) (abstract {}) (individual {}) (definition {}) (type ",
             visibility_name(usage.membership.visibility),
             usage.is_abstract,
+            usage.is_individual,
             usage.is_definition,
         )?;
         if let Some(type_name) = usage.type_name {
@@ -5255,7 +5265,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, definition.identification.short_name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") (specializes ")?;
         match &definition.specializes {
             Some(specializes) => self.write_typing(&specializes.value)?,
@@ -5406,7 +5419,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_use_case_definition(&mut self, definition: &super::UseCaseDef) -> io::Result<()> {
         self.writer.write_str("(use-case-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_use_case_body(&definition.body)?;
         self.writer.write_char(')')
@@ -5415,7 +5431,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_state_definition(&mut self, definition: &super::StateDef) -> io::Result<()> {
         self.writer.write_str("(state-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_state_body(&definition.body)?;
         self.writer.write_char(')')

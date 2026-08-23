@@ -18,6 +18,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
         input,
         DefinitionPrefixOptions::new(b"case")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = loose_use_case_body(input)?;
@@ -27,6 +28,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
             start,
             input,
             CaseDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 definition_prefix: prefix.basic_prefix,
@@ -133,6 +135,7 @@ pub(crate) fn verification_case_def(
         input,
         DefinitionPrefixOptions::new(b"verification")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = loose_use_case_body(input)?;
@@ -142,6 +145,7 @@ pub(crate) fn verification_case_def(
             start,
             input,
             VerificationCaseDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 definition_prefix: prefix.basic_prefix,

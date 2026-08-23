@@ -44,7 +44,8 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
         input,
         DefinitionPrefixOptions::new(b"constraint")
             .with_captured_visibility()
-            .def_required(),
+            .def_required()
+            .individual_allowed(),
     )?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
@@ -53,6 +54,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             start,
             input,
             ConstraintDef {
+                is_individual: prefix.is_individual,
                 definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -430,7 +432,9 @@ pub(crate) fn calc_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Cal
 
 fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"calc").with_captured_visibility();
+    let mut options = DefinitionPrefixOptions::new(b"calc")
+        .with_captured_visibility()
+        .individual_allowed();
     if require_def {
         options = options.def_required();
     }
@@ -442,6 +446,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             start,
             input,
             CalcDef {
+                is_individual: prefix.is_individual,
                 definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

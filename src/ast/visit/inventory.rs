@@ -6053,11 +6053,12 @@ macro_rules! ast_traversal {
         pub fn walk_requirement_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequirementDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequirementDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let RequirementDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6552,10 +6553,11 @@ macro_rules! ast_traversal {
         pub fn walk_concern_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConcernUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConcernUsage { name, name_span, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
+            let ConcernUsage { name, name_span, is_abstract, is_individual, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
             visitor.visit_span(name_span);
             let _ = is_abstract;
+            let _ = is_individual;
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
@@ -6577,11 +6579,12 @@ macro_rules! ast_traversal {
         pub fn walk_case_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CaseDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CaseDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let CaseDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6653,11 +6656,12 @@ macro_rules! ast_traversal {
         pub fn walk_verification_case_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerificationCaseDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VerificationCaseDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let VerificationCaseDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6717,11 +6721,12 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let UseCaseDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7061,11 +7066,12 @@ macro_rules! ast_traversal {
         pub fn walk_constraint_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConstraintDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConstraintDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ConstraintDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7162,11 +7168,12 @@ macro_rules! ast_traversal {
         pub fn walk_calc_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let CalcDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7340,11 +7347,12 @@ macro_rules! ast_traversal {
         pub fn walk_view_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ViewDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7464,11 +7472,12 @@ macro_rules! ast_traversal {
         pub fn walk_viewpoint_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewpointDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewpointDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ViewpointDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7480,11 +7489,12 @@ macro_rules! ast_traversal {
         pub fn walk_rendering_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RenderingDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RenderingDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let RenderingDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }

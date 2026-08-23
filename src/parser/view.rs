@@ -235,6 +235,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
         input,
         DefinitionPrefixOptions::new(b"view")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = view_def_body(input)?;
@@ -244,6 +245,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             start,
             input,
             ViewDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
@@ -260,6 +262,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
         input,
         DefinitionPrefixOptions::new(b"viewpoint")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = requirement_def_body(input)?;
@@ -269,6 +272,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
             start,
             input,
             ViewpointDef {
+                is_individual: prefix.is_individual,
                 definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -358,6 +362,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
         input,
         DefinitionPrefixOptions::new(b"rendering")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = rendering_def_body(input)?;
@@ -367,6 +372,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             start,
             input,
             RenderingDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,

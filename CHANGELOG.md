@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`individual` on every `OccurrenceDefinitionPrefix` family.** `OccurrenceDefinitionPrefix =
+  BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?` (SysML BNF 541; Pilot
+  `SysML.xtext` 804) is reached by calc, constraint, requirement, concern, case, verification,
+  use case, view, viewpoint and rendering definitions, and only the structural and action families
+  accepted it: `individual calc def D8;` fell to package-body recovery and cascaded over every
+  later sibling. The nine definition nodes and `ConcernUsage` gain `is_individual`, emitted and
+  projected; `StateDef` already carried it but its projection dropped it. Closes the
+  `coverage_individual` corpus snapshot. **AST version 231.**
+
 - **Five member forms the reference grammar spells.** Each verified against the Pilot
   Implementation before implementation, not the published BNF alone: the `perform` reference form in
   an action body (`SysML.xtext:1411-1417`), a part member in either port body (604/514/623), the
