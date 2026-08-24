@@ -229,6 +229,17 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
 
 /// Entry action: `entry` (`;` or body) or `entry action` path body / `entry` path body.
 fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"entry") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, entry_action_inner)
 }
 
@@ -258,6 +269,17 @@ fn entry_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>>
 
 /// Do action: `do` (`;` or body) or `do action` path body / `do` path body.
 fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"do") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, do_action_inner)
 }
 
@@ -287,6 +309,17 @@ fn do_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
 
 /// Exit action: `exit` (`;` or body) or `exit action` path body / `exit` path body.
 fn exit_action(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"exit") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, exit_action_inner)
 }
 
@@ -425,6 +458,17 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
 
 /// Then (initial state): `then` state-path `;`.
 fn then_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"then") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, then_stmt_inner)
 }
 

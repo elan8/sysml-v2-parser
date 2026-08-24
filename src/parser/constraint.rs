@@ -751,6 +751,21 @@ pub(crate) fn kerml_connector_end(
 pub(crate) fn kerml_connector_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorMember>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !(starts_with_keyword(cursor.fragment(), b"connector")
+            || starts_with_keyword(cursor.fragment(), b"public")
+            || starts_with_keyword(cursor.fragment(), b"private")
+            || starts_with_keyword(cursor.fragment(), b"protected"))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_connector_member_inner)
 }
 

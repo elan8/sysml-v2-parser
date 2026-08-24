@@ -218,19 +218,20 @@ fn namespace_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDe
 pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElement>> {
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
-    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(import_, |import| RootElement::Import(Box::new(import))).parse(input)
-    }) {
+    // No transactions here: `import_`, `namespace_decl`, and `library_package_` each guard and
+    // wrap their own arena transaction, so another layer only doubled the bookkeeping.
+    if let Ok((next, import)) = import_(input) {
+        let elem = RootElement::Import(Box::new(import));
         return Ok((next, node_from_to(start, next, elem)));
     }
-    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(namespace_decl, RootElement::Namespace).parse(input)
-    }) {
-        return Ok((next, node_from_to(start, next, elem)));
+    if let Ok((next, namespace)) = namespace_decl(input) {
+        return Ok((
+            next,
+            node_from_to(start, next, RootElement::Namespace(namespace)),
+        ));
     }
-    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(library_package_, RootElement::LibraryPackage).parse(input)
-    }) {
+    if let Ok((next, library)) = library_package_(input) {
+        let elem = RootElement::LibraryPackage(library);
         return Ok((next, node_from_to(start, next, elem)));
     }
     if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
@@ -424,6 +425,17 @@ fn strip_common_decl_prefixes(fragment: &[u8]) -> &[u8] {
 fn binding_connector_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"binding") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, binding_connector_usage_inner)
 }
 
@@ -707,6 +719,38 @@ fn kerml_bare_declaration(
 fn kerml_relationship_decl(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
+    // Speculated at member starts it does not own; refuse unless one of the relationship
+    // keywords follows the optional visibility prefix, before entering an arena transaction.
+    {
+        const STARTERS: &[&[u8]] = &[
+            b"specialization",
+            b"subclassifier",
+            b"subtype",
+            b"subset",
+            b"redefinition",
+            b"typing",
+            b"conjugation",
+            b"conjugate",
+            b"disjoining",
+            b"disjoint",
+            b"inverting",
+            b"inverse",
+            b"featuring",
+        ];
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        let fragment = cursor.fragment();
+        if !STARTERS
+            .iter()
+            .any(|keyword| starts_with_keyword(fragment, keyword))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_relationship_decl_inner)
 }
 
