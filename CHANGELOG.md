@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
+  Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
+  whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,
+  `derived`, ...) are refused on their first byte before the `tag` alternations, the delimiter
+  prescan and line-start table use `memchr`, trivia skipping rebuilds the located input from the
+  byte count it already has instead of re-slicing through `nom_locate`, and the release profile
+  enables fat LTO with one codegen unit for the repository's own binaries and benches. No
+  observable parser behaviour changes; every snapshot checksum is identical.
+
 ### Fixed
 
 - **Three round-trip and dispatch gaps in the last corpus snapshots.** A KerML classifier's
