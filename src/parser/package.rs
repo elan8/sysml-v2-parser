@@ -2388,6 +2388,11 @@ pub(crate) fn package_body_element(
     if let Ok(r) = try_package_body_view(input, start, starter) {
         return Ok(r);
     }
+    // One gate for the whole annotation family (`#`-extension, `@`, `metadata` forms below):
+    // every arm's parser refuses on the same first bytes, so a keyword-led member skips the
+    // family without paying a speculative attempt per arm.
+    let member_starts_annotation =
+        crate::parser::metadata_annotation::starts_annotation_member(input);
     // `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`. Must be tried before
     // `metadata_keyword_usage`/`metadata_keyword_prefix` below get first refusal on a `#<name>`
     // sequence immediately followed by `def` -- `def Failure;` alone is not an independently
@@ -2395,26 +2400,30 @@ pub(crate) fn package_body_element(
     // `metadata_keyword_prefix` does for ordinary `PrefixMetadataMember` prefixes) would hit raw
     // recovery. Speculative: rolls back cleanly (via `reference_transaction`) to the ordinary
     // `#`-forms below when the `def`/name tail isn't present.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::extended_definition,
-            PackageBodyElement::ExtendedDefinition,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::extended_definition,
+                PackageBodyElement::ExtendedDefinition,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     // `ExtendedUsage` with a declaration (SysML BNF 341): `#systemdd name :> base { … }`,
     // `#idd name;`. Ahead of the two `#` forms below, which own the empty-declaration and the
     // prefix-member spellings; the parser refuses both, so they fall through untouched.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::extended_usage,
-            |usage| PackageBodyElement::ExtendedUsage(Box::new(usage)),
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::extended_usage,
+                |usage| PackageBodyElement::ExtendedUsage(Box::new(usage)),
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at
     // all. Tried only after every other dispatcher above: some definitions (e.g. `connection_def`
@@ -2425,39 +2434,45 @@ pub(crate) fn package_body_element(
     // `connection` parse. Bare/typed/`about`/body form tried first, then the
     // `PrefixMetadataMember`-style form that prefixes the next member (e.g. `#fmeaspec
     // requirement req1 { ... }`, OMG spec Annex `14c-Language Extensions.sysml`).
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_usage,
-            PackageBodyElement::MetadataKeywordUsage,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                PackageBodyElement::MetadataKeywordUsage,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_prefix,
-            PackageBodyElement::MetadataKeywordUsage,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                PackageBodyElement::MetadataKeywordUsage,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     // `@ Name (: Type)? (about target(, target)*)? body` standalone annotation statement
     // (KerML `Annotation`/`@`-syntax) -- previously only the `#`-keyword forms above were
     // dispatched at package scope, e.g. `@ Classified about Annotated;`.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            |member| {
-                PackageBodyElement::Annotating(crate::ast::AnnotatingMember::MetadataAnnotation(
-                    member,
-                ))
-            },
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_annotation,
+                |member| {
+                    PackageBodyElement::Annotating(
+                        crate::ast::AnnotatingMember::MetadataAnnotation(member),
+                    )
+                },
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     if starts_with_keyword(input.fragment(), b"occurrence") {
         if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {

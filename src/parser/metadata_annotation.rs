@@ -45,9 +45,31 @@ pub(crate) fn parse_about_targets(
 ///     ( 'about' Annotation ( ',' Annotation )* )? MetadataBody
 /// MetadataFeatureDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping
 /// ```
+/// Whether the member can begin an annotation form at all: a `#` extension run, an `@`
+/// introducer, or the `metadata` keyword. One check gates every annotation-family dispatch arm,
+/// so the ordinary keyword-led members skip the whole family without a transaction each.
+pub(crate) fn starts_annotation_member(input: Input<'_>) -> bool {
+    let Ok((cursor, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    let fragment = cursor.fragment();
+    matches!(fragment.first(), Some(b'@'))
+        || crate::parser::lex::starts_with_keyword(fragment, b"metadata")
+        // `#` extensions may follow definition-prefix words (`abstract #situation def A;`);
+        // the shared scan looks past exactly that vocabulary.
+        || crate::parser::occurrence_prefix::hash_extension_follows(input)
+}
+
 pub(crate) fn metadata_annotation(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataAnnotation>> {
+    // See [`starts_annotation_member`].
+    if !starts_annotation_member(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, metadata_annotation_inner)
 }
 
@@ -252,6 +274,14 @@ fn extended_definition_prefix_tag(
 pub(crate) fn extended_definition(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
+    // A `#` extension run must follow the optional definition prefix; refuse before the
+    // arena transaction otherwise.
+    if !crate::parser::occurrence_prefix::hash_extension_follows(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, extended_definition_inner)
 }
 

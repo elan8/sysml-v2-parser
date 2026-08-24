@@ -76,6 +76,17 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 }
 
 fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"first") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, first_succession_inner)
 }
 
@@ -233,6 +244,17 @@ fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseU
 fn actor_redefinition_assignment(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"actor") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, actor_redefinition_assignment_inner)
 }
 
@@ -255,6 +277,17 @@ fn actor_redefinition_assignment_inner(
 }
 
 fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"ref") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, ref_redefinition_inner)
 }
 

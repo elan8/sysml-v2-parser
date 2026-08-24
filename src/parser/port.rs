@@ -267,27 +267,33 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
+    let member_starts_annotation =
+        crate::parser::metadata_annotation::starts_annotation_member(input);
     // `#keyword` metadata tag -- tried first so a stacked/prefixing `#idd port APIS_HTTP { ... }`
     // (bare form, then `PrefixMetadataMember`-style form prefixing the next port-body member)
     // dispatches here instead of falling through to the opaque-capture fallback below. Mirrors
     // `package_body_element`'s identical two-arm `#`-handling.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_usage,
-            PortDefBodyElement::MetadataKeywordUsage,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, node_from_to(start, input, elem)));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                PortDefBodyElement::MetadataKeywordUsage,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, node_from_to(start, input, elem)));
+        }
     }
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_prefix,
-            PortDefBodyElement::MetadataKeywordUsage,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, node_from_to(start, input, elem)));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                PortDefBodyElement::MetadataKeywordUsage,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, node_from_to(start, input, elem)));
+        }
     }
     let (input, elem) = alt((
         map(

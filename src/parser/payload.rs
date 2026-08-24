@@ -48,6 +48,17 @@ fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
 /// Transition-level `accept` trigger. Shares `AcceptParameterPart` with an action-node accept,
 /// including the three `TriggerKind` alternatives.
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"accept") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, transition_accept_inner)
 }
 

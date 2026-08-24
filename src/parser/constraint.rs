@@ -1003,6 +1003,23 @@ fn kerml_succession_member_inner(
 pub(crate) fn calc_named_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    // Its head is a mandatory declared name token. The inner parser deliberately accepts a
+    // reserved spelling there (dispatch order gives keyword-led siblings first refusal), so this
+    // guard only mirrors the lexical shape: something name-like must lead at all.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = visibility_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        let head = cursor.fragment().first();
+        let name_like = matches!(head, Some(b'\''))
+            || head.is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_');
+        if !name_like {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, calc_named_binding_inner)
 }
 

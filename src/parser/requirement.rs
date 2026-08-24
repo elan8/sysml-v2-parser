@@ -493,6 +493,17 @@ fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<Stakeho
 }
 
 fn stakeholder_shorthand_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"stakeholder") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, stakeholder_shorthand_member_inner)
 }
 
@@ -522,6 +533,17 @@ fn stakeholder_shorthand_member_inner(
 fn stakeholder_redefinition_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"stakeholder") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, stakeholder_redefinition_member_inner)
 }
 
@@ -566,6 +588,17 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 }
 
 fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"purpose") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, purpose_member_inner)
 }
 
