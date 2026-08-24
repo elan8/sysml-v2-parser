@@ -44,6 +44,11 @@ harness = false
 
 [profile.release]
 debug = 1
+# The parser is one deep tree of small generic nom closures; whole-program optimization is worth
+# ~19% on the snapshot corpus (`parser_profile`, `parser_bench`). Downstream crates set their own
+# profile, so this only affects binaries and benches built from this repository.
+lto = "fat"
+codegen-units = 1
 
 [profile.bench]
 debug = 1
