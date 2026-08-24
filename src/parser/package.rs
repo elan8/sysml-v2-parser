@@ -292,7 +292,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::Succession(_)
         | PackageBodyElement::ExhibitState(_)
         | PackageBodyElement::IncludeUseCase(_)
-        | PackageBodyElement::ExtendedDefinition(_) => RootElement::Member(boxed),
+        | PackageBodyElement::ExtendedDefinition(_)
+        | PackageBodyElement::ExtendedUsage(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -667,6 +668,27 @@ fn kerml_relationship_decl(
     crate::parser::span::reference_transaction(input, kerml_relationship_decl_inner)
 }
 
+/// Whether the next word is one of `Specialization`-family relationship keywords, which are not
+/// in the reserved-word table and would otherwise be read as the relationship's identification.
+fn relationship_keyword_follows(input: Input<'_>) -> bool {
+    let Ok((after_ws, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    [
+        &b"subtype"[..],
+        b"subclassifier",
+        b"typing",
+        b"subset",
+        b"redefinition",
+        b"disjoint",
+        b"inverse",
+        b"featuring",
+        b"conjugate",
+    ]
+    .iter()
+    .any(|keyword| starts_with_keyword(after_ws.fragment(), keyword))
+}
+
 fn kerml_relationship_decl_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
@@ -676,24 +698,55 @@ fn kerml_relationship_decl_inner(
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
 
     // Optional declaration-prefix keyword with its identification.
-    let (input, prefixed_identification) =
+    let (input, prefixed_identification, declaration_keyword_span) =
         if starts_with_keyword(input.fragment(), b"specialization") {
-            let (input, _) = tag(&b"specialization"[..]).parse(input)?;
+            let (input, (keyword_span, _)) =
+                crate::parser::span::with_span(tag(&b"specialization"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
-            let (input, identification) = crate::parser::lex::identification(input)?;
-            (input, Some(identification))
+            // `( 'specialization' Identification? )?`: the relationship keyword that follows is
+            // reserved and can never be the identification (`specialization subtype x :> y;`).
+            let (input, identification) = if relationship_keyword_follows(input) {
+                (input, None)
+            } else {
+                let (input, identification) = crate::parser::lex::identification(input)?;
+                (input, Some(identification))
+            };
+            (input, identification, Some(keyword_span))
         } else if starts_with_keyword(input.fragment(), b"disjoining") {
-            let (input, _) = tag(&b"disjoining"[..]).parse(input)?;
+            let (input, (keyword_span, _)) =
+                crate::parser::span::with_span(tag(&b"disjoining"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
-            let (input, identification) = crate::parser::lex::identification(input)?;
-            (input, Some(identification))
+            let (input, identification) = if relationship_keyword_follows(input) {
+                (input, None)
+            } else {
+                let (input, identification) = crate::parser::lex::identification(input)?;
+                (input, Some(identification))
+            };
+            (input, identification, Some(keyword_span))
+        } else if starts_with_keyword(input.fragment(), b"conjugation") {
+            let (input, (keyword_span, _)) =
+                crate::parser::span::with_span(tag(&b"conjugation"[..])).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, identification) = if relationship_keyword_follows(input) {
+                (input, None)
+            } else {
+                let (input, identification) = crate::parser::lex::identification(input)?;
+                (input, Some(identification))
+            };
+            (input, identification, Some(keyword_span))
         } else if starts_with_keyword(input.fragment(), b"inverting") {
-            let (input, _) = tag(&b"inverting"[..]).parse(input)?;
+            let (input, (keyword_span, _)) =
+                crate::parser::span::with_span(tag(&b"inverting"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
-            let (input, identification) = crate::parser::lex::identification(input)?;
-            (input, Some(identification))
+            let (input, identification) = if relationship_keyword_follows(input) {
+                (input, None)
+            } else {
+                let (input, identification) = crate::parser::lex::identification(input)?;
+                (input, Some(identification))
+            };
+            (input, identification, Some(keyword_span))
         } else {
-            (input, None)
+            (input, None, None)
         };
     let (input, _) = ws_and_comments(input)?;
 
@@ -722,6 +775,9 @@ fn kerml_relationship_decl_inner(
     } else if starts_with_keyword(input.fragment(), b"featuring") {
         let (input, _) = tag(&b"featuring"[..]).parse(input)?;
         (input, Kw::Featuring)
+    } else if starts_with_keyword(input.fragment(), b"conjugate") {
+        let (input, _) = tag(&b"conjugate"[..]).parse(input)?;
+        (input, Kw::Conjugate)
     } else {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -744,7 +800,7 @@ fn kerml_relationship_decl_inner(
             Kw::Typing => b"typing",
             Kw::Subset => b"subset",
             Kw::Redefinition => b"redefinition",
-            Kw::Disjoint | Kw::Inverse | Kw::Featuring => unreachable!(),
+            Kw::Disjoint | Kw::Inverse | Kw::Featuring | Kw::Conjugate => unreachable!(),
         };
         let (input, doubled) = opt(map(
             (
@@ -812,6 +868,10 @@ fn kerml_relationship_decl_inner(
             let (input, _) = ws1(input)?;
             input
         }
+        Kw::Conjugate => {
+            let (input, _) = crate::parser::lex::conjugates_operator(input)?;
+            input
+        }
     };
     let (input, target) =
         preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
@@ -823,6 +883,7 @@ fn kerml_relationship_decl_inner(
             input,
             crate::ast::KermlRelationshipDecl {
                 keyword,
+                declaration_keyword_span,
                 identification,
                 source,
                 target,
@@ -2251,6 +2312,18 @@ pub(crate) fn package_body_element(
         map(
             crate::parser::metadata_annotation::extended_definition,
             PackageBodyElement::ExtendedDefinition,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    // `ExtendedUsage` with a declaration (SysML BNF 341): `#systemdd name :> base { … }`,
+    // `#idd name;`. Ahead of the two `#` forms below, which own the empty-declaration and the
+    // prefix-member spellings; the parser refuses both, so they fall through untouched.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::extended_usage,
+            |usage| PackageBodyElement::ExtendedUsage(Box::new(usage)),
         )
         .parse(input)
     }) {

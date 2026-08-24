@@ -55,10 +55,6 @@ pub struct ExtendedDefinition {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
     /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
-    /// Whether the `def` keyword was authored: `true` for the `ExtendedDefinition` form
-    /// (`#situation def Failure;`), `false` for the bare extended-usage shorthand
-    /// (`#clouddd ArrowheadCore { ... }`, spec42 Gap 39).
-    pub has_def_keyword: bool,
     pub identification: Identification,
     /// Supertype after `:>`.
     pub specializes: Option<Node<TypingRelationship>>,
@@ -78,6 +74,36 @@ pub enum DefinitionPrefix {
 
 /// Body of a part definition: `;` or `{` PartDefBodyElement* `}`.
 pub type PartDefBody = Body<PartDefBodyElement>;
+
+/// `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix` (SysML BNF 299).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum UnextendedUsagePrefix {
+    End(crate::ast::EndUsagePrefix),
+    Basic(crate::ast::BasicUsagePrefix),
+}
+
+/// `ExtendedUsage : Usage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage` (SysML BNF 341;
+/// reference `SysML.xtext:728-730`): one or more `#Tag` keywords standing in place of a kind
+/// keyword, then an ordinary usage declaration, value and body -- `#systemdd service_registry_DD
+/// :> service_registry { #servicedd :>> serviceDiscovery : ServiceDiscoveryDD { #idd
+/// serviceDiscovery_HTTP; } }` (`AHFCoreLib.sysml`).
+///
+/// The empty-declaration spelling (`#Tag;`, `#Tag { … }`) is still
+/// [`MetadataKeywordUsage`] with a body, as every scope dispatches it; this node carries the
+/// spellings that declare something.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedUsage {
+    pub prefix: UnextendedUsagePrefix,
+    /// `UsageExtensionKeyword+`, in authored order; never empty.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
+    pub declaration: Node<crate::ast::UsageDeclaration>,
+    pub value: Option<Node<FeatureValue>>,
+    /// `UsageBody = DefinitionBody`, the same members a part usage body admits.
+    pub body: PartUsageBody,
+    pub membership: Membership,
+}
 
 /// Element inside a part definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -765,6 +791,8 @@ pub enum PartUsageBodyElement {
     /// `action` / `ref action` usage inside a part usage body.
     ActionUsage(Box<Node<ActionUsage>>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `ExtendedUsage` with a declaration; see [`ExtendedUsage`].
+    ExtendedUsage(Box<Node<ExtendedUsage>>),
     /// `variant` name `;` inside a variation part usage body.
     VariantUsage(Node<VariantUsage>),
     /// `state def` nested inside a part usage body (PAR-002: usage bodies legally contain
@@ -1384,16 +1412,6 @@ pub enum InterfaceDefBodyElement {
     ConstraintUsage(Box<Node<ConstraintUsage>>),
 }
 
-/// GH-53: the nested-usage kinds confirmed by real usage as an [`EndDecl`]'s target (see
-/// `EndDecl::nested_usage`'s doc comment). Only `occurrence`/`item` are evidenced; extend this
-/// only alongside a matching real-usage citation, not speculatively.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum EndNestedUsage {
-    Occurrence(Box<Node<OccurrenceUsage>>),
-    Item(Box<Node<ItemUsage>>),
-}
-
 /// The immediate declaration introducer after an `end` prefix.
 ///
 /// `ref` is the required keyword of the pinned `ReferenceUsage` production after its
@@ -1411,7 +1429,8 @@ pub enum EndDeclIntroducer {
 }
 
 /// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
-/// target | nested `occurrence`/`item` usage, see [`nested_usage`](EndDecl::nested_usage)) `;`.
+/// target) `;`. A kind-keyworded end (`end [1] part bead : TireBead;`) is not this node: it is the
+/// usage family's own node with an [`EndUsagePrefix`](crate::ast::EndUsagePrefix) head.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
@@ -1456,14 +1475,6 @@ pub struct EndDecl {
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// `crosses` cross-subsetting clause trailing the `: Type` typed form. `None` when absent.
     pub crosses: Option<Node<SubsettingRelationship>>,
-    /// GH-53: an alternative end-declaration form where the target is itself a complete, nested
-    /// kind-prefixed usage rather than a bare type/reference, e.g. `end theCauses [*] occurrence
-    /// theCause :> causes :>> source { ... }` (Systems Library `Domain Libraries/Cause and
-    /// Effect/CausationConnections.sysml`) / `end touchesToo [0..*] item touchedItemToo :>>
-    /// separateSpaceToo, thisOccurrence;` (`Items.sysml`). `theCauses`/`touchesToo` is still this
-    /// `EndDecl`'s declaration identity; the nested usage supplies this end's typing/structure instead of a
-    /// `:`/`::>` clause. `None` for the ordinary forms above.
-    pub nested_usage: Option<Box<EndNestedUsage>>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
     pub type_ref_span: Option<Span>,
 }
@@ -1472,6 +1483,10 @@ pub struct EndDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EndIdentity {
+    /// No label at all: `UsageDeclaration = Identification? …`, so `end : TireBead[1];`
+    /// (`Wheel Package - Updated.sysml`) and `end :>> source ::> producer.publicationPort;`
+    /// (`ServerSequenceRealization_2.sysml`) declare an end through its specialization alone.
+    Anonymous,
     /// Ordinary declaration label with its authored token span.
     Declaration(Node<String>),
     /// Fixed derivation role with its authored `#...` token span.
@@ -1499,7 +1514,6 @@ impl PartialEq for EndDecl {
             && self.multiplicity == other.multiplicity
             && self.redefines == other.redefines
             && self.crosses == other.crosses
-            && self.nested_usage == other.nested_usage
     }
 }
 
@@ -1524,6 +1538,11 @@ pub struct RefDecl {
     /// Previously parsed by `connector::ref_decl` and discarded, so formatting dropped the
     /// authored keyword.
     pub kind_keyword: Option<RefDeclKind>,
+    /// `UsageExtensionKeyword+` of `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
+    /// Usage` (reference `SysML.xtext:728-730`) after `ref`, or `OccurrenceUsagePrefix`'s
+    /// trailing run ahead of a kind keyword: `private ref #Classified #Security z1;`
+    /// (`MetadataTest.sysml`). Empty when none was authored.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
     pub name: String,
     pub short_name: Option<String>,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
@@ -1811,6 +1830,11 @@ pub enum EnumerationBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumeratedValue {
+    /// `UsageExtensionKeyword*` ahead of the optional keyword: `EnumeratedValue =
+    /// UsageExtensionKeyword* 'enum'? Usage` (reference `SysML.xtext:784-786`; the published
+    /// BNF 531 omits the run). `#Security enum secret : ClassificationLevel = 2;`
+    /// (`MetadataTest.sysml`).
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
     /// Authored optional `enum` keyword.  Its presence is syntactic provenance, not an inferred
     /// boolean; emission streams it only when the source contained it.
     pub enum_keyword_span: Option<Span>,
@@ -2203,6 +2227,9 @@ pub enum InterfaceUsageBodyElement {
     /// `end` member inside a typed, non-`connect` interface usage's body. Boxed: `EndDecl` is
     /// much larger than `RefRedef`, the other variant here.
     EndDecl(Box<Node<EndDecl>>),
+    /// `PortUsage = OccurrenceUsagePrefix 'port' Usage` with an `end` head: `end port p3 : P
+    /// ::> p.p1;` (`ConjugationTest.sysml`), reached through `UsageBody = DefinitionBody`.
+    PortUsage(Box<Node<PortUsage>>),
     /// A behavior occurrence usage in an interface body. `InterfaceOccurrenceUsageElement`
     /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
     /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.

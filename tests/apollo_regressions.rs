@@ -37,7 +37,7 @@ fn individual_part_definition_and_usage_parse_as_parts() {
 
     match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => {
-            assert!(usage.value.prefix.individual_span.is_some());
+            assert!(usage.value.prefix.individual_span().is_some());
             assert_eq!(usage.value.name, "crewMember");
         }
         other => panic!("expected individual part usage, got {other:?}"),
@@ -209,7 +209,7 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
         })
         .expect("timeslice should parse in part body");
     assert_eq!(
-        timeslice.prefix.portion.as_ref().map(|node| node.value),
+        timeslice.prefix.portion().map(|node| node.value),
         Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
     );
     let OccurrenceUsageBody::Brace { elements, .. } = &timeslice.body else {
@@ -223,7 +223,7 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
         })
         .expect("snapshot should parse in timeslice body");
     assert_eq!(
-        snapshot.prefix.portion.as_ref().map(|node| node.value),
+        snapshot.prefix.portion().map(|node| node.value),
         Some(sysml_v2_parser::OccurrencePortionKind::Snapshot)
     );
 }
@@ -261,20 +261,12 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         .collect();
     assert_eq!(occurrences.len(), 2);
     assert_eq!(
-        occurrences[0]
-            .prefix
-            .portion
-            .as_ref()
-            .map(|node| node.value),
+        occurrences[0].prefix.portion().map(|node| node.value),
         Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
     );
     assert!(occurrences[0].subsets.is_none());
     assert_eq!(
-        occurrences[1]
-            .prefix
-            .portion
-            .as_ref()
-            .map(|node| node.value),
+        occurrences[1].prefix.portion().map(|node| node.value),
         Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
     );
 
@@ -369,7 +361,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         .iter()
         .filter_map(|e| match &e.value {
             PartUsageBodyElement::PartUsage(usage)
-                if usage.value.prefix.individual_span.is_some() =>
+                if usage.value.prefix.individual_span().is_some() =>
             {
                 Some(&usage.value)
             }
@@ -923,7 +915,7 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         _ => panic!("expected individual part usage"),
     };
     assert_eq!(csm.name, "csm");
-    assert!(csm.prefix.individual_span.is_some());
+    assert!(csm.prefix.individual_span().is_some());
     assert!(csm.typing.is_some());
     assert!(csm.redefines.is_some());
     assert!(elements

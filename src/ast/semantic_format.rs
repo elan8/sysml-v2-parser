@@ -2304,6 +2304,45 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("))")
     }
 
+    fn write_extended_usage(&mut self, usage: &super::ExtendedUsage) -> io::Result<()> {
+        self.writer.write_str("(extended-usage (visibility ")?;
+        self.writer
+            .write_str(visibility_name(usage.membership.visibility))?;
+        self.writer.write_str(") (prefix ")?;
+        match &usage.prefix {
+            super::UnextendedUsagePrefix::End(end) => {
+                self.writer.write_str("(end (cross ")?;
+                match &end.cross {
+                    Some(cross) => {
+                        self.writer.write_char('(')?;
+                        self.write_basic_usage_prefix(&cross.value.prefix)?;
+                        self.writer.write_char(' ')?;
+                        self.write_usage_declaration(&cross.value.declaration.value)?;
+                        self.writer.write_char(')')?;
+                    }
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")?;
+            }
+            super::UnextendedUsagePrefix::Basic(basic) => self.write_basic_usage_prefix(basic)?,
+        }
+        self.writer.write_str(") (extensions")?;
+        for keyword in &usage.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str(") (declaration ")?;
+        self.write_usage_declaration(&usage.declaration.value)?;
+        self.writer.write_str(") (value ")?;
+        match &usage.value {
+            Some(value) => self.write_feature_value(&value.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_ref_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_extended_definition(
         &mut self,
         definition: &super::ExtendedDefinition,
@@ -2327,12 +2366,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
             None => self.writer.write_str("none")?,
         }
-        self.writer.write_str(") (def ")?;
-        self.writer.write_str(if definition.has_def_keyword {
-            "true"
-        } else {
-            "false"
-        })?;
         self.writer.write_str(") (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
         self.writer.write_str(") (specializes ")?;
@@ -2420,7 +2453,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_calc_definition(&mut self, definition: &super::CalcDef) -> io::Result<()> {
         self.writer.write_str("(calc-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&definition.body)?;
         self.writer.write_char(')')
@@ -2452,6 +2488,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (specializes ")?;
         match &declaration.specializes {
             Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (conjugates ")?;
+        match &declaration.conjugates {
+            Some(conjugation) => {
+                self.writer.write_str(match conjugation.value.spelling {
+                    super::ConjugationSpelling::Keyword => "(keyword ",
+                    super::ConjugationSpelling::Operator => "(operator ",
+                })?;
+                self.write_reference(conjugation.value.target)?;
+                self.writer.write_char(')')?;
+            }
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") ")?;
@@ -2659,7 +2707,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_constraint_definition(&mut self, definition: &super::ConstraintDef) -> io::Result<()> {
         self.writer.write_str("(constraint-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") (specializes ")?;
         match &definition.specializes {
             Some(typing) => self.write_typing(&typing.value)?,
@@ -3452,7 +3503,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             None => self.writer.write_str("none")?,
         }
         write!(self.writer, ") (constant {}))", declaration.is_constant)?;
-        self.writer.write_str(" (kind ")?;
+        self.writer.write_str(" (extensions")?;
+        for keyword in &declaration.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str(") (kind ")?;
         match declaration.kind_keyword {
             Some(kind) => self.writer.write_str(kind.as_str())?,
             None => self.writer.write_str("none")?,
@@ -3902,6 +3958,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::MetadataKeywordUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&member.value)?;
+                        }
+                        super::PartUsageBodyElement::ExtendedUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::VariantUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -4581,6 +4641,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_optional_quoted(self.writer, end.short_name.as_deref())?;
         self.writer.write_str(") (identity ")?;
         match &end.identity {
+            EndIdentity::Anonymous => self.writer.write_str("anonymous")?,
             EndIdentity::Declaration(name) => {
                 self.writer.write_str("(declaration (name ")?;
                 write_quoted(self.writer, &name.value)?;
@@ -4614,15 +4675,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_optional_subsetting("redefines", end.redefines.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("crosses", end.crosses.as_ref())?;
-        self.writer.write_str(" (nested-usage ")?;
-        match end.nested_usage.as_deref() {
-            Some(super::EndNestedUsage::Occurrence(usage)) => {
-                self.write_occurrence(&usage.value)?
-            }
-            Some(super::EndNestedUsage::Item(usage)) => self.write_item_usage(&usage.value)?,
-            None => self.writer.write_str("none")?,
-        }
-        self.writer.write_char(')')?;
         self.writer.write_char(')')
     }
 
@@ -4802,9 +4854,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
 
     fn write_connect(&mut self, connect: &super::Connect) -> io::Result<()> {
         self.writer.write_str("(connect (from ")?;
-        self.write_expression(&connect.from.value.expression)?;
+        self.write_connection_end(&connect.from.value)?;
         self.writer.write_str(") (to ")?;
-        self.write_expression(&connect.to.value.expression)?;
+        self.write_connection_end(&connect.to.value)?;
         self.writer.write_str(") ")?;
         self.write_ref_body(&connect.body)?;
         self.writer.write_str(" ")?;
@@ -4812,6 +4864,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", connect.redefines.as_ref())?;
         self.writer.write_char(')')
+    }
+
+    /// A `ConnectorEnd`: its declared name and operator spelling when authored, then the target.
+    fn write_connection_end(&mut self, end: &super::ConnectionEnd) -> io::Result<()> {
+        if let Some(declared) = &end.declared_name {
+            self.writer.write_str("(declared-name ")?;
+            write_quoted(self.writer, &declared.name.value)?;
+            self.writer.write_str(") (operator ")?;
+            self.writer.write_str(match declared.operator {
+                super::InterfaceEndReferenceOperator::Symbol { .. } => "::>",
+                super::InterfaceEndReferenceOperator::Keyword { .. } => "references",
+            })?;
+            self.writer.write_str(") ")?;
+        }
+        self.write_expression(&end.expression)
     }
 
     /// A KerML `binding` member owns a `TypeBody`; project it rather than reducing the member to
@@ -4942,6 +5009,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::PortUsage(port) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_usage(&port.value)?;
                         }
                         super::InterfaceUsageBodyElement::FlowUsage(flow) => {
                             self.write_item_prefix(&mut first)?;
@@ -5207,7 +5278,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     ) -> io::Result<()> {
         self.writer.write_str("(requirement-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_requirement_body(&definition.body)?;
         self.writer.write_char(')')
@@ -5221,9 +5295,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_quoted(self.writer, &usage.name)?;
         write!(
             self.writer,
-            ") (visibility {}) (abstract {}) (definition {}) (type ",
+            ") (visibility {}) (abstract {}) (individual {}) (definition {}) (type ",
             visibility_name(usage.membership.visibility),
             usage.is_abstract,
+            usage.is_individual,
             usage.is_definition,
         )?;
         if let Some(type_name) = usage.type_name {
@@ -5255,7 +5330,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, definition.identification.short_name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") (specializes ")?;
         match &definition.specializes {
             Some(specializes) => self.write_typing(&specializes.value)?,
@@ -5406,7 +5484,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_use_case_definition(&mut self, definition: &super::UseCaseDef) -> io::Result<()> {
         self.writer.write_str("(use-case-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_use_case_body(&definition.body)?;
         self.writer.write_char(')')
@@ -5415,7 +5496,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_state_definition(&mut self, definition: &super::StateDef) -> io::Result<()> {
         self.writer.write_str("(state-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
-        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_state_body(&definition.body)?;
         self.writer.write_char(')')
@@ -5448,7 +5532,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             let value_span = &value.span;
                             let value = &value.value;
-                            self.writer.write_str("(enum-value (enum-keyword ")?;
+                            self.writer.write_str("(enum-value (extensions")?;
+                            for keyword in &value.extension_keywords {
+                                self.writer.write_char(' ')?;
+                                self.write_reference(keyword.value.annotation)?;
+                            }
+                            self.writer.write_str(") (enum-keyword ")?;
                             self.writer
                                 .write_str(if value.enum_keyword_span.is_some() {
                                     "present"
@@ -5587,8 +5676,57 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         &mut self,
         prefix: &super::OccurrenceUsagePrefix,
     ) -> io::Result<()> {
-        let ref_prefix = &prefix.basic.ref_prefix;
-        self.writer.write_str("(prefix (direction ")?;
+        match &prefix.head {
+            super::OccurrenceUsagePrefixHead::End(end) => {
+                self.writer.write_str("(prefix (end (cross ")?;
+                match &end.cross {
+                    Some(cross) => {
+                        self.writer.write_char('(')?;
+                        self.write_basic_usage_prefix(&cross.value.prefix)?;
+                        self.writer.write_char(' ')?;
+                        self.write_usage_declaration(&cross.value.declaration.value)?;
+                        self.writer.write_char(')')?;
+                    }
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")?;
+            }
+            super::OccurrenceUsagePrefixHead::Basic {
+                basic,
+                individual_span,
+                portion,
+            } => {
+                self.writer.write_str("(prefix ")?;
+                self.write_basic_usage_prefix(basic)?;
+                write!(
+                    self.writer,
+                    " (individual {}) (portion ",
+                    individual_span.is_some()
+                )?;
+                match portion.as_ref().map(|node| node.value) {
+                    Some(super::OccurrencePortionKind::Snapshot) => {
+                        self.writer.write_str("snapshot")?
+                    }
+                    Some(super::OccurrencePortionKind::Timeslice) => {
+                        self.writer.write_str("timeslice")?
+                    }
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_char(')')?;
+            }
+        }
+        self.writer.write_str(" (extensions")?;
+        for keyword in &prefix.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str("))")
+    }
+
+    /// `BasicUsagePrefix`'s slots, each naming the alternative that was authored.
+    fn write_basic_usage_prefix(&mut self, basic: &super::BasicUsagePrefix) -> io::Result<()> {
+        let ref_prefix = &basic.ref_prefix;
+        self.writer.write_str("(direction ")?;
         self.write_direction(ref_prefix.direction.as_ref().map(|node| node.value))?;
         write!(
             self.writer,
@@ -5602,22 +5740,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         write!(
             self.writer,
-            ") (constant {}) (reference {}) (individual {}) (portion ",
+            ") (constant {}) (reference {})",
             ref_prefix.constant_span.is_some(),
-            prefix.basic.reference_span.is_some(),
-            prefix.individual_span.is_some()
-        )?;
-        match prefix.portion.as_ref().map(|node| node.value) {
-            Some(super::OccurrencePortionKind::Snapshot) => self.writer.write_str("snapshot")?,
-            Some(super::OccurrencePortionKind::Timeslice) => self.writer.write_str("timeslice")?,
-            None => self.writer.write_str("none")?,
-        }
-        self.writer.write_str(") (extensions")?;
-        for keyword in &prefix.extension_keywords {
-            self.writer.write_char(' ')?;
-            self.write_reference(keyword.value.annotation)?;
-        }
-        self.writer.write_str("))")
+            basic.reference_span.is_some(),
+        )
     }
 
     fn write_attribute_usage(&mut self, usage: &super::AttributeUsage) -> io::Result<()> {
@@ -6197,7 +6323,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-relationship (keyword ")?;
                 self.writer.write_str(relationship.value.keyword.as_str())?;
-                self.writer.write_str(") (source ")?;
+                write!(
+                    self.writer,
+                    ") (declaration-keyword {}) (source ",
+                    relationship.value.declaration_keyword_span.is_some()
+                )?;
                 self.write_reference(relationship.value.source)?;
                 self.writer.write_str(") (target ")?;
                 self.write_reference(relationship.value.target)?;
@@ -6294,6 +6424,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ExtendedDefinition(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_extended_definition(&definition.value)
+            }
+            PackageBodyElement::ExtendedUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_usage(&usage.value)
             }
             PackageBodyElement::Connect(connect) => {
                 self.write_item_prefix(first)?;

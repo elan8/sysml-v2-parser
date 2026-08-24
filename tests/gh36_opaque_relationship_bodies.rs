@@ -167,7 +167,12 @@ fn connection_ref_part_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected ref part usage");
-    assert!(part_usage.prefix.basic.reference_span.is_some());
+    assert!(part_usage
+        .prefix
+        .basic()
+        .expect("basic head")
+        .reference_span
+        .is_some());
     let PartUsageBody::Brace { elements, .. } = &part_usage.body else {
         panic!("expected brace part usage body");
     };

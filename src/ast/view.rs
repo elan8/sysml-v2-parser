@@ -21,6 +21,10 @@ pub struct ConstraintDef {
     /// authored keyword's exact span. `ConstraintDefinition` (SysML BNF 1378) reaches it through
     /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConstraintDefBody,
@@ -146,6 +150,10 @@ pub struct CalcDef {
     /// authored keyword's exact span. `CalculationDefinition` (SysML BNF 1351) reaches it through
     /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub identification: Identification,
     /// Supertype(s) after `:>`, e.g. `Some(..)` for `calc def X :> Y { }`. Mirrors
     /// `PartDef::specializes`/`ActionDef::specializes`.
@@ -378,6 +386,10 @@ pub struct ViewDef {
     /// authored keyword's exact span. `ViewDefinition` (SysML BNF 1580) reaches it through
     /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
     pub membership: Membership,
@@ -469,6 +481,10 @@ pub struct ViewpointDef {
     /// authored keyword's exact span. `ViewpointDefinition` (SysML BNF 1632) reaches it through
     /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RequirementDefBody,
     pub membership: Membership,
@@ -484,6 +500,10 @@ pub struct RenderingDef {
     /// authored keyword's exact span. `RenderingDefinition` (SysML BNF 1642) reaches it through
     /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
     pub membership: Membership,

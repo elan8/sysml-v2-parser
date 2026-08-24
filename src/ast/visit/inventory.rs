@@ -303,6 +303,16 @@ macro_rules! ast_traversal {
                 walk_extended_definition(self, node)
             }
 
+            /// Visits [`ExtendedUsage`]; the default implementation walks its children.
+            fn visit_extended_usage(&mut self, node: &$($mutability)? Node<ExtendedUsage>) {
+                walk_extended_usage(self, node)
+            }
+
+            /// Visits [`UnextendedUsagePrefix`]; the default implementation walks its children.
+            fn visit_unextended_usage_prefix(&mut self, node: &$($mutability)? UnextendedUsagePrefix) {
+                walk_unextended_usage_prefix(self, node)
+            }
+
             /// Visits [`DefinitionPrefix`]; the default implementation walks its children.
             fn visit_definition_prefix(&mut self, node: &$($mutability)? Node<DefinitionPrefix>) {
                 walk_definition_prefix(self, node)
@@ -498,10 +508,6 @@ macro_rules! ast_traversal {
                 walk_interface_def_body_element(self, node)
             }
 
-            /// Visits [`EndNestedUsage`]; the default implementation walks its children.
-            fn visit_end_nested_usage(&mut self, node: &$($mutability)? EndNestedUsage) {
-                walk_end_nested_usage(self, node)
-            }
 
             /// Visits [`EndDecl`]; the default implementation walks its children.
             fn visit_end_decl(&mut self, node: &$($mutability)? Node<EndDecl>) {
@@ -656,6 +662,21 @@ macro_rules! ast_traversal {
             /// Visits [`OccurrenceUsagePrefix`]; the default implementation walks its children.
             fn visit_occurrence_usage_prefix(&mut self, node: &$($mutability)? OccurrenceUsagePrefix) {
                 walk_occurrence_usage_prefix(self, node)
+            }
+
+            /// Visits [`OccurrenceUsagePrefixHead`]; the default implementation walks its children.
+            fn visit_occurrence_usage_prefix_head(&mut self, node: &$($mutability)? OccurrenceUsagePrefixHead) {
+                walk_occurrence_usage_prefix_head(self, node)
+            }
+
+            /// Visits [`EndUsagePrefix`]; the default implementation walks its children.
+            fn visit_end_usage_prefix(&mut self, node: &$($mutability)? EndUsagePrefix) {
+                walk_end_usage_prefix(self, node)
+            }
+
+            /// Visits [`OwnedCrossUsage`]; the default implementation walks its children.
+            fn visit_owned_cross_usage(&mut self, node: &$($mutability)? Node<OwnedCrossUsage>) {
+                walk_owned_cross_usage(self, node)
             }
 
             /// Visits [`FeaturePortionKind`]; the default implementation walks its children.
@@ -1894,7 +1915,11 @@ macro_rules! ast_traversal {
         pub fn walk_connection_end<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectionEnd>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectionEnd { expression, multiplicity, span } = &$($mutability)? node.value;
+            let ConnectionEnd { declared_name, expression, multiplicity, span } = &$($mutability)? node.value;
+            if let Some(inner) = declared_name {
+                visitor.visit_span(&$($mutability)? inner.name.span);
+                visitor.visit_text(&$($mutability)? inner.name.value);
+            }
             visitor.visit_expression(expression);
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -2510,6 +2535,9 @@ macro_rules! ast_traversal {
                 PackageBodyElement::ExtendedDefinition(field_0) => {
                     visitor.visit_extended_definition(field_0);
                 }
+                PackageBodyElement::ExtendedUsage(field_0) => {
+                    visitor.visit_extended_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -2531,17 +2559,44 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_extended_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedUsage>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let ExtendedUsage { prefix, extension_keywords, declaration, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_unextended_usage_prefix(prefix);
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
+            visitor.visit_usage_declaration(declaration);
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
+            }
+            visitor.visit_part_usage_body(body);
+            visitor.visit_membership(membership);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_unextended_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? UnextendedUsagePrefix) {
+            match node {
+                UnextendedUsagePrefix::End(field_0) => {
+                    visitor.visit_end_usage_prefix(field_0);
+                }
+                UnextendedUsagePrefix::Basic(field_0) => {
+                    visitor.visit_basic_usage_prefix(field_0);
+                }
+            }
+        }
+
         pub fn walk_extended_definition<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedDefinition>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExtendedDefinition { prefix_keywords, definition_prefix, has_def_keyword, identification, specializes, body } = &$($mutability)? node.value;
+            let ExtendedDefinition { prefix_keywords, definition_prefix, identification, specializes, body } = &$($mutability)? node.value;
             for inner in prefix_keywords {
                 visitor.visit_metadata_keyword_usage(inner);
             }
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
-            let _ = has_def_keyword;
             visitor.visit_identification(identification);
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
@@ -3248,6 +3303,9 @@ macro_rules! ast_traversal {
                 PartUsageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                PartUsageBodyElement::ExtendedUsage(field_0) => {
+                    visitor.visit_extended_usage(&$($mutability)? **field_0);
+                }
                 PartUsageBodyElement::VariantUsage(field_0) => {
                     visitor.visit_variant_usage(field_0);
                 }
@@ -3872,21 +3930,10 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_end_nested_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndNestedUsage) {
-            match node {
-                EndNestedUsage::Occurrence(field_0) => {
-                    visitor.visit_occurrence_usage(&$($mutability)? **field_0);
-                }
-                EndNestedUsage::Item(field_0) => {
-                    visitor.visit_item_usage(&$($mutability)? **field_0);
-                }
-            }
-        }
-
         pub fn walk_end_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EndDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EndDecl { ref_prefix, introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, nested_usage, type_ref_span } = &$($mutability)? node.value;
+            let EndDecl { ref_prefix, introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, type_ref_span } = &$($mutability)? node.value;
             visitor.visit_ref_prefix(ref_prefix);
             visitor.visit_end_decl_introducer(introducer);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
@@ -3905,9 +3952,6 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = crosses {
                 visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = nested_usage {
-                visitor.visit_end_nested_usage(&$($mutability)? **inner);
             }
             if let Some(inner) = type_ref_span {
                 visitor.visit_span(inner);
@@ -3929,6 +3973,7 @@ macro_rules! ast_traversal {
 
         pub fn walk_end_identity<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndIdentity) {
             match node {
+                EndIdentity::Anonymous => {}
                 EndIdentity::Declaration(field_0) => {
                     visitor.visit_span(&$($mutability)? field_0.span);
                     visitor.visit_text(&$($mutability)? field_0.value);
@@ -3952,7 +3997,10 @@ macro_rules! ast_traversal {
         pub fn walk_ref_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RefDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RefDecl { direction, is_derived, usage_prefix, is_constant, kind_keyword, name, short_name, typing, redefines, subsets, multiplicity, multiplicity_modifiers, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let RefDecl { direction, is_derived, usage_prefix, is_constant, kind_keyword, extension_keywords, name, short_name, typing, redefines, subsets, multiplicity, multiplicity_modifiers, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
@@ -4223,7 +4271,7 @@ macro_rules! ast_traversal {
         pub fn walk_enumerated_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumeratedValue>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumeratedValue { enum_keyword_span, identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
+            let EnumeratedValue { extension_keywords, enum_keyword_span, identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             visitor.visit_span(identification_span);
             if let Some(inner) = typing {
@@ -4255,6 +4303,9 @@ macro_rules! ast_traversal {
                 visitor.visit_feature_value(inner);
             }
             visitor.visit_part_usage_body(body);
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
             if let Some(inner) = enum_keyword_span {
                 visitor.visit_span(inner);
             }
@@ -4410,17 +4461,45 @@ macro_rules! ast_traversal {
         }
 
         pub fn walk_occurrence_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsagePrefix) {
-            let OccurrenceUsagePrefix { basic, individual_span, portion, extension_keywords } = node;
-            visitor.visit_basic_usage_prefix(basic);
-            if let Some(inner) = individual_span {
-                visitor.visit_span(inner);
-            }
-            if let Some(inner) = portion {
-                visitor.visit_occurrence_portion_kind(inner);
-            }
+            let OccurrenceUsagePrefix { head, extension_keywords } = node;
+            visitor.visit_occurrence_usage_prefix_head(head);
             for inner in extension_keywords {
                 visitor.visit_usage_extension_keyword(inner);
             }
+        }
+
+        pub fn walk_occurrence_usage_prefix_head<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsagePrefixHead) {
+            match node {
+                OccurrenceUsagePrefixHead::End(field_0) => {
+                    visitor.visit_end_usage_prefix(field_0);
+                }
+                OccurrenceUsagePrefixHead::Basic { basic, individual_span, portion } => {
+                    visitor.visit_basic_usage_prefix(basic);
+                    if let Some(inner) = individual_span {
+                        visitor.visit_span(inner);
+                    }
+                    if let Some(inner) = portion {
+                        visitor.visit_occurrence_portion_kind(inner);
+                    }
+                }
+            }
+        }
+
+        pub fn walk_end_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndUsagePrefix) {
+            let EndUsagePrefix { end_span, cross } = node;
+            visitor.visit_span(end_span);
+            if let Some(inner) = cross {
+                visitor.visit_owned_cross_usage(inner);
+            }
+        }
+
+        pub fn walk_owned_cross_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<OwnedCrossUsage>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let OwnedCrossUsage { prefix, declaration } = &$($mutability)? node.value;
+            visitor.visit_basic_usage_prefix(prefix);
+            visitor.visit_usage_declaration(declaration);
+            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_feature_portion_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeaturePortionKind>) {
@@ -4807,6 +4886,9 @@ macro_rules! ast_traversal {
                 }
                 InterfaceUsageBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(&$($mutability)? **field_0);
+                }
+                InterfaceUsageBodyElement::PortUsage(field_0) => {
+                    visitor.visit_port_usage(field_0);
                 }
                 InterfaceUsageBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
@@ -6053,11 +6135,12 @@ macro_rules! ast_traversal {
         pub fn walk_requirement_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequirementDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequirementDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let RequirementDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6552,10 +6635,11 @@ macro_rules! ast_traversal {
         pub fn walk_concern_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConcernUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConcernUsage { name, name_span, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
+            let ConcernUsage { name, name_span, is_abstract, is_individual, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
             visitor.visit_span(name_span);
             let _ = is_abstract;
+            let _ = is_individual;
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
@@ -6577,11 +6661,12 @@ macro_rules! ast_traversal {
         pub fn walk_case_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CaseDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CaseDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let CaseDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6653,11 +6738,12 @@ macro_rules! ast_traversal {
         pub fn walk_verification_case_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerificationCaseDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VerificationCaseDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let VerificationCaseDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6717,11 +6803,12 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let UseCaseDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7061,11 +7148,12 @@ macro_rules! ast_traversal {
         pub fn walk_constraint_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConstraintDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConstraintDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ConstraintDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7162,11 +7250,12 @@ macro_rules! ast_traversal {
         pub fn walk_calc_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let CalcDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7340,11 +7429,12 @@ macro_rules! ast_traversal {
         pub fn walk_view_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ViewDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7464,11 +7554,12 @@ macro_rules! ast_traversal {
         pub fn walk_viewpoint_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewpointDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewpointDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ViewpointDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7480,11 +7571,12 @@ macro_rules! ast_traversal {
         pub fn walk_rendering_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RenderingDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RenderingDef { definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let RenderingDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
             visitor.visit_identification(identification);
+            let _ = is_individual;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -7992,7 +8084,10 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_relationship_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlRelationshipDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlRelationshipDecl { keyword, identification, source, target, body, membership } = &$($mutability)? node.value;
+            let KermlRelationshipDecl { keyword, declaration_keyword_span, identification, source, target, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = declaration_keyword_span {
+                visitor.visit_span(inner);
+            }
             visitor.visit_kerml_relationship_keyword(keyword);
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
@@ -8018,6 +8113,7 @@ macro_rules! ast_traversal {
                 KermlRelationshipKeyword::Disjoint => {}
                 KermlRelationshipKeyword::Inverse => {}
                 KermlRelationshipKeyword::Featuring => {}
+                KermlRelationshipKeyword::Conjugate => {}
             }
         }
 

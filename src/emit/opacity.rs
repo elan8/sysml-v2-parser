@@ -4,7 +4,7 @@ use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
     AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
     ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
-    DefinitionBodyElement, EndDeclIntroducer, EndNestedUsage, FirstMergeBody, InterfaceDefBody,
+    DefinitionBodyElement, EndDeclIntroducer, FirstMergeBody, InterfaceDefBody,
     InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, LibraryPackage,
     OccurrenceBodyElement, OccurrenceUsageBody, Package, PackageBody, PackageBodyElement,
     PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement, Perform,
@@ -217,6 +217,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         }
         PackageBodyElement::ExtendedDefinition(definition) => {
             walk_package_body(report, path, &definition.value.body)
+        }
+        PackageBodyElement::ExtendedUsage(usage) => {
+            walk_part_usage_body(report, path, &usage.value.body)
         }
         PackageBodyElement::Satisfy(s) => walk_satisfy(report, path, &s.value),
         PackageBodyElement::Import(i) => {
@@ -671,6 +674,9 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PartUsageBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
+            }
+            PartUsageBodyElement::ExtendedUsage(n) => {
+                walk_part_usage_body(report, &p, &n.value.body)
             }
             PartUsageBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             PartUsageBodyElement::StateDef(n) => walk_state_def_body(report, &p, &n.value.body),
@@ -1703,6 +1709,9 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
             InterfaceUsageBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             InterfaceUsageBodyElement::RefRedef { body, .. } => walk_ref_body(report, &p, body),
             InterfaceUsageBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
+            InterfaceUsageBodyElement::PortUsage(port) => {
+                walk_port_body(report, &p, &port.value.body)
+            }
             InterfaceUsageBodyElement::FlowUsage(flow) => walk_flow_usage(report, &p, &flow.value),
             InterfaceUsageBodyElement::Perform(perform) => walk_perform(report, &p, &perform.value),
             InterfaceUsageBodyElement::Annotating(member) => {
@@ -1712,18 +1721,11 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
     }
 }
 
-fn walk_end_decl(report: &mut OpacityReport, path: &str, end: &crate::ast::EndDecl) {
+fn walk_end_decl(_report: &mut OpacityReport, _path: &str, end: &crate::ast::EndDecl) {
     match &end.introducer {
         EndDeclIntroducer::Bare => {}
         EndDeclIntroducer::Reference { .. } => {}
         EndDeclIntroducer::KerMLFeature { .. } => {}
-    }
-    match end.nested_usage.as_deref() {
-        Some(EndNestedUsage::Occurrence(occurrence)) => {
-            walk_occurrence_usage_body(report, path, &occurrence.value.body)
-        }
-        Some(EndNestedUsage::Item(item)) => walk_attribute_body(report, path, &item.value.body),
-        None => {}
     }
 }
 

@@ -20,8 +20,9 @@
 //! input it does not record.
 
 use crate::ast::{
-    BasicUsagePrefix, DefinitionPrefix, InOut, Node, OccurrencePortionKind, OccurrenceUsagePrefix,
-    RefPrefix, Span, UsageExtensionKeyword,
+    BasicUsagePrefix, DefinitionPrefix, EndUsagePrefix, InOut, Node, OccurrencePortionKind,
+    OccurrenceUsagePrefix, OccurrenceUsagePrefixHead, OwnedCrossUsage, RefPrefix, Span,
+    UsageExtensionKeyword,
 };
 use crate::parser::lex::{starts_with_keyword, ws_and_comments};
 use crate::parser::span::with_span;
@@ -237,7 +238,10 @@ pub(crate) fn starts_contended_prefix(input: Input<'_>) -> bool {
             return false;
         };
         let fragment = after_ws.fragment();
-        if fragment.starts_with(b"#") || starts_with_keyword(fragment, b"ref") {
+        if fragment.starts_with(b"#")
+            || starts_with_keyword(fragment, b"ref")
+            || starts_with_keyword(fragment, b"end")
+        {
             return true;
         }
         let Some(keyword) = UNCONTENDED_SLOTS
@@ -285,7 +289,8 @@ pub(crate) fn next_word_is_reserved(input: Input<'_>) -> bool {
 const fn prefix_slot_first_bytes() -> [bool; 256] {
     let mut table = [false; 256];
     table[b'#' as usize] = true;
-    let keywords: [&[u8]; 11] = [
+    let keywords: [&[u8]; 12] = [
+        b"end",
         b"in",
         b"out",
         b"inout",
@@ -326,6 +331,82 @@ fn starts_a_prefix_slot(fragment: &[u8]) -> bool {
 /// qualified name. Callers therefore run this inside
 /// [`reference_transaction`](crate::parser::span::reference_transaction), which rolls the arena
 /// back when the owning production is refused.
+/// `OwnedCrossFeature : ReferenceUsage = BasicUsagePrefix UsageDeclaration` (SysML BNF 293),
+/// the declaration `OwnedCrossFeatureMember` hangs between `end` and the owning usage's kind
+/// keyword.
+///
+/// Fails -- consuming nothing -- when nothing stands between `end` and a reserved keyword, so a
+/// bare `end port p : P;` keeps an empty cross slot, and when what follows the declaration is
+/// not a reserved keyword, so the keyword-less `end p1 : P;` is left to `DefaultReferenceUsage`
+/// untouched. Takes trivia-free input and returns trivia-free input.
+fn owned_cross_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OwnedCrossUsage>> {
+    let start = input;
+    let (input, prefix) = basic_usage_prefix(input);
+    // A reserved keyword can never be an unquoted declaration name, so a kind keyword right
+    // after the prefix means the cross feature has no identification.
+    let (input, declaration) = if next_word_is_reserved(input) {
+        crate::parser::usage::usage_declaration_without_identification(input)?
+    } else {
+        crate::parser::usage::usage_declaration(input)?
+    };
+    // A cross feature is a declaration: a bare prefix (`end derived part p : T;`) is a prefix
+    // keyword in a position no production spells, which the owning scope reports as
+    // `end_feature_invalid_prefix`, not a nameless cross feature.
+    if !usage_declaration_is_authored(&declaration.value) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (rest, _) = ws_and_comments(input)?;
+    if !next_word_is_reserved(rest) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((
+        rest,
+        node_from_to(
+            start,
+            input,
+            OwnedCrossUsage {
+                prefix,
+                declaration,
+            },
+        ),
+    ))
+}
+
+fn usage_declaration_is_authored(declaration: &crate::ast::UsageDeclaration) -> bool {
+    declaration.identification.name.is_some()
+        || declaration.identification.short_name.is_some()
+        || declaration.typing.is_some()
+        || declaration.multiplicity.is_some()
+        || declaration.multiplicity_modifiers.is_authored()
+        || declaration.subsets.is_some()
+        || declaration.redefines.is_some()
+        || declaration.references.is_some()
+        || declaration.crosses.is_some()
+        || declaration.intersects.is_some()
+}
+
+/// `EndUsagePrefix : Usage = isEnd ?= 'end' ( ownedRelationship += OwnedCrossFeatureMember )?`
+/// (SysML BNF 285). Returns `None`, consuming nothing, when `end` does not lead. Takes
+/// trivia-free input.
+fn end_usage_prefix(input: Input<'_>) -> (Input<'_>, Option<EndUsagePrefix>) {
+    let Some((rest, end_span)) = slot_keyword(input, b"end") else {
+        return (input, None);
+    };
+    // The cross feature owns qualified references, so a failed attempt rolls its arena work
+    // back rather than leaking entries the accepted syntax never named.
+    let (rest, cross) = match crate::parser::span::reference_transaction(rest, owned_cross_usage) {
+        Ok((rest, cross)) => (rest, Some(Box::new(cross))),
+        Err(_) => (rest, None),
+    };
+    (rest, Some(EndUsagePrefix { end_span, cross }))
+}
+
 pub(crate) fn occurrence_usage_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, OccurrenceUsagePrefix> {
@@ -335,18 +416,33 @@ pub(crate) fn occurrence_usage_prefix(
     if !starts_a_prefix_slot(input.fragment()) {
         return Ok((input, OccurrenceUsagePrefix::default()));
     }
-    let (input, basic) = basic_usage_prefix(input);
-    let (input, individual_span) = match slot_keyword(input, b"individual") {
-        Some((rest, span)) => (rest, Some(span)),
-        None => (input, None),
+    // `EndUsagePrefix | BasicUsagePrefix ( 'individual' )? ( PortionKind )?` -- a choice, so the
+    // basic slots are never probed once `end` has led (reference `SysML.xtext:836-843`).
+    let (input, head) = match end_usage_prefix(input) {
+        (rest, Some(end)) => (rest, OccurrenceUsagePrefixHead::End(end)),
+        (input, None) => {
+            let (input, basic) = basic_usage_prefix(input);
+            let (input, individual_span) = match slot_keyword(input, b"individual") {
+                Some((rest, span)) => (rest, Some(span)),
+                None => (input, None),
+            };
+            let (input, portion) = optional_alternative(
+                input,
+                [
+                    (&b"snapshot"[..], OccurrencePortionKind::Snapshot),
+                    (&b"timeslice"[..], OccurrencePortionKind::Timeslice),
+                ],
+            );
+            (
+                input,
+                OccurrenceUsagePrefixHead::Basic {
+                    basic,
+                    individual_span,
+                    portion,
+                },
+            )
+        }
     };
-    let (input, portion) = optional_alternative(
-        input,
-        [
-            (&b"snapshot"[..], OccurrencePortionKind::Snapshot),
-            (&b"timeslice"[..], OccurrencePortionKind::Timeslice),
-        ],
-    );
     let mut input = input;
     let mut extension_keywords = Vec::new();
     while input.fragment().starts_with(b"#") {
@@ -362,9 +458,7 @@ pub(crate) fn occurrence_usage_prefix(
     Ok((
         input,
         OccurrenceUsagePrefix {
-            basic,
-            individual_span,
-            portion,
+            head,
             extension_keywords,
         },
     ))
@@ -387,10 +481,58 @@ mod tests {
     }
 
     #[test]
+    fn an_end_head_keeps_its_cross_feature_and_excludes_the_basic_slots() {
+        let text = "end theCauses [*] occurrence theCause;";
+        let (rest, prefix) = occurrence_usage_prefix(input(text)).expect("prefix");
+        let end = prefix.end().expect("an `end` head");
+        assert_eq!(
+            &text[end.end_span.offset..end.end_span.offset + end.end_span.len],
+            "end"
+        );
+        let cross = end.cross.as_deref().expect("a cross feature");
+        assert_eq!(
+            &text[cross.span.offset..cross.span.offset + cross.span.len],
+            "theCauses [*]"
+        );
+        assert_eq!(
+            cross.value.declaration.value.identification.name.as_deref(),
+            Some("theCauses")
+        );
+        assert!(cross.value.declaration.value.multiplicity.is_some());
+        assert!(prefix.basic().is_none());
+        assert!(prefix.individual_span().is_none());
+        assert!(rest.fragment().starts_with(b"occurrence"));
+    }
+
+    #[test]
+    fn an_end_head_with_nothing_before_the_keyword_owns_no_cross_feature() {
+        let text = "end port p : P;";
+        let (rest, prefix) = occurrence_usage_prefix(input(text)).expect("prefix");
+        assert!(prefix.end().expect("an `end` head").cross.is_none());
+        assert!(rest.fragment().starts_with(b"port"));
+    }
+
+    #[test]
+    fn a_keyword_less_end_leaves_its_declaration_for_the_default_reference_usage() {
+        let text = "end p1 : P;";
+        let (rest, prefix) = occurrence_usage_prefix(input(text)).expect("prefix");
+        assert!(prefix.end().expect("an `end` head").cross.is_none());
+        assert!(rest.fragment().starts_with(b"p1"));
+    }
+
+    #[test]
+    fn a_bare_prefix_after_end_is_not_a_cross_feature() {
+        let text = "end derived part p : T;";
+        let (rest, prefix) = occurrence_usage_prefix(input(text)).expect("prefix");
+        assert!(prefix.end().expect("an `end` head").cross.is_none());
+        assert!(rest.fragment().starts_with(b"derived"));
+    }
+
+    #[test]
     fn every_slot_keeps_its_authored_span() {
         let text = "in derived variation constant ref individual timeslice occurrence o1;";
         let (_, prefix) = occurrence_usage_prefix(input(text)).expect("prefix");
-        let basic = &prefix.basic;
+        let basic = prefix.basic().expect("basic head");
         let ref_prefix = &basic.ref_prefix;
         let slice = |span: &Span| &text[span.offset..span.offset + span.len];
         assert_eq!(
@@ -413,12 +555,9 @@ mod tests {
             Some("constant")
         );
         assert_eq!(basic.reference_span.as_ref().map(slice), Some("ref"));
+        assert_eq!(prefix.individual_span().map(slice), Some("individual"));
         assert_eq!(
-            prefix.individual_span.as_ref().map(slice),
-            Some("individual")
-        );
-        assert_eq!(
-            prefix.portion.as_ref().map(|n| (n.value, slice(&n.span))),
+            prefix.portion().map(|n| (n.value, slice(&n.span))),
             Some((OccurrencePortionKind::Timeslice, "timeslice"))
         );
     }
@@ -429,8 +568,8 @@ mod tests {
         // owning production has to fail on it rather than accept a reordered prefix.
         let (rest, prefix) = occurrence_usage_prefix(input("individual ref occurrence o1;"))
             .expect("prefix never fails");
-        assert!(prefix.individual_span.is_some());
-        assert!(prefix.basic.reference_span.is_none());
+        assert!(prefix.individual_span().is_some());
+        assert!(prefix.basic().expect("basic head").reference_span.is_none());
         assert!(rest.fragment().starts_with(b"ref occurrence"));
     }
 
@@ -439,7 +578,7 @@ mod tests {
         let (rest, prefix) =
             occurrence_usage_prefix(input("snapshot timeslice t;")).expect("prefix");
         assert_eq!(
-            prefix.portion.as_ref().map(|n| n.value),
+            prefix.portion().map(|n| n.value),
             Some(OccurrencePortionKind::Snapshot)
         );
         assert!(rest.fragment().starts_with(b"timeslice"));
@@ -463,8 +602,18 @@ mod tests {
     fn a_comment_between_two_slots_is_trivia() {
         let (rest, prefix) =
             occurrence_usage_prefix(input("in /* why */ derived occurrence o1;")).expect("prefix");
-        assert!(prefix.basic.ref_prefix.direction.is_some());
-        assert!(prefix.basic.ref_prefix.derived_span.is_some());
+        assert!(prefix
+            .basic()
+            .expect("basic head")
+            .ref_prefix
+            .direction
+            .is_some());
+        assert!(prefix
+            .basic()
+            .expect("basic head")
+            .ref_prefix
+            .derived_span
+            .is_some());
         assert!(rest.fragment().starts_with(b"occurrence"));
     }
 

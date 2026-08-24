@@ -97,6 +97,7 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
         input,
         DefinitionPrefixOptions::new(b"requirement")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = requirement_def_body(input)?;
@@ -106,6 +107,7 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
             start,
             input,
             RequirementDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 definition_prefix: prefix.basic_prefix,
@@ -1252,6 +1254,8 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, individual_kw) =
+        nom::combinator::opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
@@ -1262,6 +1266,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
         name: ident,
         name_span,
         is_abstract: abstract_kw.is_some(),
+        is_individual: individual_kw.is_some(),
         type_name: header.type_reference,
         multiplicity: header.multiplicity,
         subsets: header.subsets,

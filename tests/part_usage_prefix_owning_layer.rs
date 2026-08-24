@@ -332,11 +332,11 @@ fn a_part_prefix_span_outside_its_own_declaration_is_rejected() {
             .document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
     let first = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                 /value/PartUsage/value/prefix/individual_span/offset";
+                 /value/PartUsage/value/prefix/head/Basic/individual_span/offset";
     let second_offset = tampered
         .pointer(
             "/root/elements/0/value/Package/value/body/Brace/elements/1\
-             /value/PartUsage/value/prefix/individual_span/offset",
+             /value/PartUsage/value/prefix/head/Basic/individual_span/offset",
         )
         .cloned()
         .expect("the second usage's `individual` keyword offset");

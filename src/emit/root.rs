@@ -73,9 +73,7 @@ fn emit_extended_definition(
         structure::emit_metadata_keyword_usage(w, path, &keyword.value)?;
         w.push_char(' ');
     }
-    if def.has_def_keyword {
-        w.push_str("def ");
-    }
+    w.push_str("def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
         structure::emit_typing_clause(w, &spec.value)?;
@@ -136,29 +134,30 @@ fn emit_kerml_relationship_decl(
     use crate::ast::KermlRelationshipKeyword as Kw;
     emit_visibility(w, decl.membership.visibility);
     // The prefix keyword and identification placement depend on the relationship family.
-    match decl.keyword {
+    let declaration_keyword = match decl.keyword {
         Kw::Subtype | Kw::Subclassifier | Kw::Typing | Kw::Subset | Kw::Redefinition => {
+            Some("specialization ")
+        }
+        Kw::Disjoint => Some("disjoining "),
+        Kw::Inverse => Some("inverting "),
+        Kw::Conjugate => Some("conjugation "),
+        Kw::Featuring => None,
+    };
+    if let Some(declaration_keyword) = declaration_keyword {
+        if decl.declaration_keyword_span.is_some() {
+            w.push_str(declaration_keyword);
             if let Some(identification) = &decl.identification {
-                w.push_str("specialization ");
                 emit_identification(w, identification);
                 w.push_char(' ');
             }
+        } else if let Some(identification) = &decl.identification {
+            // The doubled spelling names the identification with the relationship's own
+            // keyword: `typing t1 typing f typed by B;` (`kerml/coverage_relationships`).
+            w.push_str(decl.keyword.as_str());
+            w.push_char(' ');
+            emit_identification(w, identification);
+            w.push_char(' ');
         }
-        Kw::Disjoint => {
-            if let Some(identification) = &decl.identification {
-                w.push_str("disjoining ");
-                emit_identification(w, identification);
-                w.push_char(' ');
-            }
-        }
-        Kw::Inverse => {
-            if let Some(identification) = &decl.identification {
-                w.push_str("inverting ");
-                emit_identification(w, identification);
-                w.push_char(' ');
-            }
-        }
-        Kw::Featuring => {}
     }
     w.push_str(decl.keyword.as_str());
     w.push_char(' ');
@@ -177,6 +176,7 @@ fn emit_kerml_relationship_decl(
         Kw::Disjoint => " from ",
         Kw::Inverse => " of ",
         Kw::Featuring => " by ",
+        Kw::Conjugate => " conjugates ",
     });
     w.push_qualified_reference(&format!("{path}/target"), decl.target)?;
     // Annotation-only RelationshipBody; `None` is the `;` form. Annotations inside the brace
@@ -223,6 +223,13 @@ pub(crate) fn emit_kerml_classifier_decl(
     }
     if let Some(spec) = &decl.specializes {
         structure::emit_typing_clause(w, &spec.value)?;
+    }
+    if let Some(conjugation) = &decl.conjugates {
+        w.push_str(match conjugation.value.spelling {
+            crate::ast::ConjugationSpelling::Keyword => " conjugates ",
+            crate::ast::ConjugationSpelling::Operator => " ~ ",
+        });
+        w.push_qualified_reference(&format!("{path}/conjugates"), conjugation.value.target)?;
     }
     for (index, clause) in decl.type_relationships.iter().enumerate() {
         w.push_char(' ');
@@ -362,6 +369,7 @@ pub(crate) fn emit_package_body_element(
             requirement::emit_include_use_case(w, path, &i.value)
         }
         PackageBodyElement::ExtendedDefinition(d) => emit_extended_definition(w, path, &d.value),
+        PackageBodyElement::ExtendedUsage(u) => structure::emit_extended_usage(w, path, &u.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

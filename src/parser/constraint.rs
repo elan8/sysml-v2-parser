@@ -44,7 +44,8 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
         input,
         DefinitionPrefixOptions::new(b"constraint")
             .with_captured_visibility()
-            .def_required(),
+            .def_required()
+            .individual_allowed(),
     )?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
@@ -53,6 +54,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             start,
             input,
             ConstraintDef {
+                is_individual: prefix.is_individual,
                 definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -430,7 +432,9 @@ pub(crate) fn calc_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Cal
 
 fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"calc").with_captured_visibility();
+    let mut options = DefinitionPrefixOptions::new(b"calc")
+        .with_captured_visibility()
+        .individual_allowed();
     if require_def {
         options = options.def_required();
     }
@@ -442,6 +446,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             start,
             input,
             CalcDef {
+                is_individual: prefix.is_individual,
                 definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -983,31 +988,22 @@ fn calc_named_binding_inner(
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, typing) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let before = input;
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-            let span = crate::parser::span_from_to(before, input);
-            (
-                input,
-                Some(crate::ast::Node::new(
-                    span.clone(),
-                    crate::ast::TypingRelationship {
-                        target: vec![target],
-                        kind: crate::ast::TypingKind::Typing,
-                        span,
-                        is_conjugated: false,
-                        is_implied: false,
-                        spelling: crate::ast::TypingSpelling::Operator,
-                    },
-                )),
-            )
-        } else {
-            (input, None)
-        }
-    };
+    // `FeatureTyping`'s target list is comma-separated (`private y: A, '2'[0..*];`,
+    // `Classes.kerml`), so the shared multi-target parser owns the clause.
+    let (input, typing) = crate::parser::usage::optional_typings(input)?;
+    let typing = typing.map(|(span, is_conjugated, targets, spelling)| {
+        crate::ast::Node::new(
+            span.clone(),
+            crate::ast::TypingRelationship {
+                target: targets,
+                kind: crate::ast::TypingKind::Typing,
+                span,
+                is_conjugated,
+                is_implied: false,
+                spelling,
+            },
+        )
+    });
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
             ws_and_comments,

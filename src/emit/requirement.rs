@@ -22,6 +22,9 @@ pub(crate) fn emit_requirement_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("requirement def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -507,6 +510,9 @@ pub(crate) fn emit_concern_usage(
     if concern.is_abstract {
         w.push_str("abstract ");
     }
+    if concern.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("concern ");
     if concern.is_definition {
         w.push_str("def ");
@@ -535,6 +541,9 @@ pub(crate) fn emit_use_case_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("use case def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -614,6 +623,9 @@ pub(crate) fn emit_verification_case_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("verification def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -653,6 +665,9 @@ pub(crate) fn emit_case_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("case def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

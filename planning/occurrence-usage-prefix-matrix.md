@@ -94,7 +94,7 @@ OccurrenceDefinitionPrefix : OccurrenceDefinition =
 
 | Production | Differs from `OccurrenceUsagePrefix` by | Consequence |
 | --- | --- | --- |
-| `UsagePrefix` | admits `EndUsagePrefix` (`end` + `OwnedCrossFeatureMember`) as an alternative to `BasicUsagePrefix`; admits **no** `individual` and **no** `PortionKind` | `end` is legal on an `AttributeUsage`, illegal on an occurrence usage; `individual`/`snapshot` are legal on an occurrence usage, illegal on an attribute usage. Two productions, not one with optional parts |
+| `UsagePrefix` | admits **no** `individual` and **no** `PortionKind`; shares the `EndUsagePrefix` alternative (`end` + `OwnedCrossFeatureMember`) with the *reference* `OccurrenceUsagePrefix` (`SysML.xtext:836-843`), which the published `.kebnf` (564-570) omits -- see `spec42-upstream-gap-audit.md`, wave 3 | `individual`/`snapshot` are legal on an occurrence usage, illegal on an attribute usage; `end` is legal on both. Two productions, not one with optional parts |
 | `ControlNodePrefix` | `RefPrefix` directly, **without** `BasicUsagePrefix`'s `ref` | `ref merge m;` is not grammatical; `ref occurrence o;` is |
 | `OccurrenceDefinitionPrefix` | `BasicDefinitionPrefix` (`abstract`/`variation` only — no direction, no `derived`, no `constant`, no `ref`) and `DefinitionExtensionKeyword*` | a definition prefix cannot carry a direction, and `individual` there also contributes an `EmptyMultiplicityMember` |
 | `BasicDefinitionPrefix` | is exactly `RefPrefix`'s third slot, in isolation | reusing one two-alternative enum for both is grammar-backed (see §5.1); reusing the whole prefix struct is not |

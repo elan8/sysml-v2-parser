@@ -209,6 +209,14 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by the KerML declaration-grammar work (see ServerSequenceModelOutside above).
     "v1 Spec Examples/8.4.5 Constraining Decomposition/Vehicle Decomposition - Updated.sysml",
     "Vehicle Example/VehicleIndividuals.sysml",
+    "Interaction Sequencing Examples/ServerSequenceOutsideRealization-2.sysml",
+    "Interaction Sequencing Examples/ServerSequenceRealization-2.sysml",
+    "v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel Package - Updated.sysml",
+    "v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel Package.sysml",
+    "Arrowhead Framework Example/AHFCoreLib.sysml",
+    "Simple Tests/ConjugationTest.sysml",
+    "Simple Tests/MetadataTest.sysml",
+    "Association Examples/ProductSelection_N_ary.sysml",
 ];
 
 fn release_root() -> PathBuf {

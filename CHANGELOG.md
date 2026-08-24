@@ -7,7 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Three round-trip and dispatch gaps in the last corpus snapshots.** A KerML classifier's
+  `ConjugationPart` (`type Conjugate4 ~ Conjugate1;`, `Types.kerml`) was parsed but neither
+  emitted nor projected, so it vanished silently; an interface *usage* body did not dispatch the
+  `end port` member (`ConjugationTest.sysml`); and an end declaration led by a redefinition
+  (`end :>> source ::> producer.publicationPort;`, `ServerSequenceRealization_2.sysml`) was
+  refused, and once accepted was re-emitted in an order that did not reparse. Every
+  corpus-derived snapshot under `tests/snapshots/spec42` now parses without a diagnostic.
+  **AST version 239.**
+
+- **The KerML `Conjugation` declaration.** `( 'conjugation' Identification )? 'conjugate'
+  conjugatedType CONJUGATES originalType RelationshipBody` (KerML BNF 463-475) joins the
+  relationship declarations, so `conjugation c1 conjugate Conjugate1 conjugates Original;`
+  (`Types.kerml`) no longer reaches recovery. `KermlRelationshipKeyword` gains `Conjugate`.
+  **AST version 238.**
+
+- **Two KerML corpus spellings.** A keyword-less feature with a comma-separated typing
+  (`private y: A, '2'[0..*];`, `Classes.kerml`) was shredded into three expression members
+  because the keyword-less member parser took one typing target; it now uses the shared
+  multi-target parser. `specialization subtype x :> y;` (`Types.kerml`) read `subtype` as the
+  specialization's name; the relationship keywords are excluded from the identification, and
+  the authored `specialization` / `disjoining` / `inverting` keyword keeps its span so the
+  keyword and the doubled `typing t1 typing …` spelling both round-trip. **AST version 237.**
+
+- **A named connector end.** `ConnectorEnd = OwnedCrossMultiplicityMember? ( declaredName =
+  Name ReferencesKeyword )? OwnedReferenceSubsetting` (reference `SysML.xtext:998-1002`), so
+  `connect bead references t.bead to mountingRim references w.rim;` (`09. Connections`) lost its
+  semicolon to recovery in every `connect` form except an interface's. `ConnectionEnd` gains
+  `declared_name` with the authored `::>` / `references` spelling. **AST version 236.**
+
+- **`ExtendedUsage` with a declaration.** `ExtendedUsage = UnextendedUsagePrefix
+  UsageExtensionKeyword+ Usage` (SysML BNF 341; reference `SysML.xtext:728-730`) was modelled
+  only as a `def`-less `ExtendedDefinition` -- which required a name and gave the member a
+  package body -- so `#servicedd :>> serviceDiscovery : ServiceDiscoveryDD { #idd
+  serviceDiscovery_HTTP; }` (`AHFCoreLib.sysml`) recovered. A typed `ExtendedUsage` node
+  carries the prefix choice, the keyword run, a `UsageDeclaration`, a value and a usage body,
+  in package and part-usage bodies; `ExtendedDefinition` requires `def` again and loses
+  `has_def_keyword`. **AST version 235.**
+
+- **`#Tag` prefixes after `ref`.** `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
+  Usage` (reference `SysML.xtext:728-730`), so `private ref #Classified #Security z1;`
+  (`MetadataTest.sysml`) recovered in a package body. `RefDecl` gains `extension_keywords`.
+  **AST version 234.**
+
+- **`#Tag` prefixes on an enumerated value.** `EnumeratedValue = UsageExtensionKeyword* 'enum'?
+  Usage` (reference `SysML.xtext:784-786`; the published BNF 531 omits the run), so `#Security
+  enum secret : ClassificationLevel = 2;` (`MetadataTest.sysml`) recovered. `EnumeratedValue`
+  gains `extension_keywords`, emitted and projected in authored order. **AST version 233.**
+
+- **Columns are O(1), so a long line is no longer quadratic to parse.** Every span took its
+  column from `nom_locate`'s `get_column`, a backward scan to the previous newline, so each node
+  on a line cost the whole line and a single 400 KB line (the deeply-nested-parentheses stack
+  test) took 240 s in a debug build -- the entire `cargo test` wall clock. `ParseContext` now
+  builds a line-start table once per document and every column is one subtraction. The suite
+  runs in ~14 s; spans, diagnostics and snapshots are byte-identical.
+
 ### Added
+
+- **`end` on every usage family that owns `OccurrenceUsagePrefix`.** The reference grammar
+  (`SysML.xtext:836-843`) heads the prefix with `EndUsagePrefix | BasicUsagePrefix …`; the
+  published `.kebnf` (564-570) omits the first alternative, and the normative library authors it
+  (`Interfaces.sysml:72` `end port source: Port :>> …`, `Flows.sysml:82` `end occurrence source:
+  …`), so the parser follows the reference. `OccurrenceUsagePrefix` gains a `head` choice with
+  `EndUsagePrefix` carrying an optional `OwnedCrossUsage` (`end [1] part bead : TireBead;`,
+  `end theCauses [*] occurrence theCause :> causes;`); `EndDecl::nested_usage` is superseded by
+  it and deleted; `EndIdentity` gains `Anonymous` for `end : TireBead[1];`. Closes four corpus
+  snapshots and the library's `Interfaces.sysml`/`Flows.sysml` diagnostics. **AST version 232.**
+
+- **`cargo snapshot`.** A cargo alias for the snapshot driver (`cargo snapshot check|update`).
+
+- **`individual` on every `OccurrenceDefinitionPrefix` family.** `OccurrenceDefinitionPrefix =
+  BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?` (SysML BNF 541; Pilot
+  `SysML.xtext` 804) is reached by calc, constraint, requirement, concern, case, verification,
+  use case, view, viewpoint and rendering definitions, and only the structural and action families
+  accepted it: `individual calc def D8;` fell to package-body recovery and cascaded over every
+  later sibling. The nine definition nodes and `ConcernUsage` gain `is_individual`, emitted and
+  projected; `StateDef` already carried it but its projection dropped it. Closes the
+  `coverage_individual` corpus snapshot. **AST version 231.**
 
 - **Five member forms the reference grammar spells.** Each verified against the Pilot
   Implementation before implementation, not the published BNF alone: the `perform` reference form in

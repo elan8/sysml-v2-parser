@@ -334,11 +334,11 @@ fn a_prefix_span_outside_its_own_declaration_is_rejected() {
         parse_for_editor("package P {\n    individual o;\n    individual o2;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
     let first = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                 /value/OccurrenceUsage/value/prefix/individual_span/offset";
+                 /value/OccurrenceUsage/value/prefix/head/Basic/individual_span/offset";
     let second_offset = tampered
         .pointer(
             "/root/elements/0/value/Package/value/body/Brace/elements/1\
-             /value/OccurrenceUsage/value/prefix/individual_span/offset",
+             /value/OccurrenceUsage/value/prefix/head/Basic/individual_span/offset",
         )
         .cloned()
         .expect("the second usage's `individual` keyword offset");

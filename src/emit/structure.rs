@@ -8,13 +8,13 @@ use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
     ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
-    EndDeclIntroducer, EndIdentity, EndNestedUsage, InOut, InterfaceDef, InterfaceDefBody,
-    InterfaceDefBodyElement, InterfaceEnd, InterfaceEndReferenceOperator, InterfaceEndTarget,
-    InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, MetadataBody, MetadataBodyElement,
-    MetadataBodyRedefinitionOperator, MetadataBodyUsage, Multiplicity, Node, PartDef, PartDefBody,
-    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement,
-    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
-    SubsettingRelationship, TypingKind, TypingRelationship,
+    EndDeclIntroducer, EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceEnd, InterfaceEndReferenceOperator, InterfaceEndTarget, InterfacePart, InterfaceUsage,
+    InterfaceUsageBodyElement, MetadataBody, MetadataBodyElement, MetadataBodyRedefinitionOperator,
+    MetadataBodyUsage, Multiplicity, Node, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
+    PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement, PortDef, PortDefBody,
+    PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind, SubsettingRelationship,
+    TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -568,6 +568,7 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PartUsageBodyElement::ExtendedUsage(u) => emit_extended_usage(w, path, &u.value),
         PartUsageBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
@@ -905,6 +906,13 @@ fn emit_connection_end(w: &mut EmitWriter<'_>, end: &ConnectionEnd) -> Result<()
         emit_multiplicity(w, &mult.value)?;
         w.push_char(' ');
     }
+    if let Some(declared) = &end.declared_name {
+        w.push_str(&format_name(&declared.name.value));
+        match declared.operator {
+            InterfaceEndReferenceOperator::Symbol { .. } => w.push_str(" ::> "),
+            InterfaceEndReferenceOperator::Keyword { .. } => w.push_str(" references "),
+        }
+    }
     emit_expression(w, &end.expression.value)
 }
 
@@ -990,18 +998,6 @@ pub(crate) fn emit_end_decl(
     path: &str,
     end: &EndDecl,
 ) -> Result<(), EmitError> {
-    if end.nested_usage.is_some()
-        && (end.typing.is_some()
-            || end.references.is_some()
-            || end.redefines.is_some()
-            || end.crosses.is_some()
-            || end.type_ref_span.is_some())
-    {
-        return w.unsupported(
-            path,
-            "EndDecl nested usage with outer type/reference relationship",
-        );
-    }
     w.push_str("end ");
     // `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix …` (SysML BNF 630): the prefix is
     // authored between `end` and the declaration, so it must be re-emitted there. Dropping it
@@ -1026,6 +1022,7 @@ pub(crate) fn emit_end_decl(
         w.push_str("> ");
     }
     match &end.identity {
+        EndIdentity::Anonymous => w.trim_trailing_space(),
         EndIdentity::Declaration(name) => {
             w.push_authored_name(&format!("{path}/identity"), &name.span)?
         }
@@ -1034,25 +1031,17 @@ pub(crate) fn emit_end_decl(
             DerivationEndRole::Derive => w.push_str("#derive"),
         },
     }
-    if let Some(nested) = &end.nested_usage {
-        if let Some(mult) = &end.multiplicity {
-            w.push_char(' ');
-            emit_multiplicity(w, &mult.value)?;
-        }
-        w.push_char(' ');
-        return match nested.as_ref() {
-            EndNestedUsage::Occurrence(usage) => super::behavior::emit_occurrence_usage(
-                w,
-                &format!("{path}/nested-occurrence"),
-                &usage.value,
-            ),
-            EndNestedUsage::Item(usage) => {
-                super::requirement::emit_item_usage(w, &format!("{path}/nested-item"), &usage.value)
-            }
-        };
-    }
     if let Some(typing) = &end.typing {
         emit_typing_clause(w, &typing.value)?;
+    }
+    // Without a typing, a redefinition can only have led the declaration (`end :>> source ::>
+    // producer.publicationPort;`), so it is written ahead of the reference subsetting; after
+    // a typing it trails, as authored (`end source : Anything :>> BinaryLinkObject::source;`).
+    let redefines_leads = end.typing.is_none();
+    if redefines_leads {
+        if let Some(redefines) = &end.redefines {
+            emit_subsetting_clause(w, &redefines.value)?;
+        }
     }
     if let Some(references) = &end.references {
         emit_subsetting_clause(w, &references.value)?;
@@ -1060,8 +1049,10 @@ pub(crate) fn emit_end_decl(
     if let Some(mult) = &end.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if let Some(redefines) = &end.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
+    if !redefines_leads {
+        if let Some(redefines) = &end.redefines {
+            emit_subsetting_clause(w, &redefines.value)?;
+        }
     }
     if let Some(crosses) = &end.crosses {
         emit_subsetting_clause(w, &crosses.value)?;
@@ -1301,6 +1292,7 @@ fn emit_interface_usage_body_element(
             emit_ref_body(w, path, body)
         }
         InterfaceUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
+        InterfaceUsageBodyElement::PortUsage(port) => emit_port_usage(w, path, &port.value),
         InterfaceUsageBodyElement::FlowUsage(flow) => emit_flow_usage(w, path, &flow.value),
         InterfaceUsageBodyElement::Perform(perform) => emit_perform(w, path, &perform.value),
     }
@@ -1322,6 +1314,13 @@ pub(crate) fn emit_ref_decl(
         decl.is_constant,
     );
     w.push_str("ref");
+    for (index, keyword) in decl.extension_keywords.iter().enumerate() {
+        w.push_str(" #");
+        w.push_qualified_reference(
+            &format!("{path}/extension[{index}]"),
+            keyword.value.annotation,
+        )?;
+    }
     if let Some(kind) = decl.kind_keyword {
         w.push_char(' ');
         w.push_str(kind.as_str());
@@ -1515,12 +1514,53 @@ pub(crate) fn emit_direction(w: &mut EmitWriter<'_>, dir: InOut) {
 /// holds an authored span, never because a flag was inferred from something else, and the order is
 /// the grammar's, not the order the fields happen to be declared in. A slot that was not authored
 /// writes nothing; nothing here can invent a prefix, and no branch can omit one that is present.
-pub(crate) fn emit_occurrence_usage_prefix(
+pub(crate) fn emit_extended_usage(
     w: &mut EmitWriter<'_>,
     path: &str,
-    prefix: &crate::ast::OccurrenceUsagePrefix,
+    usage: &crate::ast::ExtendedUsage,
 ) -> Result<(), EmitError> {
-    let ref_prefix = &prefix.basic.ref_prefix;
+    emit_visibility(w, usage.membership.visibility);
+    match &usage.prefix {
+        crate::ast::UnextendedUsagePrefix::End(end) => {
+            w.push_str("end ");
+            if let Some(cross) = &end.cross {
+                emit_basic_usage_prefix(w, &cross.value.prefix);
+                crate::emit::behavior::emit_usage_declaration(
+                    w,
+                    &format!("{path}/prefix/cross"),
+                    &cross.value.declaration.value,
+                )?;
+                w.push_char(' ');
+            }
+        }
+        crate::ast::UnextendedUsagePrefix::Basic(basic) => emit_basic_usage_prefix(w, basic),
+    }
+    for (index, keyword) in usage.extension_keywords.iter().enumerate() {
+        w.push_char('#');
+        w.push_qualified_reference(
+            &format!("{path}/extension[{index}]"),
+            keyword.value.annotation,
+        )?;
+        w.push_char(' ');
+    }
+    // `emit_usage_declaration` spaces a name from what precedes it; the keyword run already did.
+    w.trim_trailing_space();
+    crate::emit::behavior::emit_usage_declaration(
+        w,
+        &format!("{path}/declaration"),
+        &usage.declaration.value,
+    )?;
+    if let Some(value) = &usage.value {
+        crate::emit::expr::emit_feature_value(w, value)?;
+    }
+    emit_part_usage_body(w, path, &usage.body)
+}
+
+pub(crate) fn emit_basic_usage_prefix(
+    w: &mut EmitWriter<'_>,
+    prefix: &crate::ast::BasicUsagePrefix,
+) {
+    let ref_prefix = &prefix.ref_prefix;
     if let Some(direction) = &ref_prefix.direction {
         emit_direction(w, direction.value);
     }
@@ -1535,15 +1575,55 @@ pub(crate) fn emit_occurrence_usage_prefix(
     if ref_prefix.constant_span.is_some() {
         w.push_str("constant ");
     }
-    if prefix.basic.reference_span.is_some() {
+    if prefix.reference_span.is_some() {
         w.push_str("ref ");
     }
-    if prefix.individual_span.is_some() {
-        w.push_str("individual ");
-    }
-    if let Some(portion) = &prefix.portion {
-        w.push_str(portion.value.keyword());
-        w.push_char(' ');
+}
+
+pub(crate) fn emit_occurrence_usage_prefix(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    prefix: &crate::ast::OccurrenceUsagePrefix,
+) -> Result<(), EmitError> {
+    match &prefix.head {
+        crate::ast::OccurrenceUsagePrefixHead::End(end) => {
+            w.push_str("end ");
+            if let Some(cross) = &end.cross {
+                emit_basic_usage_prefix(w, &cross.value.prefix);
+                let declaration = &cross.value.declaration.value;
+                // `emit_usage_declaration` spaces a name from the keyword before it; a nameless
+                // cross feature (`end [1] part …`) starts with its own clause.
+                if declaration.identification_span.len == 0 {
+                    crate::emit::behavior::emit_usage_declaration(
+                        w,
+                        &format!("{path}/prefix/cross"),
+                        declaration,
+                    )?;
+                } else {
+                    w.trim_trailing_space();
+                    crate::emit::behavior::emit_usage_declaration(
+                        w,
+                        &format!("{path}/prefix/cross"),
+                        declaration,
+                    )?;
+                }
+                w.push_char(' ');
+            }
+        }
+        crate::ast::OccurrenceUsagePrefixHead::Basic {
+            basic,
+            individual_span,
+            portion,
+        } => {
+            emit_basic_usage_prefix(w, basic);
+            if individual_span.is_some() {
+                w.push_str("individual ");
+            }
+            if let Some(portion) = portion {
+                w.push_str(portion.value.keyword());
+                w.push_char(' ');
+            }
+        }
     }
     for (index, keyword) in prefix.extension_keywords.iter().enumerate() {
         w.push_char('#');
@@ -1886,6 +1966,14 @@ pub(crate) fn emit_enum_def(
                     crate::ast::EnumerationBodyElement::Value(value) => {
                         let value = &value.value;
                         emit_visibility(w, value.membership.visibility);
+                        for (index, keyword) in value.extension_keywords.iter().enumerate() {
+                            w.push_char('#');
+                            w.push_qualified_reference(
+                                &format!("{path}/enumerated-value/extension[{index}]"),
+                                keyword.value.annotation,
+                            )?;
+                            w.push_char(' ');
+                        }
                         if value.enum_keyword_span.is_some() {
                             w.push_str("enum ");
                         }

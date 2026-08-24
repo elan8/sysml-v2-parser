@@ -250,25 +250,10 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
         )?;
     let (input, prefix_keywords) =
         many1(preceded(ws_and_comments, extended_definition_prefix_tag)).parse(input)?;
-    // `def` is optional: the bare extended-usage shorthand `#clouddd ArrowheadCore { ... }`
-    // (spec42 Gap 39) has no declaration keyword at all. The keyword guard below keeps the
-    // `#fmeaspec requirement req1 { ... }` `PrefixMetadataMember` shape on
-    // `metadata_keyword_prefix`.
-    let (input, def_kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"def"[..])), ws1)).parse(input)?;
+    // `def` is required: the keyword-less `#Tag name …` spelling is `ExtendedUsage`
+    // (SysML BNF 341), owned by [`extended_usage`].
+    let (input, _) = preceded(preceded(ws_and_comments, tag(&b"def"[..])), ws1).parse(input)?;
     let (input, ident) = identification(input)?;
-    if def_kw.is_none() {
-        let name_is_usable = ident
-            .name
-            .as_deref()
-            .is_some_and(|n| !crate::parser::lex::is_reserved_keyword(n.as_bytes()));
-        if !name_is_usable {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    }
     let (input, specializes) = parse_optional_definition_specialization(input)?;
     let (input, body) = package_body(input)?;
     Ok((
@@ -279,10 +264,90 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
             ExtendedDefinition {
                 prefix_keywords,
                 definition_prefix,
-                has_def_keyword: def_kw.is_some(),
                 identification: ident,
                 specializes,
                 body,
+            },
+        ),
+    ))
+}
+
+/// `ExtendedUsage : Usage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage` (SysML BNF 341;
+/// reference `SysML.xtext:728-730`), for the spellings that declare something: `#systemdd
+/// service_registry_DD :> service_registry { … }`, `#servicedd :>> serviceDiscovery :
+/// ServiceDiscoveryDD { … }`, `#idd serviceDiscovery_HTTP;` (`AHFCoreLib.sysml`).
+///
+/// Refuses the empty-declaration spelling (`#Tag;`, `#Tag { … }`), which every scope already
+/// dispatches as [`metadata_keyword_usage`], and a keyword run followed by a reserved word,
+/// which is a `PrefixMetadataMember` ahead of that keyword's own production
+/// (`#fmeaspec requirement req1 { … }`) and belongs to [`metadata_keyword_prefix`].
+pub(crate) fn extended_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::ExtendedUsage>> {
+    crate::parser::span::reference_transaction(input, extended_usage_inner)
+}
+
+fn extended_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ExtendedUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, occurrence_prefix) =
+        crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    // The shared prefix parser also collects the keyword run, and refuses the slots
+    // `UnextendedUsagePrefix` lacks by construction of the choice below.
+    let prefix = match occurrence_prefix.head {
+        crate::ast::OccurrenceUsagePrefixHead::End(end) => {
+            crate::ast::UnextendedUsagePrefix::End(end)
+        }
+        crate::ast::OccurrenceUsagePrefixHead::Basic {
+            basic,
+            individual_span: None,
+            portion: None,
+        } => crate::ast::UnextendedUsagePrefix::Basic(basic),
+        crate::ast::OccurrenceUsagePrefixHead::Basic { .. } => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    };
+    let extension_keywords = occurrence_prefix.extension_keywords;
+    if extension_keywords.is_empty() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (peek, _) = ws_and_comments(input)?;
+    if peek.fragment().starts_with(b";")
+        || peek.fragment().starts_with(b"{")
+        || crate::parser::occurrence_prefix::next_word_is_reserved(peek)
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            peek,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, declaration) = crate::parser::usage::usage_declaration(peek)?;
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
+    let (input, body) = crate::parser::part::part_usage_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::ExtendedUsage {
+                prefix,
+                extension_keywords,
+                declaration,
+                value,
+                body,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -352,26 +417,32 @@ mod tests {
     use crate::ast::SourceStorage;
     use crate::parser::span::ParseContext;
 
-    /// Spec42 Gap 39: the bare extended-usage shorthand (`#clouddd ArrowheadCore { ... }`) has
-    /// no `def` keyword; the keyword guard keeps `#tag <keyword-led member>` shapes on
-    /// `metadata_keyword_prefix`.
+    /// The keyword-less shorthand (`#clouddd ArrowheadCore { ... }`, spec42 Gap 39) is
+    /// `ExtendedUsage`, not a `def`-less definition; the keyword guard keeps `#tag <keyword-led
+    /// member>` shapes on `metadata_keyword_prefix`.
     #[test]
-    fn extended_definition_accepts_the_def_less_usage_shorthand() {
+    fn extended_definition_requires_def_and_extended_usage_owns_the_shorthand() {
         let context = ParseContext::new();
         let input = context.input(b"#clouddd ArrowheadCore { part x; }");
-        let (rest, node) = extended_definition(input).expect("extended usage shorthand");
+        assert!(extended_definition(input).is_err());
+        let (rest, node) = extended_usage(input).expect("extended usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(!node.value.has_def_keyword);
         assert_eq!(
-            node.value.identification.name.as_deref(),
+            node.value.declaration.value.identification.name.as_deref(),
             Some("ArrowheadCore")
         );
+        assert_eq!(node.value.extension_keywords.len(), 1);
 
         let context = ParseContext::new();
         let input = context.input(b"#situation def Failure;");
-        let (_, node) = extended_definition(input).expect("extended definition");
-        assert!(node.value.has_def_keyword);
+        extended_definition(input).expect("extended definition");
 
+        let context = ParseContext::new();
+        let input = context.input(b"#fmeaspec requirement req1 { }");
+        assert!(
+            extended_usage(input).is_err(),
+            "keyword-led members stay on metadata_keyword_prefix"
+        );
         let context = ParseContext::new();
         let input = context.input(b"#fmeaspec requirement req1 { }");
         assert!(

@@ -971,7 +971,13 @@ mod par_002_nested_def_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::PartUsage(part) => {
-                assert!(part.value.prefix.basic.reference_span.is_some());
+                assert!(part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some());
                 assert_eq!(part.value.name, "origin");
                 assert_eq!(
                     part.value

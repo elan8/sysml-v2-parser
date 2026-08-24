@@ -107,13 +107,18 @@ fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicit
             _ => None,
         })
         .expect("expected occurrence usage");
-    let ref_prefix = &occurrence.prefix.basic.ref_prefix;
+    let ref_prefix = &occurrence.prefix.basic().expect("basic head").ref_prefix;
     assert_eq!(
         ref_prefix.variance.as_ref().map(|node| node.value),
         Some(sysml_v2_parser::ast::DefinitionPrefix::Abstract)
     );
     assert!(ref_prefix.constant_span.is_some());
-    assert!(occurrence.prefix.basic.reference_span.is_some());
+    assert!(occurrence
+        .prefix
+        .basic()
+        .expect("basic head")
+        .reference_span
+        .is_some());
     assert!(occurrence.multiplicity.is_some());
 }
 
@@ -181,7 +186,11 @@ fn interface_def_body_accepts_anonymous_ref_port_with_redefines_type_and_modifie
         })
         .expect("expected port usage");
     assert!(
-        port.prefix.basic.reference_span.is_some(),
+        port.prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some(),
         "the `ref` belongs to the port usage's own BasicUsagePrefix"
     );
     assert_eq!(port.name, "");

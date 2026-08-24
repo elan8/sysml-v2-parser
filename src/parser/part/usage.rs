@@ -705,10 +705,12 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     // §6 G24: each endpoint may carry its own multiplicity -- `connect [0..1] a.p1 to [1] b.p2;`.
     let (input, from_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, from_expr) = path_expression(input)?;
+    let (input, from_name) = crate::parser::connector::connector_end_name(input)?;
+    let (input, from_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, to_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, to_name) = crate::parser::connector::connector_end_name(input)?;
     let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = ref_body(input)?;
     let before_subsets = input;
@@ -743,8 +745,8 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
             start,
             input,
             Connect {
-                from: connection_end_with_multiplicity(from_multiplicity, from_expr),
-                to: connection_end_with_multiplicity(to_multiplicity, to_expr),
+                from: connection_end_with_multiplicity(from_multiplicity, from_name, from_expr),
+                to: connection_end_with_multiplicity(to_multiplicity, to_name, to_expr),
                 body,
                 subsets,
                 redefines,
@@ -757,12 +759,14 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 /// node, reusing the expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
 fn connection_end_with_multiplicity(
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<Expression>,
 ) -> Node<ConnectionEnd> {
     let span = expr.span.clone();
     Node::new(
         span.clone(),
         ConnectionEnd {
+            declared_name,
             expression: expr,
             multiplicity,
             span,
@@ -777,6 +781,24 @@ fn interface_usage_body_element(
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     alt((
         interface_usage_ref_redef,
+        // An `end`-led kind-keyworded usage is that family's node with an `end` head; give it
+        // first refusal ahead of the keyword-less `EndDecl`, as every other body does.
+        map(
+            |input| {
+                if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+                    crate::parser::port::port_usage(input)
+                } else {
+                    Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )))
+                }
+            },
+            |port| {
+                let span = port.span.clone();
+                Node::new(span, InterfaceUsageBodyElement::PortUsage(Box::new(port)))
+            },
+        ),
         map(interface_usage_end_decl, |end| {
             let span = end.span.clone();
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
@@ -1288,6 +1310,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             start,
             input,
             RefDecl {
+                extension_keywords: Vec::new(),
                 short_name,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
@@ -1518,6 +1541,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 map(
                     |i| crate::parser::connector::end_decl(i, true),
                     PartUsageBodyElement::EndDecl,
+                ),
+                map(
+                    crate::parser::metadata_annotation::extended_usage,
+                    |usage| PartUsageBodyElement::ExtendedUsage(Box::new(usage)),
                 ),
                 map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,
@@ -2118,7 +2145,13 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part origin : Remote :> remotes;")).expect("ref part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.reference_span.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert_eq!(node.value.name, "origin");
         assert_eq!(
             node.value
@@ -2140,14 +2173,26 @@ mod short_name_tests {
     fn part_usage_accepts_ref_prefix_with_subsetting_only() {
         let (rest, node) = part_usage(input("ref part origin :> mesolab;")).expect("ref part");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.reference_span.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert!(node.value.subsets.is_some());
     }
 
     #[test]
     fn part_usage_without_ref_prefix_is_not_reference() {
         let (_, node) = part_usage(input("part origin : Remote :> remotes;")).expect("part");
-        assert!(node.value.prefix.basic.reference_span.is_none());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_none());
         assert!(node.value.subsets.is_some());
     }
 
@@ -2158,7 +2203,13 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part :>> elements: SparePart;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.reference_span.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert!(node.value.name.is_empty());
         assert!(node.value.redefines.is_some());
         assert_eq!(

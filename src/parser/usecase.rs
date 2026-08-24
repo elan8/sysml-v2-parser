@@ -563,6 +563,7 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
         DefinitionPrefixOptions::new(b"use")
             .with_second_keyword(b"case")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = use_case_def_body(input)?;
@@ -572,6 +573,7 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
             start,
             input,
             UseCaseDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 definition_prefix: prefix.basic_prefix,

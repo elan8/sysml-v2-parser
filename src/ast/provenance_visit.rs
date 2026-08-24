@@ -451,65 +451,72 @@ impl Visitor for ProvenanceValidator<'_> {
         if self.error.is_some() {
             return;
         }
-        let ref_prefix = &prefix.basic.ref_prefix;
-        let direction = ref_prefix.direction.as_ref();
-        let variance = ref_prefix.variance.as_ref();
-        let portion = prefix.portion.as_ref();
         // In production order, so the same slice drives both the token check and the ordering
-        // check below and the two cannot disagree about what the order is.
-        let slots: [(Option<&Span>, &str, &str); 7] = [
-            (
-                direction.map(|node| &node.span),
-                match direction.map(|node| node.value) {
-                    Some(InOut::In) => "in",
-                    Some(InOut::Out) => "out",
-                    Some(InOut::InOut) => "inout",
-                    None => "",
-                },
-                "usage prefix direction keyword",
-            ),
-            (
-                ref_prefix.derived_span.as_ref(),
-                "derived",
-                "usage prefix `derived` keyword",
-            ),
-            (
-                variance.map(|node| &node.span),
-                match variance.map(|node| node.value) {
-                    Some(DefinitionPrefix::Abstract) => "abstract",
-                    Some(DefinitionPrefix::Variation) => "variation",
-                    None => "",
-                },
-                "usage prefix variance keyword",
-            ),
-            (
-                ref_prefix.constant_span.as_ref(),
-                "constant",
-                "usage prefix `constant` keyword",
-            ),
-            (
-                prefix.basic.reference_span.as_ref(),
-                "ref",
-                "usage prefix `ref` keyword",
-            ),
-            (
-                prefix.individual_span.as_ref(),
-                "individual",
-                "occurrence prefix `individual` keyword",
-            ),
-            (
-                portion.map(|node| &node.span),
-                match portion.map(|node| node.value) {
-                    Some(OccurrencePortionKind::Snapshot) => "snapshot",
-                    Some(OccurrencePortionKind::Timeslice) => "timeslice",
-                    None => "",
-                },
-                "occurrence prefix portion keyword",
-            ),
-        ];
-        for (span, token, role) in slots {
-            let Some(span) = span else { continue };
-            if self.error.is_none() {
+        // check below and the two cannot disagree about what the order is. The head is a choice:
+        // `end` (then its cross feature) or the basic slots, never both.
+        let mut slots: Vec<(&Span, &str, &str)> = Vec::new();
+        match &prefix.head {
+            OccurrenceUsagePrefixHead::End(end) => {
+                slots.push((&end.end_span, "end", "occurrence prefix `end` keyword"));
+                if let Some(cross) = &end.cross {
+                    slots.push((&cross.span, "", "owned cross feature"));
+                }
+            }
+            OccurrenceUsagePrefixHead::Basic {
+                basic,
+                individual_span,
+                portion,
+            } => {
+                let ref_prefix = &basic.ref_prefix;
+                if let Some(direction) = ref_prefix.direction.as_ref() {
+                    slots.push((
+                        &direction.span,
+                        match direction.value {
+                            InOut::In => "in",
+                            InOut::Out => "out",
+                            InOut::InOut => "inout",
+                        },
+                        "usage prefix direction keyword",
+                    ));
+                }
+                if let Some(span) = ref_prefix.derived_span.as_ref() {
+                    slots.push((span, "derived", "usage prefix `derived` keyword"));
+                }
+                if let Some(variance) = ref_prefix.variance.as_ref() {
+                    slots.push((
+                        &variance.span,
+                        match variance.value {
+                            DefinitionPrefix::Abstract => "abstract",
+                            DefinitionPrefix::Variation => "variation",
+                        },
+                        "usage prefix variance keyword",
+                    ));
+                }
+                if let Some(span) = ref_prefix.constant_span.as_ref() {
+                    slots.push((span, "constant", "usage prefix `constant` keyword"));
+                }
+                if let Some(span) = basic.reference_span.as_ref() {
+                    slots.push((span, "ref", "usage prefix `ref` keyword"));
+                }
+                if let Some(span) = individual_span.as_ref() {
+                    slots.push((span, "individual", "occurrence prefix `individual` keyword"));
+                }
+                if let Some(portion) = portion.as_ref() {
+                    slots.push((
+                        &portion.span,
+                        match portion.value {
+                            OccurrencePortionKind::Snapshot => "snapshot",
+                            OccurrencePortionKind::Timeslice => "timeslice",
+                        },
+                        "occurrence prefix portion keyword",
+                    ));
+                }
+            }
+        }
+        for (span, token, role) in &slots {
+            // A cross feature is a declaration, not a keyword: it is checked for ownership and
+            // order here and for its own tokens when walked below.
+            if !token.is_empty() && self.error.is_none() {
                 self.check(self.delimiter(span, token, role));
             }
             if self.error.is_none() {
@@ -518,15 +525,12 @@ impl Visitor for ProvenanceValidator<'_> {
         }
         if self.error.is_none() {
             let mut previous: Option<(usize, &str)> = None;
-            let ordered = slots
-                .into_iter()
-                .filter_map(|(span, _, role)| span.map(|span| (span, role)))
-                .chain(
-                    prefix
-                        .extension_keywords
-                        .iter()
-                        .map(|keyword| (&keyword.value.hash_span, "usage extension keyword")),
-                );
+            let ordered = slots.iter().map(|(span, _, role)| (*span, *role)).chain(
+                prefix
+                    .extension_keywords
+                    .iter()
+                    .map(|keyword| (&keyword.value.hash_span, "usage extension keyword")),
+            );
             for (span, role) in ordered {
                 if let Some((end, before)) = previous {
                     if span.offset < end {

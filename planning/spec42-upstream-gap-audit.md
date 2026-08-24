@@ -524,6 +524,97 @@ never writes it" was treated as no information rather than as refutation.
   singular, so `flow of Thing of Thing …` is correctly refused; what it lacks is a *precise*
   diagnostic naming the at-most-one rule, as `end_feature_invalid_prefix` does for Gap 59.
 
+## Wave 3 -- the corpus snapshots that still carried diagnostics
+
+Twelve corpus-derived snapshots under `tests/snapshots/spec42/{sysml,kerml}` still recorded a
+diagnostic at the wave-2 pin. Each construct was checked against the reference grammar and,
+where the two disagree, against the normative model library, before anything was changed.
+
+### Fixed
+
+- **`individual` on every `OccurrenceDefinitionPrefix` family** (`coverage_individual`).
+  `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' … )?`
+  (SysML BNF 541; `SysML.xtext:804-810`) is reached by calc, constraint, requirement, concern,
+  case, verification, use case, view, viewpoint and rendering definitions; only the structural
+  and action families accepted it. The nine definition nodes and `ConcernUsage` gain
+  `is_individual`; `StateDef` carried it but its projection dropped it. AST version 231.
+
+- **`EndUsagePrefix` as the head of `OccurrenceUsagePrefix`** (`09_connections_example`,
+  `11_interface_decomposition_example`, `conjugation_test`, `wheel_package_updated`).
+
+  ```text
+  OccurrenceUsagePrefix returns SysML::OccurrenceUsage :
+      ( EndUsagePrefix
+      | BasicUsagePrefix ( isIndividual ?= 'individual' )? ( portionKind = PortionKind )? )
+      UsageExtensionKeyword*                                        -- SysML.xtext:836-843
+  EndUsagePrefix : Usage = isEnd ?= 'end' ( ownedRelationship += OwnedCrossFeatureMember )?
+                                                                    -- SysML BNF 285
+  OwnedCrossFeature : ReferenceUsage = BasicUsagePrefix UsageDeclaration   -- SysML BNF 293
+  ```
+
+  The published `.kebnf` (564-570) spells only the second alternative, and the earlier
+  `pilot_occurrence_end_prefix_recovery` fixture deliberately refused `end port` on that basis.
+  The normative library disagrees with the `.kebnf`: `Interfaces.sysml:72` authors `end port
+  source: Port :>> BinaryConnection::source;` and `Flows.sysml:82` `end occurrence source:
+  Occurrence :>> Message::source, …;`, and both were recovering. A grammar the specification's
+  own library cannot parse against is the erratum, so the parser follows the reference grammar.
+
+  `OccurrenceUsagePrefix` gains a `head` choice -- `End(EndUsagePrefix)` or the basic slots --
+  so `end individual part p;` is unrepresentable rather than merely unemitted. The owned cross
+  feature is a `BasicUsagePrefix` plus a `UsageDeclaration`, retained with its span: `end [1]
+  part bead : TireBead;` crosses a bare multiplicity, `end theCauses [*] occurrence theCause :>
+  causes;` a named one. A prefix with no declaration (`end derived part p : T;`) is not a cross
+  feature and still reports `end_feature_invalid_prefix`. Every family that owns the prefix
+  (part, port, item, occurrence, action nodes, satisfy, constraint and analysis usages) accepts
+  the head; the connection, interface, part-definition and occurrence bodies give those typed
+  parsers first refusal on an `end`-led member, ahead of the keyword-less `EndDecl`.
+
+  `EndDecl::nested_usage` (GH-53) was this production seen from the other side -- an `EndDecl`
+  whose "target" was a complete occurrence or item usage -- and is deleted; the fixtures and
+  `tests/gh53_end_decl_nested_usage.rs` now assert the usage node with its `end` head.
+
+- **A nameless `DefaultReferenceUsage` end** (`wheel_package_updated`, `server_sequence_*`).
+  `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration …` (`SysML.xtext:
+  630-633`) with `UsageDeclaration = Identification? …`, so `end : TireBead[1];` and `end :>>
+  source ::> producer.publicationPort;` declare an end through its specialization alone.
+  `EndIdentity` gains `Anonymous`; the flow-usage body already dispatched `EndDecl`.
+
+### Fixed since
+
+- `#Security enum secret : …` (`metadata_test`): `EnumeratedValue = UsageExtensionKeyword*
+  'enum'? Usage` (`SysML.xtext:784-786`). `EnumeratedValue` gains `extension_keywords`.
+- `private ref #Classified #Security z1;` (`metadata_test`): the keyword run sits between
+  `ref` and the declaration; `RefDecl` gains `extension_keywords`. `abstract #Classified z2;`
+  already reached the KerML feature path with its metadata keywords.
+- `#systemdd name :> base { #servicedd :>> x : T { #idd y; } }` (`ahfcore_lib`): `ExtendedUsage`
+  (SysML BNF 341) was a `def`-less `ExtendedDefinition` that required a name and owned a
+  package body. A typed `ExtendedUsage` node now carries the prefix choice, the keyword run, a
+  `UsageDeclaration`, a value and a usage body, in package and part-usage bodies;
+  `ExtendedDefinition` requires `def` again. The empty-declaration `#Tag;` / `#Tag { }` spelling
+  stays on `MetadataKeywordUsage` in every scope; folding it in is a body-dispatch change across
+  all of them and is left as recorded debt.
+
+- `connect bead references t.bead to mountingRim references w.rim;` (`09_connections_example`):
+  `ConnectorEnd`'s `( declaredName = Name ReferencesKeyword )?`; `ConnectionEnd` gains
+  `declared_name`.
+- `specialization subtype x :> Base::things;`, `conjugation c1 conjugate Conjugate1 conjugates
+  Original;` and `type Conjugate4 ~ Conjugate1;` (`kerml/types`): the relationship keywords are
+  excluded from the declaration's identification, `Conjugation` joins the relationship
+  declarations, and the classifier's parsed `ConjugationPart` is now emitted and projected --
+  it had been dropped silently.
+- `private y: A, '2'[0..*];` (`kerml/examples/classes`): the keyword-less member's typing is
+  multi-target.
+- `end port p3 : P ::> p.p1;` in an interface *usage* body (`conjugation_test`) and the
+  redefinition-led `end :>> source ::> producer.publicationPort;` (`server_sequence_*`).
+
+### Still open at this pin
+
+- None of the corpus-derived snapshots under `tests/snapshots/spec42/{sysml,kerml,sysml.library}`
+  carries a diagnostic. `coverage_connectors` is not a corpus file and authors `connector` in a
+  SysML `part def`, which `SysML.xtext` does not spell at all; the fixture records a refusal.
+- The snapshot corpus is a sample of the 403 release files; `planning/corpus-coverage-*.md`
+  record the wider inventories, which this wave did not re-measure.
+
 ## Deferred neighbouring debt
 
 Found during the audit, out of scope for these commits, recorded so it is not rediscovered:

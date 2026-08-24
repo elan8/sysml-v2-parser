@@ -105,10 +105,10 @@ streams bytes to any `std::io::Write` destination (for example a file or `Vec<u8
 enum matches make newly added AST variants a compile-time formatting decision.
 
 ```bash
-cargo run --bin snapshot_tool -- check
-cargo run --bin snapshot_tool -- update
-cargo run --bin snapshot_tool -- check --fixture semantic_references.md
-cargo run --bin snapshot_tool -- check --root path/to/snapshots
+cargo snapshot check
+cargo snapshot update
+cargo snapshot check --fixture semantic_references.md
+cargo snapshot check --root path/to/snapshots
 ```
 
 The driver processes fixtures sequentially in sorted path order. `check` fails on stale derived

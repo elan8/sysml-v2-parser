@@ -1995,7 +1995,13 @@ fn test_part_usage_body_ref_part_assignments_parse() {
         .iter()
         .filter_map(|element| match &element.value {
             PartUsageBodyElement::PartUsage(part)
-                if part.value.prefix.basic.reference_span.is_some() =>
+                if part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some() =>
             {
                 Some(&part.value)
             }
@@ -2069,7 +2075,12 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
             _ => None,
         })
         .expect("ref part origin as PartUsage");
-    assert!(origin.prefix.basic.reference_span.is_some());
+    assert!(origin
+        .prefix
+        .basic()
+        .expect("basic head")
+        .reference_span
+        .is_some());
     assert!(origin.subsets.is_some(), "expected :> mesolab subsets");
 }
 
@@ -2318,7 +2329,8 @@ port def DebrisPort {
     assert_eq!(item.name, "debris");
     assert_eq!(
         item.prefix
-            .basic
+            .basic()
+            .expect("basic head")
             .ref_prefix
             .direction
             .as_ref()
@@ -3370,27 +3382,70 @@ part def Foo {
         diag.errors
     );
     let derived = part_def_body_part_usage(&diag.document.root, 0, 0);
-    assert!(derived.prefix.basic.ref_prefix.derived_span.is_some());
-    assert!(derived.prefix.basic.ref_prefix.constant_span.is_none());
-    assert!(derived.prefix.basic.ref_prefix.direction.is_none());
+    assert!(derived
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .derived_span
+        .is_some());
+    assert!(derived
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .constant_span
+        .is_none());
+    assert!(derived
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .direction
+        .is_none());
 
     let constant = part_def_body_part_usage(&diag.document.root, 0, 1);
-    assert!(constant.prefix.basic.ref_prefix.constant_span.is_some());
-    assert!(constant.prefix.basic.ref_prefix.derived_span.is_none());
+    assert!(constant
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .constant_span
+        .is_some());
+    assert!(constant
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .derived_span
+        .is_none());
 
     let directed = part_def_body_part_usage(&diag.document.root, 0, 2);
     assert_eq!(
         directed
             .prefix
-            .basic
+            .basic()
+            .expect("basic head")
             .ref_prefix
             .direction
             .as_ref()
             .map(|node| node.value),
         Some(InOut::In)
     );
-    assert!(directed.prefix.basic.ref_prefix.derived_span.is_none());
-    assert!(directed.prefix.basic.ref_prefix.constant_span.is_none());
+    assert!(directed
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .derived_span
+        .is_none());
+    assert!(directed
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .constant_span
+        .is_none());
 }
 
 #[test]
@@ -3402,9 +3457,27 @@ part def Foo {
 }"#;
     let result = parse(input).expect("parse should succeed");
     let plain = part_def_body_part_usage(&result, 0, 0);
-    assert!(plain.prefix.basic.ref_prefix.derived_span.is_none());
-    assert!(plain.prefix.basic.ref_prefix.constant_span.is_none());
-    assert!(plain.prefix.basic.ref_prefix.direction.is_none());
+    assert!(plain
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .derived_span
+        .is_none());
+    assert!(plain
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .constant_span
+        .is_none());
+    assert!(plain
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .direction
+        .is_none());
 }
 
 #[test]
@@ -3427,22 +3500,47 @@ part brushSystem : BrushSystem {
         diag.errors
     );
     let derived_port = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 0);
-    assert!(derived_port.prefix.basic.ref_prefix.derived_span.is_some());
-    assert!(derived_port.prefix.basic.ref_prefix.constant_span.is_none());
-    assert!(derived_port.prefix.basic.ref_prefix.direction.is_none());
+    assert!(derived_port
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .derived_span
+        .is_some());
+    assert!(derived_port
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .constant_span
+        .is_none());
+    assert!(derived_port
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .direction
+        .is_none());
 
     let directed_port = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 1);
     assert_eq!(
         directed_port
             .prefix
-            .basic
+            .basic()
+            .expect("basic head")
             .ref_prefix
             .direction
             .as_ref()
             .map(|node| node.value),
         Some(InOut::Out)
     );
-    assert!(directed_port.prefix.basic.ref_prefix.derived_span.is_none());
+    assert!(directed_port
+        .prefix
+        .basic()
+        .expect("basic head")
+        .ref_prefix
+        .derived_span
+        .is_none());
 }
 
 #[test]

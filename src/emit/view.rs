@@ -21,6 +21,9 @@ pub(crate) fn emit_constraint_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("constraint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -151,6 +154,9 @@ pub(crate) fn emit_calc_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("calc def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -661,6 +667,9 @@ pub(crate) fn emit_view_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("view def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -886,6 +895,9 @@ pub(crate) fn emit_viewpoint_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("viewpoint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -922,6 +934,9 @@ pub(crate) fn emit_rendering_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("rendering def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

@@ -26,15 +26,13 @@
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndDeclIntroducer, EndIdentity,
-    EndNestedUsage, Node, RefDecl,
+    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndDeclIntroducer, EndIdentity, Node,
+    RefDecl,
 };
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
-use crate::parser::item::item_usage;
 use crate::parser::lex::{name, qualified_reference, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::occurrence_body::occurrence_usage;
 use crate::parser::usage::{
     cross_subsetting, multiplicity_node, redefinition, reference_subsetting, single_target_typing,
     subsetting, typing_node,
@@ -141,6 +139,10 @@ pub(crate) fn end_decl(
     let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
         let (input, role) = derivation_end_role(input)?;
         (input, EndIdentity::Derivation(role))
+    } else if input.fragment().starts_with(b":") {
+        // `UsageDeclaration = Identification? FeatureSpecializationPart?`: a specialization
+        // operator right after `end` means the end has no label of its own.
+        (input, EndIdentity::Anonymous)
     } else {
         let (input, (span, declaration_name)) = with_span(name).parse(input)?;
         (
@@ -154,6 +156,9 @@ pub(crate) fn end_decl(
     let (input, mid_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let leading_multiplicity = mid_multiplicity.or(leading_multiplicity);
+    // `FeatureSpecializationPart` orders its clauses freely, so a redefinition may lead:
+    // `end :>> source ::> producer.publicationPort;` (`ServerSequenceRealization_2.sysml`).
+    let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
 
     // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type, so
     // it's modeled via the same structured `SubsettingRelationship` every other reference-
@@ -180,64 +185,9 @@ pub(crate) fn end_decl(
                     typing: None,
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
-                    redefines: None,
+                    redefines: leading_redefines,
                     crosses: None,
-                    nested_usage: None,
                     type_ref_span: Some(type_ref_span),
-                },
-            ),
-        ));
-    }
-
-    // GH-53: an alternative form where the target is a complete, nested kind-prefixed usage
-    // rather than a bare type/reference -- see `EndDecl::nested_usage`'s doc comment. Only
-    // `occurrence`/`item` are evidenced; each of those parsers already handles its own full
-    // grammar (specialization clauses, multiplicity, body), so this end's own `name`/multiplicity
-    // above are everything this branch itself needs to contribute.
-    let (peek, _) = ws_and_comments(input)?;
-    let peek_frag = peek.fragment();
-    if starts_with_keyword(peek_frag, b"occurrence") {
-        let (input, nested) = occurrence_usage(input)?;
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                EndDecl {
-                    ref_prefix: ref_prefix.clone(),
-                    introducer,
-                    short_name,
-                    identity,
-                    typing: None,
-                    references: None,
-                    multiplicity: leading_multiplicity,
-                    redefines: None,
-                    crosses: None,
-                    nested_usage: Some(Box::new(EndNestedUsage::Occurrence(Box::new(nested)))),
-                    type_ref_span: None,
-                },
-            ),
-        ));
-    }
-    if starts_with_keyword(peek_frag, b"item") {
-        let (input, nested) = item_usage(input)?;
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                EndDecl {
-                    ref_prefix: ref_prefix.clone(),
-                    introducer,
-                    short_name,
-                    identity,
-                    typing: None,
-                    references: None,
-                    multiplicity: leading_multiplicity,
-                    redefines: None,
-                    crosses: None,
-                    nested_usage: Some(Box::new(EndNestedUsage::Item(Box::new(nested)))),
-                    type_ref_span: None,
                 },
             ),
         ));
@@ -263,9 +213,8 @@ pub(crate) fn end_decl(
                         typing: None,
                         references: None,
                         multiplicity: leading_multiplicity,
-                        redefines: None,
+                        redefines: leading_redefines,
                         crosses: None,
-                        nested_usage: None,
                         type_ref_span: None,
                     },
                 ),
@@ -310,9 +259,8 @@ pub(crate) fn end_decl(
                 typing,
                 references: trailing_references,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
-                redefines,
+                redefines: leading_redefines.or(redefines),
                 crosses,
-                nested_usage: None,
                 type_ref_span: Some(type_ref_span),
             },
         ),
@@ -342,6 +290,17 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage`, and the prefix of a
+    // kind-keyworded usage ends in the same run, so the tags sit between `ref` and whatever
+    // follows.
+    let mut input = input;
+    let mut extension_keywords = Vec::new();
+    while input.fragment().starts_with(b"#") {
+        let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
+        extension_keywords.push(keyword);
+        let (rest, _) = ws_and_comments(rest)?;
+        input = rest;
+    }
     let (input, kind_keyword) = opt(preceded(
         ws_and_comments,
         alt((
@@ -472,6 +431,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
+                extension_keywords,
                 short_name,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
@@ -494,28 +454,73 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     ))
 }
 
-/// Wrap a parsed endpoint expression in a `ConnectionEnd` node with no multiplicity, reusing the
-/// expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
-fn connection_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
-    connection_end_with_multiplicity(None, expr)
-}
-
-/// [`connection_end`] for the §6 G24 `connect [0..1] a to [1] b;` form. The endpoint's span still
-/// comes from the expression alone, so a multiplicity-bearing endpoint reports the same range as
-/// the bare one.
-pub(crate) fn connection_end_with_multiplicity(
+fn connection_end_full(
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<crate::ast::Expression>,
 ) -> Node<ConnectionEnd> {
     let span = expr.span.clone();
     Node::new(
         span.clone(),
         ConnectionEnd {
+            declared_name,
             expression: expr,
             multiplicity,
             span,
         },
     )
+}
+
+/// `( declaredName = Name ReferencesKeyword )?` of `ConnectorEnd`. A named end and a bare target
+/// share their first identifier, so this commits only once the `::>` / `references` operator is
+/// visible and otherwise consumes nothing.
+pub(crate) fn connector_end_name(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<crate::ast::ConnectorEndName>> {
+    let (after_ws, _) = ws_and_comments(input)?;
+    let Ok((after_name, (name_span, end_name))) = with_span(name).parse(after_ws) else {
+        return Ok((input, None));
+    };
+    if crate::parser::lex::is_reserved_keyword(end_name.as_bytes()) {
+        return Ok((input, None));
+    }
+    let (after_trivia, _) = ws_and_comments(after_name)?;
+    let operator = if after_trivia.fragment().starts_with(b"::>") {
+        let (rest, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
+        Some((
+            rest,
+            crate::ast::InterfaceEndReferenceOperator::Symbol { span },
+        ))
+    } else if starts_with_keyword(after_trivia.fragment(), b"references") {
+        let (rest, (span, _)) = with_span(tag(&b"references"[..])).parse(after_trivia)?;
+        Some((
+            rest,
+            crate::ast::InterfaceEndReferenceOperator::Keyword { span },
+        ))
+    } else {
+        None
+    };
+    match operator {
+        Some((rest, operator)) => Ok((
+            rest,
+            Some(crate::ast::ConnectorEndName {
+                name: Node::new(name_span, end_name),
+                operator,
+            }),
+        )),
+        None => Ok((input, None)),
+    }
+}
+
+/// One `ConnectorEnd`: `OwnedCrossMultiplicity? ( Name ReferencesKeyword )? target`.
+fn connector_end(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionEnd>> {
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, declared_name) = connector_end_name(input)?;
+    let (input, expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+    Ok((
+        input,
+        connection_end_full(multiplicity, declared_name, expr),
+    ))
 }
 
 /// `(from, to, extra_ends)` for a parsed connect statement.
@@ -533,38 +538,26 @@ pub(crate) fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> 
         map(
             (
                 preceded(ws_and_comments, tag(&b"("[..])),
-                preceded(ws_and_comments, path_expression),
+                connector_end,
                 nom::multi::many1(preceded(
                     preceded(ws_and_comments, tag(&b","[..])),
-                    preceded(ws_and_comments, path_expression),
+                    connector_end,
                 )),
                 preceded(ws_and_comments, tag(&b")"[..])),
             ),
             |(_, first, mut rest, _)| {
                 let to = rest.remove(0);
-                (
-                    connection_end(first),
-                    connection_end(to),
-                    rest.into_iter().map(connection_end).collect(),
-                )
+                (first, to, rest)
             },
         ),
         map(
             (
                 // §6 G24: each binary endpoint may carry its own multiplicity.
-                opt(preceded(ws_and_comments, multiplicity_node)),
-                path_expression,
+                connector_end,
                 preceded(ws_and_comments, tag(&b"to"[..])),
-                opt(preceded(ws_and_comments, multiplicity_node)),
-                preceded(ws_and_comments, path_expression),
+                connector_end,
             ),
-            |(from_mult, from, _, to_mult, to)| {
-                (
-                    connection_end_with_multiplicity(from_mult, from),
-                    connection_end_with_multiplicity(to_mult, to),
-                    Vec::new(),
-                )
-            },
+            |(from, _, to)| (from, to, Vec::new()),
         ),
     ))
     .parse(input)

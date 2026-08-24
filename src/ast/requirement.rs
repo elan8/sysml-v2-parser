@@ -26,6 +26,10 @@ pub struct RequirementDef {
     /// authored keyword's exact span. `RequirementDefinition` (SysML BNF 1400) reaches it through `OccurrenceDefinitionPrefix`
     /// (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub body: RequirementDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::OwningMembership`]. Genuine new grammar coverage (not just
@@ -543,6 +547,9 @@ pub struct ConcernUsage {
     /// (Systems Library `Requirements.sysml`). The parser has always accepted it; this struct
     /// had nowhere to put it, so emission dropped the keyword.
     pub is_abstract: bool,
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541) admits `individual` on `concern def`; the
+    /// usage keeps it through `OccurrenceUsagePrefix` (SysML BNF 564).
+    pub is_individual: bool,
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity after the name, e.g. `[0..*]` in `abstract concern concerns[0..*]`. Also
     /// previously parsed and discarded.
@@ -572,6 +579,10 @@ pub struct CaseDef {
     /// authored keyword's exact span. `CaseDefinition` (SysML BNF 1499) reaches it through `OccurrenceDefinitionPrefix`
     /// (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `case_def`.
     pub membership: Membership,
@@ -649,6 +660,10 @@ pub struct VerificationCaseDef {
     /// authored keyword's exact span. `VerificationCaseDefinition` (SysML BNF 1539) reaches it through `OccurrenceDefinitionPrefix`
     /// (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `verification_case_def`.
     pub membership: Membership,
@@ -718,6 +733,10 @@ pub struct UseCaseDef {
     /// authored keyword's exact span. `UseCaseDefinition` (SysML BNF 1560) reaches it through `OccurrenceDefinitionPrefix`
     /// (SysML BNF 541).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?`
+    /// (SysML BNF 541; Pilot `SysML.xtext` 804): `individual` is legal on every definition kind
+    /// that reaches this prefix, carried the same way as [`super::ActionDef::is_individual`].
+    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `use_case_def`.
     pub membership: Membership,
