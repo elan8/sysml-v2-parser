@@ -632,7 +632,7 @@ pub(crate) struct QualifiedReferenceArenaBuilder {
     arena: QualifiedReferenceArena,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct QualifiedReferenceArenaCheckpoint {
     references: usize,
     segments: usize,
