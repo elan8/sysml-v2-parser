@@ -906,6 +906,13 @@ fn emit_connection_end(w: &mut EmitWriter<'_>, end: &ConnectionEnd) -> Result<()
         emit_multiplicity(w, &mult.value)?;
         w.push_char(' ');
     }
+    if let Some(declared) = &end.declared_name {
+        w.push_str(&format_name(&declared.name.value));
+        match declared.operator {
+            InterfaceEndReferenceOperator::Symbol { .. } => w.push_str(" ::> "),
+            InterfaceEndReferenceOperator::Keyword { .. } => w.push_str(" references "),
+        }
+    }
     emit_expression(w, &end.expression.value)
 }
 

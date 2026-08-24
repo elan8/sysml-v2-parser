@@ -1915,7 +1915,11 @@ macro_rules! ast_traversal {
         pub fn walk_connection_end<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectionEnd>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectionEnd { expression, multiplicity, span } = &$($mutability)? node.value;
+            let ConnectionEnd { declared_name, expression, multiplicity, span } = &$($mutability)? node.value;
+            if let Some(inner) = declared_name {
+                visitor.visit_span(&$($mutability)? inner.name.span);
+                visitor.visit_text(&$($mutability)? inner.name.value);
+            }
             visitor.visit_expression(expression);
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);

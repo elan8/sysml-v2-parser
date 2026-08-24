@@ -4842,9 +4842,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
 
     fn write_connect(&mut self, connect: &super::Connect) -> io::Result<()> {
         self.writer.write_str("(connect (from ")?;
-        self.write_expression(&connect.from.value.expression)?;
+        self.write_connection_end(&connect.from.value)?;
         self.writer.write_str(") (to ")?;
-        self.write_expression(&connect.to.value.expression)?;
+        self.write_connection_end(&connect.to.value)?;
         self.writer.write_str(") ")?;
         self.write_ref_body(&connect.body)?;
         self.writer.write_str(" ")?;
@@ -4852,6 +4852,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", connect.redefines.as_ref())?;
         self.writer.write_char(')')
+    }
+
+    /// A `ConnectorEnd`: its declared name and operator spelling when authored, then the target.
+    fn write_connection_end(&mut self, end: &super::ConnectionEnd) -> io::Result<()> {
+        if let Some(declared) = &end.declared_name {
+            self.writer.write_str("(declared-name ")?;
+            write_quoted(self.writer, &declared.name.value)?;
+            self.writer.write_str(") (operator ")?;
+            self.writer.write_str(match declared.operator {
+                super::InterfaceEndReferenceOperator::Symbol { .. } => "::>",
+                super::InterfaceEndReferenceOperator::Keyword { .. } => "references",
+            })?;
+            self.writer.write_str(") ")?;
+        }
+        self.write_expression(&end.expression)
     }
 
     /// A KerML `binding` member owns a `TypeBody`; project it rather than reducing the member to

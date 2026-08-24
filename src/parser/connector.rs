@@ -451,28 +451,73 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     ))
 }
 
-/// Wrap a parsed endpoint expression in a `ConnectionEnd` node with no multiplicity, reusing the
-/// expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
-fn connection_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
-    connection_end_with_multiplicity(None, expr)
-}
-
-/// [`connection_end`] for the §6 G24 `connect [0..1] a to [1] b;` form. The endpoint's span still
-/// comes from the expression alone, so a multiplicity-bearing endpoint reports the same range as
-/// the bare one.
-pub(crate) fn connection_end_with_multiplicity(
+fn connection_end_full(
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<crate::ast::Expression>,
 ) -> Node<ConnectionEnd> {
     let span = expr.span.clone();
     Node::new(
         span.clone(),
         ConnectionEnd {
+            declared_name,
             expression: expr,
             multiplicity,
             span,
         },
     )
+}
+
+/// `( declaredName = Name ReferencesKeyword )?` of `ConnectorEnd`. A named end and a bare target
+/// share their first identifier, so this commits only once the `::>` / `references` operator is
+/// visible and otherwise consumes nothing.
+pub(crate) fn connector_end_name(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<crate::ast::ConnectorEndName>> {
+    let (after_ws, _) = ws_and_comments(input)?;
+    let Ok((after_name, (name_span, end_name))) = with_span(name).parse(after_ws) else {
+        return Ok((input, None));
+    };
+    if crate::parser::lex::is_reserved_keyword(end_name.as_bytes()) {
+        return Ok((input, None));
+    }
+    let (after_trivia, _) = ws_and_comments(after_name)?;
+    let operator = if after_trivia.fragment().starts_with(b"::>") {
+        let (rest, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
+        Some((
+            rest,
+            crate::ast::InterfaceEndReferenceOperator::Symbol { span },
+        ))
+    } else if starts_with_keyword(after_trivia.fragment(), b"references") {
+        let (rest, (span, _)) = with_span(tag(&b"references"[..])).parse(after_trivia)?;
+        Some((
+            rest,
+            crate::ast::InterfaceEndReferenceOperator::Keyword { span },
+        ))
+    } else {
+        None
+    };
+    match operator {
+        Some((rest, operator)) => Ok((
+            rest,
+            Some(crate::ast::ConnectorEndName {
+                name: Node::new(name_span, end_name),
+                operator,
+            }),
+        )),
+        None => Ok((input, None)),
+    }
+}
+
+/// One `ConnectorEnd`: `OwnedCrossMultiplicity? ( Name ReferencesKeyword )? target`.
+fn connector_end(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionEnd>> {
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, declared_name) = connector_end_name(input)?;
+    let (input, expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+    Ok((
+        input,
+        connection_end_full(multiplicity, declared_name, expr),
+    ))
 }
 
 /// `(from, to, extra_ends)` for a parsed connect statement.
@@ -490,38 +535,26 @@ pub(crate) fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> 
         map(
             (
                 preceded(ws_and_comments, tag(&b"("[..])),
-                preceded(ws_and_comments, path_expression),
+                connector_end,
                 nom::multi::many1(preceded(
                     preceded(ws_and_comments, tag(&b","[..])),
-                    preceded(ws_and_comments, path_expression),
+                    connector_end,
                 )),
                 preceded(ws_and_comments, tag(&b")"[..])),
             ),
             |(_, first, mut rest, _)| {
                 let to = rest.remove(0);
-                (
-                    connection_end(first),
-                    connection_end(to),
-                    rest.into_iter().map(connection_end).collect(),
-                )
+                (first, to, rest)
             },
         ),
         map(
             (
                 // §6 G24: each binary endpoint may carry its own multiplicity.
-                opt(preceded(ws_and_comments, multiplicity_node)),
-                path_expression,
+                connector_end,
                 preceded(ws_and_comments, tag(&b"to"[..])),
-                opt(preceded(ws_and_comments, multiplicity_node)),
-                preceded(ws_and_comments, path_expression),
+                connector_end,
             ),
-            |(from_mult, from, _, to_mult, to)| {
-                (
-                    connection_end_with_multiplicity(from_mult, from),
-                    connection_end_with_multiplicity(to_mult, to),
-                    Vec::new(),
-                )
-            },
+            |(from, _, to)| (from, to, Vec::new()),
         ),
     ))
     .parse(input)

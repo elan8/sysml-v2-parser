@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A named connector end.** `ConnectorEnd = OwnedCrossMultiplicityMember? ( declaredName =
+  Name ReferencesKeyword )? OwnedReferenceSubsetting` (reference `SysML.xtext:998-1002`), so
+  `connect bead references t.bead to mountingRim references w.rim;` (`09. Connections`) lost its
+  semicolon to recovery in every `connect` form except an interface's. `ConnectionEnd` gains
+  `declared_name` with the authored `::>` / `references` spelling. **AST version 236.**
+
 - **`ExtendedUsage` with a declaration.** `ExtendedUsage = UnextendedUsagePrefix
   UsageExtensionKeyword+ Usage` (SysML BNF 341; reference `SysML.xtext:728-730`) was modelled
   only as a `def`-less `ExtendedDefinition` -- which required a name and gave the member a

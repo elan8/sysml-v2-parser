@@ -705,10 +705,12 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     // §6 G24: each endpoint may carry its own multiplicity -- `connect [0..1] a.p1 to [1] b.p2;`.
     let (input, from_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, from_expr) = path_expression(input)?;
+    let (input, from_name) = crate::parser::connector::connector_end_name(input)?;
+    let (input, from_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, to_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, to_name) = crate::parser::connector::connector_end_name(input)?;
     let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = ref_body(input)?;
     let before_subsets = input;
@@ -743,8 +745,8 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
             start,
             input,
             Connect {
-                from: connection_end_with_multiplicity(from_multiplicity, from_expr),
-                to: connection_end_with_multiplicity(to_multiplicity, to_expr),
+                from: connection_end_with_multiplicity(from_multiplicity, from_name, from_expr),
+                to: connection_end_with_multiplicity(to_multiplicity, to_name, to_expr),
                 body,
                 subsets,
                 redefines,
@@ -757,12 +759,14 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 /// node, reusing the expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
 fn connection_end_with_multiplicity(
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<Expression>,
 ) -> Node<ConnectionEnd> {
     let span = expr.span.clone();
     Node::new(
         span.clone(),
         ConnectionEnd {
+            declared_name,
             expression: expr,
             multiplicity,
             span,

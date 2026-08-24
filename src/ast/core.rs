@@ -850,6 +850,11 @@ impl Eq for SubsettingRelationship {}
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionEnd {
+    /// `( declaredName = Name ReferencesKeyword )?` of `ConnectorEnd` (reference
+    /// `SysML.xtext:998-1002`; SysML BNF `ConnectorEnd`): the end's own name ahead of its
+    /// `::>` / `references` target, `connect bead references t.bead to mountingRim references
+    /// w.rim;` (`09. Connections`). `None` for the far more common bare target.
+    pub declared_name: Option<ConnectorEndName>,
     pub expression: Node<Expression>,
     /// Endpoint multiplicity (§6 G24), as in `connect [0..1] a.p1 to [1] b.p2;` from the OMG spec
     /// Annex `7a1-Variant Configuration - General Concept-a.sysml`. `None` for the (far more
@@ -858,10 +863,21 @@ pub struct ConnectionEnd {
     pub span: Span,
 }
 
+/// The `Name ReferencesKeyword` half of a `ConnectorEnd`: a declaration label, never a
+/// reference, and the authored spelling of the operator that follows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ConnectorEndName {
+    pub name: Node<String>,
+    pub operator: crate::ast::InterfaceEndReferenceOperator,
+}
+
 /// Equality ignores `span`, matching [`TypingRelationship`]'s convention.
 impl PartialEq for ConnectionEnd {
     fn eq(&self, other: &Self) -> bool {
-        self.expression == other.expression && self.multiplicity == other.multiplicity
+        self.declared_name == other.declared_name
+            && self.expression == other.expression
+            && self.multiplicity == other.multiplicity
     }
 }
 
