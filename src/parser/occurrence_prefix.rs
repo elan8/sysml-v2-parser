@@ -258,6 +258,146 @@ pub(crate) fn starts_contended_prefix(input: Input<'_>) -> bool {
     }
 }
 
+/// Whether `keyword` can introduce this member's kind after its optional prefixes.
+///
+/// Six usage families spell `MemberPrefix OccurrenceUsagePrefix <kind-keyword> ...`, and each is
+/// speculated at member starts it does not own: the whole prefix was parsed (allocating arena
+/// entries for `#tag` extensions) only for the kind keyword to refuse. This scans past trivia,
+/// `then`, visibility, every prefix slot keyword, and `#`-extension tags *without allocating*,
+/// then answers whether `keyword` leads. It is deliberately permissive -- a `true` only admits
+/// the real parser, which still decides -- but a `false` must be exact, so the skip set is a
+/// superset of every caller's authored prefix vocabulary.
+pub(crate) fn kind_keyword_follows(input: Input<'_>, keyword: &[u8]) -> bool {
+    const SKIPPED: &[&[u8]] = &[
+        b"then",
+        b"public",
+        b"private",
+        b"protected",
+        b"inout",
+        b"in",
+        b"out",
+        b"end",
+        b"derived",
+        b"abstract",
+        b"variation",
+        b"constant",
+        b"ref",
+        b"individual",
+        b"snapshot",
+        b"timeslice",
+    ];
+    let Ok((mut cursor, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    loop {
+        let fragment = cursor.fragment();
+        if starts_with_keyword(fragment, keyword) {
+            return true;
+        }
+        if fragment.starts_with(b"#") {
+            // Skip the `#` and its qualified-name tag: name bytes, separators, and quoted
+            // segments (whose closing quote may be escaped).
+            let mut index = 1usize;
+            while index < fragment.len() {
+                match fragment[index] {
+                    b'\'' => {
+                        index += 1;
+                        while index < fragment.len() {
+                            if fragment[index] == b'\\' && index + 1 < fragment.len() {
+                                index += 2;
+                            } else if fragment[index] == b'\'' {
+                                index += 1;
+                                break;
+                            } else {
+                                index += 1;
+                            }
+                        }
+                    }
+                    byte if byte.is_ascii_alphanumeric() => index += 1,
+                    b'_' | b':' | b'.' | b'$' => index += 1,
+                    _ => break,
+                }
+            }
+            let Ok((rest, _)) =
+                nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(index)
+                    .parse(cursor)
+            else {
+                return false;
+            };
+            let Ok((rest, _)) = ws_and_comments(rest) else {
+                return false;
+            };
+            cursor = rest;
+            continue;
+        }
+        if let Some(skipped) = SKIPPED
+            .iter()
+            .find(|candidate| starts_with_keyword(fragment, candidate))
+        {
+            let Ok((rest, _)) =
+                nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(skipped.len())
+                    .parse(cursor)
+            else {
+                return false;
+            };
+            let Ok((rest, _)) = ws_and_comments(rest) else {
+                return false;
+            };
+            cursor = rest;
+            continue;
+        }
+        // A multiplicity (`end [1] port …`) or a declared name (`end touches [0..*] item …`)
+        // may also stand before the kind keyword. Skipping them stays safe -- a `true` only
+        // admits the real parser -- while refusing here would reject authored syntax.
+        let skip_len = match fragment.first() {
+            Some(b'[') => {
+                let mut depth = 0usize;
+                let mut index = 0usize;
+                loop {
+                    match fragment.get(index) {
+                        Some(b'[') => depth += 1,
+                        Some(b']') => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break index + 1;
+                            }
+                        }
+                        Some(_) => {}
+                        None => return false,
+                    }
+                    index += 1;
+                }
+            }
+            Some(b'\'') => {
+                let mut index = 1usize;
+                loop {
+                    match fragment.get(index) {
+                        Some(b'\\') => index += 2,
+                        Some(b'\'') => break index + 1,
+                        Some(_) => index += 1,
+                        None => return false,
+                    }
+                }
+            }
+            Some(byte) if byte.is_ascii_alphabetic() || *byte == b'_' => fragment
+                .iter()
+                .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+                .count(),
+            _ => return false,
+        };
+        let Ok((rest, _)) =
+            nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(skip_len)
+                .parse(cursor)
+        else {
+            return false;
+        };
+        let Ok((rest, _)) = ws_and_comments(rest) else {
+            return false;
+        };
+        cursor = rest;
+    }
+}
+
 /// Whether the next unquoted identifier token spells a reserved SysML keyword.
 ///
 /// A reserved keyword can never be an unquoted declaration name, so a production whose next slot

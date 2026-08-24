@@ -125,6 +125,14 @@ fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
 /// other than `port` fails the whole production, so the member reaches recovery as one node
 /// rather than being reinterpreted as an unprefixed usage.
 pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"port") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, port_usage_inner)
 }
 

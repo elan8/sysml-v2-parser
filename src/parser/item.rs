@@ -54,6 +54,14 @@ pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Ite
 /// Wrapped in a reference transaction because the prefix's `UsageExtensionKeyword*` allocates an
 /// arena entry per `#tag` before the production is known to apply.
 pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"item") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, item_usage_inner)
 }
 
