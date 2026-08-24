@@ -34,13 +34,7 @@ impl ParseContext {
     /// Create a location-aware parser input backed by this parse context.
     pub(crate) fn input<'a>(&'a self, source: &'a [u8]) -> Input<'a> {
         let mut line_starts = vec![0];
-        line_starts.extend(
-            source
-                .iter()
-                .enumerate()
-                .filter(|(_, byte)| **byte == b'\n')
-                .map(|(index, _)| index + 1),
-        );
+        line_starts.extend(memchr::memchr_iter(b'\n', source).map(|index| index + 1));
         *self.line_starts.borrow_mut() = line_starts;
         LocatedSpan::new_extra(source, ParseContextRef { owner: self })
     }

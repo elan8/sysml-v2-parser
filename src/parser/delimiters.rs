@@ -8,6 +8,17 @@
 
 use super::parse::MAX_SYNTAX_NESTING;
 
+/// Bytes that can begin a delimiter, comment, or quoted text: everything the scanner must inspect.
+const INTERESTING: [bool; 256] = {
+    let mut table = [false; 256];
+    table[b'/' as usize] = true;
+    table[b'\'' as usize] = true;
+    table[b'"' as usize] = true;
+    table[b'{' as usize] = true;
+    table[b'}' as usize] = true;
+    table
+};
+
 /// Whole-document brace structure outside comments and quoted text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DelimiterScan {
@@ -32,6 +43,17 @@ impl DelimiterScan {
         let mut pos = 0usize;
 
         while pos < bytes.len() {
+            // Most of a document is neither a delimiter nor the start of a comment or quote;
+            // skip those bytes with a table lookup rather than the match below.
+            while let Some(&byte) = bytes.get(pos) {
+                if INTERESTING[byte as usize] {
+                    break;
+                }
+                pos += 1;
+            }
+            if pos >= bytes.len() {
+                break;
+            }
             let byte = bytes[pos];
             let next = bytes.get(pos + 1).copied();
             match (byte, next) {
@@ -97,7 +119,7 @@ impl DelimiterScan {
 /// Offset just past the line comment body starting at `pos` (the terminator is left unconsumed;
 /// it is ordinary whitespace to every caller).
 fn skip_line_comment(bytes: &[u8], pos: usize) -> usize {
-    match bytes[pos..].iter().position(|&b| b == b'\n' || b == b'\r') {
+    match memchr::memchr2(b'\n', b'\r', &bytes[pos..]) {
         Some(offset) => pos + offset,
         None => bytes.len(),
     }
@@ -106,26 +128,31 @@ fn skip_line_comment(bytes: &[u8], pos: usize) -> usize {
 /// Offset just past the closing `*/` of a block comment whose body starts at `pos`, or end of
 /// input when the comment is unterminated.
 fn skip_block_comment(bytes: &[u8], pos: usize) -> usize {
-    match bytes[pos..].windows(2).position(|pair| pair == b"*/") {
-        Some(offset) => pos + offset + 2,
-        None => bytes.len(),
+    let mut pos = pos;
+    while let Some(offset) = memchr::memchr(b'*', &bytes[pos..]) {
+        pos += offset + 1;
+        if bytes.get(pos) == Some(&b'/') {
+            return pos + 1;
+        }
     }
+    bytes.len()
 }
 
 /// Offset just past the closing `delimiter` of quoted text whose body starts at `pos`, or end of
 /// input when the text is unterminated.
 fn skip_quoted(bytes: &[u8], pos: usize, delimiter: u8) -> usize {
     let mut pos = pos;
-    while pos < bytes.len() {
-        let byte = bytes[pos];
+    while let Some(offset) = bytes
+        .get(pos..)
+        .and_then(|rest| memchr::memchr2(b'\\', delimiter, rest))
+    {
+        let byte = bytes[pos + offset];
+        pos += offset + 1;
         if byte == b'\\' {
-            pos += 2;
+            pos += 1;
             continue;
         }
-        pos += 1;
-        if byte == delimiter {
-            return pos;
-        }
+        return pos;
     }
     bytes.len()
 }
