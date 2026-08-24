@@ -294,7 +294,9 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ExhibitState(_)
         | PackageBodyElement::IncludeUseCase(_)
         | PackageBodyElement::ExtendedDefinition(_)
-        | PackageBodyElement::ExtendedUsage(_) => RootElement::Member(Box::new(Node { span, value })),
+        | PackageBodyElement::ExtendedUsage(_) => {
+            RootElement::Member(Box::new(Node { span, value }))
+        }
     };
     Ok((input, node_from_to(start, input, elem)))
 }
