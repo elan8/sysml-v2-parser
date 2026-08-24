@@ -1034,14 +1034,25 @@ pub(crate) fn emit_end_decl(
     if let Some(typing) = &end.typing {
         emit_typing_clause(w, &typing.value)?;
     }
+    // Without a typing, a redefinition can only have led the declaration (`end :>> source ::>
+    // producer.publicationPort;`), so it is written ahead of the reference subsetting; after
+    // a typing it trails, as authored (`end source : Anything :>> BinaryLinkObject::source;`).
+    let redefines_leads = end.typing.is_none();
+    if redefines_leads {
+        if let Some(redefines) = &end.redefines {
+            emit_subsetting_clause(w, &redefines.value)?;
+        }
+    }
     if let Some(references) = &end.references {
         emit_subsetting_clause(w, &references.value)?;
     }
     if let Some(mult) = &end.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if let Some(redefines) = &end.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
+    if !redefines_leads {
+        if let Some(redefines) = &end.redefines {
+            emit_subsetting_clause(w, &redefines.value)?;
+        }
     }
     if let Some(crosses) = &end.crosses {
         emit_subsetting_clause(w, &crosses.value)?;
@@ -1281,6 +1292,7 @@ fn emit_interface_usage_body_element(
             emit_ref_body(w, path, body)
         }
         InterfaceUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
+        InterfaceUsageBodyElement::PortUsage(port) => emit_port_usage(w, path, &port.value),
         InterfaceUsageBodyElement::FlowUsage(flow) => emit_flow_usage(w, path, &flow.value),
         InterfaceUsageBodyElement::Perform(perform) => emit_perform(w, path, &perform.value),
     }

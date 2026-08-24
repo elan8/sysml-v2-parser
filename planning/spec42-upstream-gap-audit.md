@@ -594,14 +594,26 @@ where the two disagree, against the normative model library, before anything was
   stays on `MetadataKeywordUsage` in every scope; folding it in is a body-dispatch change across
   all of them and is left as recorded debt.
 
+- `connect bead references t.bead to mountingRim references w.rim;` (`09_connections_example`):
+  `ConnectorEnd`'s `( declaredName = Name ReferencesKeyword )?`; `ConnectionEnd` gains
+  `declared_name`.
+- `specialization subtype x :> Base::things;`, `conjugation c1 conjugate Conjugate1 conjugates
+  Original;` and `type Conjugate4 ~ Conjugate1;` (`kerml/types`): the relationship keywords are
+  excluded from the declaration's identification, `Conjugation` joins the relationship
+  declarations, and the classifier's parsed `ConjugationPart` is now emitted and projected --
+  it had been dropped silently.
+- `private y: A, '2'[0..*];` (`kerml/examples/classes`): the keyword-less member's typing is
+  multi-target.
+- `end port p3 : P ::> p.p1;` in an interface *usage* body (`conjugation_test`) and the
+  redefinition-led `end :>> source ::> producer.publicationPort;` (`server_sequence_*`).
+
 ### Still open at this pin
 
-- `connection : PressureSeat connect bead references t.bead to mountingRim references w.rim;`
-  (`09_connections_example`): the `references` spelling of a connector end in a `ConnectionUsage`.
-- `specialization Gen subtype A specializes B;` in a KerML package (`kerml/types`).
-- `composite feature c : C { … }` in a KerML `struct` body (`kerml/examples/classes`).
-- `coverage_connectors` is not a corpus file and authors `connector` in a SysML `part def`,
-  which `SysML.xtext` does not spell at all; the fixture records a refusal, not a gap.
+- None of the corpus-derived snapshots under `tests/snapshots/spec42/{sysml,kerml,sysml.library}`
+  carries a diagnostic. `coverage_connectors` is not a corpus file and authors `connector` in a
+  SysML `part def`, which `SysML.xtext` does not spell at all; the fixture records a refusal.
+- The snapshot corpus is a sample of the 403 release files; `planning/corpus-coverage-*.md`
+  record the wider inventories, which this wave did not re-measure.
 
 ## Deferred neighbouring debt
 

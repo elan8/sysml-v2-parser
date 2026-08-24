@@ -2490,6 +2490,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
+        self.writer.write_str(") (conjugates ")?;
+        match &declaration.conjugates {
+            Some(conjugation) => {
+                self.writer.write_str(match conjugation.value.spelling {
+                    super::ConjugationSpelling::Keyword => "(keyword ",
+                    super::ConjugationSpelling::Operator => "(operator ",
+                })?;
+                self.write_reference(conjugation.value.target)?;
+                self.writer.write_char(')')?;
+            }
+            None => self.writer.write_str("none")?,
+        }
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&declaration.body)?;
         self.writer.write_char(')')
@@ -4997,6 +5009,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::PortUsage(port) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_usage(&port.value)?;
                         }
                         super::InterfaceUsageBodyElement::FlowUsage(flow) => {
                             self.write_item_prefix(&mut first)?;

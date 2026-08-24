@@ -2227,6 +2227,9 @@ pub enum InterfaceUsageBodyElement {
     /// `end` member inside a typed, non-`connect` interface usage's body. Boxed: `EndDecl` is
     /// much larger than `RefRedef`, the other variant here.
     EndDecl(Box<Node<EndDecl>>),
+    /// `PortUsage = OccurrenceUsagePrefix 'port' Usage` with an `end` head: `end port p3 : P
+    /// ::> p.p1;` (`ConjugationTest.sysml`), reached through `UsageBody = DefinitionBody`.
+    PortUsage(Box<Node<PortUsage>>),
     /// A behavior occurrence usage in an interface body. `InterfaceOccurrenceUsageElement`
     /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
     /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.

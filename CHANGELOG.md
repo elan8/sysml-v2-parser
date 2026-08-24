@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Three round-trip and dispatch gaps in the last corpus snapshots.** A KerML classifier's
+  `ConjugationPart` (`type Conjugate4 ~ Conjugate1;`, `Types.kerml`) was parsed but neither
+  emitted nor projected, so it vanished silently; an interface *usage* body did not dispatch the
+  `end port` member (`ConjugationTest.sysml`); and an end declaration led by a redefinition
+  (`end :>> source ::> producer.publicationPort;`, `ServerSequenceRealization_2.sysml`) was
+  refused, and once accepted was re-emitted in an order that did not reparse. Every
+  corpus-derived snapshot under `tests/snapshots/spec42` now parses without a diagnostic.
+  **AST version 239.**
+
 - **The KerML `Conjugation` declaration.** `( 'conjugation' Identification )? 'conjugate'
   conjugatedType CONJUGATES originalType RelationshipBody` (KerML BNF 463-475) joins the
   relationship declarations, so `conjugation c1 conjugate Conjugate1 conjugates Original;`

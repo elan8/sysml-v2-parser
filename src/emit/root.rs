@@ -224,6 +224,13 @@ pub(crate) fn emit_kerml_classifier_decl(
     if let Some(spec) = &decl.specializes {
         structure::emit_typing_clause(w, &spec.value)?;
     }
+    if let Some(conjugation) = &decl.conjugates {
+        w.push_str(match conjugation.value.spelling {
+            crate::ast::ConjugationSpelling::Keyword => " conjugates ",
+            crate::ast::ConjugationSpelling::Operator => " ~ ",
+        });
+        w.push_qualified_reference(&format!("{path}/conjugates"), conjugation.value.target)?;
+    }
     for (index, clause) in decl.type_relationships.iter().enumerate() {
         w.push_char(' ');
         w.push_str(clause.value.keyword.as_str());

@@ -781,6 +781,24 @@ fn interface_usage_body_element(
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     alt((
         interface_usage_ref_redef,
+        // An `end`-led kind-keyworded usage is that family's node with an `end` head; give it
+        // first refusal ahead of the keyword-less `EndDecl`, as every other body does.
+        map(
+            |input| {
+                if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+                    crate::parser::port::port_usage(input)
+                } else {
+                    Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )))
+                }
+            },
+            |port| {
+                let span = port.span.clone();
+                Node::new(span, InterfaceUsageBodyElement::PortUsage(Box::new(port)))
+            },
+        ),
         map(interface_usage_end_decl, |end| {
             let span = end.span.clone();
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))

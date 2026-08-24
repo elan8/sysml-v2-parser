@@ -4887,6 +4887,9 @@ macro_rules! ast_traversal {
                 InterfaceUsageBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(&$($mutability)? **field_0);
                 }
+                InterfaceUsageBodyElement::PortUsage(field_0) => {
+                    visitor.visit_port_usage(field_0);
+                }
                 InterfaceUsageBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }

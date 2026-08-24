@@ -156,6 +156,9 @@ pub(crate) fn end_decl(
     let (input, mid_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let leading_multiplicity = mid_multiplicity.or(leading_multiplicity);
+    // `FeatureSpecializationPart` orders its clauses freely, so a redefinition may lead:
+    // `end :>> source ::> producer.publicationPort;` (`ServerSequenceRealization_2.sysml`).
+    let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
 
     // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type, so
     // it's modeled via the same structured `SubsettingRelationship` every other reference-
@@ -182,7 +185,7 @@ pub(crate) fn end_decl(
                     typing: None,
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
-                    redefines: None,
+                    redefines: leading_redefines,
                     crosses: None,
                     type_ref_span: Some(type_ref_span),
                 },
@@ -210,7 +213,7 @@ pub(crate) fn end_decl(
                         typing: None,
                         references: None,
                         multiplicity: leading_multiplicity,
-                        redefines: None,
+                        redefines: leading_redefines,
                         crosses: None,
                         type_ref_span: None,
                     },
@@ -256,7 +259,7 @@ pub(crate) fn end_decl(
                 typing,
                 references: trailing_references,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
-                redefines,
+                redefines: leading_redefines.or(redefines),
                 crosses,
                 type_ref_span: Some(type_ref_span),
             },
