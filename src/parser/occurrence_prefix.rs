@@ -258,6 +258,40 @@ pub(crate) fn starts_contended_prefix(input: Input<'_>) -> bool {
     }
 }
 
+/// Whether the member can begin an `OccurrenceUsage`: `then`, a visibility keyword, a prefix
+/// slot keyword, a `#` extension, `event`, or `occurrence` leads. Exact word matches; a `true`
+/// only admits the real parser.
+pub(crate) fn could_start_occurrence_usage(input: Input<'_>) -> bool {
+    const STARTERS: &[&[u8]] = &[
+        b"then",
+        b"public",
+        b"private",
+        b"protected",
+        b"event",
+        b"occurrence",
+        b"end",
+        b"inout",
+        b"in",
+        b"out",
+        b"derived",
+        b"abstract",
+        b"variation",
+        b"constant",
+        b"ref",
+        b"individual",
+        b"snapshot",
+        b"timeslice",
+    ];
+    let Ok((cursor, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    let fragment = cursor.fragment();
+    fragment.starts_with(b"#")
+        || STARTERS
+            .iter()
+            .any(|keyword| starts_with_keyword(fragment, keyword))
+}
+
 /// Whether `keyword` can introduce this member's kind after its optional prefixes.
 ///
 /// Six usage families spell `MemberPrefix OccurrenceUsagePrefix <kind-keyword> ...`, and each is

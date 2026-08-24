@@ -97,6 +97,18 @@ fn required_package_identification(
 
 /// [standard] library package Identification PackageBody (BNF LibraryPackage)
 pub(crate) fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
+    // Refuse unless `library` or `standard` leads, before entering an arena transaction.
+    {
+        let (after_trivia, _) = crate::parser::lex::ws_and_comments(input)?;
+        let fragment = after_trivia.fragment();
+        if !starts_with_keyword(fragment, b"library") && !starts_with_keyword(fragment, b"standard")
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, library_package_inner)
 }
 
@@ -138,6 +150,14 @@ fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPac
 
 /// package Identification PackageBody
 pub(crate) fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"package") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, package_inner)
 }
 
@@ -161,6 +181,14 @@ fn package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
 
 /// KerML namespace Identification NamespaceBody
 fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"namespace") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, namespace_decl_inner)
 }
 
@@ -911,6 +939,28 @@ fn kerml_relationship_decl_inner(
 pub(crate) fn kerml_classifier_structured(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
+    // Refuse unless a classifier keyword follows the optional visibility/`abstract` prefix,
+    // before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
+        let (cursor, _) = crate::parser::lex::ws_and_comments(cursor)?;
+        let fragment = cursor.fragment();
+        let fragment = if starts_with_keyword(fragment, b"abstract") {
+            crate::parser::diagnostics::trim_ascii_start(&fragment[b"abstract".len()..])
+        } else {
+            fragment
+        };
+        if !KERML_CLASSIFIER_KEYWORDS
+            .iter()
+            .any(|(keyword, _)| starts_with_keyword(fragment, keyword))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_classifier_structured_inner)
 }
 

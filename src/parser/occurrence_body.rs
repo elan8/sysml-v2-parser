@@ -204,6 +204,17 @@ struct OccurrenceHead {
 /// Wrapped in a reference transaction because a `UsageExtensionKeyword` allocates an arena entry
 /// for its qualified name before the production is known to apply.
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
+    // The production has keyword-less spellings (`individual snapshot s : Ind;`), so the guard
+    // asks whether any word this production can begin with leads: `then`, visibility, a prefix
+    // slot keyword or `#` extension, `event`, or `occurrence`. Exact word matches, not first
+    // bytes, so `attribute`/`part`/... members refuse here instead of parsing a whole prefix
+    // inside an arena transaction and rolling it back.
+    if !crate::parser::occurrence_prefix::could_start_occurrence_usage(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, occurrence_usage_inner)
 }
 
@@ -571,6 +582,14 @@ pub(crate) fn occurrence_body_element(
 /// only valid inside an action body). Real usage from the SysML Systems Library
 /// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
 pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"succession") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, succession_usage_inner)
 }
 
@@ -653,6 +672,14 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
 pub(crate) fn assert_constraint_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"assert") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, assert_constraint_member_inner)
 }
 
