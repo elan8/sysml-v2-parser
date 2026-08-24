@@ -568,13 +568,29 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
 /// [`UsageDeclaration`] when no identification is authored. That is the grammar's optional
 /// declaration, not a sentinel action name.
 pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
-    // Speculated at member starts it does not own; refuse by lookahead before entering an
-    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
-    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"perform") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
+    // Mirror of the inner parser's first two tokens: `perform` (after its small prefix) then
+    // `action`. A `perform <path>` member is the sibling `perform_usage` form and refuses here
+    // without an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = perform_usage_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"perform") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        let (cursor, _) =
+            nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(b"perform".len())
+                .parse(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"action") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
     }
     crate::parser::span::reference_transaction(input, perform_action_decl_inner)
 }

@@ -822,17 +822,12 @@ pub(crate) fn action_def_body_element(
     // optional `action` declaration. Claim a complete loop node before a generic reference,
     // metadata prefix, or action usage can consume only its first part. Both parsers are
     // transactional, so failed probes cannot leak prefix references into the document arena.
-    if let Ok((next, node)) = while_stmt(start) {
-        return Ok((
-            next,
-            node_from_to(start, next, ActionDefBodyElement::WhileStmt(node)),
-        ));
-    }
-    if let Ok((next, node)) = loop_stmt(start) {
-        return Ok((
-            next,
-            node_from_to(start, next, ActionDefBodyElement::LoopStmt(node)),
-        ));
+    if let Ok((next, node)) = while_or_loop_stmt(start) {
+        let elem = match node {
+            WhileOrLoop::While(stmt) => ActionDefBodyElement::WhileStmt(stmt),
+            WhileOrLoop::Loop(stmt) => ActionDefBodyElement::LoopStmt(stmt),
+        };
+        return Ok((next, node_from_to(start, next, elem)));
     }
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see
@@ -984,8 +979,10 @@ fn action_def_body_behavior_element(input: Input<'_>) -> IResult<Input<'_>, Acti
 fn action_def_body_control_element(input: Input<'_>) -> IResult<Input<'_>, ActionDefBodyElement> {
     alt((
         map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
-        map(while_stmt, ActionDefBodyElement::WhileStmt),
-        map(loop_stmt, ActionDefBodyElement::LoopStmt),
+        map(while_or_loop_stmt, |node| match node {
+            WhileOrLoop::While(stmt) => ActionDefBodyElement::WhileStmt(stmt),
+            WhileOrLoop::Loop(stmt) => ActionDefBodyElement::LoopStmt(stmt),
+        }),
         map(if_stmt, ActionDefBodyElement::IfStmt),
         map(
             crate::parser::metadata::metadata_usage,
@@ -1498,15 +1495,16 @@ fn optional_until_parameter(input: Input<'_>) -> IResult<Input<'_>, Option<Until
     ))
 }
 
-/// While-loop control node: `ActionNodePrefix while` expression action-body (`until` expression
-/// `;`)? (SysML textual BNF 1143-1149).
-fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
-    // Speculated at member starts it does not own; refuse by lookahead before entering an
-    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+/// One dispatcher for the `while` and `loop` spellings of `WhileLoopNode`: both own the same
+/// `ActionNodePrefix`, so it is parsed once and the node keyword selects the branch. An
+/// `action`-led member that is neither spelling fails one transaction here instead of one per
+/// spelling.
+fn while_or_loop_stmt(input: Input<'_>) -> IResult<Input<'_>, WhileOrLoop> {
     if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"while")
-        // `ActionNodePrefix` admits an `action` declaration (with name/typing) before the
-        // node keyword (`ref action loopStep : Step loop { .. }`), which the generic
-        // prefix scan cannot cross; an `action`-led member admits the parser instead.
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"loop")
+        // `ActionNodePrefix` admits an `action` declaration (with name/typing) before the node
+        // keyword, which the generic prefix scan cannot cross; an `action`-led member admits
+        // the parser instead.
         && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
     {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -1514,69 +1512,51 @@ fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
             nom::error::ErrorKind::Tag,
         )));
     }
-    crate::parser::span::reference_transaction(input, while_stmt_inner)
+    crate::parser::span::reference_transaction(input, |input| {
+        let start = input;
+        let (input, prefix) = action_node_prefix(input)?;
+        let (peek, _) = ws_and_comments(input)?;
+        if starts_with_keyword(peek.fragment(), b"while") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"while"[..])).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, condition) = expression(input)?;
+            let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+            let (input, until) = optional_until_parameter(input)?;
+            return Ok((
+                input,
+                WhileOrLoop::While(node_from_to(
+                    start,
+                    input,
+                    WhileStmt {
+                        prefix,
+                        condition,
+                        body,
+                        until,
+                    },
+                )),
+            ));
+        }
+        let (input, _) = preceded(ws_and_comments, tag(&b"loop"[..])).parse(input)?;
+        let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+        let (input, until) = optional_until_parameter(input)?;
+        Ok((
+            input,
+            WhileOrLoop::Loop(node_from_to(
+                start,
+                input,
+                LoopStmt {
+                    prefix,
+                    body,
+                    until,
+                },
+            )),
+        ))
+    })
 }
 
-fn while_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
-    let start = input;
-    let (input, prefix) = action_node_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"while"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, condition) = expression(input)?;
-    let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
-    let (input, until) = optional_until_parameter(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            WhileStmt {
-                prefix,
-                condition,
-                body,
-                until,
-            },
-        ),
-    ))
-}
-
-/// `loop` is the empty-parameter alternative of `WhileLoopNode`; it owns the same prefix, body,
-/// and optional `until` parameter as the `while` spelling.
-fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
-    // Speculated at member starts it does not own; refuse by lookahead before entering an
-    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
-    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"loop")
-        // `ActionNodePrefix` admits an `action` declaration (with name/typing) before the
-        // node keyword (`ref action loopStep : Step loop { .. }`), which the generic
-        // prefix scan cannot cross; an `action`-led member admits the parser instead.
-        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
-    {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    crate::parser::span::reference_transaction(input, loop_stmt_inner)
-}
-
-fn loop_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
-    let start = input;
-    let (input, prefix) = action_node_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"loop"[..])).parse(input)?;
-    let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
-    let (input, until) = optional_until_parameter(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            LoopStmt {
-                prefix,
-                body,
-                until,
-            },
-        ),
-    ))
+enum WhileOrLoop {
+    While(Node<WhileStmt>),
+    Loop(Node<LoopStmt>),
 }
 
 /// A single `then <target>;`/`else <target>;` shorthand statement (GH-86): a branch member with
@@ -1901,8 +1881,10 @@ fn action_usage_body_control_element(
 ) -> IResult<Input<'_>, ActionUsageBodyElement> {
     alt((
         map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
-        map(while_stmt, ActionUsageBodyElement::WhileStmt),
-        map(loop_stmt, ActionUsageBodyElement::LoopStmt),
+        map(while_or_loop_stmt, |node| match node {
+            WhileOrLoop::While(stmt) => ActionUsageBodyElement::WhileStmt(stmt),
+            WhileOrLoop::Loop(stmt) => ActionUsageBodyElement::LoopStmt(stmt),
+        }),
         map(if_stmt, ActionUsageBodyElement::IfStmt),
         // Literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`,
         // GH-86), e.g. `metadata ToolExecution { ... }`. Previously only dispatched at

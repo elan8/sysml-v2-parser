@@ -861,6 +861,25 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
             nom::error::ErrorKind::Tag,
         )));
     }
+    // `actor :>> target = value;` is the sibling redefinition-assignment form, which this
+    // parser never accepts; refuse it without a transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = visibility_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        if crate::parser::lex::starts_with_keyword(cursor.fragment(), b"actor") {
+            let (cursor, _) =
+                nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(b"actor".len())
+                    .parse(cursor)?;
+            let (cursor, _) = ws_and_comments(cursor)?;
+            if cursor.fragment().starts_with(b":>>") {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+        }
+    }
     crate::parser::span::reference_transaction(input, actor_usage_inner)
 }
 
