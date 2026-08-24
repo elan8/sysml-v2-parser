@@ -404,7 +404,19 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 dot_shorthand: _,
             } => {
                 self.writer.write_str("(collection-op (operator ")?;
-                write_quoted(self.writer, collection_operator_name(op))?;
+                match op.classified_name() {
+                    Some(name) => write_quoted(self.writer, name)?,
+                    None => {
+                        let CollectionOperator::Other(spelling) = op else {
+                            unreachable!("only `Other` has no classified name");
+                        };
+                        let authored = self
+                            .document
+                            .operator_spelling(*spelling)
+                            .ok_or_else(|| invalid_span("operator spelling", spelling.span()))?;
+                        write_quoted(self.writer, authored)?;
+                    }
+                }
                 self.writer.write_str(") (base ")?;
                 self.write_expression(base)?;
                 self.writer.write_str(") (arguments")?;
@@ -6567,31 +6579,6 @@ fn type_check_name(kind: &TypeCheckKind) -> &'static str {
         TypeCheckKind::Istype => "istype",
         TypeCheckKind::Hastype => "hastype",
         TypeCheckKind::As => "as",
-    }
-}
-
-fn collection_operator_name(operator: &CollectionOperator) -> &str {
-    match operator {
-        CollectionOperator::Collect => "collect",
-        CollectionOperator::Select => "select",
-        CollectionOperator::SelectOne => "selectOne",
-        CollectionOperator::Size => "size",
-        CollectionOperator::IsEmpty => "isEmpty",
-        CollectionOperator::NotEmpty => "notEmpty",
-        CollectionOperator::Includes => "includes",
-        CollectionOperator::Including => "including",
-        CollectionOperator::Excludes => "excludes",
-        CollectionOperator::Excluding => "excluding",
-        CollectionOperator::ExcludingAt => "excludingAt",
-        CollectionOperator::ExcludingOnce => "excludingOnce",
-        CollectionOperator::Equals => "equals",
-        CollectionOperator::ForAll => "forAll",
-        CollectionOperator::Exists => "exists",
-        CollectionOperator::Sum => "sum",
-        CollectionOperator::Sort => "sort",
-        CollectionOperator::Filter => "filter",
-        CollectionOperator::Reduce => "reduce",
-        CollectionOperator::Other(name) => name,
     }
 }
 

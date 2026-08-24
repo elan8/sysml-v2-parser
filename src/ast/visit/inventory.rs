@@ -1574,7 +1574,7 @@ macro_rules! ast_traversal {
             }
         }
 
-        pub fn walk_binary_operator<V: $Visitor>(visitor: &mut V, node: &$($mutability)? BinaryOperator) {
+        pub fn walk_binary_operator<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? BinaryOperator) {
             match node {
                 BinaryOperator::Eq => {}
                 BinaryOperator::Ne => {}
@@ -1599,9 +1599,6 @@ macro_rules! ast_traversal {
                 BinaryOperator::BitOr => {}
                 BinaryOperator::BitAnd => {}
                 BinaryOperator::NullCoalesce => {}
-                BinaryOperator::Other(field_0) => {
-                    visitor.visit_text(field_0);
-                }
             }
         }
 
@@ -1613,15 +1610,12 @@ macro_rules! ast_traversal {
             }
         }
 
-        pub fn walk_unary_operator<V: $Visitor>(visitor: &mut V, node: &$($mutability)? UnaryOperator) {
+        pub fn walk_unary_operator<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? UnaryOperator) {
             match node {
                 UnaryOperator::Plus => {}
                 UnaryOperator::Minus => {}
                 UnaryOperator::Not => {}
                 UnaryOperator::BitNot => {}
-                UnaryOperator::Other(field_0) => {
-                    visitor.visit_text(field_0);
-                }
             }
         }
 
@@ -1848,7 +1842,7 @@ macro_rules! ast_traversal {
                 CollectionOperator::Filter => {}
                 CollectionOperator::Reduce => {}
                 CollectionOperator::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                    visitor.visit_span(&$($mutability)? field_0.span);
                 }
             }
         }
@@ -7834,45 +7828,45 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_semantic_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlSemanticDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlSemanticDecl { bnf_production, text } = &$($mutability)? node.value;
-            visitor.visit_text(bnf_production);
-            visitor.visit_text(text);
+            let KermlSemanticDecl { keyword_span, text } = &$($mutability)? node.value;
+            visitor.visit_span(keyword_span);
+            visitor.visit_span(&$($mutability)? text.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_kerml_feature_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeatureDecl { bnf_production, text } = &$($mutability)? node.value;
-            visitor.visit_text(bnf_production);
-            visitor.visit_text(text);
+            let KermlFeatureDecl { keyword_span, text } = &$($mutability)? node.value;
+            visitor.visit_span(keyword_span);
+            visitor.visit_span(&$($mutability)? text.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_feature_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let FeatureDecl { keyword, text } = &$($mutability)? node.value;
-            visitor.visit_text(keyword);
-            visitor.visit_text(text);
+            let FeatureDecl { keyword_span, text } = &$($mutability)? node.value;
+            visitor.visit_span(keyword_span);
+            visitor.visit_span(&$($mutability)? text.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_classifier_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ClassifierDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ClassifierDecl { keyword, text } = &$($mutability)? node.value;
-            visitor.visit_text(keyword);
-            visitor.visit_text(text);
+            let ClassifierDecl { keyword_span, text } = &$($mutability)? node.value;
+            visitor.visit_span(keyword_span);
+            visitor.visit_span(&$($mutability)? text.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_extended_library_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedLibraryDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExtendedLibraryDecl { bnf_production, text } = &$($mutability)? node.value;
-            visitor.visit_text(bnf_production);
-            visitor.visit_text(text);
+            let ExtendedLibraryDecl { keyword_span, text } = &$($mutability)? node.value;
+            visitor.visit_span(keyword_span);
+            visitor.visit_span(&$($mutability)? text.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

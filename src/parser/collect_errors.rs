@@ -106,10 +106,17 @@ impl Visitor for RecoveryErrorCollector<'_> {
     /// dialect's spelling -- cannot tell a declaration from the same words inside a comment or a
     /// string literal.
     fn visit_extended_library_decl(&mut self, node: &Node<ExtendedLibraryDecl>) {
-        if let Some((code, message, expected, suggestion)) =
-            crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
-                node.value.text.as_bytes(),
+        if let Some((code, message, expected, suggestion)) = self
+            .source
+            .get(
+                node.value.text.span().offset
+                    ..node.value.text.span().offset + node.value.text.span().len,
             )
+            .and_then(|text| {
+                crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
+                    text.as_bytes(),
+                )
+            })
         {
             self.errors.push(
                 ParseError::new(message)

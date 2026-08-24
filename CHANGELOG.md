@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `language`/`language_span` pair). `ParsedDocument::comment_body` returns the authored body and
   `normalized_comment_body` the pinned-normalized view, borrowing when nothing changes;
   `normalize_comment_body` now returns a `Cow`.
+- **Opaque declaration text and operator fallback spellings are typed source spans.** The
+  fallback nodes (`KermlSemanticDecl`, `KermlFeatureDecl`, `FeatureDecl`, `ClassifierDecl`,
+  `ExtendedLibraryDecl`) carry `text: OpaqueText` and a `keyword_span` for the starter keyword that
+  classified them, replacing the copied `text` and `bnf_production`/`keyword` strings
+  (`ParsedDocument::opaque_text`). `CollectionOperator::Other` holds an `OperatorSpelling` span
+  (`ParsedDocument::operator_spelling`, `CollectionOperator::classified_name`); the never-produced
+  `BinaryOperator::Other`/`UnaryOperator::Other` variants and `from_token` constructors are
+  removed.
 - **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
   Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
   whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,

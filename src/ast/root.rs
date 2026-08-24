@@ -10,7 +10,10 @@ use super::qualified_reference::{
     SourceRange, SourceStorage,
 };
 use crate::ast::common::{normalize_comment_body, CommentBody, DeclarationName};
-use crate::ast::core::{decode_string_literal, Node, RealLiteral, Span, StringLiteral};
+use crate::ast::core::{
+    decode_string_literal, Node, OperatorSpelling, RealLiteral, Span, StringLiteral,
+};
+use crate::ast::kerml_fallback::OpaqueText;
 use std::borrow::Cow;
 
 /// KerML top-level element (BNF `RootNamespace = PackageBodyElement*`).
@@ -162,6 +165,16 @@ impl ParsedDocument {
     /// change nothing.
     pub fn normalized_comment_body(&self, body: CommentBody) -> Option<Cow<'_, str>> {
         Some(normalize_comment_body(self.comment_body(body)?))
+    }
+
+    /// The authored spelling of an operator the grammar did not classify.
+    pub fn operator_spelling(&self, operator: OperatorSpelling) -> Option<&str> {
+        self.source.slice(operator.span())
+    }
+
+    /// The retained source of a declaration the parser recognized but did not model.
+    pub fn opaque_text(&self, text: OpaqueText) -> Option<&str> {
+        self.source.slice(text.span())
     }
 
     /// Resolve a qualified declaration name without erasing its declaration role in the AST.

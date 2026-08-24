@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
-use sysml_v2_parser::{parse_with_diagnostics, ParseError};
+use sysml_v2_parser::{parse_with_diagnostics, ParseError, ParsedDocument};
 
 /// Root of the SysML v2 Release tree (from env or the local sysml-v2-release directory).
 fn sysml_v2_release_root() -> PathBuf {
@@ -118,21 +118,31 @@ fn classify_error(err: &ParseError) -> String {
         .join(" ")
 }
 
-fn collect_bnf_decl_counts(root: &RootNamespace, counts: &mut BTreeMap<String, usize>) {
+fn collect_bnf_decl_counts(
+    doc: &ParsedDocument,
+    root: &RootNamespace,
+    counts: &mut BTreeMap<String, usize>,
+) {
     for element in &root.elements {
         match &element.value {
-            RootElement::Package(p) => collect_bnf_decl_counts_in_body(&p.value.body, counts),
+            RootElement::Package(p) => collect_bnf_decl_counts_in_body(doc, &p.value.body, counts),
             RootElement::LibraryPackage(p) => {
-                collect_bnf_decl_counts_in_body(&p.value.body, counts)
+                collect_bnf_decl_counts_in_body(doc, &p.value.body, counts)
             }
-            RootElement::Namespace(n) => collect_bnf_decl_counts_in_body(&n.value.body, counts),
+            RootElement::Namespace(n) => {
+                collect_bnf_decl_counts_in_body(doc, &n.value.body, counts)
+            }
             RootElement::Import(_) => {}
             RootElement::Member(_) => {}
         }
     }
 }
 
-fn collect_bnf_decl_counts_in_body(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
+fn collect_bnf_decl_counts_in_body(
+    doc: &ParsedDocument,
+    body: &PackageBody,
+    counts: &mut BTreeMap<String, usize>,
+) {
     let PackageBody::Brace { elements, .. } = body else {
         return;
     };
@@ -140,34 +150,49 @@ fn collect_bnf_decl_counts_in_body(body: &PackageBody, counts: &mut BTreeMap<Str
         match &element.value {
             PackageBodyElement::FeatureDecl(n) => {
                 *counts
-                    .entry(format!("dedicated:{}", n.value.keyword))
+                    .entry(format!(
+                        "dedicated:{}",
+                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
+                    ))
                     .or_insert(0) += 1;
             }
             PackageBodyElement::ClassifierDecl(n) => {
                 *counts
-                    .entry(format!("dedicated:{}", n.value.keyword))
+                    .entry(format!(
+                        "dedicated:{}",
+                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
+                    ))
                     .or_insert(0) += 1;
             }
             PackageBodyElement::KermlSemanticDecl(n) => {
                 *counts
-                    .entry(format!("bnf:{}", n.value.bnf_production))
+                    .entry(format!(
+                        "bnf:{}",
+                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
+                    ))
                     .or_insert(0) += 1;
             }
             PackageBodyElement::KermlFeatureDecl(n) => {
                 *counts
-                    .entry(format!("bnf:{}", n.value.bnf_production))
+                    .entry(format!(
+                        "bnf:{}",
+                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
+                    ))
                     .or_insert(0) += 1;
             }
             PackageBodyElement::ExtendedLibraryDecl(n) => {
                 *counts
-                    .entry(format!("bnf:{}", n.value.bnf_production))
+                    .entry(format!(
+                        "bnf:{}",
+                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
+                    ))
                     .or_insert(0) += 1;
             }
             PackageBodyElement::Package(n) => {
-                collect_bnf_decl_counts_in_body(&n.value.body, counts)
+                collect_bnf_decl_counts_in_body(doc, &n.value.body, counts)
             }
             PackageBodyElement::LibraryPackage(n) => {
-                collect_bnf_decl_counts_in_body(&n.value.body, counts)
+                collect_bnf_decl_counts_in_body(doc, &n.value.body, counts)
             }
             _ => {}
         }
@@ -234,15 +259,19 @@ fn env_threshold(name: &str) -> Option<usize> {
         .and_then(|v| v.parse::<usize>().ok())
 }
 
-fn collect_extended_texts(body: &PackageBody, out: &mut Vec<String>) {
+fn collect_extended_texts(doc: &ParsedDocument, body: &PackageBody, out: &mut Vec<String>) {
     let PackageBody::Brace { elements, .. } = body else {
         return;
     };
     for element in elements {
         match &element.value {
-            PackageBodyElement::ExtendedLibraryDecl(n) => out.push(n.value.text.clone()),
-            PackageBodyElement::Package(n) => collect_extended_texts(&n.value.body, out),
-            PackageBodyElement::LibraryPackage(n) => collect_extended_texts(&n.value.body, out),
+            PackageBodyElement::ExtendedLibraryDecl(n) => {
+                out.push(doc.opaque_text(n.value.text).unwrap_or_default().to_owned())
+            }
+            PackageBodyElement::Package(n) => collect_extended_texts(doc, &n.value.body, out),
+            PackageBodyElement::LibraryPackage(n) => {
+                collect_extended_texts(doc, &n.value.body, out)
+            }
             _ => {}
         }
     }
@@ -388,7 +417,7 @@ fn test_systems_library_strict_no_diagnostics() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
         let result = parse_with_diagnostics(&content);
-        collect_bnf_decl_counts(&result.document.root, &mut bnf_counts);
+        collect_bnf_decl_counts(&result.document, &result.document.root, &mut bnf_counts);
         if !result.errors.is_empty() {
             for err in &result.errors {
                 *pattern_counts.entry(classify_error(err)).or_insert(0) += 1;
@@ -468,7 +497,7 @@ fn test_full_library_strict_no_diagnostics() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
         let result = parse_with_diagnostics(&content);
-        collect_bnf_decl_counts(&result.document.root, &mut bnf_counts);
+        collect_bnf_decl_counts(&result.document, &result.document.root, &mut bnf_counts);
         if result.errors.is_empty() {
             eprintln!("✓ {}", relative_path);
             continue;
@@ -550,12 +579,14 @@ fn test_systems_library_node_types_no_extended() {
             let mut snippets = Vec::new();
             for root in &result.document.root.elements {
                 match &root.value {
-                    RootElement::Package(n) => collect_extended_texts(&n.value.body, &mut snippets),
+                    RootElement::Package(n) => {
+                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
+                    }
                     RootElement::LibraryPackage(n) => {
-                        collect_extended_texts(&n.value.body, &mut snippets)
+                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
                     }
                     RootElement::Namespace(n) => {
-                        collect_extended_texts(&n.value.body, &mut snippets)
+                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
                     }
                     RootElement::Import(_) => {}
                     RootElement::Member(_) => {}
@@ -650,12 +681,14 @@ fn test_full_library_node_types_no_extended() {
             let mut snippets = Vec::new();
             for root in &result.document.root.elements {
                 match &root.value {
-                    RootElement::Package(n) => collect_extended_texts(&n.value.body, &mut snippets),
+                    RootElement::Package(n) => {
+                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
+                    }
                     RootElement::LibraryPackage(n) => {
-                        collect_extended_texts(&n.value.body, &mut snippets)
+                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
                     }
                     RootElement::Namespace(n) => {
-                        collect_extended_texts(&n.value.body, &mut snippets)
+                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
                     }
                     RootElement::Import(_) => {}
                     RootElement::Member(_) => {}

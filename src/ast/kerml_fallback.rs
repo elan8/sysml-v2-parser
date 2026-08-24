@@ -98,36 +98,63 @@ impl KermlBareDeclarationKeyword {
     }
 }
 
+/// Retained source of a declaration the parser recognized but did not model structurally.
+///
+/// A span into the document, trimmed of surrounding trivia; resolve through
+/// [`crate::ast::ParsedDocument::opaque_text`]. It is deliberately not a [`crate::ast::Span`]
+/// in the open: opaque text is a narrowly scoped state, and consumers must not treat it as a
+/// parsed construct.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OpaqueText {
+    pub(crate) span: Span,
+}
+
+impl OpaqueText {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the retained text.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
 /// Modeled KerML semantic declaration captured as package-level syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlSemanticDecl {
-    pub bnf_production: String,
-    pub text: String,
+    /// The starter keyword that classified this declaration (its BNF production name).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Modeled KerML feature declaration family (occurrence/expr/predicate/succession).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlFeatureDecl {
-    pub bnf_production: String,
-    pub text: String,
+    /// The starter keyword that classified this declaration (its BNF production name).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Package-level KerML feature declaration captured as an explicit dedicated node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FeatureDecl {
-    pub keyword: String,
-    pub text: String,
+    /// The `feature` keyword.
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Package-level KerML classifier declaration captured as an explicit dedicated node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ClassifierDecl {
-    pub keyword: String,
-    pub text: String,
+    /// The classifier keyword (`class`, `classifier`, `struct`, `structure`, `subclassifier`).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Modeled extended SysML/KerML declaration family not yet represented by
@@ -135,8 +162,9 @@ pub struct ClassifierDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExtendedLibraryDecl {
-    pub bnf_production: String,
-    pub text: String,
+    /// The starter keyword that classified this declaration (its BNF production name).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Structured KerML classifier declaration with a body, e.g. `abstract function isZero

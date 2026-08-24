@@ -1213,7 +1213,11 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 };
                 let (after_brace, body) = collection_operator_body(next)?;
                 let expr = Expression::CollectionOp {
-                    op: CollectionOperator::from_name(if select { "select" } else { "collect" }),
+                    op: if select {
+                        CollectionOperator::Select
+                    } else {
+                        CollectionOperator::Collect
+                    },
                     base: Box::new(atom),
                     args: Vec::new(),
                     brace_body: Some(Box::new(body)),
@@ -1250,9 +1254,9 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 let (next, _) = ws_and_comments(next)?;
                 let member_input = next;
                 let (next, member) = name(next)?;
-                let op = CollectionOperator::from_name(
-                    std::str::from_utf8(crate::parser::lex::name_bytes(member_input, member))
-                        .unwrap_or_default(),
+                let op = CollectionOperator::from_authored(
+                    crate::parser::lex::name_bytes(member_input, member),
+                    *member.span(),
                 );
                 let (after_name, _) = ws_and_comments(next)?;
                 // Brace-body form: `collection->forAll { in ref w; expr }`
@@ -1672,7 +1676,7 @@ mod tests {
                 assert!(matches!(&right.value, Expression::LiteralInteger(1)));
                 match &left.value {
                     Expression::CollectionOp { op, base, args, .. } => {
-                        assert_eq!(op, &CollectionOperator::Other("c".to_string()));
+                        assert!(matches!(op, CollectionOperator::Other(_)));
                         assert!(args.is_empty());
                         match &base.value {
                             Expression::MemberAccess {

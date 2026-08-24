@@ -138,41 +138,10 @@ pub enum BinaryOperator {
     /// KerML null-coalescing operator `??` (BNF `NullCoalescingExpression`), e.g.
     /// `collection->reduce '+' ?? zero` (Kernel Function Library `DataFunctions.kerml`).
     NullCoalesce,
-    /// Unclassified or extension operator; retains source token.
-    Other(String),
 }
 
 impl BinaryOperator {
-    pub fn from_token(token: &str) -> Self {
-        match token {
-            "==" => Self::Eq,
-            "!=" => Self::Ne,
-            "===" => Self::StrictEq,
-            "!==" => Self::StrictNe,
-            "<" => Self::Lt,
-            "<=" => Self::Le,
-            ">" => Self::Gt,
-            ">=" => Self::Ge,
-            "+" => Self::Add,
-            "-" => Self::Sub,
-            "*" => Self::Mul,
-            "/" => Self::Div,
-            "%" => Self::Mod,
-            "^" => Self::Pow,
-            "**" => Self::Exp,
-            "&&" | "and" => Self::And,
-            "||" | "or" => Self::Or,
-            "xor" => Self::Xor,
-            "implies" => Self::Implies,
-            "??" => Self::NullCoalesce,
-            ".." => Self::Range,
-            "|" => Self::BitOr,
-            "&" => Self::BitAnd,
-            other => Self::Other(other.to_string()),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Self::Eq => "==",
             Self::Ne => "!=",
@@ -197,7 +166,6 @@ impl BinaryOperator {
             Self::Range => "..",
             Self::BitOr => "|",
             Self::BitAnd => "&",
-            Self::Other(s) => s.as_str(),
         }
     }
 }
@@ -219,27 +187,15 @@ pub enum UnaryOperator {
     Minus,
     Not,
     BitNot,
-    Other(String),
 }
 
 impl UnaryOperator {
-    pub fn from_token(token: &str) -> Self {
-        match token {
-            "+" => Self::Plus,
-            "-" => Self::Minus,
-            "not" => Self::Not,
-            "~" => Self::BitNot,
-            other => Self::Other(other.to_string()),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Not => "not",
             Self::BitNot => "~",
-            Self::Other(s) => s.as_str(),
         }
     }
 }
@@ -651,38 +607,63 @@ pub enum CollectionOperator {
     Sort,
     Filter,
     Reduce,
-    /// Any other arrow-invoked name not special-cased above, e.g. `->minimize`, `->maximize`.
-    Other(String),
+    /// Any other arrow-invoked name not special-cased above, e.g. `->minimize`, `->maximize`,
+    /// retained as its authored spelling.
+    Other(OperatorSpelling),
+}
+
+/// The authored spelling of an operator the grammar does not classify, as a span into the source.
+///
+/// Resolve through [`crate::ast::ParsedDocument::operator_spelling`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OperatorSpelling {
+    pub(crate) span: Span,
+}
+
+impl OperatorSpelling {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the authored token.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
 }
 
 impl CollectionOperator {
-    pub fn from_name(name: &str) -> Self {
+    /// Classify an arrow-invoked name from its authored bytes; an unrecognized name is retained
+    /// by `span`.
+    pub(crate) fn from_authored(name: &[u8], span: Span) -> Self {
         match name {
-            "collect" => Self::Collect,
-            "select" => Self::Select,
-            "selectOne" => Self::SelectOne,
-            "size" => Self::Size,
-            "isEmpty" => Self::IsEmpty,
-            "notEmpty" => Self::NotEmpty,
-            "includes" => Self::Includes,
-            "including" => Self::Including,
-            "excludes" => Self::Excludes,
-            "excluding" => Self::Excluding,
-            "excludingAt" => Self::ExcludingAt,
-            "excludingOnce" => Self::ExcludingOnce,
-            "equals" => Self::Equals,
-            "forAll" => Self::ForAll,
-            "exists" => Self::Exists,
-            "sum" => Self::Sum,
-            "sort" => Self::Sort,
-            "filter" => Self::Filter,
-            "reduce" => Self::Reduce,
-            other => Self::Other(other.to_string()),
+            b"collect" => Self::Collect,
+            b"select" => Self::Select,
+            b"selectOne" => Self::SelectOne,
+            b"size" => Self::Size,
+            b"isEmpty" => Self::IsEmpty,
+            b"notEmpty" => Self::NotEmpty,
+            b"includes" => Self::Includes,
+            b"including" => Self::Including,
+            b"excludes" => Self::Excludes,
+            b"excluding" => Self::Excluding,
+            b"excludingAt" => Self::ExcludingAt,
+            b"excludingOnce" => Self::ExcludingOnce,
+            b"equals" => Self::Equals,
+            b"forAll" => Self::ForAll,
+            b"exists" => Self::Exists,
+            b"sum" => Self::Sum,
+            b"sort" => Self::Sort,
+            b"filter" => Self::Filter,
+            b"reduce" => Self::Reduce,
+            _ => Self::Other(OperatorSpelling::new(span)),
         }
     }
 
-    pub fn as_str(&self) -> &str {
-        match self {
+    /// The classified operator's spelling; `None` for [`Self::Other`], whose spelling lives in
+    /// the document.
+    pub fn classified_name(&self) -> Option<&'static str> {
+        Some(match self {
             Self::Collect => "collect",
             Self::Select => "select",
             Self::SelectOne => "selectOne",
@@ -702,8 +683,8 @@ impl CollectionOperator {
             Self::Sort => "sort",
             Self::Filter => "filter",
             Self::Reduce => "reduce",
-            Self::Other(s) => s.as_str(),
-        }
+            Self::Other(_) => return None,
+        })
     }
 }
 
