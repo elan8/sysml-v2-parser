@@ -1897,6 +1897,14 @@ pub(crate) fn emit_enum_def(
                     crate::ast::EnumerationBodyElement::Value(value) => {
                         let value = &value.value;
                         emit_visibility(w, value.membership.visibility);
+                        for (index, keyword) in value.extension_keywords.iter().enumerate() {
+                            w.push_char('#');
+                            w.push_qualified_reference(
+                                &format!("{path}/enumerated-value/extension[{index}]"),
+                                keyword.value.annotation,
+                            )?;
+                            w.push_char(' ');
+                        }
                         if value.enum_keyword_span.is_some() {
                             w.push_str("enum ");
                         }

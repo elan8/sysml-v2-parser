@@ -1797,6 +1797,11 @@ pub enum EnumerationBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumeratedValue {
+    /// `UsageExtensionKeyword*` ahead of the optional keyword: `EnumeratedValue =
+    /// UsageExtensionKeyword* 'enum'? Usage` (reference `SysML.xtext:784-786`; the published
+    /// BNF 531 omits the run). `#Security enum secret : ClassificationLevel = 2;`
+    /// (`MetadataTest.sysml`).
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
     /// Authored optional `enum` keyword.  Its presence is syntactic provenance, not an inferred
     /// boolean; emission streams it only when the source contained it.
     pub enum_keyword_span: Option<Span>,

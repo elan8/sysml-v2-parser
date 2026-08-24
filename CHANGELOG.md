@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`#Tag` prefixes on an enumerated value.** `EnumeratedValue = UsageExtensionKeyword* 'enum'?
+  Usage` (reference `SysML.xtext:784-786`; the published BNF 531 omits the run), so `#Security
+  enum secret : ClassificationLevel = 2;` (`MetadataTest.sysml`) recovered. `EnumeratedValue`
+  gains `extension_keywords`, emitted and projected in authored order. **AST version 233.**
+
 - **Columns are O(1), so a long line is no longer quadratic to parse.** Every span took its
   column from `nom_locate`'s `get_column`, a backward scan to the previous newline, so each node
   on a line cost the whole line and a single 400 KB line (the deeply-nested-parentheses stack

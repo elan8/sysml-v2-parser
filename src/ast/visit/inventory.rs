@@ -4221,7 +4221,7 @@ macro_rules! ast_traversal {
         pub fn walk_enumerated_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumeratedValue>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumeratedValue { enum_keyword_span, identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
+            let EnumeratedValue { extension_keywords, enum_keyword_span, identification, identification_span, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             visitor.visit_span(identification_span);
             if let Some(inner) = typing {
@@ -4253,6 +4253,9 @@ macro_rules! ast_traversal {
                 visitor.visit_feature_value(inner);
             }
             visitor.visit_part_usage_body(body);
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
             if let Some(inner) = enum_keyword_span {
                 visitor.visit_span(inner);
             }

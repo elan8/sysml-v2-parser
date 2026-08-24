@@ -31,6 +31,15 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let mut input = input;
+    let mut extension_keywords = Vec::new();
+    while input.fragment().starts_with(b"#") {
+        let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
+        extension_keywords.push(keyword);
+        let (rest, _) = ws_and_comments(rest)?;
+        input = rest;
+    }
     let (input, enum_keyword_span) = opt(with_span(|input| {
         preceded(tag(&b"enum"[..]), ws1).parse(input)
     }))
@@ -45,6 +54,7 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue
             start,
             input,
             EnumeratedValue {
+                extension_keywords,
                 enum_keyword_span: enum_keyword_span.map(|(span, _)| span),
                 identification: ident,
                 identification_span,

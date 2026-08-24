@@ -5459,7 +5459,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             let value_span = &value.span;
                             let value = &value.value;
-                            self.writer.write_str("(enum-value (enum-keyword ")?;
+                            self.writer.write_str("(enum-value (extensions")?;
+                            for keyword in &value.extension_keywords {
+                                self.writer.write_char(' ')?;
+                                self.write_reference(keyword.value.annotation)?;
+                            }
+                            self.writer.write_str(") (enum-keyword ")?;
                             self.writer
                                 .write_str(if value.enum_keyword_span.is_some() {
                                     "present"
