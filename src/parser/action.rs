@@ -111,6 +111,14 @@ fn annotating_member_stmt(input: Input<'_>) -> IResult<Input<'_>, crate::ast::An
 /// typing clause (S42-004). We also accept `= expr` bindings; anything still unrecognized before
 /// the terminator is skipped as before.
 fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"ref") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, action_ref_decl_inner)
 }
 
@@ -321,6 +329,20 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
 
 /// In/out decl: `in` name `:` type `;` or `out` name `:` type `;`
 pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !(starts_with_keyword(cursor.fragment(), b"in")
+            || starts_with_keyword(cursor.fragment(), b"out")
+            || starts_with_keyword(cursor.fragment(), b"inout"))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, in_out_decl_inner)
 }
 
@@ -609,6 +631,19 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
 }
 
 pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"for")
+        // `ActionNodePrefix` admits an `action` declaration (with name/typing) before the
+        // node keyword (`ref action loopStep : Step loop { .. }`), which the generic
+        // prefix scan cannot cross; an `action`-led member admits the parser instead.
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, for_loop_inner)
 }
 
@@ -1155,6 +1190,19 @@ fn guarded_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Guarded
 
 /// First stmt: (`succession` prefix)? `first` `[mult]`? path (`then` `[mult]`? path)? body
 pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !(starts_with_keyword(cursor.fragment(), b"first")
+            || starts_with_keyword(cursor.fragment(), b"succession"))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, first_stmt_inner)
 }
 
@@ -1219,6 +1267,14 @@ fn control_node_declaration(input: Input<'_>) -> IResult<Input<'_>, ControlNodeD
 
 /// Merge stmt: `merge` declaration action-body.
 fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"merge") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, merge_stmt_inner)
 }
 
@@ -1270,6 +1326,14 @@ fn join_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
 
 /// Fork node: `fork` declaration action-body.
 fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"fork") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, fork_stmt_inner)
 }
 
@@ -1402,6 +1466,19 @@ fn optional_until_parameter(input: Input<'_>) -> IResult<Input<'_>, Option<Until
 /// While-loop control node: `ActionNodePrefix while` expression action-body (`until` expression
 /// `;`)? (SysML textual BNF 1143-1149).
 fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"while")
+        // `ActionNodePrefix` admits an `action` declaration (with name/typing) before the
+        // node keyword (`ref action loopStep : Step loop { .. }`), which the generic
+        // prefix scan cannot cross; an `action`-led member admits the parser instead.
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, while_stmt_inner)
 }
 
@@ -1431,6 +1508,19 @@ fn while_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
 /// `loop` is the empty-parameter alternative of `WhileLoopNode`; it owns the same prefix, body,
 /// and optional `until` parameter as the `while` spelling.
 fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"loop")
+        // `ActionNodePrefix` admits an `action` declaration (with name/typing) before the
+        // node keyword (`ref action loopStep : Step loop { .. }`), which the generic
+        // prefix scan cannot cross; an `action`-led member admits the parser instead.
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, loop_stmt_inner)
 }
 

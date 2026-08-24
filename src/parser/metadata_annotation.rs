@@ -299,6 +299,13 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
 pub(crate) fn extended_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ExtendedUsage>> {
+    // Refuse unless a `#` extension follows the member's optional prefixes.
+    if !crate::parser::occurrence_prefix::hash_extension_follows(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, extended_usage_inner)
 }
 

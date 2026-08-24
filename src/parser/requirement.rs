@@ -597,6 +597,17 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
 }
 
 pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"subject") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, subject_decl_inner)
 }
 
@@ -936,6 +947,17 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
 /// and this parser is tried speculatively: a comment that fails after its targets are read must
 /// not leave them in the document's arena.
 pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"comment") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, comment_annotation_inner)
 }
 
@@ -1111,6 +1133,14 @@ pub(crate) fn textual_representation(
 /// See [`crate::ast::SatisfyRequirementUsage`] for the two places where the pinned production text
 /// omits an optionality marker its own corpus proves is there.
 pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirementUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"satisfy") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, satisfy_inner)
 }
 

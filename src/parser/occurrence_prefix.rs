@@ -302,8 +302,21 @@ pub(crate) fn could_start_occurrence_usage(input: Input<'_>) -> bool {
 /// the real parser, which still decides -- but a `false` must be exact, so the skip set is a
 /// superset of every caller's authored prefix vocabulary.
 pub(crate) fn kind_keyword_follows(input: Input<'_>, keyword: &[u8]) -> bool {
+    scan_prefix_for(input, |fragment| starts_with_keyword(fragment, keyword))
+}
+
+/// Whether a `#` extension tag follows the member's optional prefixes; same contract as
+/// [`kind_keyword_follows`], with the `#` itself as the target instead of a keyword.
+pub(crate) fn hash_extension_follows(input: Input<'_>) -> bool {
+    scan_prefix_for(input, |fragment| fragment.starts_with(b"#"))
+}
+
+fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool {
     const SKIPPED: &[&[u8]] = &[
         b"then",
+        b"assert",
+        b"not",
+        b"member",
         b"public",
         b"private",
         b"protected",
@@ -325,7 +338,7 @@ pub(crate) fn kind_keyword_follows(input: Input<'_>, keyword: &[u8]) -> bool {
     };
     loop {
         let fragment = cursor.fragment();
-        if starts_with_keyword(fragment, keyword) {
+        if is_target(fragment) {
             return true;
         }
         if fragment.starts_with(b"#") {

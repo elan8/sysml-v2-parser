@@ -101,6 +101,17 @@ fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
 }
 
 pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"include") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, include_use_case_inner)
 }
 
