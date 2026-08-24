@@ -134,29 +134,29 @@ fn emit_kerml_relationship_decl(
     use crate::ast::KermlRelationshipKeyword as Kw;
     emit_visibility(w, decl.membership.visibility);
     // The prefix keyword and identification placement depend on the relationship family.
-    match decl.keyword {
+    let declaration_keyword = match decl.keyword {
         Kw::Subtype | Kw::Subclassifier | Kw::Typing | Kw::Subset | Kw::Redefinition => {
+            Some("specialization ")
+        }
+        Kw::Disjoint => Some("disjoining "),
+        Kw::Inverse => Some("inverting "),
+        Kw::Featuring => None,
+    };
+    if let Some(declaration_keyword) = declaration_keyword {
+        if decl.declaration_keyword_span.is_some() {
+            w.push_str(declaration_keyword);
             if let Some(identification) = &decl.identification {
-                w.push_str("specialization ");
                 emit_identification(w, identification);
                 w.push_char(' ');
             }
+        } else if let Some(identification) = &decl.identification {
+            // The doubled spelling names the identification with the relationship's own
+            // keyword: `typing t1 typing f typed by B;` (`kerml/coverage_relationships`).
+            w.push_str(decl.keyword.as_str());
+            w.push_char(' ');
+            emit_identification(w, identification);
+            w.push_char(' ');
         }
-        Kw::Disjoint => {
-            if let Some(identification) = &decl.identification {
-                w.push_str("disjoining ");
-                emit_identification(w, identification);
-                w.push_char(' ');
-            }
-        }
-        Kw::Inverse => {
-            if let Some(identification) = &decl.identification {
-                w.push_str("inverting ");
-                emit_identification(w, identification);
-                w.push_char(' ');
-            }
-        }
-        Kw::Featuring => {}
     }
     w.push_str(decl.keyword.as_str());
     w.push_char(' ');

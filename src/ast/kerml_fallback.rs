@@ -531,6 +531,11 @@ pub struct KermlSuccessionMember {
 pub struct KermlRelationshipDecl {
     /// The declaration-introducer keyword pair.
     pub keyword: KermlRelationshipKeyword,
+    /// The authored `specialization` / `disjoining` / `inverting` declaration keyword, when
+    /// written: `( 'specialization' Identification? )?` (KerML BNF 442) admits the keyword
+    /// with no identification (`specialization subtype x :> y;`, `Types.kerml`), so its
+    /// presence is a fact of its own rather than an inference from the identification.
+    pub declaration_keyword_span: Option<crate::ast::Span>,
     /// Optional declared identification (`specialization S ...`, `disjoining d1 ...`,
     /// `inverting i ...`, `featuring F of ...`).
     pub identification: Option<crate::ast::Identification>,

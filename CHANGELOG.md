@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two KerML corpus spellings.** A keyword-less feature with a comma-separated typing
+  (`private y: A, '2'[0..*];`, `Classes.kerml`) was shredded into three expression members
+  because the keyword-less member parser took one typing target; it now uses the shared
+  multi-target parser. `specialization subtype x :> y;` (`Types.kerml`) read `subtype` as the
+  specialization's name; the relationship keywords are excluded from the identification, and
+  the authored `specialization` / `disjoining` / `inverting` keyword keeps its span so the
+  keyword and the doubled `typing t1 typing …` spelling both round-trip. **AST version 237.**
+
 - **A named connector end.** `ConnectorEnd = OwnedCrossMultiplicityMember? ( declaredName =
   Name ReferencesKeyword )? OwnedReferenceSubsetting` (reference `SysML.xtext:998-1002`), so
   `connect bead references t.bead to mountingRim references w.rim;` (`09. Connections`) lost its

@@ -46,7 +46,7 @@ package Types {
 (fixture-diagnostics
   (document "types.md"
     (diagnostics
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 418) (line 18) (column 2) (len 545)) (message "unrecognized declaration `specialization` in package body"))
+      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 624) (line 25) (column 2) (len 339)) (message "unrecognized declaration `conjugation` in package body"))
     )
   )
 )
@@ -65,14 +65,13 @@ package Types {
     }
     type B :> Base::Anything;
     specialization Gen subtype A specializes B;
-    specialization subtype x :> Base::things;
-	
-	type Original specializes Base::Anything {
-	    in feature Input; 
-	}
-	type Conjugate1 specializes Base::Anything;
-	type Conjugate2 specializes Base::Anything;
-	conjugation c1 conjugate Conjugate1 conjugates Original; 
+    specialization subtype x specializes Base::things;
+    type Original specializes Base::Anything {
+        in feature Input;
+    }
+    type Conjugate1 specializes Base::Anything;
+    type Conjugate2 specializes Base::Anything;
+    conjugation c1 conjugate Conjugate1 conjugates Original; 
 	conjugation c2 conjugate Conjugate2 ~ Original; 
 	
 	type Conjugate3 conjugates Original;
@@ -99,7 +98,12 @@ package Types {
     (reference r7 (scope relative) (span (offset 354) (line 15) (column 12) (len 14)) (segments (segment 0 (token "Base") (name "Base") (separator none) (span (offset 354) (line 15) (column 12) (len 4))) (segment 1 (token "Anything") (name "Anything") (separator colon-colon) (span (offset 360) (line 15) (column 18) (len 8)))))
     (reference r8 (scope relative) (span (offset 400) (line 17) (column 29) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 400) (line 17) (column 29) (len 1)))))
     (reference r9 (scope relative) (span (offset 414) (line 17) (column 43) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 414) (line 17) (column 43) (len 1)))))
+    (reference r10 (scope relative) (span (offset 441) (line 18) (column 25) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 441) (line 18) (column 25) (len 1)))))
+    (reference r11 (scope relative) (span (offset 446) (line 18) (column 30) (len 12)) (segments (segment 0 (token "Base") (name "Base") (separator none) (span (offset 446) (line 18) (column 30) (len 4))) (segment 1 (token "things") (name "things") (separator colon-colon) (span (offset 452) (line 18) (column 36) (len 6)))))
+    (reference r12 (scope relative) (span (offset 489) (line 20) (column 28) (len 14)) (segments (segment 0 (token "Base") (name "Base") (separator none) (span (offset 489) (line 20) (column 28) (len 4))) (segment 1 (token "Anything") (name "Anything") (separator colon-colon) (span (offset 495) (line 20) (column 34) (len 8)))))
+    (reference r13 (scope relative) (span (offset 562) (line 23) (column 30) (len 14)) (segments (segment 0 (token "Base") (name "Base") (separator none) (span (offset 562) (line 23) (column 30) (len 4))) (segment 1 (token "Anything") (name "Anything") (separator colon-colon) (span (offset 568) (line 23) (column 36) (len 8)))))
+    (reference r14 (scope relative) (span (offset 607) (line 24) (column 30) (len 14)) (segments (segment 0 (token "Base") (name "Base") (separator none) (span (offset 607) (line 24) (column 30) (len 4))) (segment 1 (token "Anything") (name "Anything") (separator colon-colon) (span (offset 613) (line 24) (column 36) (len 8)))))
   )
-  (root (package (name "Types") (body brace (kerml-classifier (keyword type) (abstract true) (name "A") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "x") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r1) (ref r2)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "Singleton") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r3)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "Super") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r4)))) (body brace (package-member (visibility private) (package (name "P") (body brace (kerml-classifier (keyword type) (abstract false) (name "Sub") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r5)))) (body semicolon))))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "f") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (relationships) (value none) (body semicolon)))) (kerml-classifier (keyword type) (abstract false) (name "B") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r7)))) (body semicolon)) (kerml-relationship (keyword subtype) (source (ref r8)) (target (ref r9))) (malformed (code "unrecognized_declaration_in_scope") (found "specialization subtype x :> Base::things;") (span (offset 418) (line 18) (column 2) (len 545))))))
+  (root (package (name "Types") (body brace (kerml-classifier (keyword type) (abstract true) (name "A") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "x") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r1) (ref r2)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "Singleton") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r3)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "Super") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r4)))) (body brace (package-member (visibility private) (package (name "P") (body brace (kerml-classifier (keyword type) (abstract false) (name "Sub") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r5)))) (body semicolon))))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "f") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (relationships) (value none) (body semicolon)))) (kerml-classifier (keyword type) (abstract false) (name "B") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r7)))) (body semicolon)) (kerml-relationship (keyword subtype) (declaration-keyword true) (source (ref r8)) (target (ref r9))) (kerml-relationship (keyword subtype) (declaration-keyword true) (source (ref r10)) (target (ref r11))) (kerml-classifier (keyword type) (abstract false) (name "Original") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r12)))) (body brace (kerml-feature (prefix (head basic) (direction in) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "Input") (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (relationships) (value none) (body semicolon)))) (kerml-classifier (keyword type) (abstract false) (name "Conjugate1") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r13)))) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "Conjugate2") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r14)))) (body semicolon)) (malformed (code "unrecognized_declaration_in_scope") (found "conjugation c1 conjugate Conjugate1 conjugates Original;") (span (offset 624) (line 25) (column 2) (len 339))))))
 )
 ~~~

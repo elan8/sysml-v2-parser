@@ -6307,7 +6307,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-relationship (keyword ")?;
                 self.writer.write_str(relationship.value.keyword.as_str())?;
-                self.writer.write_str(") (source ")?;
+                write!(
+                    self.writer,
+                    ") (declaration-keyword {}) (source ",
+                    relationship.value.declaration_keyword_span.is_some()
+                )?;
                 self.write_reference(relationship.value.source)?;
                 self.writer.write_str(") (target ")?;
                 self.write_reference(relationship.value.target)?;

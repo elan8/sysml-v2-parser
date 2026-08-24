@@ -988,31 +988,22 @@ fn calc_named_binding_inner(
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, typing) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let before = input;
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-            let span = crate::parser::span_from_to(before, input);
-            (
-                input,
-                Some(crate::ast::Node::new(
-                    span.clone(),
-                    crate::ast::TypingRelationship {
-                        target: vec![target],
-                        kind: crate::ast::TypingKind::Typing,
-                        span,
-                        is_conjugated: false,
-                        is_implied: false,
-                        spelling: crate::ast::TypingSpelling::Operator,
-                    },
-                )),
-            )
-        } else {
-            (input, None)
-        }
-    };
+    // `FeatureTyping`'s target list is comma-separated (`private y: A, '2'[0..*];`,
+    // `Classes.kerml`), so the shared multi-target parser owns the clause.
+    let (input, typing) = crate::parser::usage::optional_typings(input)?;
+    let typing = typing.map(|(span, is_conjugated, targets, spelling)| {
+        crate::ast::Node::new(
+            span.clone(),
+            crate::ast::TypingRelationship {
+                target: targets,
+                kind: crate::ast::TypingKind::Typing,
+                span,
+                is_conjugated,
+                is_implied: false,
+                spelling,
+            },
+        )
+    });
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
             ws_and_comments,

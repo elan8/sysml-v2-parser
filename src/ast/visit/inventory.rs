@@ -8081,7 +8081,10 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_relationship_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlRelationshipDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlRelationshipDecl { keyword, identification, source, target, body, membership } = &$($mutability)? node.value;
+            let KermlRelationshipDecl { keyword, declaration_keyword_span, identification, source, target, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = declaration_keyword_span {
+                visitor.visit_span(inner);
+            }
             visitor.visit_kerml_relationship_keyword(keyword);
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
