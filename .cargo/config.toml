@@ -4,8 +4,8 @@
 [env]
 RUST_MIN_STACK = "8388608"
 
-# The snapshot driver parses every fixture under `tests/snapshots`; an unoptimized build pays
-# for every nom combinator on every one, so it runs optimized by default. Use it as
-# `cargo snapshot check` / `cargo snapshot update [--fixture PATH]`.
+# Short spelling for the snapshot driver: `cargo snapshot check` / `cargo snapshot update
+# [--fixture PATH]`. A dev build checks every fixture in a few seconds and shares the test
+# build cache, so it is not run optimized.
 [alias]
-snapshot = "run --release --bin snapshot_tool --"
+snapshot = "run --bin snapshot_tool --"

@@ -76,8 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it and deleted; `EndIdentity` gains `Anonymous` for `end : TireBead[1];`. Closes four corpus
   snapshots and the library's `Interfaces.sysml`/`Flows.sysml` diagnostics. **AST version 232.**
 
-- **`cargo snapshot`.** A cargo alias runs the snapshot driver as a release build, since an
-  unoptimized build pays for every nom combinator on every fixture.
+- **`cargo snapshot`.** A cargo alias for the snapshot driver (`cargo snapshot check|update`).
 
 - **`individual` on every `OccurrenceDefinitionPrefix` family.** `OccurrenceDefinitionPrefix =
   BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?` (SysML BNF 541; Pilot
