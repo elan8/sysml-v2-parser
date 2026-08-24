@@ -148,6 +148,31 @@ pub(crate) fn test_input(text: &str) -> Input<'_> {
     context.input(text.as_bytes())
 }
 
+/// `input` advanced by `skipped` bytes, which must lie within its fragment.
+///
+/// The lexer's trivia scanners already know how many bytes they consumed; this rebuilds the
+/// location directly rather than going through `nom::Input::take_from`, whose generic slicing
+/// path recomputes the consumed length and pays a call for every zero-length skip.
+#[inline]
+pub(crate) fn advance(input: Input<'_>, skipped: usize) -> Input<'_> {
+    if skipped == 0 {
+        return input;
+    }
+    let fragment = input.fragment();
+    let (consumed, rest) = fragment.split_at(skipped);
+    let newlines = memchr::memchr_iter(b'\n', consumed).count() as u32;
+    // SAFETY: `rest` is the tail of `input`'s own fragment, so the byte offset and line count
+    // carried alongside it describe exactly the position `nom_locate` would compute by slicing.
+    unsafe {
+        LocatedSpan::new_from_raw_offset(
+            input.location_offset() + skipped,
+            input.location_line() + newlines,
+            rest,
+            input.extra,
+        )
+    }
+}
+
 /// Build a Span from the start and rest inputs (the consumed region).
 pub fn span_from_to(start: Input<'_>, rest: Input<'_>) -> Span {
     let len = start.fragment().len().saturating_sub(rest.fragment().len());
