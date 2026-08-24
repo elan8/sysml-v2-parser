@@ -488,7 +488,14 @@ mod par_002_widening_tests {
         ))
         .expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.ref_prefix.variance.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .ref_prefix
+            .variance
+            .is_some());
         assert!(node.value.multiplicity.is_some());
         assert!(!node.value.multiplicity_modifiers.is_unique());
         assert!(!node.value.multiplicity_modifiers.is_ordered());

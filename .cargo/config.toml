@@ -3,3 +3,9 @@
 # not hit this; bump the test/build stack uniformly so `accepts_nesting_at_the_limit` is stable.
 [env]
 RUST_MIN_STACK = "8388608"
+
+# The snapshot driver parses every fixture under `tests/snapshots`; an unoptimized build pays
+# for every nom combinator on every one, so it runs optimized by default. Use it as
+# `cargo snapshot check` / `cargo snapshot update [--fixture PATH]`.
+[alias]
+snapshot = "run --release --bin snapshot_tool --"

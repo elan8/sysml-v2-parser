@@ -1,17 +1,20 @@
-//! GH-53: `end` declarations previously only supported a bare `:` typed target or a `::>`/
-//! `references` reference target. Two vendored library files use a third form where the target is
-//! itself a complete, nested kind-prefixed usage (`occurrence`/`item`), with an additional
-//! "middle" multiplicity position between the end's own name and that nested usage. These tests
-//! cover each confirmed real-usage fix, using the exact (trimmed) real-library lines that
-//! motivated it, plus confirmation that the pre-existing `end` forms still work unaffected.
+//! GH-53, revisited under the reference grammar: an end whose target is a kind-keyworded usage
+//! is that usage family's own node with an `EndUsagePrefix` head, not an `EndDecl` carrying a
+//! nested usage.
+//!
+//! `OccurrenceUsagePrefix = ( EndUsagePrefix | BasicUsagePrefix … ) UsageExtensionKeyword*`
+//! (reference `SysML.xtext:836-843`) and `EndUsagePrefix = 'end' OwnedCrossFeatureMember?`
+//! (SysML BNF 285), whose `OwnedCrossFeature = BasicUsagePrefix UsageDeclaration` (293). So in
+//! `end theCauses [*] occurrence theCause :> causes :>> source { }` the end *is* the occurrence
+//! usage `theCause`, and `theCauses [*]` is its owned cross feature.
 
 use sysml_v2_parser::ast::{
-    ConnectionDefBody, ConnectionDefBodyElement, EndIdentity, EndNestedUsage, PackageBody,
+    ConnectionDefBody, ConnectionDefBodyElement, EndIdentity, OccurrenceUsagePrefix, PackageBody,
     PackageBodyElement, RootElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn connection_def_ends(input: &str) -> Vec<sysml_v2_parser::ast::EndDecl> {
+fn connection_def_elements(input: &str) -> Vec<ConnectionDefBodyElement> {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -35,87 +38,96 @@ fn connection_def_ends(input: &str) -> Vec<sysml_v2_parser::ast::EndDecl> {
     let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
-    elements
-        .iter()
-        .filter_map(|e| match &e.value {
-            ConnectionDefBodyElement::EndDecl(end) => Some(end.value.clone()),
-            _ => None,
-        })
-        .collect()
+    elements.iter().map(|e| e.value.clone()).collect()
 }
 
-fn assert_declaration_name(end: &sysml_v2_parser::ast::EndDecl, expected: &str) {
-    assert!(matches!(
-        &end.identity,
-        EndIdentity::Declaration(name) if name.value == expected
-    ));
+/// The cross feature's declared name and whether it authored a multiplicity.
+fn cross_feature(prefix: &OccurrenceUsagePrefix) -> (Option<String>, bool) {
+    let end = prefix.end().expect("an `end` head");
+    let cross = end.cross.as_deref().expect("an owned cross feature");
+    let declaration = &cross.value.declaration.value;
+    (
+        declaration.identification.name.clone(),
+        declaration.multiplicity.is_some(),
+    )
 }
 
-/// Real usage: Systems Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`'s
-/// `end theCauses [*] occurrence theCause :> causes :>> source { ... }` -- the target is a nested
-/// `occurrence` usage, not a bare type/reference, with a multiplicity between the end's own name
-/// (`theCauses`) and that nested usage.
 #[test]
-fn end_decl_accepts_nested_occurrence_usage_with_middle_multiplicity() {
+fn end_occurrence_usage_owns_its_cross_feature() {
     let input = "package P {\nconnection def Causation {\nend theCauses [*] occurrence theCause :> causes :>> source {\n}\nend theEffects [*] occurrence theEffect :> effects :>> target {\n}\n}\n}";
-    let ends = connection_def_ends(input);
-    assert_eq!(ends.len(), 2);
+    let elements = connection_def_elements(input);
+    assert_eq!(elements.len(), 2);
 
-    let the_causes = &ends[0];
-    assert_declaration_name(the_causes, "theCauses");
-    assert!(the_causes.multiplicity.is_some());
-    let nested = the_causes
-        .nested_usage
-        .as_deref()
-        .expect("expected nested usage");
-    let EndNestedUsage::Occurrence(occurrence) = nested else {
-        panic!("expected occurrence nested usage, got {nested:?}");
+    let ConnectionDefBodyElement::OccurrenceUsage(the_cause) = &elements[0] else {
+        panic!("expected an occurrence usage, got {:?}", elements[0]);
     };
-    assert_eq!(occurrence.value.name, "theCause");
-}
-
-/// Real usage: Systems Library `Domain Libraries/.../Items.sysml`'s `end touchesToo [0..*] item
-/// touchedItemToo :>> separateSpaceToo, thisOccurrence;` -- the target is a nested `item` usage.
-#[test]
-fn end_decl_accepts_nested_item_usage_with_middle_multiplicity() {
-    let input = "package P {\nconnection def Touches {\nend touchesToo [0..*] item touchedItemToo :>> separateSpaceToo, thisOccurrence;\nend touches [0..*] item touchedItem :>> separateSpace, thatOccurrence;\n}\n}";
-    let ends = connection_def_ends(input);
-    assert_eq!(ends.len(), 2);
-
-    let touches_too = &ends[0];
-    assert_declaration_name(touches_too, "touchesToo");
-    assert!(touches_too.multiplicity.is_some());
-    let nested = touches_too
-        .nested_usage
-        .as_deref()
-        .expect("expected nested usage");
-    let EndNestedUsage::Item(item) = nested else {
-        panic!("expected item nested usage, got {nested:?}");
-    };
-    assert_eq!(item.value.name, "touchedItemToo");
-}
-
-/// Confirms the pre-existing `end` forms (typed, `::>` reference, and `:>>` redefines trailing the
-/// typed form) still parse identically and leave `nested_usage` as `None` -- the new nested-usage
-/// alternative and middle-multiplicity position must not affect these unrelated forms.
-#[test]
-fn end_decl_existing_forms_unaffected() {
-    let input = "package P {\nconnection def C {\nend hub ::> mainSwitch[1];\nend source: Anything :>> BinaryLinkObject::source;\n}\n}";
-    let ends = connection_def_ends(input);
-    assert_eq!(ends.len(), 2);
-
-    let hub = &ends[0];
-    assert_declaration_name(hub, "hub");
-    assert!(hub.references.is_some());
-    assert!(hub.typing.is_none());
-    assert!(hub.nested_usage.is_none());
-
-    let source = &ends[1];
-    assert_declaration_name(source, "source");
-    assert!(source.typing.is_some());
-    assert!(source.nested_usage.is_none());
+    assert_eq!(the_cause.value.name, "theCause");
     assert_eq!(
-        source.redefines.as_ref().map(|n| n.value.target.len()),
+        cross_feature(&the_cause.value.prefix),
+        (Some("theCauses".to_owned()), true)
+    );
+    assert!(the_cause.value.prefix.basic().is_none());
+}
+
+#[test]
+fn end_item_usage_owns_its_cross_feature() {
+    let input = "package P {\nconnection def Touches {\nend touchesToo [0..*] item touchedItemToo :>> separateSpaceToo, thisOccurrence;\nend touches [0..*] item touchedItem :>> separateSpace, thatOccurrence;\n}\n}";
+    let elements = connection_def_elements(input);
+    assert_eq!(elements.len(), 2);
+
+    let ConnectionDefBodyElement::ItemUsage(touched_item_too) = &elements[0] else {
+        panic!("expected an item usage, got {:?}", elements[0]);
+    };
+    assert_eq!(touched_item_too.value.name, "touchedItemToo");
+    assert_eq!(
+        cross_feature(&touched_item_too.value.prefix),
+        (Some("touchesToo".to_owned()), true)
+    );
+}
+
+#[test]
+fn end_part_usage_with_a_bare_cross_multiplicity() {
+    let input = "package P {\nconnection def PressureSeat {\nend [1] part bead : TireBead;\nend [1] part mountingRim : TireMountingRim;\n}\n}";
+    let elements = connection_def_elements(input);
+    assert_eq!(elements.len(), 2);
+
+    let ConnectionDefBodyElement::PartUsage(bead) = &elements[0] else {
+        panic!("expected a part usage, got {:?}", elements[0]);
+    };
+    assert_eq!(bead.value.name, "bead");
+    assert_eq!(cross_feature(&bead.value.prefix), (None, true));
+}
+
+#[test]
+fn keyword_less_ends_stay_end_declarations() {
+    let input = "package P {\nconnection def C {\nend hub ::> mainSwitch[1];\nend source: Anything :>> BinaryLinkObject::source;\nend : TireBead[1];\n}\n}";
+    let elements = connection_def_elements(input);
+    assert_eq!(elements.len(), 3);
+
+    let ConnectionDefBodyElement::EndDecl(hub) = &elements[0] else {
+        panic!("expected an end declaration, got {:?}", elements[0]);
+    };
+    assert!(matches!(&hub.value.identity, EndIdentity::Declaration(name) if name.value == "hub"));
+    assert!(hub.value.references.is_some());
+    assert!(hub.value.typing.is_none());
+
+    let ConnectionDefBodyElement::EndDecl(source) = &elements[1] else {
+        panic!("expected an end declaration, got {:?}", elements[1]);
+    };
+    assert!(source.value.typing.is_some());
+    assert_eq!(
+        source
+            .value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target.len()),
         Some(1)
     );
+
+    let ConnectionDefBodyElement::EndDecl(anonymous) = &elements[2] else {
+        panic!("expected an end declaration, got {:?}", elements[2]);
+    };
+    assert!(matches!(anonymous.value.identity, EndIdentity::Anonymous));
+    assert!(anonymous.value.typing.is_some());
+    assert!(anonymous.value.multiplicity.is_some());
 }

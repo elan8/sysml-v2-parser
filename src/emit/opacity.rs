@@ -4,7 +4,7 @@ use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
     AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
     ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
-    DefinitionBodyElement, EndDeclIntroducer, EndNestedUsage, FirstMergeBody, InterfaceDefBody,
+    DefinitionBodyElement, EndDeclIntroducer, FirstMergeBody, InterfaceDefBody,
     InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, LibraryPackage,
     OccurrenceBodyElement, OccurrenceUsageBody, Package, PackageBody, PackageBodyElement,
     PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement, Perform,
@@ -1712,18 +1712,11 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
     }
 }
 
-fn walk_end_decl(report: &mut OpacityReport, path: &str, end: &crate::ast::EndDecl) {
+fn walk_end_decl(_report: &mut OpacityReport, _path: &str, end: &crate::ast::EndDecl) {
     match &end.introducer {
         EndDeclIntroducer::Bare => {}
         EndDeclIntroducer::Reference { .. } => {}
         EndDeclIntroducer::KerMLFeature { .. } => {}
-    }
-    match end.nested_usage.as_deref() {
-        Some(EndNestedUsage::Occurrence(occurrence)) => {
-            walk_occurrence_usage_body(report, path, &occurrence.value.body)
-        }
-        Some(EndNestedUsage::Item(item)) => walk_attribute_body(report, path, &item.value.body),
-        None => {}
     }
 }
 

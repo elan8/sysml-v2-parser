@@ -26,15 +26,13 @@
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndDeclIntroducer, EndIdentity,
-    EndNestedUsage, Node, RefDecl,
+    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndDeclIntroducer, EndIdentity, Node,
+    RefDecl,
 };
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
-use crate::parser::item::item_usage;
 use crate::parser::lex::{name, qualified_reference, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::occurrence_body::occurrence_usage;
 use crate::parser::usage::{
     cross_subsetting, multiplicity_node, redefinition, reference_subsetting, single_target_typing,
     subsetting, typing_node,
@@ -141,6 +139,10 @@ pub(crate) fn end_decl(
     let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
         let (input, role) = derivation_end_role(input)?;
         (input, EndIdentity::Derivation(role))
+    } else if input.fragment().starts_with(b":") {
+        // `UsageDeclaration = Identification? FeatureSpecializationPart?`: a specialization
+        // operator right after `end` means the end has no label of its own.
+        (input, EndIdentity::Anonymous)
     } else {
         let (input, (span, declaration_name)) = with_span(name).parse(input)?;
         (
@@ -182,62 +184,7 @@ pub(crate) fn end_decl(
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
                     redefines: None,
                     crosses: None,
-                    nested_usage: None,
                     type_ref_span: Some(type_ref_span),
-                },
-            ),
-        ));
-    }
-
-    // GH-53: an alternative form where the target is a complete, nested kind-prefixed usage
-    // rather than a bare type/reference -- see `EndDecl::nested_usage`'s doc comment. Only
-    // `occurrence`/`item` are evidenced; each of those parsers already handles its own full
-    // grammar (specialization clauses, multiplicity, body), so this end's own `name`/multiplicity
-    // above are everything this branch itself needs to contribute.
-    let (peek, _) = ws_and_comments(input)?;
-    let peek_frag = peek.fragment();
-    if starts_with_keyword(peek_frag, b"occurrence") {
-        let (input, nested) = occurrence_usage(input)?;
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                EndDecl {
-                    ref_prefix: ref_prefix.clone(),
-                    introducer,
-                    short_name,
-                    identity,
-                    typing: None,
-                    references: None,
-                    multiplicity: leading_multiplicity,
-                    redefines: None,
-                    crosses: None,
-                    nested_usage: Some(Box::new(EndNestedUsage::Occurrence(Box::new(nested)))),
-                    type_ref_span: None,
-                },
-            ),
-        ));
-    }
-    if starts_with_keyword(peek_frag, b"item") {
-        let (input, nested) = item_usage(input)?;
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                EndDecl {
-                    ref_prefix: ref_prefix.clone(),
-                    introducer,
-                    short_name,
-                    identity,
-                    typing: None,
-                    references: None,
-                    multiplicity: leading_multiplicity,
-                    redefines: None,
-                    crosses: None,
-                    nested_usage: Some(Box::new(EndNestedUsage::Item(Box::new(nested)))),
-                    type_ref_span: None,
                 },
             ),
         ));
@@ -265,7 +212,6 @@ pub(crate) fn end_decl(
                         multiplicity: leading_multiplicity,
                         redefines: None,
                         crosses: None,
-                        nested_usage: None,
                         type_ref_span: None,
                     },
                 ),
@@ -312,7 +258,6 @@ pub(crate) fn end_decl(
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
                 redefines,
                 crosses,
-                nested_usage: None,
                 type_ref_span: Some(type_ref_span),
             },
         ),

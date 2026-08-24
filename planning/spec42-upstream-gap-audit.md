@@ -524,6 +524,76 @@ never writes it" was treated as no information rather than as refutation.
   singular, so `flow of Thing of Thing …` is correctly refused; what it lacks is a *precise*
   diagnostic naming the at-most-one rule, as `end_feature_invalid_prefix` does for Gap 59.
 
+## Wave 3 -- the corpus snapshots that still carried diagnostics
+
+Twelve corpus-derived snapshots under `tests/snapshots/spec42/{sysml,kerml}` still recorded a
+diagnostic at the wave-2 pin. Each construct was checked against the reference grammar and,
+where the two disagree, against the normative model library, before anything was changed.
+
+### Fixed
+
+- **`individual` on every `OccurrenceDefinitionPrefix` family** (`coverage_individual`).
+  `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? ( isIndividual ?= 'individual' … )?`
+  (SysML BNF 541; `SysML.xtext:804-810`) is reached by calc, constraint, requirement, concern,
+  case, verification, use case, view, viewpoint and rendering definitions; only the structural
+  and action families accepted it. The nine definition nodes and `ConcernUsage` gain
+  `is_individual`; `StateDef` carried it but its projection dropped it. AST version 231.
+
+- **`EndUsagePrefix` as the head of `OccurrenceUsagePrefix`** (`09_connections_example`,
+  `11_interface_decomposition_example`, `conjugation_test`, `wheel_package_updated`).
+
+  ```text
+  OccurrenceUsagePrefix returns SysML::OccurrenceUsage :
+      ( EndUsagePrefix
+      | BasicUsagePrefix ( isIndividual ?= 'individual' )? ( portionKind = PortionKind )? )
+      UsageExtensionKeyword*                                        -- SysML.xtext:836-843
+  EndUsagePrefix : Usage = isEnd ?= 'end' ( ownedRelationship += OwnedCrossFeatureMember )?
+                                                                    -- SysML BNF 285
+  OwnedCrossFeature : ReferenceUsage = BasicUsagePrefix UsageDeclaration   -- SysML BNF 293
+  ```
+
+  The published `.kebnf` (564-570) spells only the second alternative, and the earlier
+  `pilot_occurrence_end_prefix_recovery` fixture deliberately refused `end port` on that basis.
+  The normative library disagrees with the `.kebnf`: `Interfaces.sysml:72` authors `end port
+  source: Port :>> BinaryConnection::source;` and `Flows.sysml:82` `end occurrence source:
+  Occurrence :>> Message::source, …;`, and both were recovering. A grammar the specification's
+  own library cannot parse against is the erratum, so the parser follows the reference grammar.
+
+  `OccurrenceUsagePrefix` gains a `head` choice -- `End(EndUsagePrefix)` or the basic slots --
+  so `end individual part p;` is unrepresentable rather than merely unemitted. The owned cross
+  feature is a `BasicUsagePrefix` plus a `UsageDeclaration`, retained with its span: `end [1]
+  part bead : TireBead;` crosses a bare multiplicity, `end theCauses [*] occurrence theCause :>
+  causes;` a named one. A prefix with no declaration (`end derived part p : T;`) is not a cross
+  feature and still reports `end_feature_invalid_prefix`. Every family that owns the prefix
+  (part, port, item, occurrence, action nodes, satisfy, constraint and analysis usages) accepts
+  the head; the connection, interface, part-definition and occurrence bodies give those typed
+  parsers first refusal on an `end`-led member, ahead of the keyword-less `EndDecl`.
+
+  `EndDecl::nested_usage` (GH-53) was this production seen from the other side -- an `EndDecl`
+  whose "target" was a complete occurrence or item usage -- and is deleted; the fixtures and
+  `tests/gh53_end_decl_nested_usage.rs` now assert the usage node with its `end` head.
+
+- **A nameless `DefaultReferenceUsage` end** (`wheel_package_updated`, `server_sequence_*`).
+  `DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration …` (`SysML.xtext:
+  630-633`) with `UsageDeclaration = Identification? …`, so `end : TireBead[1];` and `end :>>
+  source ::> producer.publicationPort;` declare an end through its specialization alone.
+  `EndIdentity` gains `Anonymous`; the flow-usage body already dispatched `EndDecl`.
+
+### Still open at this pin
+
+- `#Security enum secret : …` (`metadata_test`): `EnumeratedValue = UsageExtensionKeyword*
+  EnumerationUsageKeyword? Usage` (`SysML.xtext:784-786`) versus `'enum'? Usage` (BNF 531).
+- `private ref #Classified #Security z1;` and `abstract #Classified z2;` in a package body
+  (`metadata_test`): `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage`.
+- `#systemdd name :> base { #servicedd :>> x : T { … } }` (`ahfcore_lib`): the `ExtendedUsage`
+  spelling with a nested body, reported as `unsupported_annotation_syntax`.
+- `connection : PressureSeat connect bead references t.bead to mountingRim references w.rim;`
+  (`09_connections_example`): the `references` spelling of a connector end in a `ConnectionUsage`.
+- `specialization Gen subtype A specializes B;` in a KerML package (`kerml/types`).
+- `composite feature c : C { … }` in a KerML `struct` body (`kerml/examples/classes`).
+- `coverage_connectors` is not a corpus file and authors `connector` in a SysML `part def`,
+  which `SysML.xtext` does not spell at all; the fixture records a refusal, not a gap.
+
 ## Deferred neighbouring debt
 
 Found during the audit, out of scope for these commits, recorded so it is not rediscovered:

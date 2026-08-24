@@ -391,7 +391,8 @@ fn gh89_9_directed_item_usage_in_part_def_body() {
     assert!(item.type_name.is_some());
     assert_eq!(
         item.prefix
-            .basic
+            .basic()
+            .expect("basic head")
             .ref_prefix
             .direction
             .as_ref()

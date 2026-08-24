@@ -2118,7 +2118,13 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part origin : Remote :> remotes;")).expect("ref part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.reference_span.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert_eq!(node.value.name, "origin");
         assert_eq!(
             node.value
@@ -2140,14 +2146,26 @@ mod short_name_tests {
     fn part_usage_accepts_ref_prefix_with_subsetting_only() {
         let (rest, node) = part_usage(input("ref part origin :> mesolab;")).expect("ref part");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.reference_span.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert!(node.value.subsets.is_some());
     }
 
     #[test]
     fn part_usage_without_ref_prefix_is_not_reference() {
         let (_, node) = part_usage(input("part origin : Remote :> remotes;")).expect("part");
-        assert!(node.value.prefix.basic.reference_span.is_none());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_none());
         assert!(node.value.subsets.is_some());
     }
 
@@ -2158,7 +2176,13 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part :>> elements: SparePart;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.prefix.basic.reference_span.is_some());
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert!(node.value.name.is_empty());
         assert!(node.value.redefines.is_some());
         assert_eq!(

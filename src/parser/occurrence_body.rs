@@ -229,7 +229,7 @@ fn occurrence_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Occurrenc
     // own; each requires the prefix slot that names it. Without one of those slots there is no
     // production here, and consuming the prefix anyway would turn a sibling family's declaration
     // into an occurrence usage.
-    if !has_kind_keyword && prefix.individual_span.is_none() && prefix.portion.is_none() {
+    if !has_kind_keyword && prefix.individual_span().is_none() && prefix.portion().is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -873,7 +873,8 @@ mod membership_tests {
         assert_eq!(
             node.value
                 .prefix
-                .basic
+                .basic()
+                .expect("basic head")
                 .ref_prefix
                 .variance
                 .as_ref()
@@ -891,7 +892,7 @@ mod membership_tests {
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Private)
         );
-        assert!(node.value.prefix.individual_span.is_some());
+        assert!(node.value.prefix.individual_span().is_some());
     }
 
     #[test]
@@ -903,7 +904,7 @@ mod membership_tests {
             Some(crate::ast::Visibility::Public)
         );
         assert_eq!(
-            node.value.prefix.portion.as_ref().map(|node| node.value),
+            node.value.prefix.portion().map(|node| node.value),
             Some(crate::ast::OccurrencePortionKind::Snapshot)
         );
     }
@@ -931,7 +932,7 @@ mod membership_tests {
             Some(crate::ast::Visibility::Protected)
         );
         assert_eq!(
-            node.value.prefix.portion.as_ref().map(|node| node.value),
+            node.value.prefix.portion().map(|node| node.value),
             Some(crate::ast::OccurrencePortionKind::Timeslice)
         );
     }

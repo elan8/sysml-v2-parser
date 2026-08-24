@@ -2558,7 +2558,7 @@ mod control_node_gap_tests {
         match node.value {
             ActionDefBodyElement::OccurrenceUsage(o) => {
                 assert_eq!(
-                    o.value.prefix.portion.as_ref().map(|node| node.value),
+                    o.value.prefix.portion().map(|node| node.value),
                     Some(crate::ast::OccurrencePortionKind::Snapshot)
                 );
                 assert_eq!(o.value.name, "trued");

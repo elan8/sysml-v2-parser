@@ -138,7 +138,7 @@ fn emit_action_node_usage_declaration(
 }
 
 /// Stream the grammar-owned declaration shared by action-node and perform-action forms.
-fn emit_usage_declaration(
+pub(crate) fn emit_usage_declaration(
     w: &mut EmitWriter<'_>,
     path: &str,
     declaration: &UsageDeclaration,

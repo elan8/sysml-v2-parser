@@ -498,10 +498,6 @@ macro_rules! ast_traversal {
                 walk_interface_def_body_element(self, node)
             }
 
-            /// Visits [`EndNestedUsage`]; the default implementation walks its children.
-            fn visit_end_nested_usage(&mut self, node: &$($mutability)? EndNestedUsage) {
-                walk_end_nested_usage(self, node)
-            }
 
             /// Visits [`EndDecl`]; the default implementation walks its children.
             fn visit_end_decl(&mut self, node: &$($mutability)? Node<EndDecl>) {
@@ -656,6 +652,21 @@ macro_rules! ast_traversal {
             /// Visits [`OccurrenceUsagePrefix`]; the default implementation walks its children.
             fn visit_occurrence_usage_prefix(&mut self, node: &$($mutability)? OccurrenceUsagePrefix) {
                 walk_occurrence_usage_prefix(self, node)
+            }
+
+            /// Visits [`OccurrenceUsagePrefixHead`]; the default implementation walks its children.
+            fn visit_occurrence_usage_prefix_head(&mut self, node: &$($mutability)? OccurrenceUsagePrefixHead) {
+                walk_occurrence_usage_prefix_head(self, node)
+            }
+
+            /// Visits [`EndUsagePrefix`]; the default implementation walks its children.
+            fn visit_end_usage_prefix(&mut self, node: &$($mutability)? EndUsagePrefix) {
+                walk_end_usage_prefix(self, node)
+            }
+
+            /// Visits [`OwnedCrossUsage`]; the default implementation walks its children.
+            fn visit_owned_cross_usage(&mut self, node: &$($mutability)? Node<OwnedCrossUsage>) {
+                walk_owned_cross_usage(self, node)
             }
 
             /// Visits [`FeaturePortionKind`]; the default implementation walks its children.
@@ -3872,21 +3883,10 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_end_nested_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndNestedUsage) {
-            match node {
-                EndNestedUsage::Occurrence(field_0) => {
-                    visitor.visit_occurrence_usage(&$($mutability)? **field_0);
-                }
-                EndNestedUsage::Item(field_0) => {
-                    visitor.visit_item_usage(&$($mutability)? **field_0);
-                }
-            }
-        }
-
         pub fn walk_end_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EndDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EndDecl { ref_prefix, introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, nested_usage, type_ref_span } = &$($mutability)? node.value;
+            let EndDecl { ref_prefix, introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, type_ref_span } = &$($mutability)? node.value;
             visitor.visit_ref_prefix(ref_prefix);
             visitor.visit_end_decl_introducer(introducer);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
@@ -3905,9 +3905,6 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = crosses {
                 visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = nested_usage {
-                visitor.visit_end_nested_usage(&$($mutability)? **inner);
             }
             if let Some(inner) = type_ref_span {
                 visitor.visit_span(inner);
@@ -3929,6 +3926,7 @@ macro_rules! ast_traversal {
 
         pub fn walk_end_identity<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndIdentity) {
             match node {
+                EndIdentity::Anonymous => {}
                 EndIdentity::Declaration(field_0) => {
                     visitor.visit_span(&$($mutability)? field_0.span);
                     visitor.visit_text(&$($mutability)? field_0.value);
@@ -4410,17 +4408,45 @@ macro_rules! ast_traversal {
         }
 
         pub fn walk_occurrence_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsagePrefix) {
-            let OccurrenceUsagePrefix { basic, individual_span, portion, extension_keywords } = node;
-            visitor.visit_basic_usage_prefix(basic);
-            if let Some(inner) = individual_span {
-                visitor.visit_span(inner);
-            }
-            if let Some(inner) = portion {
-                visitor.visit_occurrence_portion_kind(inner);
-            }
+            let OccurrenceUsagePrefix { head, extension_keywords } = node;
+            visitor.visit_occurrence_usage_prefix_head(head);
             for inner in extension_keywords {
                 visitor.visit_usage_extension_keyword(inner);
             }
+        }
+
+        pub fn walk_occurrence_usage_prefix_head<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsagePrefixHead) {
+            match node {
+                OccurrenceUsagePrefixHead::End(field_0) => {
+                    visitor.visit_end_usage_prefix(field_0);
+                }
+                OccurrenceUsagePrefixHead::Basic { basic, individual_span, portion } => {
+                    visitor.visit_basic_usage_prefix(basic);
+                    if let Some(inner) = individual_span {
+                        visitor.visit_span(inner);
+                    }
+                    if let Some(inner) = portion {
+                        visitor.visit_occurrence_portion_kind(inner);
+                    }
+                }
+            }
+        }
+
+        pub fn walk_end_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndUsagePrefix) {
+            let EndUsagePrefix { end_span, cross } = node;
+            visitor.visit_span(end_span);
+            if let Some(inner) = cross {
+                visitor.visit_owned_cross_usage(inner);
+            }
+        }
+
+        pub fn walk_owned_cross_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<OwnedCrossUsage>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let OwnedCrossUsage { prefix, declaration } = &$($mutability)? node.value;
+            visitor.visit_basic_usage_prefix(prefix);
+            visitor.visit_usage_declaration(declaration);
+            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_feature_portion_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeaturePortionKind>) {

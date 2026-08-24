@@ -77,8 +77,15 @@ disagree, and three SysML constructs hang on the answer:
 | `#Security enum secret : …` | `EnumeratedValue` admits no `UsageExtensionKeyword*` | Pilot-SysML:784 does | as above |
 
 All three were provisionally called INVALID INPUT against the `.kebnf` alone, and **the Pilot
-reversed all three**. Until this is decided, they stay unworked; the rest of the burn-down does not
-depend on it.
+reversed all three**.
+
+**Decided (2026-08-24): the Pilot governs where the two disagree.** The deciding evidence is the
+normative model library shipped beside the `.kebnf`: `Interfaces.sysml:72` authors `end port
+source: Port :>> …` and `Flows.sysml:82` `end occurrence source: Occurrence :>> …`, neither of
+which the published `OccurrenceUsagePrefix` admits. A grammar the specification's own library
+cannot parse against is the erratum. The first two rows are closed (`OccurrenceUsagePrefix` gains
+the `EndUsagePrefix` alternative; `EndDecl` gains an anonymous identity); the `#Security enum`
+row is open. Wave-3 entries in `spec42-upstream-gap-audit.md` record each decision.
 
 Two lesser disagreements are recorded and change nothing: KerML `TypeDeclaration` requires
 `(Specialization|Conjugation)+` in the spec but exactly one in the Pilot, and control-node

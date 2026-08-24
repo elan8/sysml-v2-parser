@@ -1740,7 +1740,13 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match &node.value {
             AttributeBodyElement::PartUsage(part) => {
-                assert!(part.value.prefix.basic.reference_span.is_some());
+                assert!(part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some());
                 assert!(part.value.name.is_empty());
                 assert!(part.value.redefines.is_some());
                 assert!(part.value.typing.is_some());
@@ -1756,7 +1762,13 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match &node.value {
             AttributeBodyElement::PartUsage(part) => {
-                assert!(part.value.prefix.basic.reference_span.is_some());
+                assert!(part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some());
                 assert_eq!(part.value.name, "subscriber");
             }
             other => panic!("expected PartUsage, got {other:?}"),

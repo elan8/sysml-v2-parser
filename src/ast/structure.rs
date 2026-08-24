@@ -1384,16 +1384,6 @@ pub enum InterfaceDefBodyElement {
     ConstraintUsage(Box<Node<ConstraintUsage>>),
 }
 
-/// GH-53: the nested-usage kinds confirmed by real usage as an [`EndDecl`]'s target (see
-/// `EndDecl::nested_usage`'s doc comment). Only `occurrence`/`item` are evidenced; extend this
-/// only alongside a matching real-usage citation, not speculatively.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum EndNestedUsage {
-    Occurrence(Box<Node<OccurrenceUsage>>),
-    Item(Box<Node<ItemUsage>>),
-}
-
 /// The immediate declaration introducer after an `end` prefix.
 ///
 /// `ref` is the required keyword of the pinned `ReferenceUsage` production after its
@@ -1411,7 +1401,8 @@ pub enum EndDeclIntroducer {
 }
 
 /// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
-/// target | nested `occurrence`/`item` usage, see [`nested_usage`](EndDecl::nested_usage)) `;`.
+/// target) `;`. A kind-keyworded end (`end [1] part bead : TireBead;`) is not this node: it is the
+/// usage family's own node with an [`EndUsagePrefix`](crate::ast::EndUsagePrefix) head.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
@@ -1456,14 +1447,6 @@ pub struct EndDecl {
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// `crosses` cross-subsetting clause trailing the `: Type` typed form. `None` when absent.
     pub crosses: Option<Node<SubsettingRelationship>>,
-    /// GH-53: an alternative end-declaration form where the target is itself a complete, nested
-    /// kind-prefixed usage rather than a bare type/reference, e.g. `end theCauses [*] occurrence
-    /// theCause :> causes :>> source { ... }` (Systems Library `Domain Libraries/Cause and
-    /// Effect/CausationConnections.sysml`) / `end touchesToo [0..*] item touchedItemToo :>>
-    /// separateSpaceToo, thisOccurrence;` (`Items.sysml`). `theCauses`/`touchesToo` is still this
-    /// `EndDecl`'s declaration identity; the nested usage supplies this end's typing/structure instead of a
-    /// `:`/`::>` clause. `None` for the ordinary forms above.
-    pub nested_usage: Option<Box<EndNestedUsage>>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
     pub type_ref_span: Option<Span>,
 }
@@ -1472,6 +1455,10 @@ pub struct EndDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EndIdentity {
+    /// No label at all: `UsageDeclaration = Identification? …`, so `end : TireBead[1];`
+    /// (`Wheel Package - Updated.sysml`) and `end :>> source ::> producer.publicationPort;`
+    /// (`ServerSequenceRealization_2.sysml`) declare an end through its specialization alone.
+    Anonymous,
     /// Ordinary declaration label with its authored token span.
     Declaration(Node<String>),
     /// Fixed derivation role with its authored `#...` token span.
@@ -1499,7 +1486,6 @@ impl PartialEq for EndDecl {
             && self.multiplicity == other.multiplicity
             && self.redefines == other.redefines
             && self.crosses == other.crosses
-            && self.nested_usage == other.nested_usage
     }
 }
 

@@ -50,7 +50,7 @@ jobs:
 
       - name: Semantic parser snapshot drift
         run: |
-          cargo run --bin snapshot_tool -- update
+          cargo snapshot update
           git diff --exit-code -- tests/snapshots/qualified_references
 
       - name: cargo test

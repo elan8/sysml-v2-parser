@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`end` on every usage family that owns `OccurrenceUsagePrefix`.** The reference grammar
+  (`SysML.xtext:836-843`) heads the prefix with `EndUsagePrefix | BasicUsagePrefix …`; the
+  published `.kebnf` (564-570) omits the first alternative, and the normative library authors it
+  (`Interfaces.sysml:72` `end port source: Port :>> …`, `Flows.sysml:82` `end occurrence source:
+  …`), so the parser follows the reference. `OccurrenceUsagePrefix` gains a `head` choice with
+  `EndUsagePrefix` carrying an optional `OwnedCrossUsage` (`end [1] part bead : TireBead;`,
+  `end theCauses [*] occurrence theCause :> causes;`); `EndDecl::nested_usage` is superseded by
+  it and deleted; `EndIdentity` gains `Anonymous` for `end : TireBead[1];`. Closes four corpus
+  snapshots and the library's `Interfaces.sysml`/`Flows.sysml` diagnostics. **AST version 232.**
+
+- **`cargo snapshot`.** A cargo alias runs the snapshot driver as a release build, since an
+  unoptimized build pays for every nom combinator on every fixture.
+
 - **`individual` on every `OccurrenceDefinitionPrefix` family.** `OccurrenceDefinitionPrefix =
   BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?` (SysML BNF 541; Pilot
   `SysML.xtext` 804) is reached by calc, constraint, requirement, concern, case, verification,
