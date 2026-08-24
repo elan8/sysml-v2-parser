@@ -95,18 +95,33 @@ pub(crate) struct RefPrefix {
 /// Parse [`RefPrefix`]. Every part is optional, so this never fails; it consumes nothing when the
 /// next token is the usage keyword itself.
 pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
+    // Each slot is refused on its first byte before the `tag` trial: this prefix is speculated at
+    // nearly every member start, and a member rarely carries any of these keywords.
+    let first = |input: Input<'_>, byte: u8| input.fragment().first() == Some(&byte);
     let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
-    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
-    let (input, usage_prefix) = opt(nom::branch::alt((
-        nom::combinator::map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-            crate::ast::DefinitionPrefix::Abstract
-        }),
-        nom::combinator::map(preceded(tag(&b"variation"[..]), ws1), |_| {
-            crate::ast::DefinitionPrefix::Variation
-        }),
-    )))
-    .parse(input)?;
-    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
+    let (input, is_derived) = if first(input, b'd') {
+        opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, usage_prefix) = if first(input, b'a') || first(input, b'v') {
+        opt(nom::branch::alt((
+            nom::combinator::map(preceded(tag(&b"abstract"[..]), ws1), |_| {
+                crate::ast::DefinitionPrefix::Abstract
+            }),
+            nom::combinator::map(preceded(tag(&b"variation"[..]), ws1), |_| {
+                crate::ast::DefinitionPrefix::Variation
+            }),
+        )))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, is_constant) = if first(input, b'c') {
+        opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?
+    } else {
+        (input, None)
+    };
     Ok((
         input,
         RefPrefix {

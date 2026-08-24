@@ -785,6 +785,13 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
 }
 
 pub(crate) fn direction_prefix(input: Input<'_>) -> IResult<Input<'_>, InOut> {
+    // Speculated at many member starts; refuse on the first byte before the `tag` trials.
+    if !matches!(input.fragment().first(), Some(b'i' | b'o')) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     alt((
         map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
         map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),

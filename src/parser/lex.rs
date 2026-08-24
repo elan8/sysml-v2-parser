@@ -1598,6 +1598,11 @@ pub(crate) fn visibility_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (crate::ast::Span, Option<crate::ast::Visibility>)> {
     let start = input;
+    // Every member start runs this; nearly all of them begin with some other keyword, so refuse
+    // on the first byte before the three `tag` trials.
+    if !input.fragment().starts_with(b"p") {
+        return Ok((input, (crate::parser::span_from_to(start, input), None)));
+    }
     let (input, visibility) = opt(alt((
         map(preceded(tag(&b"private"[..]), ws1), |_| {
             crate::ast::Visibility::Private
