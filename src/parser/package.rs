@@ -211,10 +211,11 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         return Ok((next, node_from_to(start, next, elem)));
     }
     let (input, boxed) = package_body_element(input)?;
-    let elem = match &boxed.value {
-        PackageBodyElement::Package(n) => RootElement::Package(n.clone()),
-        PackageBodyElement::LibraryPackage(n) => RootElement::LibraryPackage(n.clone()),
-        PackageBodyElement::Import(n) => RootElement::Import(Box::new(n.clone())),
+    let Node { span, value } = *boxed;
+    let elem = match value {
+        PackageBodyElement::Package(n) => RootElement::Package(n),
+        PackageBodyElement::LibraryPackage(n) => RootElement::LibraryPackage(n),
+        PackageBodyElement::Import(n) => RootElement::Import(Box::new(n)),
         PackageBodyElement::Error(_)
         | PackageBodyElement::Unsupported(_)
         | PackageBodyElement::Annotating(_)
@@ -293,7 +294,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ExhibitState(_)
         | PackageBodyElement::IncludeUseCase(_)
         | PackageBodyElement::ExtendedDefinition(_)
-        | PackageBodyElement::ExtendedUsage(_) => RootElement::Member(boxed),
+        | PackageBodyElement::ExtendedUsage(_) => RootElement::Member(Box::new(Node { span, value })),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
