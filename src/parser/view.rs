@@ -517,7 +517,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             input,
             ViewUsage {
                 short_name,
-                name: name_str,
+                name: Some(name_str),
                 type_name: header.type_reference,
                 subsets: header.subsets,
                 redefines: header.redefines,
@@ -549,7 +549,7 @@ fn view_usage_redefines_only<'a>(
             input,
             ViewUsage {
                 short_name: None,
-                name: String::new(),
+                name: None,
                 type_name: None,
                 subsets: None,
                 redefines: Some(redefines_target),
@@ -605,10 +605,11 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
     {
-        (after_gap, String::new())
+        (after_gap, None)
     } else {
         let (input, _) = ws1(input)?;
-        name(input)?
+        let (input, n) = name(input)?;
+        (input, Some(n))
     };
     // Header clauses, each retained: leading `:>>` redefinition (the anonymous form), typing,
     // multiplicity (before or after the typing), and a `:>` subsets clause -- `asTreeDiagram :
@@ -1001,7 +1002,7 @@ mod column_view_tests {
         ))
         .expect("view usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "");
+        assert!(node.value.name.is_none());
         assert!(node.value.redefines.is_some());
         assert!(node.value.multiplicity.is_some());
     }
@@ -1020,7 +1021,7 @@ mod column_view_tests {
         let RenderingUsageBodyElement::ViewUsage(column_view) = &elements[0].value else {
             panic!("expected a nested view usage, got {:?}", elements[0].value);
         };
-        assert_eq!(column_view.value.name, "");
+        assert!(column_view.value.name.is_none());
         assert!(column_view.value.redefines.is_some());
         let ViewBody::Brace {
             elements: nested_elements,

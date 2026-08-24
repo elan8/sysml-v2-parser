@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Declaration names and short names are typed source spans.** Every `name`, `short_name`,
+  `declared_name`, `declaration_name`, `state_name`, `succession_name` and `binding_name` field
+  that used to copy the token into a `String` is now a `DeclarationName { span }` resolved through
+  the owning document: `ParsedDocument::declaration_name` returns the authored spelling (quotes and
+  escapes intact) and `ParsedDocument::decoded_declaration_name` the decoded `NAME` value,
+  allocating only for an escaped unrestricted name. The parallel `name_span` fields are gone --
+  the name *is* the span -- and so are the `""` sentinels: a usage that admits an anonymous form
+  (`part :>> target`, `constraint { … }`, `actor : Person;`, `return : T`, …) now has
+  `name: Option<DeclarationName>`. The emitter streams names from their spans instead of
+  re-quoting a decoded string, so `format_name` is gone; the semantic projection still shows the
+  decoded value. `ast::DeclarationName` (the `Simple | Qualified` namespace-name enum) is renamed
+  `ast::NamespaceName`. Standalone `accept`/`send` control nodes were identified by a fabricated
+  `ActionUsage.name == "accept"`; they now carry `ActionUsage::keyword: ActionUsageKeyword` and
+  no name, and the semantic projection adds a `(keyword …)` slot to `action-usage`. `Span` is
+  now `Copy`. **AST version 240.**
+- **Real and string literal spelling are typed source spans.** `Expression::LiteralReal` holds a
+  `RealLiteral` and `Expression::LiteralString` a `StringLiteral`, resolved through
+  `ParsedDocument::real_literal`, `string_literal` (authored, quotes and escapes intact) and
+  `decoded_string_literal`. The emitter streams both from the source, which also fixes string
+  literals losing their `\"` escapes on round trip.
+- **Comment bodies and `locale`/`language` tokens are typed source spans.** `DocComment`,
+  `CommentAnnotation` and `TextualRepresentation` carry a `body: CommentBody` span (replacing the
+  `text` copy and its parallel `body_span`) and `StringLiteral` spans for `locale` and `language`
+  (`TextualRepresentation::language` is now `Option<StringLiteral>`, replacing the
+  `language`/`language_span` pair). `ParsedDocument::comment_body` returns the authored body and
+  `normalized_comment_body` the pinned-normalized view, borrowing when nothing changes;
+  `normalize_comment_body` now returns a `Cow`.
+- **Opaque declaration text and operator fallback spellings are typed source spans.** The
+  fallback nodes (`KermlSemanticDecl`, `KermlFeatureDecl`, `FeatureDecl`, `ClassifierDecl`,
+  `ExtendedLibraryDecl`) carry `text: OpaqueText` and a `keyword_span` for the starter keyword that
+  classified them, replacing the copied `text` and `bnf_production`/`keyword` strings
+  (`ParsedDocument::opaque_text`). `CollectionOperator::Other` holds an `OperatorSpelling` span
+  (`ParsedDocument::operator_spelling`, `CollectionOperator::classified_name`); the never-produced
+  `BinaryOperator::Other`/`UnaryOperator::Other` variants and `from_token` constructors are
+  removed.
 - **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
   Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
   whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,
@@ -20,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An integer literal that does not fit `i64` is refused instead of silently parsing as `0`.**
+  The enclosing expression now recovers with a diagnostic, so an unrepresentable value can no
+  longer masquerade as a successfully parsed literal.
 - **Three round-trip and dispatch gaps in the last corpus snapshots.** A KerML classifier's
   `ConjugationPart` (`type Conjugate4 ~ Conjugate1;`, `Types.kerml`) was parsed but neither
   emitted nor projected, so it vanished silently; an interface *usage* body did not dispatch the

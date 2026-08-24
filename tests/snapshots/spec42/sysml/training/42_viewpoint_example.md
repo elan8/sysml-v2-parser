@@ -80,7 +80,7 @@ package 'Viewpoint Example' {
     }
     viewpoint 'system structure perspective' {
         frame 'system breakdown';
-        frame modularity;
+        frame 'modularity';
         require constraint {
             doc
             /*

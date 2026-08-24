@@ -1,7 +1,8 @@
 //! Port definition and port usage parsing.
 
 use crate::ast::{
-    Node, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage,
+    DeclarationName, Node, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement,
+    PortUsage,
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{
@@ -19,7 +20,6 @@ use crate::parser::node_from_to;
 use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
 };
-use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -134,8 +134,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
             redefines: Node<crate::ast::SubsettingRelationship>,
         },
         Named {
-            name_span: Option<crate::ast::Span>,
-            name: String,
+            name: Option<DeclarationName>,
         },
     }
 
@@ -182,31 +181,20 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
         && !peek.fragment().starts_with(b":>>"))
         || starts_with_keyword(peek.fragment(), b"defined")
     {
-        (
-            input,
-            PortUsageHead::Named {
-                name_span: None,
-                name: String::new(),
-            },
-        )
+        (input, PortUsageHead::Named { name: None })
     } else {
         alt((
             map(
                 preceded(ws_and_comments, prefix_redefinition_target),
                 |(_, redefines)| PortUsageHead::PrefixRedefines { redefines },
             ),
-            map(with_span(name), |(name_span, name)| PortUsageHead::Named {
-                name_span: Some(name_span),
-                name,
-            }),
+            map(name, |name| PortUsageHead::Named { name: Some(name) }),
         ))
         .parse(input)?
     };
-    let (input, name_str, name_span, prefix_redefines) = match usage_head {
-        PortUsageHead::PrefixRedefines { redefines } => {
-            (input, String::new(), None, Some(redefines))
-        }
-        PortUsageHead::Named { name_span, name } => (input, name, name_span, None),
+    let (input, name, prefix_redefines) = match usage_head {
+        PortUsageHead::PrefixRedefines { redefines } => (input, None, Some(redefines)),
+        PortUsageHead::Named { name } => (input, name, None),
     };
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, _, typing) =
@@ -234,7 +222,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
             input,
             PortUsage {
                 prefix,
-                name: name_str,
+                name,
                 short_name,
                 typing,
                 multiplicity,
@@ -246,7 +234,6 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
                 intersects: clauses.intersects,
                 value,
                 body,
-                name_span,
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
@@ -467,9 +454,15 @@ mod par_002_widening_tests {
             port_def(input("port p1: MyPortType;")).is_err(),
             "`port p1: MyPortType;` is a PortUsage, not a PortDefinition"
         );
-        let (rest, node) = port_usage(input("port p1: MyPortType;")).expect("port usage");
+        let src = input("port p1: MyPortType;");
+        let (rest, node) = port_usage(src).expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "p1");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"p1"[..])
+        );
         let typing = node
             .value
             .typing
@@ -599,19 +592,34 @@ mod par_002_widening_tests {
 
     #[test]
     fn port_usage_captures_short_name() {
-        let (rest, node) =
-            port_usage(input("port <pp> powerPort: PowerPort;")).expect("port usage");
+        let src = input("port <pp> powerPort: PowerPort;");
+        let (rest, node) = port_usage(src).expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("pp"));
-        assert_eq!(node.value.name, "powerPort");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"pp"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"powerPort"[..])
+        );
     }
 
     #[test]
     fn port_usage_captures_short_name_with_redefines() {
-        let (rest, node) =
-            port_usage(input("port <pp> :>> powerPort: PowerPort;")).expect("port usage");
+        let src = input("port <pp> :>> powerPort: PowerPort;");
+        let (rest, node) = port_usage(src).expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("pp"));
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"pp"[..])
+        );
         assert_eq!(
             node.value.redefines.as_ref().map(|n| n.value.target.len()),
             Some(1)

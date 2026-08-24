@@ -46,7 +46,10 @@ fn test_parse_traffic_light_intersection() {
         other => panic!("expected root to be a Package, got {:?}", other),
     };
     assert_eq!(
-        package.identification.simple_name(),
+        package
+            .identification
+            .simple_name()
+            .and_then(|n| root.declaration_name(n)),
         Some("TrafficLightIntersection"),
         "root package should be named TrafficLightIntersection"
     );

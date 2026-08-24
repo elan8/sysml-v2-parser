@@ -29,7 +29,9 @@ fn test_parse_minimal_package_one_attribute() {
     };
     assert_eq!(body.len(), 1, "expected one body element");
     match &body[0].value {
-        PackageBodyElement::AttributeDef(a) => assert_eq!(a.name, "Real"),
+        PackageBodyElement::AttributeDef(a) => {
+            assert_eq!(a.name.and_then(|n| root.declaration_name(n)), Some("Real"))
+        }
         other => panic!("expected AttributeDef, got {:?}", other),
     }
 }
@@ -69,7 +71,7 @@ fn test_parse_package_with_doc_and_line_comment() {
     }
     let attr = body
         .iter()
-        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name == "Real"));
+        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name.and_then(|n| root.declaration_name(n)) == Some("Real")));
     assert!(
         attr.is_some(),
         "expected AttributeDef(Real) in body, got {:?}",
@@ -107,7 +109,7 @@ fn test_parse_fixture_exact_start() {
     // First element is doc comment, then attribute def Real
     let attr = body
         .iter()
-        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name == "Real"));
+        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name.and_then(|n| root.declaration_name(n)) == Some("Real")));
     assert!(
         attr.is_some(),
         "expected AttributeDef(Real) in body, got {:?}",
@@ -171,11 +173,13 @@ fn test_perform_body_doc_comment_parsed_as_element() {
     match &perform_body[0].value {
         sysml_v2_parser::ast::PerformBodyElement::Annotating(
             sysml_v2_parser::ast::AnnotatingMember::Doc(d),
-        ) => assert!(
-            d.value.text.contains("allocation comment"),
-            "doc text should contain the comment content, got {:?}",
-            d.value.text
-        ),
+        ) => {
+            let text = root.comment_body(d.value.body).expect("doc body");
+            assert!(
+                text.contains("allocation comment"),
+                "doc text should contain the comment content, got {text:?}"
+            )
+        }
         other => panic!("expected first element Doc, got {:?}", other),
     }
     match &perform_body[1].value {
@@ -250,14 +254,21 @@ fn test_namespace_declaration() {
         RootElement::Namespace(n) => &n.value,
         _ => panic!("expected Namespace"),
     };
-    assert_eq!(ns.identification.simple_name(), Some("N"));
+    assert_eq!(
+        ns.identification
+            .simple_name()
+            .and_then(|n| root.declaration_name(n)),
+        Some("N")
+    );
     let body = match &ns.body {
         PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(body.len(), 1);
     match &body[0].value {
-        PackageBodyElement::AttributeDef(a) => assert_eq!(a.name, "Real"),
+        PackageBodyElement::AttributeDef(a) => {
+            assert_eq!(a.name.and_then(|n| root.declaration_name(n)), Some("Real"))
+        }
         _ => panic!("expected AttributeDef Real"),
     }
 }

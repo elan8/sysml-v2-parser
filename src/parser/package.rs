@@ -1,8 +1,8 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    ClassifierDecl, DeclarationName, ExtendedLibraryDecl, FeatureDecl, FilterMember,
-    KermlFeatureDecl, KermlSemanticDecl, LibraryPackage, NamespaceDecl, Node, Package, PackageBody,
+    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, FilterMember, KermlFeatureDecl,
+    KermlSemanticDecl, LibraryPackage, NamespaceDecl, NamespaceName, Node, Package, PackageBody,
     PackageBodyElement, QualifiedIdentification, RootElement, RootNamespace, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
@@ -74,8 +74,8 @@ fn required_package_identification(
     let (input, decl_name) = opt(preceded(
         ws_and_comments,
         alt((
-            map(qualified_declaration_name, DeclarationName::Qualified),
-            map(name, DeclarationName::Simple),
+            map(qualified_declaration_name, NamespaceName::Qualified),
+            map(name, NamespaceName::Simple),
         )),
     ))
     .parse(input)?;
@@ -336,13 +336,19 @@ fn package_body_element_fallback_inner(
     )))
 }
 
-fn modeled_decl_text(start: Input<'_>, end: Input<'_>) -> String {
+/// The retained declaration text between `start` and `end`, as a span trimmed of trivia.
+fn modeled_decl_text(start: Input<'_>, end: Input<'_>) -> crate::ast::OpaqueText {
     let delta = end
         .location_offset()
         .saturating_sub(start.location_offset());
     let bytes = start.fragment();
     let take = delta.min(bytes.len());
-    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
+    let raw = &bytes[..take];
+    let leading = raw.len() - raw.trim_ascii_start().len();
+    let trimmed_len = raw.trim_ascii().len();
+    let text_start = crate::parser::advance(start, leading);
+    let text_end = crate::parser::advance(text_start, trimmed_len);
+    crate::ast::OpaqueText::new(crate::parser::span_from_to(text_start, text_end))
 }
 
 fn starts_with_visibility_prefix(fragment: &[u8]) -> Option<usize> {
@@ -405,15 +411,15 @@ fn binding_connector_usage_inner(
         .map(|(i, o)| (i, o.is_some()))?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
-    let (input, name_span) = if all
+    let (input, binding_name) = if all
         || frag.starts_with(b"[")
         || starts_with_keyword(frag, b"of")
         || starts_with_keyword(frag, b"bind")
     {
         (input, None)
     } else {
-        let (input, (span, _text)) = crate::parser::span::with_span(name).parse(input)?;
-        (input, Some(span))
+        let (input, binding_name) = name(input)?;
+        (input, Some(binding_name))
     };
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
@@ -450,7 +456,7 @@ fn binding_connector_usage_inner(
             input,
             crate::ast::BindingConnectorUsage {
                 all,
-                name_span,
+                name: binding_name,
                 multiplicity,
                 uses_of_keyword,
                 uses_bind_keyword,
@@ -583,7 +589,7 @@ fn unsupported_package_element(
 fn parse_modeled_decl<'a>(
     input: Input<'a>,
     starters: &'a [&'a [u8]],
-) -> IResult<Input<'a>, (String, String)> {
+) -> IResult<Input<'a>, (crate::ast::Span, crate::ast::OpaqueText)> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -599,13 +605,20 @@ fn parse_modeled_decl<'a>(
     }
     let raw_start = input;
     let stripped = strip_common_decl_prefixes(input.fragment());
-    let bnf_production = starters
+    // `is_modeled_decl_start` accepted this text, so exactly this search succeeded there.
+    let keyword = starters
         .iter()
         .find(|kw| starts_with_keyword(stripped, kw))
-        .map(|kw| String::from_utf8_lossy(kw).to_string())
-        .unwrap_or_else(|| "declaration".to_string());
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+        })?;
+    let keyword_start = crate::parser::advance(input, input.fragment().len() - stripped.len());
+    let keyword_span = crate::parser::span_from_to(
+        keyword_start,
+        crate::parser::advance(keyword_start, keyword.len()),
+    );
     let (input, _) = skip_statement_or_block(input)?;
-    Ok((input, (bnf_production, modeled_decl_text(raw_start, input))))
+    Ok((input, (keyword_span, modeled_decl_text(raw_start, input))))
 }
 
 /// Structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
@@ -630,9 +643,7 @@ fn kerml_bare_declaration(
         })?;
     let (input, _) = nom::bytes::complete::tag(*keyword_bytes).parse(input)?;
     let keyword = *keyword;
-    let (input, name_span) =
-        opt(preceded(ws1, crate::parser::span::with_span(name))).parse(input)?;
-    let name_span = name_span.map(|(span, _text)| span);
+    let (input, bare_name) = opt(preceded(ws1, name)).parse(input)?;
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -647,7 +658,7 @@ fn kerml_bare_declaration(
             input,
             crate::ast::KermlBareDeclaration {
                 keyword,
-                name_span,
+                name: bare_name,
                 multiplicity,
             },
         ),
@@ -999,7 +1010,7 @@ pub(crate) fn kerml_type_relationship_clauses(
         targets.extend(more);
         let span = crate::parser::span_from_to(before, rest);
         out.push(Node::new(
-            span.clone(),
+            span,
             crate::ast::KermlTypeRelationship {
                 keyword,
                 targets,
@@ -1067,7 +1078,7 @@ fn kerml_classifier_structured_inner(
             (
                 input,
                 Some(Node::new(
-                    span.clone(),
+                    span,
                     crate::ast::TypingRelationship {
                         target: vec![target],
                         kind: crate::ast::TypingKind::Typing,
@@ -1145,7 +1156,7 @@ fn kerml_conjugation_part(
     Ok((
         input,
         Some(Node::new(
-            span.clone(),
+            span,
             crate::ast::Conjugation {
                 target,
                 spelling,
@@ -1171,44 +1182,30 @@ fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanti
         b"metaclass",
         b"step",
     ];
-    let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
+    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            KermlSemanticDecl {
-                bnf_production,
-                text,
-            },
-        ),
+        node_from_to(start, input, KermlSemanticDecl { keyword_span, text }),
     ))
 }
 
 fn kerml_feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlFeatureDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[b"occurrence", b"expr", b"predicate", b"succession"];
-    let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
+    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            KermlFeatureDecl {
-                bnf_production,
-                text,
-            },
-        ),
+        node_from_to(start, input, KermlFeatureDecl { keyword_span, text }),
     ))
 }
 
 fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[b"feature"];
-    let (input, (keyword, text)) = parse_modeled_decl(input, starters)?;
+    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
-        node_from_to(start, input, FeatureDecl { keyword, text }),
+        node_from_to(start, input, FeatureDecl { keyword_span, text }),
     ))
 }
 
@@ -1221,10 +1218,10 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
         b"structure",
         b"subclassifier",
     ];
-    let (input, (keyword, text)) = parse_modeled_decl(input, starters)?;
+    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
-        node_from_to(start, input, ClassifierDecl { keyword, text }),
+        node_from_to(start, input, ClassifierDecl { keyword_span, text }),
     ))
 }
 
@@ -1262,17 +1259,10 @@ fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLi
         b"part",
         b"port",
     ];
-    let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
+    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            ExtendedLibraryDecl {
-                bnf_production,
-                text,
-            },
-        ),
+        node_from_to(start, input, ExtendedLibraryDecl { keyword_span, text }),
     ))
 }
 
@@ -2628,14 +2618,20 @@ mod tests {
 
     #[test]
     fn package_body_accepts_connection_usage_with_inline_connect_clause() {
+        let source = parse_input("connection link : Link connect a to b;");
         let (rest, node) =
-            package_body_element(parse_input("connection link : Link connect a to b;"))
-                .expect("connection usage with connect clause");
+            package_body_element(source).expect("connection usage with connect clause");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let PackageBodyElement::ConnectionUsage(usage) = node.value else {
             panic!("expected ConnectionUsage, got {:?}", node.value);
         };
-        assert_eq!(usage.value.name.as_deref(), Some("link"));
+        assert_eq!(
+            usage
+                .value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"link"[..])
+        );
         assert!(usage.value.type_reference.is_some());
         assert!(usage.value.connect_from.is_some());
         assert!(usage.value.connect_to.is_some());

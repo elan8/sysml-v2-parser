@@ -348,13 +348,16 @@ pub(crate) fn parse_definition_prefix(
     };
 
     let (input, identification) = identification(input)?;
+    let header_start = input;
     let (input, header) = parse_definition_header_after_ident(input)?;
     if let Some(keyword) = options.reject_header_keyword {
-        if header
-            .raw_header
-            .as_deref()
-            .is_some_and(|raw| contains_keyword(raw.as_bytes(), keyword))
-        {
+        if header.raw_header.is_some_and(|raw| {
+            let relative = raw.offset - header_start.location_offset();
+            contains_keyword(
+                &header_start.fragment()[relative..relative + raw.len],
+                keyword,
+            )
+        }) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Verify,
@@ -414,7 +417,13 @@ mod tests {
             prefix.basic_prefix.as_ref().map(|node| node.value),
             Some(DefinitionPrefix::Abstract)
         );
-        assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
+        assert_eq!(
+            prefix
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"Foo"[..])
+        );
         assert_eq!(
             prefix
                 .specializes
@@ -431,7 +440,13 @@ mod tests {
         let (rest, prefix) =
             parse_definition_prefix(input, DefinitionPrefixOptions::new(b"connection"))
                 .expect("prefix");
-        assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
+        assert_eq!(
+            prefix
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"connections"[..])
+        );
         assert_eq!(
             prefix
                 .specializes
@@ -491,7 +506,13 @@ mod tests {
             prefix.basic_prefix.as_ref().map(|node| node.value),
             Some(DefinitionPrefix::Abstract)
         );
-        assert_eq!(prefix.identification.name.as_deref(), Some("X"));
+        assert_eq!(
+            prefix
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"X"[..])
+        );
         assert_eq!(prefix.visibility, Some(crate::ast::Visibility::Private));
     }
 

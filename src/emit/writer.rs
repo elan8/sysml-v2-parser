@@ -1,7 +1,7 @@
 //! Indenting SysML text writer.
 
 use super::{EmitError, EmitOptions};
-use crate::ast::{ParsedDocument, QualifiedReferenceId, ReferenceSeparator, Span};
+use crate::ast::{DeclarationName, ParsedDocument, QualifiedReferenceId, ReferenceSeparator, Span};
 
 pub(crate) struct EmitWriter<'a> {
     buf: String,
@@ -79,15 +79,43 @@ impl<'a> EmitWriter<'a> {
     /// The span includes the token's authored quoting and escapes, so formatting the decoded
     /// `String` again would both lose a quoted `BASIC_NAME` and corrupt an `UNRESTRICTED_NAME`.
     pub(crate) fn push_authored_name(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
+        self.push_authored_span(path, span)
+    }
+
+    /// Emit any authored token (a literal, a name) exactly as spelled at its source span.
+    pub(crate) fn push_authored_span(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
         let text = self
             .document
             .source
             .slice(span)
             .ok_or_else(|| EmitError::InvalidSpan {
                 path: path.to_owned(),
-                span: span.clone(),
+                span: *span,
             })?;
         self.push_str(text);
+        Ok(())
+    }
+
+    /// Emit a declaration name or short name from its authored source span.
+    pub(crate) fn push_declaration_name(
+        &mut self,
+        path: &str,
+        name: DeclarationName,
+    ) -> Result<(), EmitError> {
+        self.push_authored_name(path, name.span())
+    }
+
+    /// Emit `<short> ` for an authored short name, or nothing when there is none.
+    pub(crate) fn push_short_name_prefix(
+        &mut self,
+        path: &str,
+        short_name: Option<DeclarationName>,
+    ) -> Result<(), EmitError> {
+        if let Some(short_name) = short_name {
+            self.push_char('<');
+            self.push_declaration_name(path, short_name)?;
+            self.push_str("> ");
+        }
         Ok(())
     }
 
@@ -125,7 +153,7 @@ impl<'a> EmitWriter<'a> {
             let authored = document.source.slice(&segment.source_span).ok_or_else(|| {
                 EmitError::InvalidSpan {
                     path: path.to_owned(),
-                    span: segment.source_span.clone(),
+                    span: segment.source_span,
                 }
             })?;
             self.push_str(authored);
@@ -158,35 +186,6 @@ impl<'a> EmitWriter<'a> {
     }
 }
 
-/// Quote a SysML name when it is not a bare identifier.
-pub(crate) fn format_name(name: &str) -> String {
-    if needs_quotes(name) {
-        format!("'{}'", name.replace('\'', "\\'"))
-    } else {
-        name.to_string()
-    }
-}
-
-fn needs_quotes(name: &str) -> bool {
-    if name.is_empty() {
-        return true;
-    }
-    // A declared name that spells a reserved keyword (`'in'`, `'private'`, Kernel Semantic
-    // Library `KerML.kerml`) was necessarily authored quoted; emitting it bare would reparse as
-    // the keyword.
-    if crate::parser::lex::is_reserved_keyword(name.as_bytes()) {
-        return true;
-    }
-    let mut chars = name.chars();
-    let Some(first) = chars.next() else {
-        return true;
-    };
-    if !(first.is_ascii_alphabetic() || first == '_') {
-        return true;
-    }
-    !chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
 /// Emit visibility keyword followed by a space when present.
 pub(crate) fn emit_visibility(w: &mut EmitWriter<'_>, visibility: Option<crate::ast::Visibility>) {
     use crate::ast::Visibility;
@@ -195,20 +194,5 @@ pub(crate) fn emit_visibility(w: &mut EmitWriter<'_>, visibility: Option<crate::
         Some(Visibility::Protected) => w.push_str("protected "),
         Some(Visibility::Public) => w.push_str("public "),
         None => {}
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn format_name_quotes_when_needed() {
-        assert_eq!(format_name("Vehicle"), "Vehicle");
-        assert_eq!(
-            format_name("2a-Parts Interconnection"),
-            "'2a-Parts Interconnection'"
-        );
-        assert_eq!(format_name("_ok"), "_ok");
     }
 }

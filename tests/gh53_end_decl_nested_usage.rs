@@ -14,7 +14,12 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn connection_def_elements(input: &str) -> Vec<ConnectionDefBodyElement> {
+fn connection_def_elements(
+    input: &str,
+) -> (
+    sysml_v2_parser::ParsedDocument,
+    Vec<ConnectionDefBodyElement>,
+) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -38,16 +43,23 @@ fn connection_def_elements(input: &str) -> Vec<ConnectionDefBodyElement> {
     let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// The cross feature's declared name and whether it authored a multiplicity.
-fn cross_feature(prefix: &OccurrenceUsagePrefix) -> (Option<String>, bool) {
+fn cross_feature<'a>(
+    doc: &'a sysml_v2_parser::ParsedDocument,
+    prefix: &OccurrenceUsagePrefix,
+) -> (Option<&'a str>, bool) {
     let end = prefix.end().expect("an `end` head");
     let cross = end.cross.as_deref().expect("an owned cross feature");
     let declaration = &cross.value.declaration.value;
     (
-        declaration.identification.name.clone(),
+        declaration
+            .identification
+            .name
+            .and_then(|n| doc.declaration_name(n)),
         declaration.multiplicity.is_some(),
     )
 }
@@ -55,16 +67,19 @@ fn cross_feature(prefix: &OccurrenceUsagePrefix) -> (Option<String>, bool) {
 #[test]
 fn end_occurrence_usage_owns_its_cross_feature() {
     let input = "package P {\nconnection def Causation {\nend theCauses [*] occurrence theCause :> causes :>> source {\n}\nend theEffects [*] occurrence theEffect :> effects :>> target {\n}\n}\n}";
-    let elements = connection_def_elements(input);
+    let (doc, elements) = connection_def_elements(input);
     assert_eq!(elements.len(), 2);
 
     let ConnectionDefBodyElement::OccurrenceUsage(the_cause) = &elements[0] else {
         panic!("expected an occurrence usage, got {:?}", elements[0]);
     };
-    assert_eq!(the_cause.value.name, "theCause");
     assert_eq!(
-        cross_feature(&the_cause.value.prefix),
-        (Some("theCauses".to_owned()), true)
+        the_cause.value.name.and_then(|n| doc.declaration_name(n)),
+        Some("theCause")
+    );
+    assert_eq!(
+        cross_feature(&doc, &the_cause.value.prefix),
+        (Some("theCauses"), true)
     );
     assert!(the_cause.value.prefix.basic().is_none());
 }
@@ -72,42 +87,53 @@ fn end_occurrence_usage_owns_its_cross_feature() {
 #[test]
 fn end_item_usage_owns_its_cross_feature() {
     let input = "package P {\nconnection def Touches {\nend touchesToo [0..*] item touchedItemToo :>> separateSpaceToo, thisOccurrence;\nend touches [0..*] item touchedItem :>> separateSpace, thatOccurrence;\n}\n}";
-    let elements = connection_def_elements(input);
+    let (doc, elements) = connection_def_elements(input);
     assert_eq!(elements.len(), 2);
 
     let ConnectionDefBodyElement::ItemUsage(touched_item_too) = &elements[0] else {
         panic!("expected an item usage, got {:?}", elements[0]);
     };
-    assert_eq!(touched_item_too.value.name, "touchedItemToo");
     assert_eq!(
-        cross_feature(&touched_item_too.value.prefix),
-        (Some("touchesToo".to_owned()), true)
+        touched_item_too
+            .value
+            .name
+            .and_then(|n| doc.declaration_name(n)),
+        Some("touchedItemToo")
+    );
+    assert_eq!(
+        cross_feature(&doc, &touched_item_too.value.prefix),
+        (Some("touchesToo"), true)
     );
 }
 
 #[test]
 fn end_part_usage_with_a_bare_cross_multiplicity() {
     let input = "package P {\nconnection def PressureSeat {\nend [1] part bead : TireBead;\nend [1] part mountingRim : TireMountingRim;\n}\n}";
-    let elements = connection_def_elements(input);
+    let (doc, elements) = connection_def_elements(input);
     assert_eq!(elements.len(), 2);
 
     let ConnectionDefBodyElement::PartUsage(bead) = &elements[0] else {
         panic!("expected a part usage, got {:?}", elements[0]);
     };
-    assert_eq!(bead.value.name, "bead");
-    assert_eq!(cross_feature(&bead.value.prefix), (None, true));
+    assert_eq!(
+        bead.value.name.and_then(|n| doc.declaration_name(n)),
+        Some("bead")
+    );
+    assert_eq!(cross_feature(&doc, &bead.value.prefix), (None, true));
 }
 
 #[test]
 fn keyword_less_ends_stay_end_declarations() {
     let input = "package P {\nconnection def C {\nend hub ::> mainSwitch[1];\nend source: Anything :>> BinaryLinkObject::source;\nend : TireBead[1];\n}\n}";
-    let elements = connection_def_elements(input);
+    let (doc, elements) = connection_def_elements(input);
     assert_eq!(elements.len(), 3);
 
     let ConnectionDefBodyElement::EndDecl(hub) = &elements[0] else {
         panic!("expected an end declaration, got {:?}", elements[0]);
     };
-    assert!(matches!(&hub.value.identity, EndIdentity::Declaration(name) if name.value == "hub"));
+    assert!(
+        matches!(&hub.value.identity, EndIdentity::Declaration(name) if doc.declaration_name(*name) == Some("hub"))
+    );
     assert!(hub.value.references.is_some());
     assert!(hub.value.typing.is_none());
 

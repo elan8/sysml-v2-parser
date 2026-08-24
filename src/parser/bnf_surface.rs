@@ -33,7 +33,9 @@ pub(crate) fn owned_expression(
 }
 
 /// UsageDeclaration surface: name with optional usage header fragments.
-pub(crate) fn usage_declaration_surface(input: Input<'_>) -> IResult<Input<'_>, String> {
+pub(crate) fn usage_declaration_surface(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::DeclarationName> {
     let (input, n) = name(input)?;
     let (input, _) = opt(usage_header).parse(input)?;
     Ok((input, n))
@@ -72,16 +74,19 @@ mod tests {
 
     #[test]
     fn usage_declaration_surface_parses_header() {
-        let (_, name) =
-            usage_declaration_surface(span_input("wheel : Wheel ;")).expect("UsageDeclaration");
-        assert_eq!(name, "wheel");
+        let input = span_input("wheel : Wheel ;");
+        let (_, name) = usage_declaration_surface(input).expect("UsageDeclaration");
+        assert_eq!(crate::parser::lex::name_bytes(input, name), b"wheel");
     }
 
     #[test]
     fn definition_declaration_surface_parses_identification() {
-        let (_, id) =
-            definition_declaration_surface(span_input("MyPart ;")).expect("DefinitionDeclaration");
-        assert_eq!(id.name.as_deref(), Some("MyPart"));
+        let input = span_input("MyPart ;");
+        let (_, id) = definition_declaration_surface(input).expect("DefinitionDeclaration");
+        assert_eq!(
+            id.name.map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"MyPart"[..])
+        );
     }
 
     #[test]

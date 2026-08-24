@@ -21,13 +21,8 @@ package CommentLoopOccurrence {
 )
 ~~~
 # FORMAT
-~~~sysml
-package CommentLoopOccurrence {
-    occurrence 'subject' : Subject {
-        /* occurrence body comment */
-        snapshot instant : Instant;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

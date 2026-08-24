@@ -428,8 +428,13 @@ mod tests {
         let (rest, node) = extended_usage(input).expect("extended usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value.declaration.value.identification.name.as_deref(),
-            Some("ArrowheadCore")
+            node.value
+                .declaration
+                .value
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"ArrowheadCore"[..])
         );
         assert_eq!(node.value.extension_keywords.len(), 1);
 
@@ -523,7 +528,14 @@ mod tests {
                 .declared_name
                 .as_ref()
                 .unwrap_or_else(|| panic!("{source_text} declares a name"));
-            assert_eq!(declared.value.identification.name.as_deref(), Some("t"));
+            assert_eq!(
+                declared
+                    .value
+                    .identification
+                    .name
+                    .map(|n| crate::parser::lex::name_bytes(input, n)),
+                Some(&b"t"[..])
+            );
             assert_eq!(declared.value.typed_by, spelling);
 
             let arena = context.finish();
@@ -555,8 +567,12 @@ mod tests {
             .as_ref()
             .expect("short name declares");
         assert_eq!(
-            declared.value.identification.short_name.as_deref(),
-            Some("s")
+            declared
+                .value
+                .identification
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"s"[..])
         );
         assert!(declared.value.identification.name.is_none());
     }

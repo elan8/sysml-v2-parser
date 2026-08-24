@@ -15,7 +15,9 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn metadata_body_members(body_source: &str) -> Vec<MetadataBodyElement> {
+fn metadata_body_members(
+    body_source: &str,
+) -> (sysml_v2_parser::ParsedDocument, Vec<MetadataBodyElement>) {
     let source = format!("package P {{ part x {{ @M {{ {body_source} }} }} }}");
     let result = parse_with_diagnostics(&source);
     assert!(
@@ -37,7 +39,9 @@ fn metadata_body_members(body_source: &str) -> Vec<MetadataBodyElement> {
         !found.contains("ParseErrorNode"),
         "no member may reach recovery: {found}"
     );
-    collect_metadata_body(part).expect("the part body must own one metadata annotation")
+    let members =
+        collect_metadata_body(part).expect("the part body must own one metadata annotation");
+    (result.document, members)
 }
 
 fn collect_metadata_body(
@@ -63,7 +67,7 @@ fn collect_metadata_body(
 
 #[test]
 fn a_nested_declaration_reaches_the_ast_with_its_declaration() {
-    let members = metadata_body_members("attribute def X;");
+    let (doc, members) = metadata_body_members("attribute def X;");
     assert_eq!(members.len(), 1);
     let MetadataBodyElement::Definition(member) = &members[0] else {
         panic!("expected a DefinitionMember, got {:?}", members[0]);
@@ -71,16 +75,19 @@ fn a_nested_declaration_reaches_the_ast_with_its_declaration() {
     let AttributeBodyElement::AttributeDef(def) = &member.value else {
         panic!("expected an attribute def, got {:?}", member.value);
     };
-    assert_eq!(def.value.name, "X");
+    assert_eq!(
+        def.value.name.and_then(|n| doc.declaration_name(n)),
+        Some("X")
+    );
     assert!(member.span.len > 0, "the member keeps its own source span");
 }
 
 #[test]
 fn an_alias_member_reaches_the_ast() {
-    let members = metadata_body_members("alias a for b;");
+    let (doc, members) = metadata_body_members("alias a for b;");
     assert!(
         matches!(&members[0], MetadataBodyElement::Alias(alias)
-            if alias.value.identification.name.as_deref() == Some("a")),
+            if alias.value.identification.name.and_then(|n| doc.declaration_name(n)) == Some("a")),
         "got {:?}",
         members[0]
     );
@@ -88,7 +95,7 @@ fn an_alias_member_reaches_the_ast() {
 
 #[test]
 fn an_import_member_reaches_the_ast() {
-    let members = metadata_body_members("import X::*;");
+    let (_, members) = metadata_body_members("import X::*;");
     assert!(
         matches!(&members[0], MetadataBodyElement::Import(_)),
         "got {:?}",
@@ -101,7 +108,7 @@ fn the_keyword_less_redefinition_member_still_wins_its_spelling() {
     // `MetadataBodyUsage`'s `OwnedRedefinition` is a bare qualified name, so it must be tried
     // before the declaration dispatcher, which would otherwise read it as a keyword-less usage.
     for source in ["q = 5;", "redefines q = 5;", ":>> q = 5;"] {
-        let members = metadata_body_members(source);
+        let (_, members) = metadata_body_members(source);
         assert!(
             matches!(&members[0], MetadataBodyElement::Usage(_)),
             "`{source}` must stay a MetadataBodyUsage, got {:?}",
@@ -112,7 +119,7 @@ fn the_keyword_less_redefinition_member_still_wins_its_spelling() {
 
 #[test]
 fn a_redefinition_and_a_declaration_coexist_in_authored_order() {
-    let members = metadata_body_members(":>> q = 5; attribute def X;");
+    let (_, members) = metadata_body_members(":>> q = 5; attribute def X;");
     assert_eq!(members.len(), 2);
     assert!(matches!(&members[0], MetadataBodyElement::Usage(_)));
     assert!(matches!(&members[1], MetadataBodyElement::Definition(_)));

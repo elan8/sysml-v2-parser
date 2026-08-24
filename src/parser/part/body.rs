@@ -114,10 +114,10 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
     let (input, state_keyword) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
     let (input, name, state_reference) = if state_keyword.is_some() {
         let (input, name) = name(input)?;
-        (input, name, None)
+        (input, Some(name), None)
     } else {
         let (input, reference) = crate::parser::lex::reference_path(input)?;
-        (input, String::new(), Some(reference))
+        (input, None, Some(reference))
     };
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
@@ -605,7 +605,7 @@ mod par_002_nested_def_tests {
         let source = input("exhibit vehicleStates.on;");
         let (rest, node) = exhibit_state(source).expect("exhibit reference");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.name.is_empty());
+        assert!(node.value.name.is_none());
         assert_eq!(
             node.value
                 .state_reference
@@ -887,13 +887,20 @@ mod par_002_nested_def_tests {
     fn part_def_body_parses_abstract_ref_action_as_action_usage() {
         let src =
             "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
-        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        let source = input(src);
+        let (rest, node) = part_def_body_element(source).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::ActionUsage(action) => {
                 assert!(action.value.is_abstract);
                 assert!(action.value.is_reference);
-                assert_eq!(action.value.name, "performedActions");
+                assert_eq!(
+                    action
+                        .value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"performedActions"[..])
+                );
                 assert!(action.value.type_name.is_some());
                 assert!(action.value.subsets.is_some());
             }
@@ -907,14 +914,17 @@ mod par_002_nested_def_tests {
     /// `15_05-Unification of Expression and Constraint Definition.sysml`.
     #[test]
     fn part_def_body_accepts_untyped_constraint_usage_with_expression_body() {
-        let (rest, node) = part_def_body_element(input(
-            "constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}",
-        ))
-        .expect("constraint usage");
+        let source = input("constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}");
+        let (rest, node) = part_def_body_element(source).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::ConstraintUsage(c) => {
-                assert_eq!(c.value.name, "hasLegalProfileDepth");
+                assert_eq!(
+                    c.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"hasLegalProfileDepth"[..])
+                );
                 assert_eq!(c.value.type_name, None);
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
@@ -923,14 +933,19 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_typed_constraint_usage_with_in_binding_body() {
-        let (rest, node) = part_def_body_element(input(
+        let source = input(
             "constraint discBrakeConstraint : DiscBrakeConstraint { in wheelAssy = Vehicle_2::wheelAssy; }",
-        ))
-        .expect("constraint usage");
+        );
+        let (rest, node) = part_def_body_element(source).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::ConstraintUsage(c) => {
-                assert_eq!(c.value.name, "discBrakeConstraint");
+                assert_eq!(
+                    c.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"discBrakeConstraint"[..])
+                );
                 assert!(c.value.type_name.is_some());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
@@ -949,13 +964,19 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_parses_ref_state_as_state_usage() {
-        let src = "ref state monitor: StateKind;";
-        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        let source = input("ref state monitor: StateKind;");
+        let (rest, node) = part_def_body_element(source).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::StateUsage(state) => {
                 assert!(state.value.is_reference);
-                assert_eq!(state.value.name, "monitor");
+                assert_eq!(
+                    state
+                        .value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"monitor"[..])
+                );
                 assert!(state.value.type_name.is_some());
             }
             other => panic!("expected StateUsage, got {other:?}"),
@@ -966,8 +987,8 @@ mod par_002_nested_def_tests {
     /// parse (same path as plain `part … :> …`), not the narrow `part_ref_usage` / `RefDecl`.
     #[test]
     fn part_def_body_parses_ref_part_with_subsetting_as_part_usage() {
-        let src = "ref part origin : Remote :> remotes;";
-        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        let source = input("ref part origin : Remote :> remotes;");
+        let (rest, node) = part_def_body_element(source).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::PartUsage(part) => {
@@ -978,7 +999,12 @@ mod par_002_nested_def_tests {
                     .expect("basic head")
                     .reference_span
                     .is_some());
-                assert_eq!(part.value.name, "origin");
+                assert_eq!(
+                    part.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"origin"[..])
+                );
                 assert_eq!(
                     part.value
                         .typing
@@ -1067,12 +1093,17 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_named_succession_first_then_stmt() {
-        let (rest, node) = part_def_body_element(input("succession s first a then b;"))
-            .expect("succession first ... then ...");
+        let source = input("succession s first a then b;");
+        let (rest, node) = part_def_body_element(source).expect("succession first ... then ...");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::FirstStmt(stmt) => {
-                assert_eq!(stmt.value.succession_name.as_deref(), Some("s"));
+                assert_eq!(
+                    stmt.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"s"[..])
+                );
                 assert!(stmt.value.succession_type.is_none());
             }
             other => panic!("expected FirstStmt, got {other:?}"),
@@ -1081,12 +1112,18 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_named_typed_succession_first_then_stmt() {
-        let (rest, node) = part_def_body_element(input("succession s1 : AB first a then b;"))
-            .expect("succession : Type first ... then ...");
+        let source = input("succession s1 : AB first a then b;");
+        let (rest, node) =
+            part_def_body_element(source).expect("succession : Type first ... then ...");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::FirstStmt(stmt) => {
-                assert_eq!(stmt.value.succession_name.as_deref(), Some("s1"));
+                assert_eq!(
+                    stmt.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"s1"[..])
+                );
                 assert!(stmt.value.succession_type.is_some());
             }
             other => panic!("expected FirstStmt, got {other:?}"),

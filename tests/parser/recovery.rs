@@ -24,7 +24,10 @@ fn test_parse_with_diagnostics_partial_ast_and_multiple_errors() {
         .iter()
         .filter_map(|n| {
             if let RootElement::Package(p) = &n.value {
-                p.value.identification.simple_name()
+                p.value
+                    .identification
+                    .simple_name()
+                    .and_then(|n| result.document.declaration_name(n))
             } else {
                 None
             }
@@ -111,8 +114,8 @@ fn test_action_def_is_not_parsed_as_action_usage() {
 action def ExecutePatrol {
 }
 }"#;
-    let root = sysml_v2_parser::parse_root(input).expect("should parse");
-    let pkg = match &root.elements[0].value {
+    let doc = sysml_v2_parser::parse(input).expect("should parse");
+    let pkg = match &doc.root.elements[0].value {
         sysml_v2_parser::ast::RootElement::Package(p) => &p.value,
         _ => panic!("expected package root element"),
     };
@@ -123,7 +126,10 @@ action def ExecutePatrol {
     match &first.value {
         sysml_v2_parser::ast::PackageBodyElement::ActionDef(a) => {
             assert_eq!(
-                a.value.identification.name.as_deref(),
+                a.value
+                    .identification
+                    .name
+                    .and_then(|n| doc.declaration_name(n)),
                 Some("ExecutePatrol"),
                 "expected ActionDef name ExecutePatrol"
             );
@@ -160,7 +166,11 @@ action def B { }
     };
     let has_b = elements.iter().any(|e| match &e.value {
         sysml_v2_parser::ast::PackageBodyElement::ActionDef(a) => {
-            a.value.identification.name.as_deref() == Some("B")
+            a.value
+                .identification
+                .name
+                .and_then(|n| result.document.declaration_name(n))
+                == Some("B")
         }
         _ => false,
     });
@@ -276,7 +286,7 @@ fn test_part_def_nested_state_and_attribute_siblings() {
         elements.iter().any(|e| matches!(
             &e.value,
             sysml_v2_parser::ast::PartDefBodyElement::StateUsage(s)
-                if s.value.name == "monitor"
+                if s.value.name.and_then(|n| result.document.declaration_name(n)) == Some("monitor")
         )),
         "nested state usage in part body should be a real StateUsage, not opaque"
     );
@@ -504,7 +514,7 @@ fn test_parse_with_diagnostics_reports_missing_attribute_type_in_part_body() {
     assert!(
         elements.iter().any(|e| matches!(
             &e.value,
-            PartUsageBodyElement::AttributeUsage(a) if a.value.name == "ok"
+            PartUsageBodyElement::AttributeUsage(a) if a.value.name.and_then(|n| result.document.declaration_name(n)) == Some("ok")
         )),
         "later attribute sibling should remain parseable"
     );
@@ -532,7 +542,7 @@ fn test_parse_with_diagnostics_reports_missing_occurrence_type_and_keeps_sibling
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, PackageBodyElement::PartDef(p) if p.value.identification.name.as_deref() == Some("Good"))),
+            .any(|e| matches!(&e.value, PackageBodyElement::PartDef(p) if p.value.identification.name.and_then(|n| result.document.declaration_name(n)) == Some("Good"))),
         "later package sibling should remain parseable"
     );
 }

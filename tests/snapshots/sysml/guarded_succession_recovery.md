@@ -30,6 +30,6 @@ package GuardedSuccessionRecovery {
 (parsed-document
   (references
   )
-  (root (package (name "GuardedSuccessionRecovery") (body brace (action-def (name "Decision") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "first source if guard then;") (span (offset 70) (line 3) (column 9) (len 36))) (action-usage (name "later") (short-name none) (prefix (abstract false) (variation false) (reference false) (individual false)) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body semicolon)))))))
+  (root (package (name "GuardedSuccessionRecovery") (body brace (action-def (name "Decision") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "first source if guard then;") (span (offset 70) (line 3) (column 9) (len 36))) (action-usage (keyword action) (name "later") (short-name none) (prefix (abstract false) (variation false) (reference false) (individual false)) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body semicolon)))))))
 )
 ~~~

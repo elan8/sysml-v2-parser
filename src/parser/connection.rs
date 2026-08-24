@@ -388,11 +388,16 @@ mod membership_tests {
     /// Annex `3c-Function-based Behavior-structure mod.sysml`) fell through to opaque recovery.
     #[test]
     fn connection_usage_member_accepts_multiplicity() {
+        let src = input("connection trailerHitch : TrailerHitch[0..1];");
         let (rest, node) =
-            connection_usage_member(input("connection trailerHitch : TrailerHitch[0..1];"))
-                .expect("connection usage member with multiplicity");
+            connection_usage_member(src).expect("connection usage member with multiplicity");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("trailerHitch"));
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"trailerHitch"[..])
+        );
         assert!(node.value.type_reference.is_some());
         let multiplicity = node.value.multiplicity.expect("multiplicity present");
         assert!(multiplicity.value.lower.is_some());

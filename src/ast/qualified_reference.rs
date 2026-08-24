@@ -604,7 +604,7 @@ impl<'a> QualifiedReferenceView<'a> {
     }
 }
 
-fn decode_authored_name(authored: &str) -> Option<Cow<'_, str>> {
+pub(crate) fn decode_authored_name(authored: &str) -> Option<Cow<'_, str>> {
     if !authored.starts_with('\'') {
         return Some(Cow::Borrowed(authored));
     }
@@ -662,7 +662,7 @@ impl QualifiedReferenceArenaBuilder {
         self.arena
             .references
             .get(id.index())
-            .map(|metadata| metadata.span.clone())
+            .map(|metadata| metadata.span)
     }
 
     pub(crate) fn add_reference(

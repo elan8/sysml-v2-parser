@@ -123,68 +123,10 @@ pub fn emit_sysml_with_options(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{
-        DeclarationName, Identification, Membership, Node, Package, PackageBody,
-        PackageBodyElement, ParsedDocument, PartDef, PartDefBody, QualifiedIdentification,
-        QualifiedReferenceArena, RootElement, RootNamespace, SourceStorage, Span,
-    };
-
-    fn owning() -> Membership {
-        Membership::owning(None, Span::dummy())
-    }
-
-    fn package_identification(name: &str) -> QualifiedIdentification {
-        QualifiedIdentification {
-            short_name: None,
-            name: Some(DeclarationName::Simple(name.to_owned())),
-        }
-    }
-
-    fn document(root: RootNamespace) -> ParsedDocument {
-        ParsedDocument {
-            source: SourceStorage::default(),
-            qualified_references: QualifiedReferenceArena::default(),
-            root,
-        }
-    }
-
     #[test]
     fn emit_minimal_part_def_package() {
-        let root = RootNamespace {
-            elements: vec![Node::new(
-                Span::dummy(),
-                RootElement::Package(Node::new(
-                    Span::dummy(),
-                    Package {
-                        identification: package_identification("P"),
-                        body: PackageBody::Brace {
-                            open_span: Span::dummy(),
-                            close_span: Span::dummy(),
-                            elements: vec![Node::new(
-                                Span::dummy(),
-                                PackageBodyElement::PartDef(Node::new(
-                                    Span::dummy(),
-                                    PartDef {
-                                        definition_prefix: None,
-                                        is_individual: false,
-                                        identification: Identification {
-                                            short_name: None,
-                                            name: Some("Vehicle".into()),
-                                        },
-                                        specializes: None,
-                                        body: PartDefBody::Semicolon {
-                                            semicolon_span: Span::dummy(),
-                                        },
-                                        membership: owning(),
-                                    },
-                                )),
-                            )],
-                        },
-                    },
-                )),
-            )],
-        };
-        let out = emit_sysml(&document(root)).expect("emit");
+        let document = crate::parse("package P { part def Vehicle; }").expect("parse");
+        let out = emit_sysml(&document).expect("emit");
         assert_eq!(out.trim(), "package P {\n    part def Vehicle;\n}");
     }
 

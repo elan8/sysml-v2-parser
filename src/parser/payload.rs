@@ -1,7 +1,7 @@
 //! Shared parsers for accept/send payload clauses and transition accept triggers.
 
 use crate::ast::{
-    ActionUsage, Expression, Node, PayloadClause, SendPayload, Span, TransitionAccept, TriggerKind,
+    ActionUsage, Expression, Node, PayloadClause, SendPayload, TransitionAccept, TriggerKind,
 };
 use crate::parser::action::action_usage_body;
 use crate::parser::expr::expression;
@@ -20,7 +20,7 @@ use nom::Parser;
 
 /// Required typed payload: `name : qualified_name`.
 pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, PayloadClause> {
-    let (input, (name_span, name)) = with_span(name).parse(input)?;
+    let (input, name) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (type_span, type_name)) =
         preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
@@ -29,7 +29,6 @@ pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, Paylo
         PayloadClause {
             name,
             type_name: Some(type_name),
-            name_span,
             type_span: Some(type_span),
         },
     ))
@@ -107,7 +106,6 @@ fn accept_parameter_part(
                 PayloadClause {
                     name,
                     type_name: Some(type_name),
-                    name_span: expr_node.span.clone(),
                     type_span: Some(type_span),
                 },
                 via,
@@ -130,14 +128,13 @@ fn accept_parameter_part(
 fn control_node_payload_stmt<'a>(
     input: Input<'a>,
     keyword: &'a [u8],
-    control_name: &'static str,
 ) -> IResult<Input<'a>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(keyword).parse(input)?;
     let is_send = keyword == b"send";
 
-    let (input, name_span, type_ref_span, accept, send) = if is_send {
+    let (input, type_ref_span, accept, send) = if is_send {
         let (input, _) = ws1(input)?;
         // Peek for `via`/`to` first: neither is reserved in `name`/`expression`, so an empty
         // payload (BNF `EmptyParameterMember`) would otherwise be greedily consumed as a bare
@@ -153,29 +150,20 @@ fn control_node_payload_stmt<'a>(
         } else {
             (input, None)
         };
-        let name_span = match &payload {
-            Some(SendPayload::Typed(p)) => p.name_span.clone(),
-            Some(SendPayload::Expression(e)) => e.span.clone(),
-            None => Span::dummy(),
-        };
         let type_ref_span = match &payload {
-            Some(SendPayload::Typed(p)) => p.type_span.clone(),
+            Some(SendPayload::Typed(p)) => p.type_span,
             _ => None,
         };
-        (input, name_span, type_ref_span, None, payload)
+        (input, type_ref_span, None, payload)
     } else {
         let (input, accept) = action_accept_parameter(input)?;
-        let (name_span, type_ref_span) = match &accept {
-            TransitionAccept::Payload(payload, _) => {
-                (payload.name_span.clone(), payload.type_span.clone())
-            }
-            TransitionAccept::Shorthand(expression, _) => (expression.span.clone(), None),
-            // A trigger replaces the payload entirely (`PayloadParameter`'s `TriggerValuePart`
-            // alternative), so the node has no payload name or type to point at; the trigger
-            // expression carries its own span inside the `accept` value.
-            TransitionAccept::TimeTrigger(_, expression) => (expression.span.clone(), None),
+        let type_ref_span = match &accept {
+            TransitionAccept::Payload(payload, _) => payload.type_span,
+            // A shorthand or trigger carries its own span inside the `accept` value; there is no
+            // separate type reference to point at.
+            TransitionAccept::Shorthand(..) | TransitionAccept::TimeTrigger(..) => None,
         };
-        (input, name_span, type_ref_span, Some(accept), None)
+        (input, type_ref_span, Some(accept), None)
     };
 
     let (input, via) = if is_send {
@@ -207,11 +195,17 @@ fn control_node_payload_stmt<'a>(
             start,
             input,
             ActionUsage {
+                keyword: if is_send {
+                    crate::ast::ActionUsageKeyword::Send
+                } else {
+                    crate::ast::ActionUsageKeyword::Accept
+                },
                 is_abstract: false,
                 is_variation: false,
                 is_reference: false,
                 is_individual: false,
-                name: control_name.to_string(),
+                // A control node has no `NAME`; its kind is `keyword`.
+                name: None,
                 short_name: None,
                 type_name: None,
                 typing: None,
@@ -224,7 +218,6 @@ fn control_node_payload_stmt<'a>(
                 via,
                 to,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 // No visibility grammar at this standalone `accept`/`send` control-node-statement
                 // position. See `ActionUsage::membership`.
@@ -238,10 +231,10 @@ pub(crate) fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, 
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
     if starts_with_keyword(frag, b"accept") {
-        return control_node_payload_stmt(input, b"accept", "accept");
+        return control_node_payload_stmt(input, b"accept");
     }
     if starts_with_keyword(frag, b"send") {
-        return control_node_payload_stmt(input, b"send", "send");
+        return control_node_payload_stmt(input, b"send");
     }
     Err(nom::Err::Error(nom::error::Error::new(
         input,

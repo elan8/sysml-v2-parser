@@ -27,7 +27,12 @@ fn test_view_def_parse() {
     assert_eq!(elements.len(), 1);
     match &elements[0].value {
         PackageBodyElement::ViewDef(vd) => {
-            assert_eq!(vd.identification.name.as_deref(), Some("Name"));
+            assert_eq!(
+                vd.identification
+                    .name
+                    .and_then(|n| result.declaration_name(n)),
+                Some("Name")
+            );
             assert!(
                 matches!(&vd.body, ViewDefBody::Brace { ref elements, .. } if elements.is_empty())
             );
@@ -51,7 +56,12 @@ fn test_viewpoint_def_parse() {
     assert_eq!(elements.len(), 1);
     match &elements[0].value {
         PackageBodyElement::ViewpointDef(vpd) => {
-            assert_eq!(vpd.identification.name.as_deref(), Some("Name"));
+            assert_eq!(
+                vpd.identification
+                    .name
+                    .and_then(|n| result.declaration_name(n)),
+                Some("Name")
+            );
         }
         _ => panic!("expected ViewpointDef"),
     }
@@ -72,7 +82,12 @@ fn test_rendering_def_parse() {
     assert_eq!(elements.len(), 1);
     match &elements[0].value {
         PackageBodyElement::RenderingDef(rd) => {
-            assert_eq!(rd.identification.name.as_deref(), Some("Name"));
+            assert_eq!(
+                rd.identification
+                    .name
+                    .and_then(|n| result.declaration_name(n)),
+                Some("Name")
+            );
             assert!(matches!(rd.body, RenderingDefBody::Semicolon { .. }));
         }
         _ => panic!("expected RenderingDef"),
@@ -94,7 +109,10 @@ fn test_view_usage_parse() {
     assert_eq!(elements.len(), 1);
     match &elements[0].value {
         PackageBodyElement::ViewUsage(vu) => {
-            assert_eq!(vu.name, "name");
+            assert_eq!(
+                vu.name.and_then(|n| result.declaration_name(n)),
+                Some("name")
+            );
             assert_eq!(reference_text(&result, vu.type_name), Some("ViewType"));
             assert!(
                 matches!(&vu.body, ViewBody::Brace { ref elements, .. } if elements.is_empty())

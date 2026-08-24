@@ -158,7 +158,12 @@ fn strict_rejects_malformed_annotating_syntax_that_editor_parsing_recovers() {
         .iter()
         .find_map(|member| match &member.value {
             sysml_v2_parser::ast::PackageBodyElement::PartDef(definition)
-                if definition.value.identification.name.as_deref() == Some("Between") =>
+                if definition
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| editor.document.declaration_name(n))
+                    == Some("Between") =>
             {
                 Some(&definition.value.body)
             }
@@ -194,7 +199,7 @@ fn strict_rejects_malformed_annotating_syntax_that_editor_parsing_recovers() {
         members.iter().any(|member| matches!(
             &member.value,
             sysml_v2_parser::ast::PackageBodyElement::PartDef(definition)
-                if definition.value.identification.name.as_deref() == Some("Later")
+                if definition.value.identification.name.and_then(|n| editor.document.declaration_name(n)) == Some("Later")
         )),
         "the declaration after the recovered member must survive"
     );

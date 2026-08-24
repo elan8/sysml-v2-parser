@@ -168,7 +168,10 @@ fn requirement_body_attribute_integer_default_and_quantity() {
         _ => None,
     });
     let n = attrs.next().expect("attribute n");
-    assert_eq!(n.name, "n");
+    assert_eq!(
+        n.name.and_then(|n| r.document.declaration_name(n)),
+        Some("n")
+    );
     assert!(n.typing.is_some());
     let v0 = n.value.as_ref().expect("default 0");
     assert!(matches!(
@@ -177,7 +180,10 @@ fn requirement_body_attribute_integer_default_and_quantity() {
     ));
 
     let v = attrs.next().expect("attribute v");
-    assert_eq!(v.name, "v");
+    assert_eq!(
+        v.name.and_then(|n| r.document.declaration_name(n)),
+        Some("v")
+    );
     assert!(v.subsets.is_some());
     let q = v.value.as_ref().expect("quantity default");
     assert!(matches!(

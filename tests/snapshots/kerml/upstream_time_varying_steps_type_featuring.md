@@ -52,7 +52,7 @@ package TimeVaryingSteps {
 ~~~sysml
 package TimeVaryingSteps {
     behavior TakePicture {
-        member step 'merge' : ControlPerformances::MergePerformance[0..1] featured by TakePicture_snapshots {
+        member step merge : ControlPerformances::MergePerformance[0..1] featured by TakePicture_snapshots {
             member feature TakePicture_snapshots :>> Occurrences::Occurrence::snapshots featured by TakePicture {
                 public import merge;
             }
@@ -67,7 +67,7 @@ package TimeVaryingSteps {
                 public import shoot;
             }
         }
-        member step 'decide' : ControlPerformances::DecisionPerformance[0..1] featured by TakePicture_snapshots {
+        member step decide : ControlPerformances::DecisionPerformance[0..1] featured by TakePicture_snapshots {
             member feature TakePicture_snapshots :>> Occurrences::Occurrence::snapshots featured by TakePicture {
                 public import decide;
             }

@@ -1,7 +1,7 @@
 use crate::ast::{
-    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, FirstSuccession,
-    IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
-    ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenDone, ThenIncludeUseCase,
+    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, DeclarationName,
+    FirstSuccession, IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition,
+    ReturnRef, ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenDone, ThenIncludeUseCase,
     ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
@@ -16,7 +16,6 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::requirement::{parse_requirement_usage_payload, subject_decl};
 use crate::parser::usage::multiplicity_node;
-use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
 use nom::branch::alt;
@@ -37,9 +36,15 @@ mod use_case_member_tests {
     /// `actor passenger [0..4];`, OMG spec Annex A).
     #[test]
     fn actor_usage_accepts_the_untyped_form() {
-        let (rest, node) = actor_usage(input("actor environment;")).expect("bare actor");
+        let src = input("actor environment;");
+        let (rest, node) = actor_usage(src).expect("bare actor");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "environment");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"environment"[..])
+        );
         assert!(node.value.type_name.is_none());
 
         let (_, node) = actor_usage(input("actor passenger [0..4];")).expect("actor with mult");
@@ -161,7 +166,7 @@ fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenInclud
 
 fn use_case_usage_tail(
     input: Input<'_>,
-    ident: String,
+    ident: DeclarationName,
     is_abstract: bool,
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, UseCaseUsage> {
@@ -309,14 +314,14 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
     let (input, _) = ws_and_comments(input)?;
     // A `:>>` form carries a semantic target, not a declaration name. Ordinary and anonymous
     // return declarations keep those grammar alternatives structurally distinct.
-    let (input, (declaration_name, name_span, target)) = if is_redefine {
+    let (input, (declaration_name, target)) = if is_redefine {
         let (input, target) = qualified_reference(input)?;
-        (input, (String::new(), None, Some(target)))
+        (input, (None, Some(target)))
     } else if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-        (input, (String::new(), None, None))
+        (input, (None, None))
     } else {
-        let (input, (span, declaration_name)) = with_span(name).parse(input)?;
-        (input, (declaration_name, Some(span), None))
+        let (input, declaration_name) = name(input)?;
+        (input, (Some(declaration_name), None))
     };
     // Optional `: type` or `:> type`.
     let (input, _) = ws_and_comments(input)?;
@@ -357,7 +362,6 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
             input,
             CaseReturnDecl {
                 declaration_name,
-                name_span,
                 target,
                 type_name,
                 value,
@@ -823,11 +827,11 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
         && !after_gap.fragment().starts_with(b":>")
         && !after_gap.fragment().starts_with(b":>>")
     {
-        (after_gap, String::new())
+        (after_gap, None)
     } else {
         let (input, _) = ws1(input)?;
         let (input, n) = name(input)?;
-        (input, n)
+        (input, Some(n))
     };
     // The typing is optional: `actor environment;` / `actor passenger [0..4];` (OMG spec
     // Annex A; spec42 Gap 46). A bare `actor;` still fails (no name and no type).
@@ -836,7 +840,7 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    if n.is_empty() && type_name.is_none() {
+    if n.is_none() && type_name.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -872,7 +876,7 @@ pub(crate) fn objective(input: Input<'_>) -> IResult<Input<'_>, Node<Objective>>
     )))
     .parse(input)?;
     let (input, _) = tag(&b"objective"[..]).parse(input)?;
-    let (input, requirement) = parse_requirement_usage_payload(input, Some("objective"))?;
+    let (input, requirement) = parse_requirement_usage_payload(input)?;
     let requirement = node_from_to(start, input, requirement);
     Ok((
         input,
@@ -961,10 +965,15 @@ mod membership_tests {
 
     #[test]
     fn actor_usage_accepts_multiplicity() {
-        let (rest, node) = actor_usage(input("actor passengers : Person[0..4];"))
-            .expect("actor with multiplicity");
+        let src = input("actor passengers : Person[0..4];");
+        let (rest, node) = actor_usage(src).expect("actor with multiplicity");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "passengers");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"passengers"[..])
+        );
         let _type_reference = node.value.type_name;
         assert!(node.value.multiplicity.is_some());
     }

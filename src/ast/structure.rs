@@ -3,6 +3,7 @@ use super::behavior::{
     StateDefBody, StateUsage,
 };
 use super::body::Body;
+use super::common::DeclarationName;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
@@ -250,7 +251,7 @@ pub enum PartDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionUsageMember {
-    pub name: Option<String>,
+    pub name: Option<DeclarationName>,
     pub type_reference: Option<QualifiedReferenceId>,
     /// Multiplicity after the type, e.g. `[0..1]` in `connection trailerHitch :
     /// TrailerHitch[0..1];` (OMG spec Annex `3c-Function-based Behavior-structure mod.sysml`).
@@ -299,7 +300,7 @@ pub struct ExhibitState {
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
     /// Declaration label in the explicit `exhibit state name` form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Referenced state path in the shorthand `exhibit path` form.
     pub state_reference: Option<QualifiedReferenceId>,
     /// Structured typing clause when a `:` target was written.
@@ -327,9 +328,9 @@ pub struct AttributeDef {
     /// authored keyword's exact span. `AttributeDefinition` (SysML BNF 510) reaches it through
     /// `DefinitionPrefix` (SysML BNF 225).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
-    pub short_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
     /// Type after `:>`, represented by a relationship whose target IDs resolve through the
     /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
     /// node's own `span` for existing consumers that read the span without the node.
@@ -338,8 +339,6 @@ pub struct AttributeDef {
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
-    /// Span of the defined name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type after `:>`, if present (for semantic tokens).
     pub typing_span: Option<Span>,
     /// Span of the default/binding expression value, when present.
@@ -518,9 +517,9 @@ pub struct PartUsage {
     /// `SourceSuccession` and `SourceEndMember` below it contribute no further tokens, so the
     /// keyword's span is the whole authored fact.
     pub then_span: Option<Span>,
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
-    pub short_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
     /// Structured typing clause mirroring `AttributeUsage.typing`: every comma-separated target
     /// from `:`/`defined by`/`typed by`, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
@@ -536,8 +535,6 @@ pub struct PartUsage {
     /// Value expression (= expr, default = expr, := expr).
     pub value: Option<Node<FeatureValue>>,
     pub body: PartUsageBody,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
@@ -976,6 +973,8 @@ pub enum PerformActionTarget {
 pub type PerformBody = Body<PerformBodyElement>;
 
 /// Element inside a perform body: doc comment, in/out binding, or variant member.
+// Keep the same direct-node representation as `ActionDefBodyElement`; see its size rationale.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBodyElement {
@@ -1010,11 +1009,11 @@ pub struct PerformInOutBinding {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present, e.g. `attribute <wcf> wheelCoordinateFrame : ...`
     /// (confirmed real usage in the OMG Geometry domain library's
     /// `VehicleGeometryAndCoordinateFrames.sysml`). See `AttributeDef::short_name`.
-    pub short_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
     /// Type after `:` or `:>`, represented by a relationship whose target IDs resolve through the
     /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
     /// node's own `span`.
@@ -1032,8 +1031,6 @@ pub struct AttributeUsage {
     /// Value expression.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type after `:` / `:>`, if present (for semantic tokens).
     pub typing_span: Option<Span>,
     /// Span of the redefines target after `redefines`, if present (for semantic tokens).
@@ -1104,9 +1101,9 @@ impl PartialEq for AttributeUsage {
 pub struct DefaultReferenceUsage {
     /// The source-backed pinned `RefPrefix` (direction, derived, variance, constant).
     pub prefix: crate::ast::RefPrefix,
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Optional declaration short name from `Identification`.
-    pub short_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
     /// Type after `:` / `defined by` / `typed by`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Optional `:>` subsetting clause (GH-87), e.g. `torquePerCurrent :>
@@ -1128,7 +1125,6 @@ pub struct DefaultReferenceUsage {
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `MultiplicityPart` ordering/uniqueness slots, retained independently of the range.
     pub multiplicity_modifiers: MultiplicityModifiers,
-    pub name_span: Option<Span>,
     pub typing_span: Option<Span>,
     pub membership: Membership,
     /// `UsageBody = DefinitionBody`, represented by this slice's shared attribute/item body.
@@ -1238,9 +1234,9 @@ pub struct PortUsage {
     /// `PortionKind` nor a `UsageExtensionKeyword`, and were parsed and emitted in two different
     /// orders, neither of them the grammar's. See `planning/port-usage-prefix-matrix.md`.
     pub prefix: crate::ast::OccurrenceUsagePrefix,
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
-    pub short_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
     /// Structured, multi-target typing clause after `:` / `typed by` / `defined by`.
     pub typing: Option<Node<TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -1262,8 +1258,6 @@ pub struct PortUsage {
     /// another port instead of declaring a fresh one.
     pub value: Option<Node<crate::ast::FeatureValue>>,
     pub body: PortBody,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type reference after `:`, if present (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
@@ -1451,7 +1445,7 @@ pub struct EndDecl {
     pub ref_prefix: crate::ast::RefPrefix,
     /// `Bare`, source-backed `ref`, or source-backed KerML `feature` immediately after `end`.
     pub introducer: EndDeclIntroducer,
-    pub short_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
     /// A normal declared name or a fixed derivation-end role. `#original`/`#derive` are grammar
     /// roles, not declaration labels.
     pub identity: EndIdentity,
@@ -1488,7 +1482,7 @@ pub enum EndIdentity {
     /// (`ServerSequenceRealization_2.sysml`) declare an end through its specialization alone.
     Anonymous,
     /// Ordinary declaration label with its authored token span.
-    Declaration(Node<String>),
+    Declaration(DeclarationName),
     /// Fixed derivation role with its authored `#...` token span.
     Derivation(Node<DerivationEndRole>),
 }
@@ -1543,8 +1537,8 @@ pub struct RefDecl {
     /// trailing run ahead of a kind keyword: `private ref #Classified #Security z1;`
     /// (`MetadataTest.sysml`). Empty when none was authored.
     pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
-    pub name: String,
-    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
     /// comma-separated target from a `:` clause, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
@@ -1568,8 +1562,6 @@ pub struct RefDecl {
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
-    /// Span of the name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility wrapper (`FeatureMembership`). Populated when a visibility prefix
@@ -1772,7 +1764,7 @@ pub struct MetadataDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
-    pub name: String,
+    pub name: DeclarationName,
     pub type_reference: Option<QualifiedReferenceId>,
     pub about_targets: Vec<QualifiedReferenceId>,
     pub body: MetadataBody,
@@ -1910,8 +1902,8 @@ pub struct OccurrenceUsage {
     /// Needed so emission doesn't fabricate or drop the keyword relative to what was authored.
     pub has_occurrence_keyword: bool,
     /// Declaration label for ordinary occurrence usages.
-    pub name: String,
-    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     /// Existing occurrence referenced by the shorthand `event path` form.
     pub occurrence_reference: Option<QualifiedReferenceId>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -1942,7 +1934,7 @@ pub struct AssertConstraintMember {
     /// Optional declared name after `constraint`, e.g. `engineSelectionRational` in
     /// `assert constraint engineSelectionRational { ... }`. `None` for the anonymous form
     /// (`assert constraint { ... }`).
-    pub declaration_name: Option<String>,
+    pub declaration_name: Option<DeclarationName>,
     /// Referenced constraint in the shorthand `assert path { ... }` form.
     pub target: Option<QualifiedReferenceId>,
     /// Optional type after `:`, e.g. `DiscBrakeFitConstraint_Alt` in `assert constraint
@@ -2023,7 +2015,7 @@ pub struct SuccessionUsage {
     /// prefix, mirrored by `action::succession_prefix` for the `first`-embedded form). GH-51:
     /// real usage in Systems Library `Domain Libraries/Cause and Effect/
     /// CausationConnections.sysml`.
-    pub name: Option<String>,
+    pub name: Option<DeclarationName>,
     /// Type of the succession usage itself (BNF `UsageDeclaration`'s `FeatureSpecializationPart`),
     /// e.g. `HappensJustBefore` in the unnamed `succession : HappensJustBefore first a then b;`
     /// (GH-92.3, `Vehicle Example/VehicleIndividuals.sysml:49`). Mirrors
@@ -2079,7 +2071,7 @@ pub struct Bind {
     /// `BindingConnectorAsUsage`'s optional `'binding' UsageDeclaration` prefix, §8.2.2.13.2).
     /// `None` for the bare `bind a = b;` form (no `binding` keyword) or an unnamed `binding`
     /// prefix (e.g. `binding [1] bind ...`).
-    pub binding_name: Option<String>,
+    pub binding_name: Option<DeclarationName>,
     /// Type of the binding connector itself, e.g. `binding ab1 : AB bind a = b;`.
     pub binding_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the binding connector feature itself, e.g. `binding [1] bind ...`
@@ -2149,8 +2141,8 @@ pub struct InterfaceEnd {
 pub enum InterfaceEndTarget {
     Direct(QualifiedReferenceId),
     Named {
-        /// Decoded `NAME`, retaining the authored token in the enclosing node.
-        name: Node<String>,
+        /// The authored `NAME` token labelling this end.
+        name: DeclarationName,
         operator: InterfaceEndReferenceOperator,
         target: QualifiedReferenceId,
     },
@@ -2174,7 +2166,7 @@ pub enum InterfaceUsage {
     /// previously only the typed (`interface name: Type connect ...`) and fully anonymous
     /// (`Connection` variant) forms were reachable.
     TypedConnect {
-        name: Option<String>,
+        name: Option<DeclarationName>,
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
@@ -2201,7 +2193,7 @@ pub enum InterfaceUsage {
     /// `interface_usage` unconditionally required either a `connect` clause or a bare `from to
     /// to` form.
     Declaration {
-        name: Option<String>,
+        name: Option<DeclarationName>,
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
@@ -2271,7 +2263,7 @@ pub struct BindingConnectorUsage {
     /// instant[instantNum] of startShot = endShot;`. `None` when no name is given (e.g. `binding
     /// all ...`, `binding [0..1] ...`). The name text lives in the document source and is
     /// resolved through it rather than copied into this node.
-    pub name_span: Option<Span>,
+    pub name: Option<DeclarationName>,
     /// Multiplicity on the binding connector itself, e.g. `[instantNum]` / `[0..1]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `true` when the `of` keyword introduced `left` (e.g. `of startShot`); `false` when `left`

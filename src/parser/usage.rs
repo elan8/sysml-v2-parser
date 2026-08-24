@@ -259,10 +259,7 @@ pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Mul
     };
     let (input, _) = tag(&b"]"[..]).parse(input)?;
     let span = span_from_to(start, input);
-    Ok((
-        input,
-        Node::new(span.clone(), Multiplicity { lower, upper, span }),
-    ))
+    Ok((input, Node::new(span, Multiplicity { lower, upper, span })))
 }
 
 /// `(span, is_conjugated, targets)` for a parsed `typings`/`optional_typings` clause -- see
@@ -356,7 +353,7 @@ pub(crate) fn typing_reference_fields_from_result(
     Option<QualifiedReferenceId>,
     Option<Node<TypingRelationship>>,
 ) {
-    let type_ref_span = result.as_ref().map(|(span, _, _, _)| span.clone());
+    let type_ref_span = result.as_ref().map(|(span, _, _, _)| *span);
     let type_reference = result
         .as_ref()
         .and_then(|(_, _, targets, _)| targets.first().copied());
@@ -411,7 +408,7 @@ pub(crate) fn typing_relationship_node(
     spelling: crate::ast::TypingSpelling,
 ) -> Node<TypingRelationship> {
     Node::new(
-        span.clone(),
+        span,
         TypingRelationship {
             target,
             kind,
@@ -469,7 +466,7 @@ pub(crate) fn spelled_subsetting_relationship_node(
     span: Span,
 ) -> Node<SubsettingRelationship> {
     Node::new(
-        span.clone(),
+        span,
         SubsettingRelationship {
             target,
             kind,
@@ -488,7 +485,7 @@ pub(crate) fn subsetting_relationship_node(
     span: Span,
 ) -> Node<SubsettingRelationship> {
     Node::new(
-        span.clone(),
+        span,
         SubsettingRelationship {
             target,
             kind,

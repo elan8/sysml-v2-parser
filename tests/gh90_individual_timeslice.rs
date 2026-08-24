@@ -4,7 +4,7 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -18,7 +18,8 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Individuals Examples/AnalysisIndividualExample.sysml:75-77`:
@@ -30,7 +31,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// (`part_def`/`occurrence_def` already supported it via ad hoc parsing).
 #[test]
 fn gh90_1_individual_analysis_and_action_def_at_package_level() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             analysis def FuelEconomyAnalysis;
             action def FuelConsumption;
@@ -57,7 +58,7 @@ fn gh90_1_individual_analysis_and_action_def_at_package_level() {
 /// Previously: `occurrence_def` had no `individual` prefix handling.
 #[test]
 fn gh90_1_individual_occurrence_def_at_package_level() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             individual def IO1;
             individual occurrence def IO2 {
@@ -78,7 +79,7 @@ fn gh90_1_individual_occurrence_def_at_package_level() {
 /// Previously: `item_def`/`item_def_required` had no `individual` prefix handling.
 #[test]
 fn gh90_1_individual_item_def_at_package_level() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             item def Person;
             individual item def John :> Person;
@@ -109,7 +110,7 @@ fn gh90_1_individual_item_def_at_package_level() {
 /// for a structured `is_individual` flag here.
 #[test]
 fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             individual def IO1;
             individual occurrence def IO2 {
@@ -171,7 +172,7 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
 /// elsewhere, e.g. part def bodies), just weren't reachable from here.
 #[test]
 fn gh90_2_timeslice_usage_inside_item_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             item def Person {
                 timeslice asPresident : Person [0..*];
@@ -189,5 +190,8 @@ fn gh90_2_timeslice_usage_inside_item_def_body() {
         _ => None,
     });
     let timeslice = timeslice.expect("expected an OccurrenceUsage element");
-    assert_eq!(timeslice.name, "asPresident");
+    assert_eq!(
+        timeslice.name.and_then(|n| doc.declaration_name(n)),
+        Some("asPresident")
+    );
 }

@@ -1,6 +1,6 @@
 //! KerML fallback and modeled declaration nodes.
 
-use crate::ast::{Multiplicity, Node, Span};
+use crate::ast::{DeclarationName, Multiplicity, Node, Span};
 
 /// A structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
 /// Covers the shape shared by declarations such as `datatype DeferredType;`,
@@ -18,7 +18,7 @@ pub struct KermlBareDeclaration {
     pub keyword: KermlBareDeclarationKeyword,
     /// Span of the declared name, when present. The name text itself lives in the document
     /// source and is resolved through it rather than copied into this node.
-    pub name_span: Option<Span>,
+    pub name: Option<DeclarationName>,
     /// The `[...]` multiplicity clause, when present.
     pub multiplicity: Option<Node<Multiplicity>>,
 }
@@ -98,36 +98,63 @@ impl KermlBareDeclarationKeyword {
     }
 }
 
+/// Retained source of a declaration the parser recognized but did not model structurally.
+///
+/// A span into the document, trimmed of surrounding trivia; resolve through
+/// [`crate::ast::ParsedDocument::opaque_text`]. It is deliberately not a [`crate::ast::Span`]
+/// in the open: opaque text is a narrowly scoped state, and consumers must not treat it as a
+/// parsed construct.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OpaqueText {
+    pub(crate) span: Span,
+}
+
+impl OpaqueText {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the retained text.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
 /// Modeled KerML semantic declaration captured as package-level syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlSemanticDecl {
-    pub bnf_production: String,
-    pub text: String,
+    /// The starter keyword that classified this declaration (its BNF production name).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Modeled KerML feature declaration family (occurrence/expr/predicate/succession).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlFeatureDecl {
-    pub bnf_production: String,
-    pub text: String,
+    /// The starter keyword that classified this declaration (its BNF production name).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Package-level KerML feature declaration captured as an explicit dedicated node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FeatureDecl {
-    pub keyword: String,
-    pub text: String,
+    /// The `feature` keyword.
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Package-level KerML classifier declaration captured as an explicit dedicated node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ClassifierDecl {
-    pub keyword: String,
-    pub text: String,
+    /// The classifier keyword (`class`, `classifier`, `struct`, `structure`, `subclassifier`).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Modeled extended SysML/KerML declaration family not yet represented by
@@ -135,8 +162,9 @@ pub struct ClassifierDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExtendedLibraryDecl {
-    pub bnf_production: String,
-    pub text: String,
+    /// The starter keyword that classified this declaration (its BNF production name).
+    pub keyword_span: Span,
+    pub text: OpaqueText,
 }
 
 /// Structured KerML classifier declaration with a body, e.g. `abstract function isZero
@@ -376,7 +404,7 @@ pub struct KermlFeature {
     pub is_all: bool,
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form
     /// (`portion feature redefines spaceBoundary [1];`).
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// `:` typing clause (multi-target).
     pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// Multiplicity clause, accepted before or after the typing (and after a leading
@@ -445,7 +473,7 @@ pub struct KermlInvariantMember {
     /// `inv not` negated form (KerML `isNegated`).
     pub is_negated: bool,
     /// Declared name; empty for the anonymous form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Body holding the invariant's boolean expression(s) via the shared type-body grammar.
     pub body: crate::ast::CalcDefBody,
     pub membership: crate::ast::Membership,
@@ -472,7 +500,7 @@ pub struct KermlConnectorEnd {
 pub struct KermlConnectorMember {
     pub is_all: bool,
     /// Declared name; empty for the anonymous `connector :Type` form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// `:` type target.
     pub typing: Option<crate::ast::QualifiedReferenceId>,
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
@@ -491,7 +519,7 @@ pub struct KermlConnectorMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlBindingMember {
     /// Declared name before `of`; empty for the unnamed form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Multiplicity on the declared name (`binding instant[instantNum] of ...`,
     /// `Triggers.kerml`).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
@@ -513,7 +541,7 @@ pub struct KermlSuccessionMember {
     pub is_all: bool,
     /// Declared succession name, present only with the `first` keyword form (`succession
     /// triggerAfter [taNum] first [0..1] transitionLinkSource then ...;`); empty otherwise.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// The succession's own multiplicity in the named `first` form (`[taNum]` above).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
     pub first: Node<KermlConnectorEnd>,

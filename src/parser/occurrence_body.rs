@@ -272,12 +272,12 @@ fn occurrence_usage_tail(
     // existing occurrence and may use a dotted/qualified path.
     let (input, name, occurrence_reference) = if head.is_event_reference {
         let (input, reference) = reference_path(input)?;
-        (input, String::new(), Some(reference))
+        (input, None, Some(reference))
     } else if starts_specialization_or_body(input) {
-        (input, String::new(), None)
+        (input, None, None)
     } else {
         let (input, name) = name(input)?;
-        (input, name, None)
+        (input, Some(name), None)
     };
     // BNF puts the multiplicity directly after the identification, before the typing part:
     // `event occurrence zeroCrossingEvents[0..*] : ZeroCrossingEventDef { ... }` (Domain
@@ -721,13 +721,14 @@ mod assert_constraint_name_tests {
 
     #[test]
     fn assert_constraint_accepts_a_name() {
-        let (rest, node) =
-            assert_constraint_member(input("assert constraint engineSelectionRational { }"))
-                .expect("named assert constraint");
+        let source = input("assert constraint engineSelectionRational { }");
+        let (rest, node) = assert_constraint_member(source).expect("named assert constraint");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value.declaration_name.as_deref(),
-            Some("engineSelectionRational")
+            node.value
+                .declaration_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"engineSelectionRational"[..])
         );
         assert!(node.value.target.is_none());
         assert!(!node.value.is_negated);
@@ -744,8 +745,10 @@ mod assert_constraint_name_tests {
         let (rest, node) = assert_constraint_member(source).expect("typed assert constraint");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value.declaration_name.as_deref(),
-            Some("discBrakeFitConstraint_Alt")
+            node.value
+                .declaration_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"discBrakeFitConstraint_Alt"[..])
         );
         assert_eq!(
             node.value
@@ -788,10 +791,15 @@ mod assert_constraint_name_tests {
 
     #[test]
     fn assert_constraint_negated_named_form() {
-        let (rest, node) = assert_constraint_member(input("assert not constraint c { }"))
-            .expect("negated named form");
+        let source = input("assert not constraint c { }");
+        let (rest, node) = assert_constraint_member(source).expect("negated named form");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.declaration_name.as_deref(), Some("c"));
+        assert_eq!(
+            node.value
+                .declaration_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"c"[..])
+        );
         assert!(node.value.is_negated);
     }
 }
@@ -853,7 +861,7 @@ mod membership_tests {
         let source = input("event sequence.publishMessage;");
         let (rest, node) = occurrence_usage(source).expect("event reference");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.name.is_empty());
+        assert!(node.value.name.is_none());
         assert_eq!(
             node.value
                 .occurrence_reference
@@ -865,10 +873,8 @@ mod membership_tests {
 
     #[test]
     fn occurrence_usage_accepts_abstract_nonunique() {
-        let (rest, node) = occurrence_usage(input(
-            "abstract occurrence situations : Situation[*] nonunique;",
-        ))
-        .expect("abstract nonunique occurrence");
+        let source = input("abstract occurrence situations : Situation[*] nonunique;");
+        let (rest, node) = occurrence_usage(source).expect("abstract nonunique occurrence");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value
@@ -881,7 +887,12 @@ mod membership_tests {
                 .map(|node| node.value),
             Some(crate::ast::DefinitionPrefix::Abstract)
         );
-        assert_eq!(node.value.name, "situations");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"situations"[..])
+        );
     }
 
     #[test]

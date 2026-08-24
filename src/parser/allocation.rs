@@ -53,6 +53,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     let (input, _) = tag(&b"allocation"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
+    let name_str = Some(name_str);
     let (input, header) = feature_usage_header(input)?;
     let type_name = header.type_reference;
     // `#73`: `allocate logical ::> torqueGenerator to physical ::> powerTrain` — optional
@@ -107,7 +108,7 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             start,
             input,
             AllocationUsage {
-                name: String::new(),
+                name: None,
                 type_name: None,
                 type_is_conjugated: false,
                 subsets: None,

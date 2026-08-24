@@ -38,7 +38,14 @@ fn test_objective_parses_named_typed_requirement_usage() {
             _ => None,
         })
         .expect("objective should be present");
-    assert_eq!(objective.requirement.value.name, "missionObjective");
+    assert_eq!(
+        objective
+            .requirement
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("missionObjective")
+    );
     assert_eq!(
         objective
             .requirement
@@ -97,7 +104,7 @@ fn test_objective_body_preserves_structured_requirement_members() {
 }
 
 #[test]
-fn test_objective_typed_semicolon_uses_default_name() {
+fn test_objective_typed_semicolon_has_no_declared_name() {
     let input = "package P { use case def U { objective : MaximizeObjective; } }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
@@ -123,7 +130,15 @@ fn test_objective_typed_semicolon_uses_default_name() {
             _ => None,
         })
         .expect("objective should be present");
-    assert_eq!(objective.requirement.value.name, "objective");
+    assert_eq!(
+        objective
+            .requirement
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        // `objective` authors no `NAME`; the keyword is the member's syntax, not its name.
+        None
+    );
     assert_eq!(
         objective
             .requirement
@@ -228,7 +243,13 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
         .requirement
         .as_ref()
         .expect("explicit form should include parsed requirement usage");
-    assert_eq!(explicit_req.value.name, "vehicleMassRequirement");
+    assert_eq!(
+        explicit_req
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("vehicleMassRequirement")
+    );
     assert_eq!(
         explicit_req
             .value
@@ -268,7 +289,10 @@ fn test_verification_return_ref_parses_return_expression() {
             _ => None,
         })
         .expect("return ref should be present");
-    assert_eq!(return_ref.name, "verdictResult");
+    assert_eq!(
+        result.declaration_name(return_ref.name),
+        Some("verdictResult")
+    );
     let ReturnRefBody::Brace { elements, .. } = &return_ref.body.value else {
         panic!("expected structured return-ref body");
     };
@@ -441,7 +465,11 @@ fn test_parse_part_usage_body_satisfy_shorthand() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Home") =>
+                if p.value
+                    .identification
+                    .name
+                    .and_then(|n| result.declaration_name(n))
+                    == Some("Home") =>
             {
                 Some(&p.value)
             }
@@ -456,7 +484,7 @@ fn test_parse_part_usage_body_satisfy_shorthand() {
         .iter()
         .find_map(|e| match &e.value {
             sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p)
-                if p.value.name == "livingRoom" =>
+                if p.value.name.and_then(|n| result.declaration_name(n)) == Some("livingRoom") =>
             {
                 Some(&p.value)
             }
@@ -730,6 +758,6 @@ requirement systemSpecification {
     assert!(elements.iter().any(|element| matches!(
         &element.value,
         sysml_v2_parser::ast::RequirementDefBodyElement::RequirementUsage(requirement)
-            if requirement.value.name == "emergencyStop"
+            if requirement.value.name.and_then(|n| result.document.declaration_name(n)) == Some("emergencyStop")
     )));
 }

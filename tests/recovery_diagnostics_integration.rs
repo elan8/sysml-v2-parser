@@ -61,7 +61,12 @@ fn fixture_missing_semicolon_reports_specific_diagnostic_and_keeps_siblings() {
         .iter()
         .find_map(|element| match &element.value {
             PackageBodyElement::PartDef(part)
-                if part.value.identification.name.as_deref() == Some("A") =>
+                if part
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("A") =>
             {
                 Some(&part.value)
             }
@@ -188,7 +193,12 @@ fn fixture_nested_bad_block_recovers_inside_part_and_keeps_outer_siblings() {
         .iter()
         .find_map(|element| match &element.value {
             PackageBodyElement::PartDef(part)
-                if part.value.identification.name.as_deref() == Some("Broken") =>
+                if part
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Broken") =>
             {
                 Some(&part.value)
             }
@@ -313,7 +323,12 @@ fn fixture_incomplete_bind_expression_reports_missing_expression() {
         .iter()
         .find_map(|element| match &element.value {
             PackageBodyElement::ActionDef(action)
-                if action.value.identification.name.as_deref() == Some("ExecutePatrol") =>
+                if action
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("ExecutePatrol") =>
             {
                 Some(&action.value)
             }
@@ -467,7 +482,12 @@ package Later {
         .elements
         .iter()
         .any(|e| match &e.value {
-            RootElement::Package(pkg) => pkg.value.identification.simple_name() == Some("Later"),
+            RootElement::Package(pkg) =>
+                pkg.value
+                    .identification
+                    .simple_name()
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Later"),
             _ => false,
         }));
 }
@@ -610,7 +630,12 @@ fn invalid_bracket_expression_reports_specific_diagnostic() {
         .iter()
         .find_map(|element| match &element.value {
             PackageBodyElement::ActionDef(action)
-                if action.value.identification.name.as_deref() == Some("Evaluate") =>
+                if action
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Evaluate") =>
             {
                 Some(&action.value)
             }
@@ -680,7 +705,7 @@ fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() 
     assert!(
         elements.iter().any(|e| matches!(
             &e.value,
-            PartDefBodyElement::DefaultReferenceUsage(u) if u.value.name == "Capacity"
+            PartDefBodyElement::DefaultReferenceUsage(u) if u.value.name.and_then(|n| result.document.declaration_name(n)) == Some("Capacity")
         )),
         "bare `Capacity : Real;` should be DefaultReferenceUsage, got {:?}",
         elements
@@ -727,7 +752,12 @@ fn fixture_glued_package_member_parses_without_separator_diagnostic() {
         .elements
         .iter()
         .filter_map(|e| match &e.value {
-            RootElement::Package(p) => Some(p.value.identification.simple_name()),
+            RootElement::Package(p) => Some(
+                p.value
+                    .identification
+                    .simple_name()
+                    .and_then(|n| result.document.declaration_name(n)),
+            ),
             _ => None,
         })
         .collect();

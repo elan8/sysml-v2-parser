@@ -9,7 +9,7 @@ use sysml_v2_parser::{parse, parse_with_diagnostics};
 fn test_package_with_semicolon_body() {
     let input = "package Foo;";
     let result = parse(input).expect("parse should succeed");
-    let expected = expected_package_foo_semicolon();
+    let expected = expected_package_foo_semicolon(&result);
     assert_eq!(
         result.root.normalize_for_test_comparison(),
         expected.normalize_for_test_comparison(),
@@ -21,7 +21,7 @@ fn test_package_with_semicolon_body() {
 fn test_package_with_brace_body() {
     let input = "package Bar { }";
     let result = parse(input).expect("parse should succeed");
-    let expected = expected_package_bar_brace();
+    let expected = expected_package_bar_brace(&result);
     assert_eq!(
         result.root.normalize_for_test_comparison(),
         expected.normalize_for_test_comparison(),
@@ -37,7 +37,13 @@ fn test_standard_library_package_header_parses() {
     match &result.elements[0].value {
         RootElement::LibraryPackage(lp) => {
             assert!(lp.value.is_standard);
-            assert_eq!(lp.value.identification.simple_name(), Some("SysML"));
+            assert_eq!(
+                lp.value
+                    .identification
+                    .simple_name()
+                    .and_then(|n| result.declaration_name(n)),
+                Some("SysML")
+            );
             assert!(
                 matches!(lp.value.body, PackageBody::Brace { ref elements, .. } if elements.is_empty())
             );
@@ -59,7 +65,7 @@ fn test_legacy_library_standard_package_header_still_parses() {
                     input.len(),
                     LibraryPackage {
                         is_standard: true,
-                        identification: package_id("LegacyStd"),
+                        identification: package_id(&result, "LegacyStd"),
                         body: PackageBody::Semicolon {
                             semicolon_span: Span::dummy(),
                         },
@@ -67,6 +73,7 @@ fn test_legacy_library_standard_package_header_still_parses() {
                 ))
             )]
         }
+        .normalize_for_test_comparison()
     );
 }
 
@@ -116,7 +123,12 @@ fn test_root_level_import_then_package() {
     }
     match &result.elements[1].value {
         sysml_v2_parser::ast::RootElement::Package(p) => {
-            assert_eq!(p.identification.simple_name(), Some("P"));
+            assert_eq!(
+                p.identification
+                    .simple_name()
+                    .and_then(|n| result.declaration_name(n)),
+                Some("P")
+            );
         }
         _ => panic!("expected second element to be Package"),
     }
@@ -269,7 +281,16 @@ fn test_parse_package_with_quoted_name() {
         _ => panic!("expected package"),
     };
     assert_eq!(
-        pkg.identification.simple_name(),
+        pkg.identification
+            .simple_name()
+            .and_then(|n| result.declaration_name(n)),
+        Some("'15.10-Primitive Data Types'")
+    );
+    assert_eq!(
+        pkg.identification
+            .simple_name()
+            .and_then(|n| result.decoded_declaration_name(n))
+            .as_deref(),
         Some("15.10-Primitive Data Types")
     );
 }

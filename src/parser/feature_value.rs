@@ -98,9 +98,9 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
 /// those call sites can still populate a unified `value: Option<Node<FeatureValue>>` field. Uses
 /// the expression node's own span, since these productions only have the expression to point at.
 pub(crate) fn wrap_bind_expression(expr: Node<Expression>) -> Node<FeatureValue> {
-    let span = expr.span.clone();
+    let span = expr.span;
     Node::new(
-        span.clone(),
+        span,
         FeatureValue {
             kind: FeatureValueKind::Bind,
             is_default: false,
@@ -123,7 +123,7 @@ pub(crate) fn feature_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<Fe
     let (peek, _) = ws_and_comments(input)?;
     let (input, expression): (Input<'_>, Node<Expression>) = if peek.fragment().starts_with(b"{") {
         let (input, body) = crate::parser::expr::body_expression(input)?;
-        let span = body.span.clone();
+        let span = body.span;
         (input, Node::new(span, Expression::BodyExpr(Box::new(body))))
     } else {
         expression(input)?

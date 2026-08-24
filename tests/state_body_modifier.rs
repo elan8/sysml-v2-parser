@@ -11,7 +11,7 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -24,19 +24,26 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
     let PackageBody::Brace { elements, .. } = &pkg.value.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 fn sole_state_def(input: &str) -> sysml_v2_parser::ast::StateDef {
-    match package_elements(input).remove(0) {
+    match package_elements(input).1.remove(0) {
         PackageBodyElement::StateDef(def) => def.value,
         other => panic!("expected state def, got {other:?}"),
     }
 }
 
-fn sole_state_usage(input: &str) -> sysml_v2_parser::ast::StateUsage {
-    match package_elements(input).remove(0) {
-        PackageBodyElement::StateUsage(usage) => usage.value,
+fn sole_state_usage(
+    input: &str,
+) -> (
+    sysml_v2_parser::ParsedDocument,
+    sysml_v2_parser::ast::StateUsage,
+) {
+    let (doc, mut elements) = package_elements(input);
+    match elements.remove(0) {
+        PackageBodyElement::StateUsage(usage) => (doc, usage.value),
         other => panic!("expected state usage, got {other:?}"),
     }
 }
@@ -79,19 +86,19 @@ fn state_def_parallel_modifier_span_covers_the_keyword_only() {
 
 #[test]
 fn state_usage_preserves_parallel_and_initial_distinctly() {
-    let parallel = sole_state_usage("package P { state S parallel { state child; } }");
+    let (_, parallel) = sole_state_usage("package P { state S parallel { state child; } }");
     assert_eq!(
         parallel.body_modifier.map(|m| m.value),
         Some(StateBodyModifier::Parallel)
     );
 
-    let initial = sole_state_usage("package P { state S initial { state child; } }");
+    let (_, initial) = sole_state_usage("package P { state S initial { state child; } }");
     assert_eq!(
         initial.body_modifier.map(|m| m.value),
         Some(StateBodyModifier::Initial)
     );
 
-    let plain = sole_state_usage("package P { state S { state child; } }");
+    let (_, plain) = sole_state_usage("package P { state S { state child; } }");
     assert!(
         plain.body_modifier.is_none(),
         "the three spellings must stay distinguishable to lowering"
@@ -101,14 +108,17 @@ fn state_usage_preserves_parallel_and_initial_distinctly() {
 #[test]
 fn a_modifier_keyword_must_be_a_whole_word() {
     // `initialState` is a usage *name*, not an `initial` modifier on an anonymous state.
-    let usage = sole_state_usage("package P { state initialState { state child; } }");
+    let (doc, usage) = sole_state_usage("package P { state initialState { state child; } }");
     assert!(usage.body_modifier.is_none());
-    assert_eq!(usage.name, "initialState");
+    assert_eq!(
+        usage.name.and_then(|n| doc.declaration_name(n)),
+        Some("initialState")
+    );
 }
 
 #[test]
 fn exhibit_state_preserves_its_body_modifier() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         "package P { part vehicle { exhibit state vehicleStates parallel { state off; } } }",
     );
     let PackageBodyElement::PartUsage(part) = &elements[0] else {

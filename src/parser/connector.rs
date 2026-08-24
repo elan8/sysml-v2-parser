@@ -144,11 +144,8 @@ pub(crate) fn end_decl(
         // operator right after `end` means the end has no label of its own.
         (input, EndIdentity::Anonymous)
     } else {
-        let (input, (span, declaration_name)) = with_span(name).parse(input)?;
-        (
-            input,
-            EndIdentity::Declaration(Node::new(span, declaration_name)),
-        )
+        let (input, declaration_name) = name(input)?;
+        (input, EndIdentity::Declaration(declaration_name))
     };
     // GH-53: a multiplicity may also appear right after the name, before the target -- the most
     // common position for most usage kinds (e.g. `end touchesToo [0..*] item ...` in
@@ -171,7 +168,7 @@ pub(crate) fn end_decl(
         let (input, trailing_multiplicity) =
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        let type_ref_span = references.value.span.clone();
+        let type_ref_span = references.value.span;
         return Ok((
             input,
             node_from_to(
@@ -228,7 +225,7 @@ pub(crate) fn end_decl(
     )
     .parse(input)?;
     let typing = Some(typing_node(
-        type_ref_span.clone(),
+        type_ref_span,
         tilde.is_some(),
         vec![type_reference],
         crate::ast::TypingSpelling::Operator,
@@ -343,17 +340,16 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // and greedily consuming it here left the target list unparseable.
     let (input, parsed_name) = opt(preceded(
         ws_and_comments,
-        nom::combinator::verify(with_span(name), |(_, n)| {
+        nom::combinator::verify(name, |n| {
             !matches!(
-                n.as_str(),
-                "redefines" | "subsets" | "references" | "crosses"
+                crate::parser::lex::name_bytes(input, *n),
+                b"redefines" | b"subsets" | b"references" | b"crosses"
             )
         }),
     ))
     .parse(input)?;
     let (input, leading_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     // `redefinition` (shared with every other `:>>` call site) already handles the comma-separated
     // multi-target form, e.g. `ref port :>> Interface::participant, BinaryConnection::
@@ -368,7 +364,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 preceded(tag(&b":"[..]), with_span(qualified_reference)),
             )
             .parse(input)?;
-            let typing = Some(single_target_typing(type_ref_span.clone(), type_name));
+            let typing = Some(single_target_typing(type_ref_span, type_name));
             (input, Some(type_ref_span), typing)
         } else {
             (input, None, None)
@@ -438,7 +434,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 is_constant: prefix.is_constant,
                 direction: prefix.direction,
                 kind_keyword,
-                name: name_str,
+                name: parsed_name,
                 typing,
                 subsets,
                 redefines,
@@ -446,7 +442,6 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 multiplicity_modifiers: modifiers,
                 value,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
@@ -459,9 +454,9 @@ fn connection_end_full(
     declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<crate::ast::Expression>,
 ) -> Node<ConnectionEnd> {
-    let span = expr.span.clone();
+    let span = expr.span;
     Node::new(
-        span.clone(),
+        span,
         ConnectionEnd {
             declared_name,
             expression: expr,
@@ -478,10 +473,10 @@ pub(crate) fn connector_end_name(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<crate::ast::ConnectorEndName>> {
     let (after_ws, _) = ws_and_comments(input)?;
-    let Ok((after_name, (name_span, end_name))) = with_span(name).parse(after_ws) else {
+    let Ok((after_name, end_name)) = name(after_ws) else {
         return Ok((input, None));
     };
-    if crate::parser::lex::is_reserved_keyword(end_name.as_bytes()) {
+    if crate::parser::lex::is_reserved_keyword(crate::parser::lex::name_bytes(input, end_name)) {
         return Ok((input, None));
     }
     let (after_trivia, _) = ws_and_comments(after_name)?;
@@ -504,7 +499,7 @@ pub(crate) fn connector_end_name(
         Some((rest, operator)) => Ok((
             rest,
             Some(crate::ast::ConnectorEndName {
-                name: Node::new(name_span, end_name),
+                name: end_name,
                 operator,
             }),
         )),
@@ -605,7 +600,7 @@ mod ref_decl_kind_tests {
         ))
         .expect("anonymous ref redefinition");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.name.is_empty());
+        assert!(node.value.name.is_none());
         let redefines = node.value.redefines.expect("redefines clause");
         assert_eq!(redefines.value.target.len(), 2);
     }
@@ -614,14 +609,19 @@ mod ref_decl_kind_tests {
     /// (`ref use case self : UseCase :>> Case::self;`, Systems Library `UseCases.sysml`).
     #[test]
     fn ref_decl_accepts_the_use_case_kind_keyword() {
-        let (rest, node) =
-            ref_decl(input("ref use case self : UseCase :>> Case::self;")).expect("ref use case");
+        let source = input("ref use case self : UseCase :>> Case::self;");
+        let (rest, node) = ref_decl(source).expect("ref use case");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.kind_keyword,
             Some(crate::ast::RefDeclKind::UseCase)
         );
-        assert_eq!(node.value.name, "self");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"self"[..])
+        );
         assert!(node.value.typing.is_some());
         assert!(node.value.redefines.is_some());
     }
@@ -638,17 +638,15 @@ mod end_decl_kind_tests {
 
     #[test]
     fn end_decl_accepts_feature_kind_with_redefines() {
-        let (rest, node) = end_decl(
-            input(
-                "end feature source: Occurrence redefines FlowTransfer::source, transfers::source;",
-            ),
-            true,
-        )
-        .expect("end feature");
+        let source = input(
+            "end feature source: Occurrence redefines FlowTransfer::source, transfers::source;",
+        );
+        let (rest, node) = end_decl(source, true).expect("end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(
             &node.value.identity,
-            EndIdentity::Declaration(name) if name.value == "source"
+            EndIdentity::Declaration(name)
+                if crate::parser::lex::name_bytes(source, *name) == b"source"
         ));
         assert_eq!(
             node.value

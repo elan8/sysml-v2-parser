@@ -6,10 +6,15 @@ use super::package::{
 #[cfg(feature = "serde")]
 use super::provenance_visit::validate_ast_provenance;
 use super::qualified_reference::{
-    QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView, SourceRange,
-    SourceStorage,
+    decode_authored_name, QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView,
+    SourceRange, SourceStorage,
 };
-use crate::ast::core::{Node, Span};
+use crate::ast::common::{normalize_comment_body, CommentBody, DeclarationName};
+use crate::ast::core::{
+    decode_string_literal, Node, OperatorSpelling, RealLiteral, Span, StringLiteral,
+};
+use crate::ast::kerml_fallback::OpaqueText;
+use std::borrow::Cow;
 
 /// KerML top-level element (BNF `RootNamespace = PackageBodyElement*`).
 ///
@@ -118,6 +123,58 @@ impl ParsedDocument {
         id: QualifiedReferenceId,
     ) -> Option<QualifiedReferenceView<'_>> {
         self.qualified_references.get(&self.source, id)
+    }
+
+    /// Authored spelling of a declaration name or short name, exactly as written in the source
+    /// (an unrestricted name keeps its quotes and escapes). `None` only for a span that does not
+    /// belong to this document.
+    pub fn declaration_name(&self, name: DeclarationName) -> Option<&str> {
+        self.source.slice(name.span())
+    }
+
+    /// Decoded `NAME` value of a declaration name: a basic name as written, or the contents of
+    /// an unrestricted name with its quotes removed and `\'` escapes decoded. Only an escaped
+    /// unrestricted name allocates.
+    pub fn decoded_declaration_name(&self, name: DeclarationName) -> Option<Cow<'_, str>> {
+        decode_authored_name(self.declaration_name(name)?)
+    }
+
+    /// Authored spelling of a real literal.
+    pub fn real_literal(&self, literal: RealLiteral) -> Option<&str> {
+        self.source.slice(literal.span())
+    }
+
+    /// Authored spelling of a string literal, quotes and escapes intact.
+    pub fn string_literal(&self, literal: StringLiteral) -> Option<&str> {
+        self.source.slice(literal.span())
+    }
+
+    /// Contents of a string literal with its quotes removed and `\"` escapes decoded. Only a
+    /// literal containing an escape allocates.
+    pub fn decoded_string_literal(&self, literal: StringLiteral) -> Option<Cow<'_, str>> {
+        decode_string_literal(self.string_literal(literal)?)
+    }
+
+    /// The authored bytes of a `REGULAR_COMMENT` body, without its `/*` `*/` delimiters.
+    pub fn comment_body(&self, body: CommentBody) -> Option<&str> {
+        self.source.slice(body.span())
+    }
+
+    /// A comment body with the pinned processing rules applied; see
+    /// [`normalize_comment_body`](crate::ast::normalize_comment_body). Borrows when the rules
+    /// change nothing.
+    pub fn normalized_comment_body(&self, body: CommentBody) -> Option<Cow<'_, str>> {
+        Some(normalize_comment_body(self.comment_body(body)?))
+    }
+
+    /// The authored spelling of an operator the grammar did not classify.
+    pub fn operator_spelling(&self, operator: OperatorSpelling) -> Option<&str> {
+        self.source.slice(operator.span())
+    }
+
+    /// The retained source of a declaration the parser recognized but did not model.
+    pub fn opaque_text(&self, text: OpaqueText) -> Option<&str> {
+        self.source.slice(text.span())
     }
 
     /// Resolve a qualified declaration name without erasing its declaration role in the AST.

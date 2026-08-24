@@ -10,11 +10,11 @@ use crate::ast::{
 pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Result<(), EmitError> {
     match expr {
         Expression::LiteralInteger(i) => w.push_str(&i.to_string()),
-        Expression::LiteralReal(s) => w.push_str(s),
-        Expression::LiteralString(s) => {
-            w.push_char('"');
-            w.push_str(s);
-            w.push_char('"');
+        Expression::LiteralReal(literal) => {
+            w.push_authored_span("expression real literal", literal.span())?
+        }
+        Expression::LiteralString(literal) => {
+            w.push_authored_span("expression string literal", literal.span())?
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
         Expression::FeatureRef(reference) => {
@@ -126,7 +126,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
                     w.push_str(".");
                 } else {
                     w.push_str("->");
-                    w.push_str(collection_op_str(op));
+                    push_collection_op(w, op)?;
                 }
                 if let Some(body) = brace_body {
                     emit_body_expression_bare(w, &body.value)?;
@@ -135,7 +135,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
                 }
             } else {
                 w.push_str("->");
-                w.push_str(collection_op_str(op));
+                push_collection_op(w, op)?;
                 if let Some(body) = brace_body {
                     emit_collection_operator_body(w, &body.value)?;
                 } else {
@@ -322,8 +322,19 @@ fn unary_op_str(op: &UnaryOperator) -> &str {
     op.as_str()
 }
 
-fn collection_op_str(op: &CollectionOperator) -> &str {
-    op.as_str()
+/// Stream a collection operator: a classified name, or the authored spelling of an
+/// unclassified `->name` from its source span.
+fn push_collection_op(w: &mut EmitWriter<'_>, op: &CollectionOperator) -> Result<(), EmitError> {
+    match (op.classified_name(), op) {
+        (Some(name), _) => {
+            w.push_str(name);
+            Ok(())
+        }
+        (None, CollectionOperator::Other(spelling)) => {
+            w.push_authored_span("collection operator", spelling.span())
+        }
+        (None, _) => unreachable!("only `Other` has no classified name"),
+    }
 }
 
 fn type_check_str(kind: &TypeCheckKind) -> &'static str {

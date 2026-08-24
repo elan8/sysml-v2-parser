@@ -22,11 +22,12 @@ use crate::ast::{
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 fn textual_rep_language_diagnostic(
+    source: &str,
     node_span: &Span,
     rep: &TextualRepresentation,
 ) -> Option<ParseError> {
     use crate::parser::diagnostic_catalog;
-    if rep.language_span.is_none() {
+    let Some(language) = rep.language else {
         return Some(
             ParseError::new("rep body is missing the required 'language' keyword and string value")
                 .with_location(node_span.offset, node_span.line, node_span.column)
@@ -35,9 +36,12 @@ fn textual_rep_language_diagnostic(
                 .with_severity(DiagnosticSeverity::Error)
                 .with_category(DiagnosticCategory::ParseError),
         );
-    }
-    if rep.language.trim().is_empty() {
-        let ls = rep.language_span.as_ref()?;
+    };
+    let authored =
+        source.get(language.span().offset..language.span().offset + language.span().len)?;
+    let spelling = crate::ast::decode_string_literal(authored)?;
+    if spelling.trim().is_empty() {
+        let ls = language.span();
         return Some(
             ParseError::new("rep language value must be a non-empty string")
                 .with_location(ls.offset, ls.line, ls.column)
@@ -61,12 +65,14 @@ fn unsupported_fallback_diagnostic(span: &Span, production: &str) -> ParseError 
     .with_category(DiagnosticCategory::UnsupportedGrammarForm)
 }
 
-#[derive(Default)]
-struct RecoveryErrorCollector {
+struct RecoveryErrorCollector<'source> {
+    /// The document text the tree's spans index; the tree does not carry it, and the document
+    /// envelope that will is not built until after diagnostics are collected.
+    source: &'source str,
     errors: Vec<ParseError>,
 }
 
-impl Visitor for RecoveryErrorCollector {
+impl Visitor for RecoveryErrorCollector<'_> {
     /// Text the parser could not recognize, kept in place with its authored span.
     fn visit_parse_error_node(&mut self, node: &Node<ParseErrorNode>) {
         self.errors
@@ -86,7 +92,9 @@ impl Visitor for RecoveryErrorCollector {
 
     /// A `rep` body must name its language; both the missing and the empty spelling are errors.
     fn visit_textual_representation(&mut self, node: &Node<TextualRepresentation>) {
-        if let Some(diagnostic) = textual_rep_language_diagnostic(&node.span, &node.value) {
+        if let Some(diagnostic) =
+            textual_rep_language_diagnostic(self.source, &node.span, &node.value)
+        {
             self.errors.push(diagnostic);
         }
         walk_textual_representation(self, node);
@@ -98,10 +106,17 @@ impl Visitor for RecoveryErrorCollector {
     /// dialect's spelling -- cannot tell a declaration from the same words inside a comment or a
     /// string literal.
     fn visit_extended_library_decl(&mut self, node: &Node<ExtendedLibraryDecl>) {
-        if let Some((code, message, expected, suggestion)) =
-            crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
-                node.value.text.as_bytes(),
+        if let Some((code, message, expected, suggestion)) = self
+            .source
+            .get(
+                node.value.text.span().offset
+                    ..node.value.text.span().offset + node.value.text.span().len,
             )
+            .and_then(|text| {
+                crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
+                    text.as_bytes(),
+                )
+            })
         {
             self.errors.push(
                 ParseError::new(message)
@@ -154,8 +169,11 @@ impl Visitor for RecoveryErrorCollector {
     }
 }
 
-pub(crate) fn collect_recovery_errors(root: &RootNamespace) -> Vec<ParseError> {
-    let mut collector = RecoveryErrorCollector::default();
+pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec<ParseError> {
+    let mut collector = RecoveryErrorCollector {
+        source,
+        errors: Vec::new(),
+    };
     collector.visit_root_namespace(root);
     collector.errors
 }

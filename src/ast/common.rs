@@ -1,4 +1,4 @@
-use crate::ast::core::{Expression, Node, Span};
+use crate::ast::core::{Expression, Node, Span, StringLiteral};
 use crate::ast::membership::Membership;
 use crate::ast::QualifiedReferenceId;
 #[cfg(feature = "serde")]
@@ -51,15 +51,42 @@ pub struct UnsupportedGrammarNode {
     pub production: UnsupportedProduction,
     pub diagnostic: ParseErrorNode,
 }
+/// An authored declaration name or short name (`NAME`: `BASIC_NAME` or `UNRESTRICTED_NAME`).
+///
+/// The document source is authoritative for the spelling, so this is a typed span into it rather
+/// than a copy of the token: the span covers the exact authored token, including the quotes and
+/// escapes of an unrestricted name. Resolve it through the owning document with
+/// [`crate::ast::ParsedDocument::declaration_name`] (authored spelling) or
+/// [`crate::ast::ParsedDocument::decoded_declaration_name`] (decoded `NAME` value).
+///
+/// It is a declaration label, not a reference: it never resolves to a
+/// [`crate::ast::QualifiedReferenceId`], and equality compares provenance, not spelling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DeclarationName {
+    pub(crate) span: Span,
+}
+
+impl DeclarationName {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the authored token.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
 /// Identification: optional short name in `< >`, optional name.
 /// BNF: ( '<' declaredShortName = NAME '>' )? ( declaredName = NAME )?
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Identification {
     /// Short name inside `< ... >`, if present.
-    pub short_name: Option<String>,
-    /// Main declared name (may be quoted, e.g. '1a-Parts Tree').
-    pub name: Option<String>,
+    pub short_name: Option<DeclarationName>,
+    /// Main declared name (may be quoted, e.g. `'1a-Parts Tree'`).
+    pub name: Option<DeclarationName>,
 }
 
 /// Visibility for imports and members.
@@ -477,30 +504,39 @@ pub struct Import {
     /// only). `None` when the body is a semicolon terminator.
     pub body_elements: Option<Vec<Node<crate::ast::structure::RelationshipBodyElement>>>,
 }
+/// The body of a `REGULAR_COMMENT`: the authored bytes between `/*` and `*/`, as a span.
+///
+/// The source is authoritative for the text, so nothing is copied. Resolve through
+/// [`crate::ast::ParsedDocument::comment_body`] (raw, what the formatter reproduces) or
+/// [`crate::ast::ParsedDocument::normalized_comment_body`] (with the pinned processing rules
+/// applied; see [`normalize_comment_body`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CommentBody {
+    pub(crate) span: Span,
+}
+
+impl CommentBody {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// Source span of the body, i.e. the `REGULAR_COMMENT` without its delimiters.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
 /// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DocComment {
     /// Optional identification after 'doc'.
     pub identification: Option<Identification>,
-    /// Optional locale string (e.g. "en").
-    pub locale: Option<String>,
-    /// Body text exactly as authored, i.e. the bytes between `/*` and `*/`.
-    ///
-    /// Raw, not normalized: [`Self::normalized_text`] applies the pinned processing rules, and
-    /// [`Self::body_span`] locates this text in the source. Keeping the authored bytes here is
-    /// what lets the formatter reproduce the document it was given.
-    pub text: String,
-    /// Source span of [`Self::text`], i.e. the `REGULAR_COMMENT` body without its delimiters.
-    pub body_span: Span,
-}
-
-impl DocComment {
-    /// The body text with the pinned `Comment`/`Documentation` processing applied.
-    /// See [`normalize_comment_body`].
-    pub fn normalized_text(&self) -> String {
-        normalize_comment_body(&self.text)
-    }
+    /// The authored `locale` string literal, e.g. `"en"`, if present.
+    pub locale: Option<StringLiteral>,
+    /// The `REGULAR_COMMENT` body.
+    pub body: CommentBody,
 }
 
 /// KerML Comment: `( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )?
@@ -524,19 +560,10 @@ pub struct CommentAnnotation {
     /// [`MetadataAnnotation::about_targets`](crate::ast::MetadataAnnotation::about_targets)
     /// records the same clause of the same shape.
     pub about_targets: Vec<QualifiedReferenceId>,
-    pub locale: Option<String>,
-    /// Body text exactly as authored. See [`DocComment::text`].
-    pub text: String,
-    /// Source span of [`Self::text`]. See [`DocComment::body_span`].
-    pub body_span: Span,
-}
-
-impl CommentAnnotation {
-    /// The body text with the pinned `Comment` processing applied.
-    /// See [`normalize_comment_body`].
-    pub fn normalized_text(&self) -> String {
-        normalize_comment_body(&self.text)
-    }
+    /// The authored `locale` string literal, if present.
+    pub locale: Option<StringLiteral>,
+    /// The `REGULAR_COMMENT` body.
+    pub body: CommentBody,
 }
 
 /// Apply the pinned `REGULAR_COMMENT` body processing (KerML BNF 214 note 1, which BNF 231 note
@@ -551,9 +578,19 @@ impl CommentAnnotation {
 ///
 /// This lives here, beside the three types that own such a body, because the alternative is every
 /// consumer normalizing it slightly differently and then disagreeing about what a document says.
-/// It is deliberately *not* applied at parse time: [`DocComment::text`] keeps the authored bytes
-/// so the formatter can reproduce them, and normalization is a view over that.
-pub fn normalize_comment_body(raw: &str) -> String {
+/// It is deliberately *not* applied at parse time: the [`CommentBody`] span keeps the authored
+/// bytes in the source so the formatter can reproduce them, and normalization is a view over
+/// that. A body the rules leave untouched is returned borrowed.
+pub fn normalize_comment_body(raw: &str) -> std::borrow::Cow<'_, str> {
+    let normalized = normalize_comment_body_owned(raw);
+    if normalized == raw {
+        std::borrow::Cow::Borrowed(raw)
+    } else {
+        std::borrow::Cow::Owned(normalized)
+    }
+}
+
+fn normalize_comment_body_owned(raw: &str) -> String {
     let mut lines = raw.split_inclusive('\n');
     let mut out = String::with_capacity(raw.len());
 
@@ -589,32 +626,15 @@ pub fn normalize_comment_body(raw: &str) -> String {
 }
 
 /// KerML TextualRepresentation: ( 'rep' Identification )? 'language' STRING_VALUE body.
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextualRepresentation {
     pub rep_identification: Option<Identification>,
-    pub language: String,
-    pub language_span: Option<Span>,
-    /// Body text exactly as authored. See [`DocComment::text`].
-    pub text: String,
-    /// Source span of [`Self::text`]. See [`DocComment::body_span`].
-    pub body_span: Span,
-}
-
-impl TextualRepresentation {
-    /// The body text with the pinned processing applied -- KerML BNF 231 note 1 specifies the
-    /// same rules as for a `Comment`. See [`normalize_comment_body`].
-    pub fn normalized_text(&self) -> String {
-        normalize_comment_body(&self.text)
-    }
-}
-
-impl PartialEq for TextualRepresentation {
-    fn eq(&self, other: &Self) -> bool {
-        self.rep_identification == other.rep_identification
-            && self.language == other.language
-            && self.text == other.text
-    }
+    /// The authored `language` string literal. The grammar requires it; the parser is resilient
+    /// and records `None` when it is missing, which the diagnostic collector reports.
+    pub language: Option<StringLiteral>,
+    /// The body, processed with the same rules as a `Comment` (KerML BNF 231 note 1).
+    pub body: CommentBody,
 }
 /// A member that annotates its owner rather than declaring structure or behavior.
 ///

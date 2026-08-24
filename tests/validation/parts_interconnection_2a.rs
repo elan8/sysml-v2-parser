@@ -24,7 +24,11 @@ fn test_parse_2a_parts_interconnection() {
         roots => panic!("expected one package root, got {}", roots.len()),
     };
     assert_eq!(
-        package.identification.simple_name(),
+        package
+            .identification
+            .simple_name()
+            .and_then(|n| document.decoded_declaration_name(n))
+            .as_deref(),
         Some("2a-Parts Interconnection")
     );
 
