@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ActionUsage.name == "accept"`; they now carry `ActionUsage::keyword: ActionUsageKeyword` and
   no name, and the semantic projection adds a `(keyword …)` slot to `action-usage`. `Span` is
   now `Copy`. **AST version 240.**
+- **Real and string literal spelling are typed source spans.** `Expression::LiteralReal` holds a
+  `RealLiteral` and `Expression::LiteralString` a `StringLiteral`, resolved through
+  `ParsedDocument::real_literal`, `string_literal` (authored, quotes and escapes intact) and
+  `decoded_string_literal`. The emitter streams both from the source, which also fixes string
+  literals losing their `\"` escapes on round trip.
 - **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
   Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
   whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,

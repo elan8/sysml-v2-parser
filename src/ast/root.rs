@@ -10,7 +10,7 @@ use super::qualified_reference::{
     SourceRange, SourceStorage,
 };
 use crate::ast::common::DeclarationName;
-use crate::ast::core::{Node, Span};
+use crate::ast::core::{decode_string_literal, Node, RealLiteral, Span, StringLiteral};
 use std::borrow::Cow;
 
 /// KerML top-level element (BNF `RootNamespace = PackageBodyElement*`).
@@ -134,6 +134,22 @@ impl ParsedDocument {
     /// unrestricted name allocates.
     pub fn decoded_declaration_name(&self, name: DeclarationName) -> Option<Cow<'_, str>> {
         decode_authored_name(self.declaration_name(name)?)
+    }
+
+    /// Authored spelling of a real literal.
+    pub fn real_literal(&self, literal: RealLiteral) -> Option<&str> {
+        self.source.slice(literal.span())
+    }
+
+    /// Authored spelling of a string literal, quotes and escapes intact.
+    pub fn string_literal(&self, literal: StringLiteral) -> Option<&str> {
+        self.source.slice(literal.span())
+    }
+
+    /// Contents of a string literal with its quotes removed and `\"` escapes decoded. Only a
+    /// literal containing an escape allocates.
+    pub fn decoded_string_literal(&self, literal: StringLiteral) -> Option<Cow<'_, str>> {
+        decode_string_literal(self.string_literal(literal)?)
     }
 
     /// Resolve a qualified declaration name without erasing its declaration role in the AST.

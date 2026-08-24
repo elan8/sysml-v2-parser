@@ -10,11 +10,11 @@ use crate::ast::{
 pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Result<(), EmitError> {
     match expr {
         Expression::LiteralInteger(i) => w.push_str(&i.to_string()),
-        Expression::LiteralReal(s) => w.push_str(s),
-        Expression::LiteralString(s) => {
-            w.push_char('"');
-            w.push_str(s);
-            w.push_char('"');
+        Expression::LiteralReal(literal) => {
+            w.push_authored_span("expression real literal", literal.span())?
+        }
+        Expression::LiteralString(literal) => {
+            w.push_authored_span("expression string literal", literal.span())?
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
         Expression::FeatureRef(reference) => {

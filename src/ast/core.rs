@@ -263,13 +263,68 @@ pub struct SequenceExpressionElement {
     pub expression: Node<Expression>,
 }
 
+/// The authored spelling of a real literal (`195.3`, `6.022e23`), as a span into the source.
+///
+/// Resolve through [`crate::ast::ParsedDocument::real_literal`]. The spelling is the fact: a
+/// decimal and its scientific-notation equivalent are different authored tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RealLiteral {
+    pub(crate) span: Span,
+}
+
+impl RealLiteral {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the authored token.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
+/// An authored `STRING_VALUE` literal, as a span into the source covering the quotes and escapes.
+///
+/// Resolve through [`crate::ast::ParsedDocument::string_literal`] (authored) or
+/// [`crate::ast::ParsedDocument::decoded_string_literal`] (contents with `\"` decoded).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StringLiteral {
+    pub(crate) span: Span,
+}
+
+impl StringLiteral {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the authored token, including its quotes.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
+/// Decode an authored `STRING_VALUE` token: strip the delimiting quotes and unescape `\"`.
+/// Borrows unless an escape is present. `None` when the token is not a quoted string.
+pub(crate) fn decode_string_literal(authored: &str) -> Option<std::borrow::Cow<'_, str>> {
+    let inner = authored.strip_prefix('"')?;
+    // An unterminated literal keeps everything after the opening quote.
+    let inner = inner.strip_suffix('"').unwrap_or(inner);
+    if inner.contains("\\\"") {
+        Some(std::borrow::Cow::Owned(inner.replace("\\\"", "\"")))
+    } else {
+        Some(std::borrow::Cow::Borrowed(inner))
+    }
+}
+
 /// Expression: literals, feature refs, member access, index, bracket/unit, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Expression {
     LiteralInteger(i64),
-    LiteralReal(String),
-    LiteralString(String),
+    LiteralReal(RealLiteral),
+    LiteralString(StringLiteral),
     LiteralBoolean(bool),
     /// Single name or qualified name.
     FeatureRef(QualifiedReferenceId),

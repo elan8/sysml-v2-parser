@@ -1633,10 +1633,10 @@ macro_rules! ast_traversal {
                     let _ = field_0;
                 }
                 Expression::LiteralReal(field_0) => {
-                    visitor.visit_text(field_0);
+                    visitor.visit_span(&$($mutability)? field_0.span);
                 }
                 Expression::LiteralString(field_0) => {
-                    visitor.visit_text(field_0);
+                    visitor.visit_span(&$($mutability)? field_0.span);
                 }
                 Expression::LiteralBoolean(field_0) => {
                     let _ = field_0;

@@ -175,13 +175,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_name(&mut self, name: DeclarationName) -> io::Result<()> {
         match self.document.decoded_declaration_name(name) {
             Some(decoded) => write_quoted(self.writer, &decoded),
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "declaration name span {:?} is not in the document",
-                    name.span()
-                ),
-            )),
+            None => Err(invalid_span("declaration name", name.span())),
         }
     }
 
@@ -274,14 +268,22 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         match &expression.value {
             Expression::LiteralInteger(value) => write!(self.writer, "(integer {value})"),
-            Expression::LiteralReal(value) => {
+            Expression::LiteralReal(literal) => {
                 self.writer.write_str("(real ")?;
-                write_quoted(self.writer, value)?;
+                let spelling = self
+                    .document
+                    .real_literal(*literal)
+                    .ok_or_else(|| invalid_span("real literal", literal.span()))?;
+                write_quoted(self.writer, spelling)?;
                 self.writer.write_char(')')
             }
-            Expression::LiteralString(value) => {
+            Expression::LiteralString(literal) => {
                 self.writer.write_str("(string ")?;
-                write_quoted(self.writer, value)?;
+                let decoded = self
+                    .document
+                    .decoded_string_literal(*literal)
+                    .ok_or_else(|| invalid_span("string literal", literal.span()))?;
+                write_quoted(self.writer, &decoded)?;
                 self.writer.write_char(')')
             }
             Expression::LiteralBoolean(value) => write!(self.writer, "(boolean {value})"),
@@ -6581,6 +6583,14 @@ fn collection_operator_name(operator: &CollectionOperator) -> &str {
         CollectionOperator::Reduce => "reduce",
         CollectionOperator::Other(name) => name,
     }
+}
+
+/// A source-backed token whose span does not resolve in its own document.
+fn invalid_span(role: &str, span: &Span) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("{role} span {span:?} is not in the document"),
+    )
 }
 
 fn write_optional_quoted<W: io::Write + ?Sized>(

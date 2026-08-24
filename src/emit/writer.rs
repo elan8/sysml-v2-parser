@@ -79,6 +79,11 @@ impl<'a> EmitWriter<'a> {
     /// The span includes the token's authored quoting and escapes, so formatting the decoded
     /// `String` again would both lose a quoted `BASIC_NAME` and corrupt an `UNRESTRICTED_NAME`.
     pub(crate) fn push_authored_name(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
+        self.push_authored_span(path, span)
+    }
+
+    /// Emit any authored token (a literal, a name) exactly as spelled at its source span.
+    pub(crate) fn push_authored_span(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
         let text = self
             .document
             .source

@@ -19,9 +19,12 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// Numeric literal text: optional sign, mantissa, optional exponent (`5E9`, `195.3`, `6.022e23`).
-fn numeric_literal_text(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Numeric literal token: optional sign, mantissa, optional exponent (`5E9`, `195.3`, `6.022e23`).
+///
+/// Returns the token's bytes and its span; nothing is copied.
+fn numeric_literal_token(input: Input<'_>) -> IResult<Input<'_>, (&[u8], crate::ast::Span)> {
     let (input, _) = ws_and_comments(input)?;
+    let token_start = input;
     let frag = input.fragment();
     let mut i = 0usize;
     if matches!(frag.first(), Some(b'+' | b'-')) {
@@ -62,41 +65,43 @@ fn numeric_literal_text(input: Input<'_>) -> IResult<Input<'_>, String> {
             )));
         }
     }
-    let text = String::from_utf8_lossy(&frag[..i]).to_string();
     let (input, _) = nom::bytes::complete::take(i).parse(input)?;
-    Ok((input, text))
+    Ok((
+        input,
+        (&frag[..i], crate::parser::span_from_to(token_start, input)),
+    ))
 }
 
-fn classify_numeric_literal(text: &str) -> Expression {
-    let normalized = text.trim();
-    if normalized.contains('.') || normalized.chars().skip(1).any(|c| c == 'e' || c == 'E') {
-        Expression::LiteralReal(normalized.to_string())
-    } else {
-        Expression::LiteralInteger(normalized.parse().unwrap_or(0))
-    }
+/// Whether a numeric token spells a real (has a fraction or an exponent) rather than an integer.
+fn is_real_spelling(token: &[u8]) -> bool {
+    token.contains(&b'.') || token.iter().skip(1).any(|byte| matches!(byte, b'e' | b'E'))
 }
 
 /// Integer literal.
 fn literal_integer(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
-    let (input, text) = numeric_literal_text(input)?;
-    if text.contains('.') || text.chars().skip(1).any(|c| c == 'e' || c == 'E') {
+    let (input, (token, _)) = numeric_literal_token(input)?;
+    if is_real_spelling(token) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Digit,
         )));
     }
+    let value = std::str::from_utf8(token)
+        .ok()
+        .and_then(|text| text.parse().ok())
+        .unwrap_or(0);
     Ok((
         input,
-        node_from_to(start, input, classify_numeric_literal(&text)),
+        node_from_to(start, input, Expression::LiteralInteger(value)),
     ))
 }
 
 /// Real literal (decimal or scientific notation).
 fn literal_real(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
-    let (input, text) = numeric_literal_text(input)?;
-    if !text.contains('.') && !text.chars().skip(1).any(|c| c == 'e' || c == 'E') {
+    let (input, (token, span)) = numeric_literal_token(input)?;
+    if !is_real_spelling(token) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Digit,
@@ -104,37 +109,41 @@ fn literal_real(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     }
     Ok((
         input,
-        node_from_to(start, input, classify_numeric_literal(&text)),
+        node_from_to(
+            start,
+            input,
+            Expression::LiteralReal(crate::ast::RealLiteral::new(span)),
+        ),
     ))
 }
 
-/// String literal: double-quoted.
+/// String literal: double-quoted. The node keeps the token's span, quotes included; the
+/// contents are decoded on access through the document.
 fn literal_string(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let token_start = input;
     let (input, _) = tag(&b"\""[..]).parse(input)?;
     let frag = input.fragment();
     let mut i = 0;
-    while i < frag.len() {
+    let consumed = loop {
+        if i >= frag.len() {
+            break frag.len();
+        }
         if frag[i] == b'\\' && i + 1 < frag.len() {
             i += 2;
             continue;
         }
         if frag[i] == b'"' {
-            let s = String::from_utf8_lossy(&frag[..i]).replace("\\\"", "\"");
-            let (input, _) = nom::bytes::complete::take(i + 1).parse(input)?;
-            return Ok((
-                input,
-                node_from_to(start, input, Expression::LiteralString(s)),
-            ));
+            break i + 1;
         }
         i += 1;
-    }
-    let s = String::from_utf8_lossy(frag).replace("\\\"", "\"");
-    let (input, _) = nom::bytes::complete::take(frag.len()).parse(input)?;
+    };
+    let (input, _) = nom::bytes::complete::take(consumed).parse(input)?;
+    let literal = crate::ast::StringLiteral::new(crate::parser::span_from_to(token_start, input));
     Ok((
         input,
-        node_from_to(start, input, Expression::LiteralString(s)),
+        node_from_to(start, input, Expression::LiteralString(literal)),
     ))
 }
 
