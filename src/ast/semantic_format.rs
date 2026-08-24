@@ -2304,6 +2304,45 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("))")
     }
 
+    fn write_extended_usage(&mut self, usage: &super::ExtendedUsage) -> io::Result<()> {
+        self.writer.write_str("(extended-usage (visibility ")?;
+        self.writer
+            .write_str(visibility_name(usage.membership.visibility))?;
+        self.writer.write_str(") (prefix ")?;
+        match &usage.prefix {
+            super::UnextendedUsagePrefix::End(end) => {
+                self.writer.write_str("(end (cross ")?;
+                match &end.cross {
+                    Some(cross) => {
+                        self.writer.write_char('(')?;
+                        self.write_basic_usage_prefix(&cross.value.prefix)?;
+                        self.writer.write_char(' ')?;
+                        self.write_usage_declaration(&cross.value.declaration.value)?;
+                        self.writer.write_char(')')?;
+                    }
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")?;
+            }
+            super::UnextendedUsagePrefix::Basic(basic) => self.write_basic_usage_prefix(basic)?,
+        }
+        self.writer.write_str(") (extensions")?;
+        for keyword in &usage.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str(") (declaration ")?;
+        self.write_usage_declaration(&usage.declaration.value)?;
+        self.writer.write_str(") (value ")?;
+        match &usage.value {
+            Some(value) => self.write_feature_value(&value.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_ref_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_extended_definition(
         &mut self,
         definition: &super::ExtendedDefinition,
@@ -2327,12 +2366,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
             None => self.writer.write_str("none")?,
         }
-        self.writer.write_str(") (def ")?;
-        self.writer.write_str(if definition.has_def_keyword {
-            "true"
-        } else {
-            "false"
-        })?;
         self.writer.write_str(") (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
         self.writer.write_str(") (specializes ")?;
@@ -3913,6 +3946,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::MetadataKeywordUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&member.value)?;
+                        }
+                        super::PartUsageBodyElement::ExtendedUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::VariantUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -6352,6 +6389,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ExtendedDefinition(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_extended_definition(&definition.value)
+            }
+            PackageBodyElement::ExtendedUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_usage(&usage.value)
             }
             PackageBodyElement::Connect(connect) => {
                 self.write_item_prefix(first)?;

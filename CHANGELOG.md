@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`ExtendedUsage` with a declaration.** `ExtendedUsage = UnextendedUsagePrefix
+  UsageExtensionKeyword+ Usage` (SysML BNF 341; reference `SysML.xtext:728-730`) was modelled
+  only as a `def`-less `ExtendedDefinition` -- which required a name and gave the member a
+  package body -- so `#servicedd :>> serviceDiscovery : ServiceDiscoveryDD { #idd
+  serviceDiscovery_HTTP; }` (`AHFCoreLib.sysml`) recovered. A typed `ExtendedUsage` node
+  carries the prefix choice, the keyword run, a `UsageDeclaration`, a value and a usage body,
+  in package and part-usage bodies; `ExtendedDefinition` requires `def` again and loses
+  `has_def_keyword`. **AST version 235.**
+
 - **`#Tag` prefixes after `ref`.** `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
   Usage` (reference `SysML.xtext:728-730`), so `private ref #Classified #Security z1;`
   (`MetadataTest.sysml`) recovered in a package body. `RefDecl` gains `extension_keywords`.

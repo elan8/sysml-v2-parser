@@ -579,14 +579,23 @@ where the two disagree, against the normative model library, before anything was
   source ::> producer.publicationPort;` declare an end through its specialization alone.
   `EndIdentity` gains `Anonymous`; the flow-usage body already dispatched `EndDecl`.
 
-### Still open at this pin
+### Fixed since
 
 - `#Security enum secret : …` (`metadata_test`): `EnumeratedValue = UsageExtensionKeyword*
-  EnumerationUsageKeyword? Usage` (`SysML.xtext:784-786`) versus `'enum'? Usage` (BNF 531).
-- `private ref #Classified #Security z1;` and `abstract #Classified z2;` in a package body
-  (`metadata_test`): `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage`.
-- `#systemdd name :> base { #servicedd :>> x : T { … } }` (`ahfcore_lib`): the `ExtendedUsage`
-  spelling with a nested body, reported as `unsupported_annotation_syntax`.
+  'enum'? Usage` (`SysML.xtext:784-786`). `EnumeratedValue` gains `extension_keywords`.
+- `private ref #Classified #Security z1;` (`metadata_test`): the keyword run sits between
+  `ref` and the declaration; `RefDecl` gains `extension_keywords`. `abstract #Classified z2;`
+  already reached the KerML feature path with its metadata keywords.
+- `#systemdd name :> base { #servicedd :>> x : T { #idd y; } }` (`ahfcore_lib`): `ExtendedUsage`
+  (SysML BNF 341) was a `def`-less `ExtendedDefinition` that required a name and owned a
+  package body. A typed `ExtendedUsage` node now carries the prefix choice, the keyword run, a
+  `UsageDeclaration`, a value and a usage body, in package and part-usage bodies;
+  `ExtendedDefinition` requires `def` again. The empty-declaration `#Tag;` / `#Tag { }` spelling
+  stays on `MetadataKeywordUsage` in every scope; folding it in is a body-dispatch change across
+  all of them and is left as recorded debt.
+
+### Still open at this pin
+
 - `connection : PressureSeat connect bead references t.bead to mountingRim references w.rim;`
   (`09_connections_example`): the `references` spelling of a connector end in a `ConnectionUsage`.
 - `specialization Gen subtype A specializes B;` in a KerML package (`kerml/types`).

@@ -568,6 +568,7 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PartUsageBodyElement::ExtendedUsage(u) => emit_extended_usage(w, path, &u.value),
         PartUsageBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
@@ -1494,6 +1495,48 @@ pub(crate) fn emit_direction(w: &mut EmitWriter<'_>, dir: InOut) {
 /// holds an authored span, never because a flag was inferred from something else, and the order is
 /// the grammar's, not the order the fields happen to be declared in. A slot that was not authored
 /// writes nothing; nothing here can invent a prefix, and no branch can omit one that is present.
+pub(crate) fn emit_extended_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &crate::ast::ExtendedUsage,
+) -> Result<(), EmitError> {
+    emit_visibility(w, usage.membership.visibility);
+    match &usage.prefix {
+        crate::ast::UnextendedUsagePrefix::End(end) => {
+            w.push_str("end ");
+            if let Some(cross) = &end.cross {
+                emit_basic_usage_prefix(w, &cross.value.prefix);
+                crate::emit::behavior::emit_usage_declaration(
+                    w,
+                    &format!("{path}/prefix/cross"),
+                    &cross.value.declaration.value,
+                )?;
+                w.push_char(' ');
+            }
+        }
+        crate::ast::UnextendedUsagePrefix::Basic(basic) => emit_basic_usage_prefix(w, basic),
+    }
+    for (index, keyword) in usage.extension_keywords.iter().enumerate() {
+        w.push_char('#');
+        w.push_qualified_reference(
+            &format!("{path}/extension[{index}]"),
+            keyword.value.annotation,
+        )?;
+        w.push_char(' ');
+    }
+    // `emit_usage_declaration` spaces a name from what precedes it; the keyword run already did.
+    w.trim_trailing_space();
+    crate::emit::behavior::emit_usage_declaration(
+        w,
+        &format!("{path}/declaration"),
+        &usage.declaration.value,
+    )?;
+    if let Some(value) = &usage.value {
+        crate::emit::expr::emit_feature_value(w, value)?;
+    }
+    emit_part_usage_body(w, path, &usage.body)
+}
+
 pub(crate) fn emit_basic_usage_prefix(
     w: &mut EmitWriter<'_>,
     prefix: &crate::ast::BasicUsagePrefix,

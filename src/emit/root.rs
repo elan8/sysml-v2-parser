@@ -73,9 +73,7 @@ fn emit_extended_definition(
         structure::emit_metadata_keyword_usage(w, path, &keyword.value)?;
         w.push_char(' ');
     }
-    if def.has_def_keyword {
-        w.push_str("def ");
-    }
+    w.push_str("def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
         structure::emit_typing_clause(w, &spec.value)?;
@@ -362,6 +360,7 @@ pub(crate) fn emit_package_body_element(
             requirement::emit_include_use_case(w, path, &i.value)
         }
         PackageBodyElement::ExtendedDefinition(d) => emit_extended_definition(w, path, &d.value),
+        PackageBodyElement::ExtendedUsage(u) => structure::emit_extended_usage(w, path, &u.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

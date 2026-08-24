@@ -251,4 +251,6 @@ pub enum PackageBodyElement {
     /// `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`, e.g. `#situation def
     /// Failure;`. See [`crate::ast::ExtendedDefinition`].
     ExtendedDefinition(Node<crate::ast::ExtendedDefinition>),
+    /// `ExtendedUsage` with a declaration (SysML BNF 341); see [`crate::ast::ExtendedUsage`].
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
 }

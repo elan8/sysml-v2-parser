@@ -55,10 +55,6 @@ pub struct ExtendedDefinition {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
     /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
     pub definition_prefix: Option<Node<DefinitionPrefix>>,
-    /// Whether the `def` keyword was authored: `true` for the `ExtendedDefinition` form
-    /// (`#situation def Failure;`), `false` for the bare extended-usage shorthand
-    /// (`#clouddd ArrowheadCore { ... }`, spec42 Gap 39).
-    pub has_def_keyword: bool,
     pub identification: Identification,
     /// Supertype after `:>`.
     pub specializes: Option<Node<TypingRelationship>>,
@@ -78,6 +74,36 @@ pub enum DefinitionPrefix {
 
 /// Body of a part definition: `;` or `{` PartDefBodyElement* `}`.
 pub type PartDefBody = Body<PartDefBodyElement>;
+
+/// `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix` (SysML BNF 299).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum UnextendedUsagePrefix {
+    End(crate::ast::EndUsagePrefix),
+    Basic(crate::ast::BasicUsagePrefix),
+}
+
+/// `ExtendedUsage : Usage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage` (SysML BNF 341;
+/// reference `SysML.xtext:728-730`): one or more `#Tag` keywords standing in place of a kind
+/// keyword, then an ordinary usage declaration, value and body -- `#systemdd service_registry_DD
+/// :> service_registry { #servicedd :>> serviceDiscovery : ServiceDiscoveryDD { #idd
+/// serviceDiscovery_HTTP; } }` (`AHFCoreLib.sysml`).
+///
+/// The empty-declaration spelling (`#Tag;`, `#Tag { … }`) is still
+/// [`MetadataKeywordUsage`] with a body, as every scope dispatches it; this node carries the
+/// spellings that declare something.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedUsage {
+    pub prefix: UnextendedUsagePrefix,
+    /// `UsageExtensionKeyword+`, in authored order; never empty.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
+    pub declaration: Node<crate::ast::UsageDeclaration>,
+    pub value: Option<Node<FeatureValue>>,
+    /// `UsageBody = DefinitionBody`, the same members a part usage body admits.
+    pub body: PartUsageBody,
+    pub membership: Membership,
+}
 
 /// Element inside a part definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -765,6 +791,8 @@ pub enum PartUsageBodyElement {
     /// `action` / `ref action` usage inside a part usage body.
     ActionUsage(Box<Node<ActionUsage>>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `ExtendedUsage` with a declaration; see [`ExtendedUsage`].
+    ExtendedUsage(Box<Node<ExtendedUsage>>),
     /// `variant` name `;` inside a variation part usage body.
     VariantUsage(Node<VariantUsage>),
     /// `state def` nested inside a part usage body (PAR-002: usage bodies legally contain

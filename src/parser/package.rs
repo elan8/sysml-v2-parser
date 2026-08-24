@@ -292,7 +292,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::Succession(_)
         | PackageBodyElement::ExhibitState(_)
         | PackageBodyElement::IncludeUseCase(_)
-        | PackageBodyElement::ExtendedDefinition(_) => RootElement::Member(boxed),
+        | PackageBodyElement::ExtendedDefinition(_)
+        | PackageBodyElement::ExtendedUsage(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -2251,6 +2252,18 @@ pub(crate) fn package_body_element(
         map(
             crate::parser::metadata_annotation::extended_definition,
             PackageBodyElement::ExtendedDefinition,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    // `ExtendedUsage` with a declaration (SysML BNF 341): `#systemdd name :> base { … }`,
+    // `#idd name;`. Ahead of the two `#` forms below, which own the empty-declaration and the
+    // prefix-member spellings; the parser refuses both, so they fall through untouched.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::extended_usage,
+            |usage| PackageBodyElement::ExtendedUsage(Box::new(usage)),
         )
         .parse(input)
     }) {

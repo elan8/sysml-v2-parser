@@ -1521,6 +1521,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                     PartUsageBodyElement::EndDecl,
                 ),
                 map(
+                    crate::parser::metadata_annotation::extended_usage,
+                    |usage| PartUsageBodyElement::ExtendedUsage(Box::new(usage)),
+                ),
+                map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,
                     PartUsageBodyElement::MetadataKeywordUsage,
                 ),

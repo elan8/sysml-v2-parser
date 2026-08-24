@@ -303,6 +303,16 @@ macro_rules! ast_traversal {
                 walk_extended_definition(self, node)
             }
 
+            /// Visits [`ExtendedUsage`]; the default implementation walks its children.
+            fn visit_extended_usage(&mut self, node: &$($mutability)? Node<ExtendedUsage>) {
+                walk_extended_usage(self, node)
+            }
+
+            /// Visits [`UnextendedUsagePrefix`]; the default implementation walks its children.
+            fn visit_unextended_usage_prefix(&mut self, node: &$($mutability)? UnextendedUsagePrefix) {
+                walk_unextended_usage_prefix(self, node)
+            }
+
             /// Visits [`DefinitionPrefix`]; the default implementation walks its children.
             fn visit_definition_prefix(&mut self, node: &$($mutability)? Node<DefinitionPrefix>) {
                 walk_definition_prefix(self, node)
@@ -2521,6 +2531,9 @@ macro_rules! ast_traversal {
                 PackageBodyElement::ExtendedDefinition(field_0) => {
                     visitor.visit_extended_definition(field_0);
                 }
+                PackageBodyElement::ExtendedUsage(field_0) => {
+                    visitor.visit_extended_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -2542,17 +2555,44 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_extended_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedUsage>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let ExtendedUsage { prefix, extension_keywords, declaration, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_unextended_usage_prefix(prefix);
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
+            visitor.visit_usage_declaration(declaration);
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
+            }
+            visitor.visit_part_usage_body(body);
+            visitor.visit_membership(membership);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_unextended_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? UnextendedUsagePrefix) {
+            match node {
+                UnextendedUsagePrefix::End(field_0) => {
+                    visitor.visit_end_usage_prefix(field_0);
+                }
+                UnextendedUsagePrefix::Basic(field_0) => {
+                    visitor.visit_basic_usage_prefix(field_0);
+                }
+            }
+        }
+
         pub fn walk_extended_definition<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedDefinition>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExtendedDefinition { prefix_keywords, definition_prefix, has_def_keyword, identification, specializes, body } = &$($mutability)? node.value;
+            let ExtendedDefinition { prefix_keywords, definition_prefix, identification, specializes, body } = &$($mutability)? node.value;
             for inner in prefix_keywords {
                 visitor.visit_metadata_keyword_usage(inner);
             }
             if let Some(inner) = definition_prefix {
                 visitor.visit_definition_prefix(inner);
             }
-            let _ = has_def_keyword;
             visitor.visit_identification(identification);
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
@@ -3258,6 +3298,9 @@ macro_rules! ast_traversal {
                 }
                 PartUsageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
+                }
+                PartUsageBodyElement::ExtendedUsage(field_0) => {
+                    visitor.visit_extended_usage(&$($mutability)? **field_0);
                 }
                 PartUsageBodyElement::VariantUsage(field_0) => {
                     visitor.visit_variant_usage(field_0);

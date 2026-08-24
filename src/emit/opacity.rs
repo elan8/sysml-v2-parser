@@ -218,6 +218,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::ExtendedDefinition(definition) => {
             walk_package_body(report, path, &definition.value.body)
         }
+        PackageBodyElement::ExtendedUsage(usage) => {
+            walk_part_usage_body(report, path, &usage.value.body)
+        }
         PackageBodyElement::Satisfy(s) => walk_satisfy(report, path, &s.value),
         PackageBodyElement::Import(i) => {
             walk_optional_relationship_body(report, path, i.value.body_elements.as_deref())
@@ -671,6 +674,9 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PartUsageBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
+            }
+            PartUsageBodyElement::ExtendedUsage(n) => {
+                walk_part_usage_body(report, &p, &n.value.body)
             }
             PartUsageBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             PartUsageBodyElement::StateDef(n) => walk_state_def_body(report, &p, &n.value.body),
