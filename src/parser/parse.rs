@@ -135,7 +135,7 @@ fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootName
                 );
                 let (found_snippet, found_len) = fragment_to_found_snippet(rest.fragment());
                 let mut pe = ParseError::new("expected end of input")
-                    .with_location(offset, rest.location_line(), rest.get_column())
+                    .with_location(offset, rest.location_line(), crate::parser::span::column_of(&rest))
                     .with_length(found_len.max(1))
                     .with_code("expected_end_of_input")
                     .with_category(DiagnosticCategory::ParseError);
@@ -344,7 +344,7 @@ fn parse_with_diagnostics_document(
                         .with_location(
                             input.location_offset(),
                             input.location_line(),
-                            input.get_column(),
+                            crate::parser::span::column_of(&input),
                         )
                         .with_length(1)
                         .with_code("unexpected_eof")
@@ -385,7 +385,7 @@ fn parse_with_diagnostics_document(
                 .with_location(
                     input.location_offset(),
                     input.location_line(),
-                    input.get_column(),
+                    crate::parser::span::column_of(&input),
                 )
                 .with_length(found_len.max(1))
                 .with_code("expected_end_of_input")

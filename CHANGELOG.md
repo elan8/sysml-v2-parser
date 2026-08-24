@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Columns are O(1), so a long line is no longer quadratic to parse.** Every span took its
+  column from `nom_locate`'s `get_column`, a backward scan to the previous newline, so each node
+  on a line cost the whole line and a single 400 KB line (the deeply-nested-parentheses stack
+  test) took 240 s in a debug build -- the entire `cargo test` wall clock. `ParseContext` now
+  builds a line-start table once per document and every column is one subtraction. The suite
+  runs in ~14 s; spans, diagnostics and snapshots are byte-identical.
+
 ### Added
 
 - **`end` on every usage family that owns `OccurrenceUsagePrefix`.** The reference grammar

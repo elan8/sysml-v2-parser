@@ -76,7 +76,7 @@ pub(crate) fn nom_err_to_parse_error(
 ) -> ParseError {
     let offset = e.input.location_offset();
     let line = e.input.location_line();
-    let column = e.input.get_column();
+    let column = crate::parser::span::column_of(&e.input);
     let fragment = e.input.fragment();
     let (found_snippet, found_len) = fragment_to_found_snippet(fragment);
     let message = nom_error_kind_to_message(&e.code).to_string();
@@ -947,7 +947,7 @@ pub(crate) fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseErr
         .with_location(
             input.location_offset(),
             input.location_line(),
-            input.get_column(),
+            crate::parser::span::column_of(&input),
         )
         .with_length(1)
         .with_code("unexpected_closing_brace")
@@ -1241,7 +1241,7 @@ pub(crate) fn root_body_recovery_error(input: Input<'_>, scope: &str) -> ParseEr
     .with_location(
         input.location_offset(),
         input.location_line(),
-        input.get_column(),
+        crate::parser::span::column_of(&input),
     )
     .with_length(len.max(1))
     .with_code("recovered_root_body")

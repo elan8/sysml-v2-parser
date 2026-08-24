@@ -16,17 +16,32 @@ use std::cell::RefCell;
 #[derive(Debug, Default)]
 pub(crate) struct ParseContext {
     qualified_references: RefCell<QualifiedReferenceArenaBuilder>,
+    /// Byte offset at which each line starts, `line_starts[line - 1]` for the 1-indexed line
+    /// `LocatedSpan` tracks. Built once per document by [`ParseContext::input`], so a column is
+    /// one subtraction rather than `nom_locate`'s backward scan to the previous newline -- which
+    /// is O(line length) per span and made every node on a long line cost the whole line.
+    line_starts: RefCell<Vec<usize>>,
 }
 
 impl ParseContext {
     pub(crate) fn new() -> Self {
         Self {
             qualified_references: RefCell::new(QualifiedReferenceArenaBuilder::new()),
+            line_starts: RefCell::new(Vec::new()),
         }
     }
 
     /// Create a location-aware parser input backed by this parse context.
     pub(crate) fn input<'a>(&'a self, source: &'a [u8]) -> Input<'a> {
+        let mut line_starts = vec![0];
+        line_starts.extend(
+            source
+                .iter()
+                .enumerate()
+                .filter(|(_, byte)| **byte == b'\n')
+                .map(|(index, _)| index + 1),
+        );
+        *self.line_starts.borrow_mut() = line_starts;
         LocatedSpan::new_extra(source, ParseContextRef { owner: self })
     }
 
@@ -83,6 +98,18 @@ impl ParseContextRef<'_> {
 /// Parser input: source bytes with location tracking and a document-local arena context.
 pub type Input<'a> = LocatedSpan<&'a [u8], ParseContextRef<'a>>;
 
+/// The 1-indexed byte column of `input`'s position, as `LocatedSpan::get_column` defines it,
+/// in O(1) from the document's line-start table.
+pub(crate) fn column_of(input: &Input<'_>) -> usize {
+    let line_starts = input.extra.owner.line_starts.borrow();
+    match line_starts.get(input.location_line() as usize - 1) {
+        Some(line_start) => input.location_offset() - line_start + 1,
+        // Only reachable for an input not created by `ParseContext::input`; scan rather than
+        // report a wrong column.
+        None => input.get_column(),
+    }
+}
+
 /// Run one complete parser production as an arena transaction.
 ///
 /// Reference lexers allocate only after accepting a complete path, but a containing production
@@ -133,7 +160,7 @@ pub fn span_from_to(start: Input<'_>, rest: Input<'_>) -> Span {
     Span {
         offset: start.location_offset(),
         line: start.location_line(),
-        column: start.get_column(),
+        column: column_of(&start),
         len,
     }
 }
