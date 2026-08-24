@@ -1638,11 +1638,12 @@ pub(crate) fn visibility_prefix(
     Ok((input, (span, visibility)))
 }
 
-/// Take input until we hit one of the terminator bytes (e.g. '{' or ';'), return as string (trimmed).
+/// Take input until we hit one of the terminator bytes (e.g. '{' or ';'); returns the consumed
+/// bytes trimmed of surrounding ASCII whitespace, borrowed from the input.
 pub(crate) fn take_until_terminator<'a>(
     input: Input<'a>,
     terminators: &'a [u8],
-) -> IResult<Input<'a>, String> {
+) -> IResult<Input<'a>, &'a [u8]> {
     let frag = input.fragment();
     let mut i = 0;
     let mut quote = None;
@@ -1666,9 +1667,9 @@ pub(crate) fn take_until_terminator<'a>(
             continue;
         }
         if terminators.contains(&frag[i]) {
-            let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
+            let consumed = frag[..i].trim_ascii();
             let (input, _) = nom::bytes::complete::take(i).parse(input)?;
-            return Ok((input, s));
+            return Ok((input, consumed));
         }
         if terminators.contains(&b';') && matches!(frag[i], b'\n' | b'\r') {
             let mut newline_end = i;
@@ -1686,9 +1687,9 @@ pub(crate) fn take_until_terminator<'a>(
                 && !consumed_ends_incomplete
                 && starts_new_declaration_after_newline(frag, newline_end)
             {
-                let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
+                let consumed = frag[..i].trim_ascii();
                 let (input, _) = nom::bytes::complete::take(i).parse(input)?;
-                return Ok((input, s));
+                return Ok((input, consumed));
             }
         }
         if frag[i] == b'/' && i + 1 < frag.len() && (frag[i + 1] == b'*' || frag[i + 1] == b'/') {
@@ -1696,9 +1697,9 @@ pub(crate) fn take_until_terminator<'a>(
         }
         i += 1;
     }
-    let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
+    let consumed = frag[..i].trim_ascii();
     let (input, _) = nom::bytes::complete::take(i).parse(input)?;
-    Ok((input, s))
+    Ok((input, consumed))
 }
 
 /// Skip one unknown statement or balanced block.
@@ -2130,7 +2131,7 @@ mod lexical_bnf_tests {
     fn terminator_scan_ignores_punctuation_inside_quotes() {
         let input = span_input(r#"name "};"; next"#);
         let (rest, captured) = take_until_terminator(input, b";{").expect("quoted terminator scan");
-        assert_eq!(captured, r#"name "};""#);
+        assert_eq!(captured, br#"name "};""#);
         assert_eq!(*rest.fragment(), &b"; next"[..]);
     }
 

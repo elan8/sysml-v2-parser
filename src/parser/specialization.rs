@@ -1,6 +1,6 @@
 //! Definition subclassification (`:>` / `specializes`) parsing.
 
-use crate::ast::{Node, QualifiedReferenceId, TypingKind, TypingRelationship};
+use crate::ast::{Node, QualifiedReferenceId, Span, TypingKind, TypingRelationship};
 use crate::parser::lex::{
     qualified_reference, specialization_operator, starts_with_keyword, take_until_terminator,
     ws_and_comments,
@@ -106,10 +106,9 @@ fn typing_target_from_header(input: Input<'_>) -> IResult<Input<'_>, (QualifiedR
 /// The original parser input is advanced to the discovered tail before parsing references, so
 /// every allocated identity retains document-relative source provenance.
 fn specializes_from_header_input(
-    header: &str,
+    bytes: &[u8],
     input: Input<'_>,
 ) -> Option<Vec<QualifiedReferenceId>> {
-    let bytes = header.as_bytes();
     let tail_offset = if let Some(pos) = bytes.windows(2).position(|window| window == b":>") {
         Some(pos + 2)
     } else {
@@ -151,7 +150,7 @@ fn specializes_from_header_input(
 /// left for a sibling usage parser -- see `DefinitionPrefixOptions::reject_header_keyword`.
 pub(crate) fn parse_optional_definition_header_with_raw(
     input: Input<'_>,
-) -> IResult<Input<'_>, (Option<Node<TypingRelationship>>, Option<String>)> {
+) -> IResult<Input<'_>, (Option<Node<TypingRelationship>>, Option<Span>)> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b":>") || starts_with_keyword(input.fragment(), b"specializes")
     {
@@ -162,7 +161,12 @@ pub(crate) fn parse_optional_definition_header_with_raw(
         let before_header = input;
         let (input, header) = take_until_terminator(input, b";{")?;
         let span = span_from_to(before_header, input);
-        if let Some(targets) = specializes_from_header_input(&header, before_header) {
+        // `header` is the consumed text trimmed of ASCII whitespace; locate it in the source.
+        let consumed = &before_header.fragment()[..span.len];
+        let leading = consumed.len() - consumed.trim_ascii_start().len();
+        let raw_start = crate::parser::advance(before_header, leading);
+        let raw_span = span_from_to(raw_start, crate::parser::advance(raw_start, header.len()));
+        if let Some(targets) = specializes_from_header_input(header, before_header) {
             return Ok((
                 input,
                 (
@@ -171,7 +175,7 @@ pub(crate) fn parse_optional_definition_header_with_raw(
                         span,
                         crate::ast::TypingSpelling::Operator,
                     )),
-                    Some(header),
+                    Some(raw_span),
                 ),
             ));
         }
@@ -184,11 +188,11 @@ pub(crate) fn parse_optional_definition_header_with_raw(
                 input,
                 (
                     Some(typing_node(vec![target], span, is_conjugated)),
-                    Some(header),
+                    Some(raw_span),
                 ),
             ));
         }
-        return Ok((input, (None, Some(header))));
+        return Ok((input, (None, Some(raw_span))));
     }
     Ok((input, (None, None)))
 }
@@ -199,6 +203,12 @@ mod tests {
 
     fn span_input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
+    }
+
+    /// The source text a span covers, read back from the test input.
+    fn raw_text(input: Input<'_>, span: Span) -> &str {
+        let relative = span.offset - input.location_offset();
+        std::str::from_utf8(&input.fragment()[relative..relative + span.len]).expect("utf-8")
     }
 
     #[test]
@@ -214,7 +224,7 @@ mod tests {
             Some("linkObjects, parts".to_string())
         );
         assert_eq!(
-            raw_header.as_deref(),
+            raw_header.map(|span| raw_text(input, span)),
             Some(": Connection[0..*] nonunique :> linkObjects, parts")
         );
     }
@@ -252,7 +262,10 @@ mod tests {
         );
         assert_eq!(node.value.kind, TypingKind::Typing);
         assert!(!node.value.is_conjugated);
-        assert_eq!(raw_header.as_deref(), Some(": MyPortType"));
+        assert_eq!(
+            raw_header.map(|span| raw_text(input, span)),
+            Some(": MyPortType")
+        );
     }
 
     #[test]
@@ -278,9 +291,12 @@ mod tests {
         let input = span_input(": Link connect a to b;");
         let (_, (_typing, raw_header)) =
             parse_optional_definition_header_with_raw(input).expect("header");
-        assert_eq!(raw_header.as_deref(), Some(": Link connect a to b"));
+        assert_eq!(
+            raw_header.map(|span| raw_text(input, span)),
+            Some(": Link connect a to b")
+        );
         assert!(crate::parser::lex::contains_keyword(
-            raw_header.expect("raw header").as_bytes(),
+            raw_text(input, raw_header.expect("raw header")).as_bytes(),
             b"connect"
         ));
     }

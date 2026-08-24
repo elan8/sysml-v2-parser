@@ -348,13 +348,16 @@ pub(crate) fn parse_definition_prefix(
     };
 
     let (input, identification) = identification(input)?;
+    let header_start = input;
     let (input, header) = parse_definition_header_after_ident(input)?;
     if let Some(keyword) = options.reject_header_keyword {
-        if header
-            .raw_header
-            .as_deref()
-            .is_some_and(|raw| contains_keyword(raw.as_bytes(), keyword))
-        {
+        if header.raw_header.is_some_and(|raw| {
+            let relative = raw.offset - header_start.location_offset();
+            contains_keyword(
+                &header_start.fragment()[relative..relative + raw.len],
+                keyword,
+            )
+        }) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Verify,
