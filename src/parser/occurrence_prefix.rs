@@ -286,10 +286,28 @@ pub(crate) fn could_start_occurrence_usage(input: Input<'_>) -> bool {
         return false;
     };
     let fragment = cursor.fragment();
-    fragment.starts_with(b"#")
-        || STARTERS
+    if !fragment.starts_with(b"#")
+        && !STARTERS
             .iter()
             .any(|keyword| starts_with_keyword(fragment, keyword))
+    {
+        return false;
+    }
+    // A slot word alone is shared with every sibling usage family (`ref part`, `in item`, ...);
+    // what makes the member an *occurrence* is one of the occurrence-marker words somewhere in
+    // its prefix run, or a `#` extension (whose typed production this parser owns).
+    scan_prefix_for(cursor, |fragment| {
+        fragment.starts_with(b"#")
+            || [
+                &b"event"[..],
+                b"occurrence",
+                b"individual",
+                b"snapshot",
+                b"timeslice",
+            ]
+            .iter()
+            .any(|keyword| starts_with_keyword(fragment, keyword))
+    })
 }
 
 /// Whether `keyword` can introduce this member's kind after its optional prefixes.

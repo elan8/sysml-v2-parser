@@ -820,6 +820,14 @@ fn directed_requirement_usage(
 }
 
 pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"actor") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, actor_usage_inner)
 }
 

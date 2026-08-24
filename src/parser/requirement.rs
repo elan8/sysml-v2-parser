@@ -411,6 +411,17 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract(
 }
 
 fn verify_requirement(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequirementMember>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"verify") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, verify_requirement_inner)
 }
 

@@ -540,6 +540,67 @@ pub(crate) fn attribute_feature_binding(
 pub(crate) fn default_reference_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    // The keyword-less usage: nothing marks it, but its head is still constrained -- after the
+    // visibility and `RefPrefix` slots it must open a short name, an anonymous
+    // specialization/typing clause, or a declared name, and an unquoted reserved keyword can
+    // never be that name. Refusing those heads here keeps the sibling keyword-led members from
+    // paying an arena transaction to be told what their own keyword already said.
+    {
+        const SLOTS: &[&[u8]] = &[
+            b"public",
+            b"private",
+            b"protected",
+            b"inout",
+            b"in",
+            b"out",
+            b"derived",
+            b"abstract",
+            b"variation",
+            b"constant",
+        ];
+        let (mut cursor, _) = ws_and_comments(input)?;
+        loop {
+            let fragment = cursor.fragment();
+            match fragment.first() {
+                // `<short>`, `:`-led anonymous clauses, `=`-led defaults, and the bare `;`
+                // empty member (a `DefaultReferenceUsage` with every slot absent) are legal
+                // heads.
+                Some(b'<' | b':' | b'=' | b';') => break,
+                Some(b'\'') => break,
+                Some(byte) if byte.is_ascii_alphabetic() || *byte == b'_' => {}
+                _ => {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )));
+                }
+            }
+            if let Some(slot) = SLOTS
+                .iter()
+                .find(|candidate| starts_with_keyword(fragment, candidate))
+            {
+                let (rest, _) =
+                    nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(slot.len())
+                        .parse(cursor)?;
+                let (rest, _) = ws_and_comments(rest)?;
+                cursor = rest;
+                continue;
+            }
+            let word_len = fragment
+                .iter()
+                .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+                .count();
+            if is_reserved_shorthand_starter(&fragment[..word_len])
+                || crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
+            {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+            break;
+        }
+    }
     crate::parser::span::reference_transaction(input, default_reference_usage_inner)
 }
 

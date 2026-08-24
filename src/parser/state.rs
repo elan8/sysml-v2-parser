@@ -354,6 +354,14 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
 /// side of typing. Keep that clause in the existing `RefDecl` relationship field instead of
 /// skipping it as opaque shorthand.
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"ref") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, state_ref_inner)
 }
 
