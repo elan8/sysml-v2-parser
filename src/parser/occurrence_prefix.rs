@@ -312,6 +312,11 @@ pub(crate) fn hash_extension_follows(input: Input<'_>) -> bool {
 }
 
 fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool {
+    // Multiplicities and declared names stand before the kind keyword only in the `end`-led
+    // cross-feature forms (`end [1] port ...`, `end touches [0..*] item ...`). Skipping them
+    // unconditionally made this scan walk a non-matching member's whole header token by token,
+    // which cost more than the speculation it replaced.
+    let mut saw_end = false;
     const SKIPPED: &[&[u8]] = &[
         b"then",
         b"assert",
@@ -381,6 +386,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
             .iter()
             .find(|candidate| starts_with_keyword(fragment, candidate))
         {
+            saw_end = saw_end || *skipped == b"end";
             let Ok((rest, _)) =
                 nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(skipped.len())
                     .parse(cursor)
@@ -394,8 +400,10 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
             continue;
         }
         // A multiplicity (`end [1] port …`) or a declared name (`end touches [0..*] item …`)
-        // may also stand before the kind keyword. Skipping them stays safe -- a `true` only
-        // admits the real parser -- while refusing here would reject authored syntax.
+        // may also stand before the kind keyword, but only in the `end`-led forms.
+        if !saw_end {
+            return false;
+        }
         let skip_len = match fragment.first() {
             Some(b'[') => {
                 let mut depth = 0usize;
