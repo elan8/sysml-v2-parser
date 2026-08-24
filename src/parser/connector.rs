@@ -287,6 +287,17 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage`, and the prefix of a
+    // kind-keyworded usage ends in the same run, so the tags sit between `ref` and whatever
+    // follows.
+    let mut input = input;
+    let mut extension_keywords = Vec::new();
+    while input.fragment().starts_with(b"#") {
+        let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
+        extension_keywords.push(keyword);
+        let (rest, _) = ws_and_comments(rest)?;
+        input = rest;
+    }
     let (input, kind_keyword) = opt(preceded(
         ws_and_comments,
         alt((
@@ -417,6 +428,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
+                extension_keywords,
                 short_name,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,

@@ -1294,6 +1294,13 @@ pub(crate) fn emit_ref_decl(
         decl.is_constant,
     );
     w.push_str("ref");
+    for (index, keyword) in decl.extension_keywords.iter().enumerate() {
+        w.push_str(" #");
+        w.push_qualified_reference(
+            &format!("{path}/extension[{index}]"),
+            keyword.value.annotation,
+        )?;
+    }
     if let Some(kind) = decl.kind_keyword {
         w.push_char(' ');
         w.push_str(kind.as_str());

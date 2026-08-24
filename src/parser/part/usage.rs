@@ -1288,6 +1288,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             start,
             input,
             RefDecl {
+                extension_keywords: Vec::new(),
                 short_name,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,

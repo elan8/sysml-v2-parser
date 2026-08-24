@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`#Tag` prefixes after `ref`.** `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
+  Usage` (reference `SysML.xtext:728-730`), so `private ref #Classified #Security z1;`
+  (`MetadataTest.sysml`) recovered in a package body. `RefDecl` gains `extension_keywords`.
+  **AST version 234.**
+
 - **`#Tag` prefixes on an enumerated value.** `EnumeratedValue = UsageExtensionKeyword* 'enum'?
   Usage` (reference `SysML.xtext:784-786`; the published BNF 531 omits the run), so `#Security
   enum secret : ClassificationLevel = 2;` (`MetadataTest.sysml`) recovered. `EnumeratedValue`

@@ -1510,6 +1510,11 @@ pub struct RefDecl {
     /// Previously parsed by `connector::ref_decl` and discarded, so formatting dropped the
     /// authored keyword.
     pub kind_keyword: Option<RefDeclKind>,
+    /// `UsageExtensionKeyword+` of `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
+    /// Usage` (reference `SysML.xtext:728-730`) after `ref`, or `OccurrenceUsagePrefix`'s
+    /// trailing run ahead of a kind keyword: `private ref #Classified #Security z1;`
+    /// (`MetadataTest.sysml`). Empty when none was authored.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
     pub name: String,
     pub short_name: Option<String>,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every

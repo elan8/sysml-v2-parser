@@ -3458,7 +3458,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             None => self.writer.write_str("none")?,
         }
         write!(self.writer, ") (constant {}))", declaration.is_constant)?;
-        self.writer.write_str(" (kind ")?;
+        self.writer.write_str(" (extensions")?;
+        for keyword in &declaration.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str(") (kind ")?;
         match declaration.kind_keyword {
             Some(kind) => self.writer.write_str(kind.as_str())?,
             None => self.writer.write_str("none")?,

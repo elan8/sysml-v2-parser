@@ -220,6 +220,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             start,
             input,
             crate::ast::RefDecl {
+                extension_keywords: Vec::new(),
                 short_name: None,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
