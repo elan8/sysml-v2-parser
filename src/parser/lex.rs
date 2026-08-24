@@ -570,7 +570,7 @@ pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// "//*" starts a block comment, not a line comment.
 pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let skipped = trivia_len(input.fragment());
-    Ok((nom::Input::take_from(&input, skipped), ()))
+    Ok((crate::parser::span::advance(input, skipped), ()))
 }
 
 /// Skip whitespace and *notes* only, leaving a `/* ... */` block comment for the caller.
@@ -593,7 +593,7 @@ pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// the grammar has no member between the tokens of a declaration for a comment there to be.
 pub(crate) fn ws_and_notes(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let skipped = note_trivia_len(input.fragment());
-    Ok((nom::Input::take_from(&input, skipped), ()))
+    Ok((crate::parser::span::advance(input, skipped), ()))
 }
 
 /// Byte length of the whitespace-and-notes run at the start of `bytes`.
@@ -687,9 +687,18 @@ fn line_comment_len(bytes: &[u8]) -> usize {
 
 /// Parse one or more whitespace characters (consumes at least one).
 pub(crate) fn ws1(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) =
-        take_while1(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r').parse(input)?;
-    Ok((input, ()))
+    let skipped = input
+        .fragment()
+        .iter()
+        .take_while(|c| matches!(c, b' ' | b'\t' | b'\n' | b'\r'))
+        .count();
+    if skipped == 0 {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::TakeWhile1,
+        )));
+    }
+    Ok((crate::parser::span::advance(input, skipped), ()))
 }
 
 /// Skip to the next sync point (next line start after newline and ws/comments), or to end of input.
@@ -1598,6 +1607,11 @@ pub(crate) fn visibility_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (crate::ast::Span, Option<crate::ast::Visibility>)> {
     let start = input;
+    // Every member start runs this; nearly all of them begin with some other keyword, so refuse
+    // on the first byte before the three `tag` trials.
+    if !input.fragment().starts_with(b"p") {
+        return Ok((input, (crate::parser::span_from_to(start, input), None)));
+    }
     let (input, visibility) = opt(alt((
         map(preceded(tag(&b"private"[..]), ws1), |_| {
             crate::ast::Visibility::Private

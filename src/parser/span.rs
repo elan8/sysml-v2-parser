@@ -34,13 +34,7 @@ impl ParseContext {
     /// Create a location-aware parser input backed by this parse context.
     pub(crate) fn input<'a>(&'a self, source: &'a [u8]) -> Input<'a> {
         let mut line_starts = vec![0];
-        line_starts.extend(
-            source
-                .iter()
-                .enumerate()
-                .filter(|(_, byte)| **byte == b'\n')
-                .map(|(index, _)| index + 1),
-        );
+        line_starts.extend(memchr::memchr_iter(b'\n', source).map(|index| index + 1));
         *self.line_starts.borrow_mut() = line_starts;
         LocatedSpan::new_extra(source, ParseContextRef { owner: self })
     }
@@ -152,6 +146,31 @@ where
 pub(crate) fn test_input(text: &str) -> Input<'_> {
     let context: &'static ParseContext = Box::leak(Box::new(ParseContext::new()));
     context.input(text.as_bytes())
+}
+
+/// `input` advanced by `skipped` bytes, which must lie within its fragment.
+///
+/// The lexer's trivia scanners already know how many bytes they consumed; this rebuilds the
+/// location directly rather than going through `nom::Input::take_from`, whose generic slicing
+/// path recomputes the consumed length and pays a call for every zero-length skip.
+#[inline]
+pub(crate) fn advance(input: Input<'_>, skipped: usize) -> Input<'_> {
+    if skipped == 0 {
+        return input;
+    }
+    let fragment = input.fragment();
+    let (consumed, rest) = fragment.split_at(skipped);
+    let newlines = memchr::memchr_iter(b'\n', consumed).count() as u32;
+    // SAFETY: `rest` is the tail of `input`'s own fragment, so the byte offset and line count
+    // carried alongside it describe exactly the position `nom_locate` would compute by slicing.
+    unsafe {
+        LocatedSpan::new_from_raw_offset(
+            input.location_offset() + skipped,
+            input.location_line() + newlines,
+            rest,
+            input.extra,
+        )
+    }
 }
 
 /// Build a Span from the start and rest inputs (the consumed region).

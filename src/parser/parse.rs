@@ -398,14 +398,13 @@ fn parse_with_diagnostics_document(
         }
     }
 
-    errors.extend(collect_recovery_errors(&RootNamespace {
-        elements: elements.clone(),
-    }));
+    let root = RootNamespace { elements };
+    errors.extend(collect_recovery_errors(&root));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);
 
-    (RootNamespace { elements }, errors)
+    (root, errors)
 }
 
 #[cfg(test)]
