@@ -140,6 +140,7 @@ fn emit_kerml_relationship_decl(
         }
         Kw::Disjoint => Some("disjoining "),
         Kw::Inverse => Some("inverting "),
+        Kw::Conjugate => Some("conjugation "),
         Kw::Featuring => None,
     };
     if let Some(declaration_keyword) = declaration_keyword {
@@ -175,6 +176,7 @@ fn emit_kerml_relationship_decl(
         Kw::Disjoint => " from ",
         Kw::Inverse => " of ",
         Kw::Featuring => " by ",
+        Kw::Conjugate => " conjugates ",
     });
     w.push_qualified_reference(&format!("{path}/target"), decl.target)?;
     // Annotation-only RelationshipBody; `None` is the `;` form. Annotations inside the brace

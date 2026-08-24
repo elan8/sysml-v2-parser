@@ -570,6 +570,9 @@ pub enum KermlRelationshipKeyword {
     Disjoint,
     /// `inverse a of b` (`FeatureInverting`).
     Inverse,
+    /// `conjugate a conjugates b` (`Conjugation`, KerML BNF 463-475): `conjugation c1 conjugate
+    /// Conjugate1 conjugates Original;` (`Types.kerml`).
+    Conjugate,
     /// `featuring (I of)? a by b` (`TypeFeaturing`).
     Featuring,
 }
@@ -586,6 +589,7 @@ impl KermlRelationshipKeyword {
             Self::Disjoint => "disjoint",
             Self::Inverse => "inverse",
             Self::Featuring => "featuring",
+            Self::Conjugate => "conjugate",
         }
     }
 }

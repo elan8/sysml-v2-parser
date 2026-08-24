@@ -8110,6 +8110,7 @@ macro_rules! ast_traversal {
                 KermlRelationshipKeyword::Disjoint => {}
                 KermlRelationshipKeyword::Inverse => {}
                 KermlRelationshipKeyword::Featuring => {}
+                KermlRelationshipKeyword::Conjugate => {}
             }
         }
 

@@ -683,6 +683,7 @@ fn relationship_keyword_follows(input: Input<'_>) -> bool {
         b"disjoint",
         b"inverse",
         b"featuring",
+        b"conjugate",
     ]
     .iter()
     .any(|keyword| starts_with_keyword(after_ws.fragment(), keyword))
@@ -714,6 +715,17 @@ fn kerml_relationship_decl_inner(
         } else if starts_with_keyword(input.fragment(), b"disjoining") {
             let (input, (keyword_span, _)) =
                 crate::parser::span::with_span(tag(&b"disjoining"[..])).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, identification) = if relationship_keyword_follows(input) {
+                (input, None)
+            } else {
+                let (input, identification) = crate::parser::lex::identification(input)?;
+                (input, Some(identification))
+            };
+            (input, identification, Some(keyword_span))
+        } else if starts_with_keyword(input.fragment(), b"conjugation") {
+            let (input, (keyword_span, _)) =
+                crate::parser::span::with_span(tag(&b"conjugation"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
             let (input, identification) = if relationship_keyword_follows(input) {
                 (input, None)
@@ -763,6 +775,9 @@ fn kerml_relationship_decl_inner(
     } else if starts_with_keyword(input.fragment(), b"featuring") {
         let (input, _) = tag(&b"featuring"[..]).parse(input)?;
         (input, Kw::Featuring)
+    } else if starts_with_keyword(input.fragment(), b"conjugate") {
+        let (input, _) = tag(&b"conjugate"[..]).parse(input)?;
+        (input, Kw::Conjugate)
     } else {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -785,7 +800,7 @@ fn kerml_relationship_decl_inner(
             Kw::Typing => b"typing",
             Kw::Subset => b"subset",
             Kw::Redefinition => b"redefinition",
-            Kw::Disjoint | Kw::Inverse | Kw::Featuring => unreachable!(),
+            Kw::Disjoint | Kw::Inverse | Kw::Featuring | Kw::Conjugate => unreachable!(),
         };
         let (input, doubled) = opt(map(
             (
@@ -851,6 +866,10 @@ fn kerml_relationship_decl_inner(
         Kw::Featuring => {
             let (input, _) = tag(&b"by"[..]).parse(input)?;
             let (input, _) = ws1(input)?;
+            input
+        }
+        Kw::Conjugate => {
+            let (input, _) = crate::parser::lex::conjugates_operator(input)?;
             input
         }
     };

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The KerML `Conjugation` declaration.** `( 'conjugation' Identification )? 'conjugate'
+  conjugatedType CONJUGATES originalType RelationshipBody` (KerML BNF 463-475) joins the
+  relationship declarations, so `conjugation c1 conjugate Conjugate1 conjugates Original;`
+  (`Types.kerml`) no longer reaches recovery. `KermlRelationshipKeyword` gains `Conjugate`.
+  **AST version 238.**
+
 - **Two KerML corpus spellings.** A keyword-less feature with a comma-separated typing
   (`private y: A, '2'[0..*];`, `Classes.kerml`) was shredded into three expression members
   because the keyword-less member parser took one typing target; it now uses the shared
