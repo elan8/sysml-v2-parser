@@ -214,52 +214,6 @@ fn null_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     Ok((input, node_from_to(start, input, Expression::Null)))
 }
 
-/// SelectExpression: base `.?` selector
-fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    crate::parser::span::reference_transaction(input, select_expression_inner)
-}
-
-fn select_expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, base) = feature_ref_primary(input)?;
-    let (input, _) = tag(&b".?"[..]).parse(input)?;
-    let (input, selector) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            Expression::Select {
-                base: Box::new(base),
-                selector,
-            },
-        ),
-    ))
-}
-
-/// CollectExpression: base `.**` selector
-fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    crate::parser::span::reference_transaction(input, collect_expression_inner)
-}
-
-fn collect_expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, base) = feature_ref_primary(input)?;
-    let (input, _) = tag(&b".**"[..]).parse(input)?;
-    let (input, selector) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            Expression::Collect {
-                base: Box::new(base),
-                selector,
-            },
-        ),
-    ))
-}
-
 /// Match a bare alphabetic keyword, requiring a word boundary immediately after it (matching
 /// [`starts_with_keyword`]'s existing use for the `meta` postfix operator below). Without this, a
 /// plain `tag()` on e.g. `not`/`and`/`or`/`istype`/`as`/`new` would also match as a prefix of any
@@ -352,8 +306,6 @@ fn primary_atom(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         null_expression,
         metadata_ref_primary,
         type_check_primary,
-        collect_expression,
-        select_expression,
         feature_ref_primary,
     ))
     .parse(input)
@@ -1235,6 +1187,34 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 input = after_brace;
                 continue;
             }
+            // `.?` (SelectExpression) and `.**` (CollectExpression) are postfix forms of the
+            // same base the member-access arm below handles; recognizing them here parses the
+            // base exactly once instead of speculatively re-parsing every primary for each form.
+            // `.?{` stays with the brace-body arm above.
+            if next.fragment().starts_with(b".?") {
+                let (next, _) = tag(&b".?"[..]).parse(next)?;
+                let (next, selector) =
+                    preceded(ws_and_comments, qualified_reference).parse(next)?;
+                let expr = Expression::Select {
+                    base: Box::new(atom),
+                    selector,
+                };
+                atom = node_from_to(primary_start, next, expr);
+                input = next;
+                continue;
+            }
+            if next.fragment().starts_with(b".**") {
+                let (next, _) = tag(&b".**"[..]).parse(next)?;
+                let (next, selector) =
+                    preceded(ws_and_comments, qualified_reference).parse(next)?;
+                let expr = Expression::Collect {
+                    base: Box::new(atom),
+                    selector,
+                };
+                atom = node_from_to(primary_start, next, expr);
+                input = next;
+                continue;
+            }
             if next.fragment().starts_with(b".") && !next.fragment().starts_with(b"..") {
                 let (next, _) = tag(&b"."[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
@@ -1501,6 +1481,37 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn select_and_collect_are_postfix_operators_on_the_parsed_base() {
+        // `.?` / `.**` have no corpus coverage; pin the postfix forms directly.
+        let (rest, node) = expression(crate::parser::span::test_input("items.?selected"))
+            .expect("select expression");
+        assert!(rest.fragment().is_empty());
+        let Expression::Select { base, .. } = &node.value else {
+            panic!("expected Select, got {:?}", node.value);
+        };
+        assert!(matches!(base.value, Expression::FeatureRef(_)));
+
+        let (rest, node) =
+            expression(crate::parser::span::test_input("a.b.**deep")).expect("collect expression");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let Expression::Collect { base, .. } = &node.value else {
+            panic!("expected Collect, got {:?}", node.value);
+        };
+        assert!(
+            matches!(base.value, Expression::MemberAccess { .. }),
+            "the member-access base is parsed once, then `.**` applies to it: {:?}",
+            base.value
+        );
+
+        // `..` is a range, not a truncated select.
+        let (_, node) =
+            expression(crate::parser::span::test_input("1..4")).expect("range expression");
+        assert!(
+            matches!(&node.value, Expression::BinaryOp { op, .. } if *op == BinaryOperator::Range)
+        );
+    }
 
     #[test]
     fn integer_literal_beyond_i64_is_refused_rather_than_read_as_zero() {

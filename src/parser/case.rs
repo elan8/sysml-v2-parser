@@ -91,6 +91,14 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
     // `OccurrenceUsagePrefix` can allocate a metadata-keyword reference before the following
     // `analysis` head proves this production applies, so a refused speculative parse must leave
     // no arena entries behind.
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"analysis") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, analysis_case_usage_inner)
 }
 

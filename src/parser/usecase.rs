@@ -76,6 +76,17 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 }
 
 fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"first") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, first_succession_inner)
 }
 
@@ -101,6 +112,17 @@ fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
 }
 
 pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"include") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, include_use_case_inner)
 }
 
@@ -222,6 +244,17 @@ fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseU
 fn actor_redefinition_assignment(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"actor") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, actor_redefinition_assignment_inner)
 }
 
@@ -244,6 +277,17 @@ fn actor_redefinition_assignment_inner(
 }
 
 fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"ref") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, ref_redefinition_inner)
 }
 
@@ -809,6 +853,33 @@ fn directed_requirement_usage(
 }
 
 pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"actor") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // `actor :>> target = value;` is the sibling redefinition-assignment form, which this
+    // parser never accepts; refuse it without a transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = visibility_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        if crate::parser::lex::starts_with_keyword(cursor.fragment(), b"actor") {
+            let (cursor, _) =
+                nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(b"actor".len())
+                    .parse(cursor)?;
+            let (cursor, _) = ws_and_comments(cursor)?;
+            if cursor.fragment().starts_with(b":>>") {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+        }
+    }
     crate::parser::span::reference_transaction(input, actor_usage_inner)
 }
 

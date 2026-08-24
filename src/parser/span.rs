@@ -119,7 +119,10 @@ where
 {
     let checkpoint = input.extra.reference_checkpoint();
     let result = parser(input);
-    if result.is_err() {
+    // Roll back only when the branch actually allocated: most refusals happen before any
+    // reference is parsed, and truncating an arena to its own length is not a rollback worth
+    // performing.
+    if result.is_err() && input.extra.reference_checkpoint() != checkpoint {
         input.extra.rollback_references(checkpoint);
     }
     result
@@ -137,7 +140,9 @@ where
 {
     let checkpoint = input.extra.reference_checkpoint();
     let result = probe(input);
-    input.extra.rollback_references(checkpoint);
+    if input.extra.reference_checkpoint() != checkpoint {
+        input.extra.rollback_references(checkpoint);
+    }
     result
 }
 

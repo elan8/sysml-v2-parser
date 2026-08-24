@@ -134,6 +134,19 @@ pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> 
 
 /// Import: visibility? 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
 pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
+    // Speculated at many member starts; refuse unless `import` follows the optional
+    // visibility keyword, before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
+        let (cursor, _) = crate::parser::lex::ws_and_comments(cursor)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     reference_transaction(input, import_inner)
 }
 

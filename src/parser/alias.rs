@@ -17,6 +17,14 @@ fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
 
 /// Alias definition: `alias` Identification `for` qualified_name body
 pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"alias") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     reference_transaction(input, alias_def_inner)
 }
 

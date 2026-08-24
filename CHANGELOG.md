@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **99.3% fewer speculative arena rollbacks on the snapshot corpus** (133,240 -> 944 per pass;
+  attempts 159k -> 29.8k; ~+4.5% throughput). Instead of trying each transaction-wrapped parser
+  and rolling back, member dispatch now decides up front wherever a bounded lookahead can be
+  exact: `.?`/`.**` are postfix operators in the expression engine; ~50 member parsers refuse by
+  kind keyword, leading-word set, or `#`/`@`/`metadata` annotation gate before opening a
+  transaction (`kind_keyword_follows`/`hash_extension_follows` scan past trivia, `then`,
+  visibility, prefix slots, `#`-extension tags, and -- after `end` only -- multiplicities and
+  declared names); the `while`/`loop` spellings share one prefix parse; and a refused branch
+  that allocated nothing no longer performs a rollback at all. The 944 remaining rollbacks are
+  branches that allocated and were then refused -- malformed-input recovery and marker-ambiguous
+  members -- which is the containment speculation requires. Per-file parse results and the corpus
+  checksum are identical at every step.
 - **Declaration names and short names are typed source spans.** Every `name`, `short_name`,
   `declared_name`, `declaration_name`, `state_name`, `succession_name` and `binding_name` field
   that used to copy the token into a `String` is now a `DeclarationName { span }` resolved through

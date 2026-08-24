@@ -97,6 +97,18 @@ fn required_package_identification(
 
 /// [standard] library package Identification PackageBody (BNF LibraryPackage)
 pub(crate) fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
+    // Refuse unless `library` or `standard` leads, before entering an arena transaction.
+    {
+        let (after_trivia, _) = crate::parser::lex::ws_and_comments(input)?;
+        let fragment = after_trivia.fragment();
+        if !starts_with_keyword(fragment, b"library") && !starts_with_keyword(fragment, b"standard")
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, library_package_inner)
 }
 
@@ -138,6 +150,14 @@ fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPac
 
 /// package Identification PackageBody
 pub(crate) fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"package") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, package_inner)
 }
 
@@ -161,6 +181,14 @@ fn package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
 
 /// KerML namespace Identification NamespaceBody
 fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"namespace") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, namespace_decl_inner)
 }
 
@@ -190,19 +218,20 @@ fn namespace_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDe
 pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElement>> {
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
-    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(import_, |import| RootElement::Import(Box::new(import))).parse(input)
-    }) {
+    // No transactions here: `import_`, `namespace_decl`, and `library_package_` each guard and
+    // wrap their own arena transaction, so another layer only doubled the bookkeeping.
+    if let Ok((next, import)) = import_(input) {
+        let elem = RootElement::Import(Box::new(import));
         return Ok((next, node_from_to(start, next, elem)));
     }
-    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(namespace_decl, RootElement::Namespace).parse(input)
-    }) {
-        return Ok((next, node_from_to(start, next, elem)));
+    if let Ok((next, namespace)) = namespace_decl(input) {
+        return Ok((
+            next,
+            node_from_to(start, next, RootElement::Namespace(namespace)),
+        ));
     }
-    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(library_package_, RootElement::LibraryPackage).parse(input)
-    }) {
+    if let Ok((next, library)) = library_package_(input) {
+        let elem = RootElement::LibraryPackage(library);
         return Ok((next, node_from_to(start, next, elem)));
     }
     if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
@@ -396,6 +425,17 @@ fn strip_common_decl_prefixes(fragment: &[u8]) -> &[u8] {
 fn binding_connector_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"binding") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, binding_connector_usage_inner)
 }
 
@@ -679,6 +719,38 @@ fn kerml_bare_declaration(
 fn kerml_relationship_decl(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
+    // Speculated at member starts it does not own; refuse unless one of the relationship
+    // keywords follows the optional visibility prefix, before entering an arena transaction.
+    {
+        const STARTERS: &[&[u8]] = &[
+            b"specialization",
+            b"subclassifier",
+            b"subtype",
+            b"subset",
+            b"redefinition",
+            b"typing",
+            b"conjugation",
+            b"conjugate",
+            b"disjoining",
+            b"disjoint",
+            b"inverting",
+            b"inverse",
+            b"featuring",
+        ];
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        let fragment = cursor.fragment();
+        if !STARTERS
+            .iter()
+            .any(|keyword| starts_with_keyword(fragment, keyword))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_relationship_decl_inner)
 }
 
@@ -911,6 +983,28 @@ fn kerml_relationship_decl_inner(
 pub(crate) fn kerml_classifier_structured(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
+    // Refuse unless a classifier keyword follows the optional visibility/`abstract` prefix,
+    // before entering an arena transaction.
+    {
+        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
+        let (cursor, _) = crate::parser::lex::ws_and_comments(cursor)?;
+        let fragment = cursor.fragment();
+        let fragment = if starts_with_keyword(fragment, b"abstract") {
+            crate::parser::diagnostics::trim_ascii_start(&fragment[b"abstract".len()..])
+        } else {
+            fragment
+        };
+        if !KERML_CLASSIFIER_KEYWORDS
+            .iter()
+            .any(|(keyword, _)| starts_with_keyword(fragment, keyword))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_classifier_structured_inner)
 }
 
@@ -2294,6 +2388,11 @@ pub(crate) fn package_body_element(
     if let Ok(r) = try_package_body_view(input, start, starter) {
         return Ok(r);
     }
+    // One gate for the whole annotation family (`#`-extension, `@`, `metadata` forms below):
+    // every arm's parser refuses on the same first bytes, so a keyword-led member skips the
+    // family without paying a speculative attempt per arm.
+    let member_starts_annotation =
+        crate::parser::metadata_annotation::starts_annotation_member(input);
     // `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`. Must be tried before
     // `metadata_keyword_usage`/`metadata_keyword_prefix` below get first refusal on a `#<name>`
     // sequence immediately followed by `def` -- `def Failure;` alone is not an independently
@@ -2301,26 +2400,30 @@ pub(crate) fn package_body_element(
     // `metadata_keyword_prefix` does for ordinary `PrefixMetadataMember` prefixes) would hit raw
     // recovery. Speculative: rolls back cleanly (via `reference_transaction`) to the ordinary
     // `#`-forms below when the `def`/name tail isn't present.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::extended_definition,
-            PackageBodyElement::ExtendedDefinition,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::extended_definition,
+                PackageBodyElement::ExtendedDefinition,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     // `ExtendedUsage` with a declaration (SysML BNF 341): `#systemdd name :> base { … }`,
     // `#idd name;`. Ahead of the two `#` forms below, which own the empty-declaration and the
     // prefix-member spellings; the parser refuses both, so they fall through untouched.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::extended_usage,
-            |usage| PackageBodyElement::ExtendedUsage(Box::new(usage)),
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::extended_usage,
+                |usage| PackageBodyElement::ExtendedUsage(Box::new(usage)),
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at
     // all. Tried only after every other dispatcher above: some definitions (e.g. `connection_def`
@@ -2331,39 +2434,45 @@ pub(crate) fn package_body_element(
     // `connection` parse. Bare/typed/`about`/body form tried first, then the
     // `PrefixMetadataMember`-style form that prefixes the next member (e.g. `#fmeaspec
     // requirement req1 { ... }`, OMG spec Annex `14c-Language Extensions.sysml`).
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_usage,
-            PackageBodyElement::MetadataKeywordUsage,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                PackageBodyElement::MetadataKeywordUsage,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_prefix,
-            PackageBodyElement::MetadataKeywordUsage,
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                PackageBodyElement::MetadataKeywordUsage,
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     // `@ Name (: Type)? (about target(, target)*)? body` standalone annotation statement
     // (KerML `Annotation`/`@`-syntax) -- previously only the `#`-keyword forms above were
     // dispatched at package scope, e.g. `@ Classified about Annotated;`.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            |member| {
-                PackageBodyElement::Annotating(crate::ast::AnnotatingMember::MetadataAnnotation(
-                    member,
-                ))
-            },
-        )
-        .parse(input)
-    }) {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    if member_starts_annotation {
+        if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+            map(
+                crate::parser::metadata_annotation::metadata_annotation,
+                |member| {
+                    PackageBodyElement::Annotating(
+                        crate::ast::AnnotatingMember::MetadataAnnotation(member),
+                    )
+                },
+            )
+            .parse(input)
+        }) {
+            return Ok((input, Box::new(node_from_to(start, input, elem))));
+        }
     }
     if starts_with_keyword(input.fragment(), b"occurrence") {
         if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {

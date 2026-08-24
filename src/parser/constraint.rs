@@ -83,6 +83,14 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
 /// Wrapped in a reference transaction because the prefix's `UsageExtensionKeyword*` allocates an
 /// arena entry per `#tag` before the production is known to apply.
 pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"constraint") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     crate::parser::span::reference_transaction(input, constraint_usage_inner)
 }
 
@@ -743,6 +751,21 @@ pub(crate) fn kerml_connector_end(
 pub(crate) fn kerml_connector_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorMember>> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !(starts_with_keyword(cursor.fragment(), b"connector")
+            || starts_with_keyword(cursor.fragment(), b"public")
+            || starts_with_keyword(cursor.fragment(), b"private")
+            || starts_with_keyword(cursor.fragment(), b"protected"))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_connector_member_inner)
 }
 
@@ -980,6 +1003,23 @@ fn kerml_succession_member_inner(
 pub(crate) fn calc_named_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    // Its head is a mandatory declared name token. The inner parser deliberately accepts a
+    // reserved spelling there (dispatch order gives keyword-led siblings first refusal), so this
+    // guard only mirrors the lexical shape: something name-like must lead at all.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = visibility_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        let head = cursor.fragment().first();
+        let name_like = matches!(head, Some(b'\''))
+            || head.is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_');
+        if !name_like {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, calc_named_binding_inner)
 }
 
@@ -1336,6 +1376,42 @@ fn kerml_feature_relationship_parts(
 pub(crate) fn kerml_feature(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
+    // The kind keyword is optional when a `FeaturePrefix` marks the member, so the guard asks
+    // whether any word this production can begin with leads; a `true` only admits the parser.
+    {
+        const STARTERS: &[&[u8]] = &[
+            b"public",
+            b"private",
+            b"protected",
+            b"member",
+            b"feature",
+            b"step",
+            b"expr",
+            b"bool",
+            b"in",
+            b"out",
+            b"inout",
+            b"composite",
+            b"const",
+            b"derived",
+            b"var",
+            b"portion",
+            b"abstract",
+            b"end",
+            b"readonly",
+        ];
+        let (cursor, _) = ws_and_comments(input)?;
+        let fragment = cursor.fragment();
+        if !STARTERS
+            .iter()
+            .any(|keyword| starts_with_keyword(fragment, keyword))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     crate::parser::span::reference_transaction(input, kerml_feature_inner)
 }
 

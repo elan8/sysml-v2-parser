@@ -126,11 +126,13 @@ pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, Annotati
         )
         .parse(input);
     }
-    if let Ok(parsed) = map(doc_comment, AnnotatingMember::Doc).parse(input) {
-        return Ok(parsed);
+    // Each remaining alternative starts with its own keyword, so a byte check selects it
+    // without speculatively parsing (and rolling back) the others at every member start.
+    if starts_with_keyword(input.fragment(), b"doc") {
+        return map(doc_comment, AnnotatingMember::Doc).parse(input);
     }
-    if let Ok(parsed) = map(comment_annotation, AnnotatingMember::Comment).parse(input) {
-        return Ok(parsed);
+    if starts_with_keyword(input.fragment(), b"comment") {
+        return map(comment_annotation, AnnotatingMember::Comment).parse(input);
     }
     map(textual_representation, AnnotatingMember::TextualRep).parse(input)
 }
