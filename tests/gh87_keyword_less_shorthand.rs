@@ -4,7 +4,7 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -18,7 +18,8 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Simple Tests/OccurrenceTest.sysml:6`:
@@ -32,7 +33,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// why the sibling `part y;` on the next line of the same fixture already worked).
 #[test]
 fn gh87_4_bare_item_usage_in_occurrence_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             occurrence def Occ {
                 item x;
@@ -58,14 +59,14 @@ fn gh87_4_bare_item_usage_in_occurrence_def_body() {
         _ => None,
     });
     let item = item.expect("expected an ItemUsage element");
-    assert_eq!(item.name, "x");
+    assert_eq!(item.name.and_then(|n| doc.declaration_name(n)), Some("x"));
     assert!(item.type_name.is_none());
     assert!(item.value.is_none());
 
     assert!(
         elements.iter().any(|e| matches!(
             e,
-            sysml_v2_parser::ast::OccurrenceBodyElement::PartUsage(p) if p.value.name == "y"
+            sysml_v2_parser::ast::OccurrenceBodyElement::PartUsage(p) if p.value.name.and_then(|n| doc.declaration_name(n)) == Some("y")
         )),
         "expected the sibling `part y;` to still parse"
     );

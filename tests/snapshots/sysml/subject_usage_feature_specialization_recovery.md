@@ -22,13 +22,8 @@ package SubjectUsageFeatureSpecializationRecovery {
 )
 ~~~
 # FORMAT
-~~~sysml
-package SubjectUsageFeatureSpecializationRecovery {
-    requirement def R {
-        subject malformed :> ;
-        subject 'after' :> Target;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

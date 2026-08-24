@@ -4,7 +4,7 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -18,7 +18,8 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Mass Roll-up Example/Vehicles.sysml:26`:
@@ -32,7 +33,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// documented synonym via `redefine_operator`, already used elsewhere e.g. `part_usage`).
 #[test]
 fn gh92_1_bare_redefines_keyword_standalone_body_member() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def Car { attribute mass; }
             part c : Car {
@@ -51,7 +52,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert!(attr.name.is_empty());
+    assert!(attr.name.is_none());
     assert!(attr.redefines.is_some());
     assert!(attr.value.is_some());
 }
@@ -68,7 +69,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
 /// forms already worked, but adding an explicit type broke parsing entirely.
 #[test]
 fn gh92_2_part_redefines_with_explicit_type_clause() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def Chassis { part rb; }
             part def LightRollBar;
@@ -89,7 +90,7 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
     });
     let rb = rb.expect("expected a nested PartUsage element");
     // The target is semantic, not a declaration name, even when an explicit type follows.
-    assert!(rb.name.is_empty());
+    assert!(rb.name.is_none());
     assert!(rb.typing.is_some());
     assert!(rb.redefines.is_some());
     assert!(rb.multiplicity.is_some());
@@ -109,7 +110,7 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
 /// `OccurrenceBodyElement`.
 #[test]
 fn gh92_3_unnamed_typed_succession_in_part_usage_body() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def V;
             part def HappensJustBefore;

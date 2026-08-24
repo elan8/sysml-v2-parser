@@ -6,10 +6,12 @@ use super::package::{
 #[cfg(feature = "serde")]
 use super::provenance_visit::validate_ast_provenance;
 use super::qualified_reference::{
-    QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView, SourceRange,
-    SourceStorage,
+    decode_authored_name, QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView,
+    SourceRange, SourceStorage,
 };
+use crate::ast::common::DeclarationName;
 use crate::ast::core::{Node, Span};
+use std::borrow::Cow;
 
 /// KerML top-level element (BNF `RootNamespace = PackageBodyElement*`).
 ///
@@ -118,6 +120,20 @@ impl ParsedDocument {
         id: QualifiedReferenceId,
     ) -> Option<QualifiedReferenceView<'_>> {
         self.qualified_references.get(&self.source, id)
+    }
+
+    /// Authored spelling of a declaration name or short name, exactly as written in the source
+    /// (an unrestricted name keeps its quotes and escapes). `None` only for a span that does not
+    /// belong to this document.
+    pub fn declaration_name(&self, name: DeclarationName) -> Option<&str> {
+        self.source.slice(name.span())
+    }
+
+    /// Decoded `NAME` value of a declaration name: a basic name as written, or the contents of
+    /// an unrestricted name with its quotes removed and `\'` escapes decoded. Only an escaped
+    /// unrestricted name allocates.
+    pub fn decoded_declaration_name(&self, name: DeclarationName) -> Option<Cow<'_, str>> {
+        decode_authored_name(self.declaration_name(name)?)
     }
 
     /// Resolve a qualified declaration name without erasing its declaration role in the AST.

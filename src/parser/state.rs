@@ -1,7 +1,7 @@
 use crate::ast::{
-    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateBodyModifier,
-    StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition,
-    TransitionEffect,
+    DeclarationName, DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl,
+    StateBodyModifier, StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt,
+    Transition, TransitionEffect,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -17,7 +17,6 @@ use crate::parser::metadata_annotation::{metadata_keyword_prefix, metadata_keywo
 use crate::parser::node_from_to;
 use crate::parser::payload::transition_accept;
 use crate::parser::requirement::requirement_usage;
-use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -118,7 +117,7 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
 struct StateActionHead {
     has_action_keyword: bool,
     action_reference: Option<crate::ast::QualifiedReferenceId>,
-    declared_name: Option<String>,
+    declared_name: Option<DeclarationName>,
     type_name: Option<crate::ast::QualifiedReferenceId>,
     redefines: Option<Node<crate::ast::SubsettingRelationship>>,
     effect: Option<crate::ast::TransitionEffect>,
@@ -336,7 +335,7 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, parsed_name) = opt(with_span(name)).parse(input)?;
+    let (input, name) = opt(name).parse(input)?;
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -347,7 +346,6 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     } else {
         (input, crate::ast::MultiplicityModifiers::default())
     };
-    let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     let (input, leading_redefines) = optional_redefinition(input)?;
     let (input, typing_result) = optional_typings(input)?;
@@ -410,7 +408,7 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 is_constant: prefix.is_constant,
                 direction: prefix.direction,
                 kind_keyword: None,
-                name: name_str,
+                name,
                 typing,
                 redefines,
                 subsets,
@@ -418,7 +416,6 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 multiplicity_modifiers,
                 value,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
@@ -449,19 +446,9 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
     let (input, _) = tag(&b"final"[..]).parse(input)?;
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (name_span, state_name)) = with_span(name).parse(input)?;
+    let (input, state_name) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            FinalState {
-                state_name,
-                name_span,
-            },
-        ),
-    ))
+    Ok((input, node_from_to(start, input, FinalState { state_name })))
 }
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
@@ -611,11 +598,11 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
         && !after_gap.fragment().starts_with(b":>>"))
         || starts_with_keyword(after_gap.fragment(), b"defined")
     {
-        (after_gap, String::new())
+        (after_gap, None)
     } else {
         let (input, _) = ws1(input)?;
         let (input, n) = name(input)?;
-        (input, n)
+        (input, Some(n))
     };
     let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
@@ -829,7 +816,7 @@ fn transition_shorthand(input: Input<'_>) -> IResult<Input<'_>, Node<Transition>
 fn transition_tail<'a>(
     start: Input<'a>,
     input: Input<'a>,
-    name: Option<String>,
+    name: Option<DeclarationName>,
 ) -> IResult<Input<'a>, Node<Transition>> {
     // Optional: `first` source with optional `accept` trigger.
     let (input, first_clause) = opt((
@@ -912,10 +899,15 @@ mod state_behavior_action_tests {
     /// Spec42 Gap 43: named/typed/redefining nested action declarations.
     #[test]
     fn do_accepts_a_named_redefining_action_declaration() {
-        let (rest, node) = do_action(input("do action doAction : Action :>> 'do';"))
-            .expect("do action declaration");
+        let src = input("do action doAction : Action :>> 'do';");
+        let (rest, node) = do_action(src).expect("do action declaration");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.declared_name.as_deref(), Some("doAction"));
+        assert_eq!(
+            node.value
+                .declared_name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"doAction"[..])
+        );
         assert!(node.value.type_name.is_some());
         assert!(node.value.redefines.is_some());
         assert!(node.value.action_reference.is_none());
@@ -923,10 +915,15 @@ mod state_behavior_action_tests {
 
     #[test]
     fn entry_accepts_a_bare_redefining_action_declaration() {
-        let (rest, node) =
-            entry_action(input("entry action entryAction :>> 'entry';")).expect("entry decl");
+        let src = input("entry action entryAction :>> 'entry';");
+        let (rest, node) = entry_action(src).expect("entry decl");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.declared_name.as_deref(), Some("entryAction"));
+        assert_eq!(
+            node.value
+                .declared_name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"entryAction"[..])
+        );
         assert!(node.value.redefines.is_some());
     }
 }
@@ -1054,7 +1051,7 @@ mod state_body_member_tests {
             panic!("expected AttributeUsage, got {:?}", node.value);
         };
         assert!(usage.value.redefines.is_some());
-        assert!(usage.value.name.is_empty());
+        assert!(usage.value.name.is_none());
     }
 
     /// Spec42 Gap 42: `action :>> subactions :> middle { }` declares an anonymous action usage
@@ -1069,21 +1066,27 @@ mod state_body_member_tests {
         };
         assert!(usage.value.redefines.is_some());
         assert!(usage.value.subsets.is_some());
-        assert!(usage.value.name.is_empty());
+        assert!(usage.value.name.is_none());
     }
 
     /// Spec42 Gap 42: the Systems Library's per-end-multiplicity succession spelling.
     #[test]
     fn state_body_dispatches_a_succession_member() {
-        let (rest, node) = state_def_body_element(input(
+        let src = input(
             "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates;",
-        ))
-        .expect("succession member");
+        );
+        let (rest, node) = state_def_body_element(src).expect("succession member");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let StateDefBodyElement::SuccessionUsage(usage) = node.value else {
             panic!("expected SuccessionUsage, got {:?}", node.value);
         };
-        assert_eq!(usage.value.name.as_deref(), Some("stateSequencing"));
+        assert_eq!(
+            usage
+                .value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"stateSequencing"[..])
+        );
         assert!(usage.value.source_multiplicity.is_some());
         assert!(usage.value.target_multiplicity.is_some());
     }

@@ -7,29 +7,38 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
-fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement>> {
+fn package_elements(
+    input: &str,
+) -> (
+    sysml_v2_parser::ParsedDocument,
+    Vec<sysml_v2_parser::Node<PackageBodyElement>>,
+) {
     let root = parse(input).expect("input should parse");
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    match &pkg.body {
+    let elements = match &pkg.body {
         PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
-    }
+    };
+    (root, elements)
 }
 
 #[test]
 fn individual_part_definition_and_usage_parse_as_parts() {
     let input = "package P {\nindividual part def 'Neil Armstrong' :> Astronaut { }\nindividual part crewMember : Astronaut { }\n}";
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
 
     match &elements[0].value {
         PackageBodyElement::PartDef(def) => {
             assert!(def.value.is_individual);
             assert_eq!(
-                def.value.identification.name.as_deref(),
-                Some("Neil Armstrong")
+                def.value
+                    .identification
+                    .name
+                    .and_then(|n| doc.declaration_name(n)),
+                Some("'Neil Armstrong'")
             );
         }
         other => panic!("expected individual part def, got {other:?}"),
@@ -38,7 +47,10 @@ fn individual_part_definition_and_usage_parse_as_parts() {
     match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => {
             assert!(usage.value.prefix.individual_span().is_some());
-            assert_eq!(usage.value.name, "crewMember");
+            assert_eq!(
+                usage.value.name.and_then(|n| doc.declaration_name(n)),
+                Some("crewMember")
+            );
         }
         other => panic!("expected individual part usage, got {other:?}"),
     }
@@ -65,7 +77,12 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("ApolloMission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("ApolloMission") =>
             {
                 Some(&def.value)
             }
@@ -104,7 +121,12 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Mission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Mission") =>
             {
                 Some(&def.value)
             }
@@ -157,7 +179,12 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::StateDef(def)
-                if def.value.identification.name.as_deref() == Some("M") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("M") =>
             {
                 Some(&def.value)
             }
@@ -174,7 +201,12 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
             _ => None,
         })
         .expect("expected named transition");
-    assert_eq!(transition.name.as_deref(), Some("docked"));
+    assert_eq!(
+        transition
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("docked")
+    );
 }
 
 #[test]
@@ -339,7 +371,13 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
     let program = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(usage) if usage.value.name == "apolloProgram" => {
+            PackageBodyElement::PartUsage(usage)
+                if usage
+                    .value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("apolloProgram") =>
+            {
                 Some(&usage.value)
             }
             _ => None,
@@ -369,7 +407,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         })
         .collect();
     assert_eq!(crew_members.len(), 2);
-    assert_eq!(crew_members[0].name, "");
+    assert!(crew_members[0].name.is_none());
     assert!(crew_members[0].typing.is_some());
     assert!(crew_members[0].subsets.is_some());
 }
@@ -395,7 +433,12 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Mission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Mission") =>
             {
                 Some(&def.value)
             }
@@ -439,7 +482,12 @@ fn exhibit_state_supports_parallel_modifier() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Vehicle") =>
             {
                 Some(&def.value)
             }
@@ -456,7 +504,12 @@ fn exhibit_state_supports_parallel_modifier() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    assert_eq!(exhibit.name, "vehicleStates");
+    assert_eq!(
+        exhibit
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("vehicleStates")
+    );
     let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
@@ -490,7 +543,12 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Vehicle") =>
             {
                 Some(&def.value)
             }
@@ -511,13 +569,15 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
 
     let abstract_states = exhibits
         .iter()
-        .find(|e| e.name == "abstractStates")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("abstractStates")
+        })
         .expect("abstractStates");
     assert!(abstract_states.is_abstract);
 
     let private_states = exhibits
         .iter()
-        .find(|e| e.name == "privateStates")
+        .find(|e| e.name.and_then(|n| result.document.declaration_name(n)) == Some("privateStates"))
         .expect("privateStates");
     assert_eq!(
         private_states.membership.visibility,
@@ -526,19 +586,21 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
 
     let subset_states = exhibits
         .iter()
-        .find(|e| e.name == "subsetStates")
+        .find(|e| e.name.and_then(|n| result.document.declaration_name(n)) == Some("subsetStates"))
         .expect("subsetStates");
     assert!(subset_states.subsets.is_some());
 
     let multiplicity_states = exhibits
         .iter()
-        .find(|e| e.name == "multiplicityStates")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("multiplicityStates")
+        })
         .expect("multiplicityStates");
     assert!(multiplicity_states.multiplicity.is_some());
 
     let ordered_states = exhibits
         .iter()
-        .find(|e| e.name == "orderedStates")
+        .find(|e| e.name.and_then(|n| result.document.declaration_name(n)) == Some("orderedStates"))
         .expect("orderedStates");
     let StateDefBody::Brace { elements, .. } = &ordered_states.body else {
         panic!("expected exhibit state body");
@@ -572,7 +634,12 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Vehicle") =>
             {
                 Some(&def.value)
             }
@@ -592,17 +659,21 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         .collect();
     let direction_states = state_usages
         .iter()
-        .find(|s| s.name == "directionStates")
+        .find(|s| {
+            s.name.and_then(|n| result.document.declaration_name(n)) == Some("directionStates")
+        })
         .expect("directionStates");
     assert_eq!(direction_states.direction, Some(InOut::In));
     let derived_states = state_usages
         .iter()
-        .find(|s| s.name == "derivedStates")
+        .find(|s| s.name.and_then(|n| result.document.declaration_name(n)) == Some("derivedStates"))
         .expect("derivedStates");
     assert!(derived_states.is_derived);
     let individual_states = state_usages
         .iter()
-        .find(|s| s.name == "individualStates")
+        .find(|s| {
+            s.name.and_then(|n| result.document.declaration_name(n)) == Some("individualStates")
+        })
         .expect("individualStates");
     assert!(individual_states.is_individual);
 
@@ -615,17 +686,23 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         .collect();
     let direction_exhibit = exhibits
         .iter()
-        .find(|e| e.name == "directionExhibit")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("directionExhibit")
+        })
         .expect("directionExhibit");
     assert_eq!(direction_exhibit.direction, Some(InOut::In));
     let derived_exhibit = exhibits
         .iter()
-        .find(|e| e.name == "derivedExhibit")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("derivedExhibit")
+        })
         .expect("derivedExhibit");
     assert!(derived_exhibit.is_derived);
     let individual_exhibit = exhibits
         .iter()
-        .find(|e| e.name == "individualExhibit")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("individualExhibit")
+        })
         .expect("individualExhibit");
     assert!(individual_exhibit.is_individual);
 }
@@ -651,7 +728,12 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Mission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Mission") =>
             {
                 Some(&def.value)
             }
@@ -707,7 +789,10 @@ fn part_usage_accepts_multiplicity_before_type() {
         PartDefBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected part usage"),
     };
-    assert_eq!(suit.name, "spaceSuits");
+    assert_eq!(
+        suit.name.and_then(|n| result.document.declaration_name(n)),
+        Some("spaceSuits")
+    );
     assert!(suit.multiplicity.is_some());
     assert!(suit.typing.is_some());
     assert!(suit.subsets.is_some());
@@ -770,15 +855,21 @@ fn rationale_and_refinement_annotations_stay_localized() {
 #[test]
 fn quoted_requirement_identifier_parses() {
     let input = "package P {\nrequirement def <'HLR-R001'> CrewReturnSafetyRequirement { }\n}";
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     match &elements[0].value {
         PackageBodyElement::RequirementDef(req) => {
             assert_eq!(
-                req.value.identification.short_name.as_deref(),
-                Some("HLR-R001")
+                req.value
+                    .identification
+                    .short_name
+                    .and_then(|n| doc.declaration_name(n)),
+                Some("'HLR-R001'")
             );
             assert_eq!(
-                req.value.identification.name.as_deref(),
+                req.value
+                    .identification
+                    .name
+                    .and_then(|n| doc.declaration_name(n)),
                 Some("CrewReturnSafetyRequirement")
             );
         }
@@ -869,7 +960,7 @@ fn part_definition_comment_members_parse_structurally() {
         comment
             .identification
             .as_ref()
-            .and_then(|id| id.name.as_deref()),
+            .and_then(|id| id.name.and_then(|n| result.document.declaration_name(n))),
         Some("source")
     );
     assert!(comment.text.contains("https://example.test/source"));
@@ -914,7 +1005,10 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         PartUsageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected individual part usage"),
     };
-    assert_eq!(csm.name, "csm");
+    assert_eq!(
+        csm.name.and_then(|n| result.document.declaration_name(n)),
+        Some("csm")
+    );
     assert!(csm.prefix.individual_span().is_some());
     assert!(csm.typing.is_some());
     assert!(csm.redefines.is_some());
@@ -1026,7 +1120,12 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("S_IC") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("S_IC") =>
             {
                 Some(&def.value)
             }
@@ -1084,7 +1183,7 @@ fn part_usage_ordered_before_colon_parses_without_recovery() {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     let stage = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
@@ -1095,7 +1194,11 @@ fn part_usage_ordered_before_colon_parses_without_recovery() {
     let engines = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::PartUsage(p) if p.value.name == "engines" => Some(&p.value),
+            PartDefBodyElement::PartUsage(p)
+                if p.value.name.and_then(|n| doc.declaration_name(n)) == Some("engines") =>
+            {
+                Some(&p.value)
+            }
             _ => None,
         })
         .expect("engines part usage");
@@ -1123,7 +1226,7 @@ fn part_def_body_item_usage_parses() {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     let stakeholder = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
@@ -1138,7 +1241,10 @@ fn part_def_body_item_usage_parses() {
             _ => None,
         })
         .expect("item usage in part def body");
-    assert_eq!(item.name, "concerns");
+    assert_eq!(
+        item.name.and_then(|n| doc.declaration_name(n)),
+        Some("concerns")
+    );
     assert!(item.multiplicity.is_some());
     assert!(item.type_name.is_some());
 }

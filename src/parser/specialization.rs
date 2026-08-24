@@ -23,7 +23,7 @@ fn subclassification_node(
     spelling: crate::ast::TypingSpelling,
 ) -> Node<TypingRelationship> {
     Node::new(
-        span.clone(),
+        span,
         TypingRelationship {
             target,
             kind: TypingKind::Subclassification,
@@ -76,7 +76,7 @@ fn typing_node(
     is_conjugated: bool,
 ) -> Node<TypingRelationship> {
     Node::new(
-        span.clone(),
+        span,
         TypingRelationship {
             target,
             kind: TypingKind::Typing,

@@ -1,8 +1,8 @@
 //! Lexer and skip helpers: whitespace, comments, names, qualified names, and body-skip utilities.
 
 use crate::ast::{
-    Identification, QualifiedDeclarationName, QualifiedReferenceId, ReferenceSegment,
-    ReferenceSeparator, Span,
+    DeclarationName, Identification, QualifiedDeclarationName, QualifiedReferenceId,
+    ReferenceSegment, ReferenceSeparator, Span,
 };
 use crate::parser::{span_from_to, Input};
 use nom::branch::alt;
@@ -1163,15 +1163,25 @@ pub(crate) fn recover_body_element<'a>(
 }
 
 /// NAME: BASIC_NAME (identifier) or UNRESTRICTED_NAME (single-quoted string).
-pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, String> {
-    alt((quoted_name, basic_name)).parse(input)
+///
+/// Returns the authored token as a source-backed [`DeclarationName`]; nothing is copied or
+/// decoded here. Use [`name_bytes`] when a parser needs to inspect the spelling.
+pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, DeclarationName> {
+    let (rest, span) = reference_name_span(input)?;
+    Ok((rest, DeclarationName::new(span)))
 }
 
-/// Unquoted identifier: letter or underscore, then alphanumeric or underscore.
-fn basic_name(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, raw) = take_while1(|c: u8| c.is_ascii_alphanumeric() || c == b'_').parse(input)?;
-    let s = String::from_utf8_lossy(raw.fragment()).into_owned();
-    Ok((input, s))
+/// The authored bytes of `name`, which must have been parsed from `input` or a position after
+/// it within the same document.
+pub(crate) fn name_bytes<'a>(input: Input<'a>, name: DeclarationName) -> &'a [u8] {
+    let span = name.span();
+    let start = span.offset - input.location_offset();
+    &input.fragment()[start..start + span.len]
+}
+
+/// Whether `name` was authored as a bare `BASIC_NAME` spelling exactly `spelling`.
+pub(crate) fn name_is(input: Input<'_>, name: DeclarationName, spelling: &[u8]) -> bool {
+    name_bytes(input, name) == spelling
 }
 
 /// Quoted name: '...' (content between single quotes; \' for escape).
@@ -1586,7 +1596,7 @@ pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identificat
 /// parsers (`attribute_usage`, `part_usage`, `item_usage`, `port_usage`, ...) whose own
 /// name-dispatch logic (anonymous colon form vs. named vs. prefix-redefines) can't reuse
 /// `identification` wholesale since the name half isn't a plain `opt(name)` for them.
-pub(crate) fn short_name_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<String>> {
+pub(crate) fn short_name_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<DeclarationName>> {
     opt(delimited(
         preceded(ws_and_comments, tag(&b"<"[..])),
         preceded(ws_and_comments, name),
@@ -1942,20 +1952,29 @@ mod lexical_bnf_tests {
 
     #[test]
     fn name_parses_basic_name() {
-        let (_, n) = name(span_input("myPart")).expect("NAME");
-        assert_eq!(n, "myPart");
+        let input = span_input("myPart");
+        let (_, n) = name(input).expect("NAME");
+        assert_eq!(name_bytes(input, n), b"myPart");
     }
 
     #[test]
     fn name_parses_unrestricted_name() {
-        let (_, n) = name(span_input("'a name'")).expect("UNRESTRICTED_NAME");
-        assert_eq!(n, "a name");
+        let input = span_input("'a name'");
+        let (_, n) = name(input).expect("UNRESTRICTED_NAME");
+        assert_eq!(name_bytes(input, n), b"'a name'");
+        assert_eq!(n.span().len, 8);
     }
 
     #[test]
     fn name_parses_unrestricted_name_with_degree_symbol() {
-        let (_, n) = name(span_input("'\u{00b0}F'")).expect("UNRESTRICTED_NAME");
-        assert_eq!(n, "\u{00b0}F");
+        let input = span_input("'\u{00b0}F'");
+        let (_, n) = name(input).expect("UNRESTRICTED_NAME");
+        assert_eq!(name_bytes(input, n), "'\u{00b0}F'".as_bytes());
+    }
+
+    #[test]
+    fn name_rejects_unterminated_unrestricted_name() {
+        assert!(name(span_input("'unterminated")).is_err());
     }
 
     #[test]

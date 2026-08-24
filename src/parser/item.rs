@@ -86,7 +86,6 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     } else {
         opt(preceded(ws_and_comments, name)).parse(input)?
     };
-    let name = name.unwrap_or_default();
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, value) = opt(nom::sequence::preceded(
@@ -207,7 +206,7 @@ mod redefines_tests {
         ))
         .expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "");
+        assert!(node.value.name.is_none());
         assert!(node.value.redefines.is_some());
         assert!(node.value.value.is_some());
         assert!(node.value.type_name.is_none());
@@ -220,7 +219,7 @@ mod redefines_tests {
         ))
         .expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "");
+        assert!(node.value.name.is_none());
         assert!(node.value.redefines.is_some());
         assert!(node.value.type_name.is_some());
         assert!(node.value.value.is_none());
@@ -228,19 +227,30 @@ mod redefines_tests {
 
     #[test]
     fn item_usage_named_form_still_parses() {
-        let (rest, node) = item_usage(input("item wheelShape : Circle;")).expect("item usage");
+        let source = input("item wheelShape : Circle;");
+        let (rest, node) = item_usage(source).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "wheelShape");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"wheelShape"[..])
+        );
         assert!(node.value.type_name.is_some());
         assert!(node.value.redefines.is_none());
     }
 
     #[test]
     fn item_usage_named_form_accepts_a_value() {
-        let (rest, node) =
-            item_usage(input("item shape = new Box(1 [mm], 2 [mm], 3 [mm]);")).expect("item usage");
+        let source = input("item shape = new Box(1 [mm], 2 [mm], 3 [mm]);");
+        let (rest, node) = item_usage(source).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "shape");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"shape"[..])
+        );
         assert!(node.value.value.is_some());
     }
 
@@ -251,10 +261,21 @@ mod redefines_tests {
 
     #[test]
     fn item_usage_captures_short_name() {
-        let (rest, node) = item_usage(input("item <ws> wheelShape : Circle;")).expect("item usage");
+        let source = input("item <ws> wheelShape : Circle;");
+        let (rest, node) = item_usage(source).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("ws"));
-        assert_eq!(node.value.name, "wheelShape");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"ws"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"wheelShape"[..])
+        );
     }
 
     #[test]

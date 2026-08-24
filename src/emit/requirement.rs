@@ -6,7 +6,7 @@ use super::structure::{
     self, emit_attribute_body, emit_definition_prefix, emit_direction, emit_multiplicity,
     emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
 };
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ConcernUsage, Dependency, EnumerationUsage, ItemUsage, RequireConstraint, RequirementDef,
@@ -26,7 +26,7 @@ pub(crate) fn emit_requirement_def(
         w.push_str("individual ");
     }
     w.push_str("requirement def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -49,13 +49,9 @@ pub(crate) fn emit_requirement_usage(
         w.push_str("variation ");
     }
     w.push_str("requirement ");
-    if let Some(short) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
-    }
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
@@ -139,7 +135,7 @@ fn emit_requirement_body_element(
                 && a.value.direction.is_none()
                 && !a.value.is_end
                 && a.value.short_name.is_none()
-                && a.value.name.is_empty()
+                && a.value.name.is_none()
             {
                 emit_redefinition_attribute_binding(w, path, &a.value)
             } else {
@@ -183,13 +179,9 @@ fn emit_requirement_body_element(
         }
         RequirementDefBodyElement::RequirementActorDecl(a) => {
             w.push_str("actor ");
-            if let Some(short) = &a.value.short_name {
-                w.push_char('<');
-                w.push_str(&format_name(short));
-                w.push_str("> ");
-            }
-            if !a.value.name.is_empty() {
-                w.push_str(&format_name(&a.value.name));
+            w.push_short_name_prefix(&format!("{path}/actor/short_name"), a.value.short_name)?;
+            if let Some(name) = a.value.name {
+                w.push_declaration_name(&format!("{path}/actor/name"), name)?;
             }
             w.push_str(" : ");
             w.push_qualified_reference(&format!("{path}/actor/type"), a.value.type_name)?;
@@ -212,8 +204,8 @@ fn emit_requirement_body_element(
             }
             if let Some(target) = s.value.target {
                 w.push_qualified_reference(&format!("{path}/stakeholder/target"), target)?;
-            } else {
-                w.push_str(&format_name(&s.value.declaration_name));
+            } else if let Some(name) = s.value.declaration_name {
+                w.push_declaration_name(&format!("{path}/stakeholder/name"), name)?;
             }
             if let Some(ty) = &s.value.type_name {
                 w.push_str(" : ");
@@ -233,12 +225,10 @@ fn emit_requirement_body_element(
             if f.value.has_concern_keyword {
                 w.push_str("concern ");
             }
-            if let Some(short_name) = &f.value.short_name {
-                w.push_char('<');
-                w.push_str(&format_name(short_name));
-                w.push_str("> ");
+            w.push_short_name_prefix(&format!("{path}/frame/short_name"), f.value.short_name)?;
+            if let Some(name) = f.value.name {
+                w.push_declaration_name(&format!("{path}/frame/name"), name)?;
             }
-            w.push_str(&format_name(&f.value.name));
             if let Some(type_name) = f.value.type_name {
                 w.push_str(" : ");
                 w.push_qualified_reference(&format!("{path}/frame/type"), type_name)?;
@@ -306,13 +296,9 @@ fn emit_verify_requirement(
         if let Some(req) = &v.requirement {
             // Avoid double `requirement` keyword from emit_requirement_usage.
             let usage = &req.value;
-            if let Some(short) = &usage.short_name {
-                w.push_char('<');
-                w.push_str(&format_name(short));
-                w.push_str("> ");
-            }
-            if !usage.name.is_empty() {
-                w.push_str(&format_name(&usage.name));
+            w.push_short_name_prefix(&format!("{path}/requirement/short_name"), usage.short_name)?;
+            if let Some(name) = usage.name {
+                w.push_declaration_name(&format!("{path}/requirement/name"), name)?;
             }
             if let Some(ty) = &usage.type_name {
                 w.push_str(" : ");
@@ -342,14 +328,14 @@ fn emit_verify_requirement(
 
 fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<(), EmitError> {
     w.push_str("subject");
-    if let Some(short) = &subject.short_name {
-        w.push_str(" <");
-        w.push_str(&format_name(short));
-        w.push_char('>');
-    }
-    if !subject.name.is_empty() {
+    if subject.short_name.is_some() {
         w.push_char(' ');
-        w.push_str(&format_name(&subject.name));
+        w.push_short_name_prefix("subject/short_name", subject.short_name)?;
+        w.trim_trailing_space();
+    }
+    if let Some(name) = subject.name {
+        w.push_char(' ');
+        w.push_declaration_name("subject/name", name)?;
     }
     if let Some(typing) = &subject.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -395,9 +381,9 @@ pub(crate) fn emit_require_constraint(
     if req.has_constraint_keyword {
         w.push_str(" constraint");
     }
-    if let Some(name) = &req.name {
+    if let Some(name) = req.name {
         w.push_char(' ');
-        w.push_str(&format_name(name));
+        w.push_declaration_name("requirement/name", name)?;
     }
     if let Some(target) = req.target {
         w.push_char(' ');
@@ -439,7 +425,7 @@ pub(crate) fn emit_dependency(
     w.push_str("dependency ");
     if let Some(id) = &dep.identification {
         if id.name.is_some() || id.short_name.is_some() {
-            emit_identification(w, id);
+            emit_identification(w, id)?;
             w.push_char(' ');
         }
     }
@@ -470,13 +456,9 @@ pub(crate) fn emit_item_usage(
     emit_visibility(w, usage.membership.visibility);
     crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("item ");
-    if let Some(short) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
-    }
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     // `item :>> shape : Cylinder` declares no label, so the `item ` keyword's trailing space has
     // no declaration to separate it from and the clause below brings its own.
@@ -517,7 +499,7 @@ pub(crate) fn emit_concern_usage(
     if concern.is_definition {
         w.push_str("def ");
     }
-    w.push_authored_name(&format!("{path}/name"), &concern.name_span)?;
+    w.push_declaration_name(&format!("{path}/name"), concern.name)?;
     if let Some(mult) = &concern.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
@@ -545,7 +527,7 @@ pub(crate) fn emit_use_case_def(
         w.push_str("individual ");
     }
     w.push_str("use case def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -562,7 +544,7 @@ pub(crate) fn emit_use_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("use case ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -587,7 +569,7 @@ pub(crate) fn emit_analysis_case_def(
         w.push_str("individual ");
     }
     w.push_str("analysis def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -602,7 +584,7 @@ pub(crate) fn emit_analysis_case_usage(
     emit_visibility(w, usage.membership.visibility);
     structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("analysis ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -627,7 +609,7 @@ pub(crate) fn emit_verification_case_def(
         w.push_str("individual ");
     }
     w.push_str("verification def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -644,7 +626,7 @@ pub(crate) fn emit_verification_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("verification ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -669,7 +651,7 @@ pub(crate) fn emit_case_def(
         w.push_str("individual ");
     }
     w.push_str("case def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -686,7 +668,7 @@ pub(crate) fn emit_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("case ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -719,9 +701,9 @@ pub(crate) fn emit_include_use_case(
         Some(target) => w.push_qualified_reference(&format!("{path}/target"), target)?,
         None => {
             w.push_str("use case");
-            if let Some(name) = &include.name {
+            if let Some(name) = include.name {
                 w.push_char(' ');
-                w.push_str(&format_name(name));
+                w.push_declaration_name(&format!("{path}/include/name"), name)?;
             }
             if let Some(typing) = &include.typing {
                 super::structure::emit_typing_clause(w, &typing.value)?;
@@ -777,14 +759,14 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::ActorUsage(a) => {
             emit_visibility(w, a.value.membership.visibility);
             w.push_str("actor");
-            if let Some(short) = &a.value.short_name {
-                w.push_str(" <");
-                w.push_str(&format_name(short));
-                w.push_char('>');
-            }
-            if !a.value.name.is_empty() {
+            if a.value.short_name.is_some() {
                 w.push_char(' ');
-                w.push_str(&format_name(&a.value.name));
+                w.push_short_name_prefix(&format!("{path}/actor/short_name"), a.value.short_name)?;
+                w.trim_trailing_space();
+            }
+            if let Some(name) = a.value.name {
+                w.push_char(' ');
+                w.push_declaration_name(&format!("{path}/actor/name"), name)?;
             }
             if let Some(type_name) = a.value.type_name {
                 w.push_str(" : ");
@@ -826,10 +808,8 @@ fn emit_use_case_body_element(
             }
             w.push_str("objective ");
             let req = &o.value.requirement.value;
-            // `objective { … }` stores a synthetic name `"objective"` from the payload default;
-            // do not reprint `requirement objective`.
-            if req.name != "objective" && !req.name.is_empty() {
-                w.push_str(&format_name(&req.name));
+            if let Some(name) = req.name {
+                w.push_declaration_name(&format!("{path}/objective/name"), name)?;
                 w.push_char(' ');
             }
             if let Some(ty) = &req.type_name {
@@ -906,7 +886,7 @@ fn emit_return_ref(
     return_ref: &ReturnRef,
 ) -> Result<(), EmitError> {
     w.push_str("return ref ");
-    w.push_str(&format_name(&return_ref.name));
+    w.push_declaration_name(&format!("{path}/name"), return_ref.name)?;
     if let Some(multiplicity) = &return_ref.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
@@ -958,17 +938,11 @@ fn emit_case_return_decl(
     if let Some(target) = decl.target {
         w.push_str(":>> ");
         w.push_qualified_reference("case-return/target", target)?;
-    } else if !decl.declaration_name.is_empty() {
-        let Some(name_span) = &decl.name_span else {
-            return w.unsupported(
-                "case-return",
-                "return declaration name without an authored source span",
-            );
-        };
-        w.push_authored_name("case-return/name", name_span)?;
+    } else if let Some(name) = decl.declaration_name {
+        w.push_declaration_name("case-return/name", name)?;
     }
     if let Some(ty) = &decl.type_name {
-        let has_head = decl.target.is_some() || !decl.declaration_name.is_empty();
+        let has_head = decl.target.is_some() || decl.declaration_name.is_some();
         if decl.is_subsetting && has_head {
             w.push_str(" :> ");
         } else if decl.is_subsetting {
@@ -1003,7 +977,7 @@ pub(crate) fn emit_enumeration_usage(
         w.push_str("end ");
     }
     w.push_str("enum ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -1043,7 +1017,7 @@ pub(crate) fn emit_satisfy(
             let identification = &declaration.value.identification;
             if identification.short_name.is_some() || identification.name.is_some() {
                 w.push_char(' ');
-                emit_identification(w, identification);
+                emit_identification(w, identification)?;
             }
         }
     }

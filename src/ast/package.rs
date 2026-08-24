@@ -3,6 +3,7 @@ use super::behavior::{
     StateDef, StateUsage,
 };
 use super::body::Body;
+use super::common::DeclarationName;
 use super::common::FilterMember;
 use super::common::{AnnotatingMember, Import, ParseErrorNode, UnsupportedGrammarNode};
 use super::kerml_fallback::{
@@ -59,8 +60,8 @@ impl QualifiedDeclarationName {
 /// the shared source-backed arena storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DeclarationName {
-    Simple(String),
+pub enum NamespaceName {
+    Simple(DeclarationName),
     Qualified(QualifiedDeclarationName),
 }
 
@@ -70,17 +71,17 @@ pub enum DeclarationName {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QualifiedIdentification {
-    pub short_name: Option<String>,
-    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
+    pub name: Option<NamespaceName>,
 }
 
 impl QualifiedIdentification {
     /// Return the declaration label only when the authored name is the simple-name alternative.
     /// Qualified declarations remain arena-backed and must be resolved through their document.
-    pub fn simple_name(&self) -> Option<&str> {
+    pub fn simple_name(&self) -> Option<DeclarationName> {
         match self.name.as_ref()? {
-            DeclarationName::Simple(name) => Some(name),
-            DeclarationName::Qualified(_) => None,
+            NamespaceName::Simple(name) => Some(*name),
+            NamespaceName::Qualified(_) => None,
         }
     }
 }

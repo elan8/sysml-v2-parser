@@ -495,7 +495,10 @@ mod tests {
             "theCauses [*]"
         );
         assert_eq!(
-            cross.value.declaration.value.identification.name.as_deref(),
+            cross.value.declaration.value.identification.name.map(|n| {
+                let span = n.span();
+                &text[span.offset..span.offset + span.len]
+            }),
             Some("theCauses")
         );
         assert!(cross.value.declaration.value.multiplicity.is_some());

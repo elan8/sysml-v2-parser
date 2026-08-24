@@ -46,7 +46,12 @@ fn test_parse_kitchen_timer() {
     }
     match &result.document.root.elements[1].value {
         RootElement::Package(pkg) => {
-            assert_eq!(pkg.identification.simple_name(), Some("KitchenTimer"));
+            assert_eq!(
+                pkg.identification
+                    .simple_name()
+                    .and_then(|n| result.document.declaration_name(n)),
+                Some("KitchenTimer")
+            );
         }
         other => panic!("expected root element to be package, got {:?}", other),
     }

@@ -6,12 +6,12 @@ use super::structure::{
     self, emit_definition_prefix, emit_definition_prefix_value, emit_direction, emit_multiplicity,
     emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
 };
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, Allocate, AssignStmt, ExhibitState, InOutDecl, Perform,
-    PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, StateDef,
+    ActionUsageBodyElement, ActionUsageKeyword, Allocate, AssignStmt, ExhibitState, InOutDecl,
+    Perform, PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, StateDef,
     StateDefBody, StateDefBodyElement, StateUsage, ThenAction, ThenTarget, UsageDeclaration,
 };
 
@@ -27,13 +27,11 @@ pub(crate) fn emit_inout_decl(
     if decl.is_var {
         w.push_str("var ");
     }
-    let leading_redefinition = decl.name.is_empty();
-    if leading_redefinition {
-        if let Some(redefines) = &decl.redefines {
-            emit_inout_redefines(w, path, redefines)?;
-        }
-    } else {
-        w.push_str(&format_name(&decl.name));
+    let leading_redefinition = decl.name.is_none();
+    if let Some(name) = decl.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    } else if let Some(redefines) = &decl.redefines {
+        emit_inout_redefines(w, path, redefines)?;
     }
     if let Some(subsets) = &decl.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -98,7 +96,7 @@ pub(crate) fn emit_action_def(
         w.push_str("individual ");
     }
     w.push_str("action def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -273,17 +271,14 @@ pub(crate) fn emit_action_usage(
         w.push_str("individual ");
     }
     // Standalone control nodes (`accept name : Type;`, `send new Publish(x, y) via p;`) are
-    // stored as ActionUsage with `name == "accept"|"send"` plus a payload — do not emit
-    // `action accept accept …`.
-    let is_standalone_accept =
-        usage.name == "accept" && usage.accept.is_some() && usage.send.is_none();
-    let is_standalone_send = usage.name == "send" && usage.accept.is_none() && usage.send.is_some();
-    if is_standalone_accept || is_standalone_send {
-        let kw = if is_standalone_accept {
-            "accept"
-        } else {
-            "send"
-        };
+    // stored as an `ActionUsage` whose `keyword` names the node kind -- do not emit
+    // `action accept …`.
+    let control_keyword = match usage.keyword {
+        ActionUsageKeyword::Action => None,
+        ActionUsageKeyword::Accept => Some("accept"),
+        ActionUsageKeyword::Send => Some("send"),
+    };
+    if let Some(kw) = control_keyword {
         w.push_str(kw);
         if let Some(accept) = &usage.accept {
             w.push_char(' ');
@@ -293,7 +288,7 @@ pub(crate) fn emit_action_usage(
             w.push_char(' ');
             emit_send_payload(w, path, send)?;
         }
-        if !is_standalone_accept {
+        if usage.keyword != ActionUsageKeyword::Accept {
             if let Some(via) = &usage.via {
                 w.push_str(" via ");
                 emit_expression(w, &via.value)?;
@@ -311,17 +306,14 @@ pub(crate) fn emit_action_usage(
     // Anonymous usages (`action :>> subactions;`, `action { ... }`) get no trailing space
     // after the keyword -- the clause emitters below supply their own leading space.
     w.push_str("action");
-    if let Some(short_name) = &usage.short_name {
+    if let Some(short_name) = usage.short_name {
         w.push_str(" <");
-        w.push_str(&format_name(short_name));
+        w.push_declaration_name(&format!("{path}/short-name"), short_name)?;
         w.push_char('>');
     }
-    if !usage.name.is_empty() {
+    if let Some(name) = usage.name {
         w.push_char(' ');
-        let Some(name_span) = &usage.name_span else {
-            return w.unsupported(path, "action usage name without an authored source span");
-        };
-        w.push_authored_name(&format!("{path}/name"), name_span)?;
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -368,7 +360,7 @@ fn emit_payload_clause(
     path: &str,
     payload: &crate::ast::PayloadClause,
 ) -> Result<(), EmitError> {
-    w.push_authored_name(&format!("{path}/name"), &payload.name_span)?;
+    w.push_declaration_name(&format!("{path}/name"), payload.name)?;
     if let Some(ty) = payload.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(path, ty)?;
@@ -780,7 +772,7 @@ pub(crate) fn emit_state_def(
         w.push_str("individual ");
     }
     w.push_str("state def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -811,8 +803,8 @@ pub(crate) fn emit_state_usage(
     w.push_str("state ");
     if let Some(reference) = usage.state_reference {
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
-    } else if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    } else if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -857,9 +849,9 @@ pub(crate) fn emit_exhibit_state(
     w.push_str("exhibit ");
     if let Some(reference) = exhibit.state_reference {
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
-    } else if !exhibit.name.is_empty() {
+    } else if let Some(name) = exhibit.name {
         w.push_str("state ");
-        w.push_str(&format_name(&exhibit.name));
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(typing) = &exhibit.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -918,13 +910,13 @@ fn emit_state_def_body_element(
                 w.push_char(' ');
                 emit_transition_effect(w, path, effect)?;
             }
-            if let Some(declared_name) = &e.value.declared_name {
+            if let Some(declared_name) = e.value.declared_name {
                 if e.value.has_action_keyword {
                     w.push_str(" action ");
                 } else {
                     w.push_char(' ');
                 }
-                w.push_str(&format_name(declared_name));
+                w.push_declaration_name(&format!("{path}/name"), declared_name)?;
                 if let Some(type_name) = e.value.type_name {
                     w.push_str(" : ");
                     w.push_qualified_reference(&format!("{path}/entry/type"), type_name)?;
@@ -949,13 +941,13 @@ fn emit_state_def_body_element(
                 w.push_char(' ');
                 emit_transition_effect(w, path, effect)?;
             }
-            if let Some(declared_name) = &d.value.declared_name {
+            if let Some(declared_name) = d.value.declared_name {
                 if d.value.has_action_keyword {
                     w.push_str(" action ");
                 } else {
                     w.push_char(' ');
                 }
-                w.push_str(&format_name(declared_name));
+                w.push_declaration_name(&format!("{path}/name"), declared_name)?;
                 if let Some(type_name) = d.value.type_name {
                     w.push_str(" : ");
                     w.push_qualified_reference(&format!("{path}/do/type"), type_name)?;
@@ -980,13 +972,13 @@ fn emit_state_def_body_element(
                 w.push_char(' ');
                 emit_transition_effect(w, path, effect)?;
             }
-            if let Some(declared_name) = &e.value.declared_name {
+            if let Some(declared_name) = e.value.declared_name {
                 if e.value.has_action_keyword {
                     w.push_str(" action ");
                 } else {
                     w.push_char(' ');
                 }
-                w.push_str(&format_name(declared_name));
+                w.push_declaration_name(&format!("{path}/name"), declared_name)?;
                 if let Some(type_name) = e.value.type_name {
                     w.push_str(" : ");
                     w.push_qualified_reference(&format!("{path}/exit/type"), type_name)?;
@@ -1013,7 +1005,7 @@ fn emit_state_def_body_element(
         }
         StateDefBodyElement::FinalState(f) => {
             w.push_str("final ");
-            w.push_authored_name(&format!("{path}/final-name"), &f.value.name_span)?;
+            w.push_declaration_name(&format!("{path}/final-name"), f.value.state_name)?;
             w.push_char(';');
             Ok(())
         }
@@ -1064,7 +1056,7 @@ pub(crate) fn emit_allocation_def(
         w.push_str("individual ");
     }
     w.push_str("allocation def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1086,7 +1078,7 @@ pub(crate) fn emit_flow_def(
         w.push_str("individual ");
     }
     w.push_str("flow def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1101,7 +1093,7 @@ pub(crate) fn emit_allocation_usage(
     emit_visibility(w, usage.membership.visibility);
     // Bare `allocate src to dst` (package-level `allocate_usage`) must not be rewritten as
     // `allocation allocate …` — that form reparses as ExtendedLibraryDecl (validation `12b`).
-    let shorthand = usage.name.is_empty() && usage.type_name.is_none();
+    let shorthand = usage.name.is_none() && usage.type_name.is_none();
     if shorthand {
         w.push_str("allocate ");
         let (Some(source), Some(target)) = (&usage.source, &usage.target) else {
@@ -1113,8 +1105,8 @@ pub(crate) fn emit_allocation_usage(
         return emit_definition_body(w, path, &usage.body);
     }
     w.push_str("allocation ");
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = usage.type_name {
         w.push_str(" : ");
@@ -1144,9 +1136,9 @@ pub(crate) fn emit_transition_effect(
             body,
         } => {
             w.push_str("action");
-            if let Some(n) = name {
+            if let Some(n) = *name {
                 w.push_char(' ');
-                w.push_str(&format_name(n));
+                w.push_declaration_name(&format!("{path}/name"), n)?;
             }
             if let Some(ty) = type_name {
                 w.push_str(" : ");
@@ -1271,8 +1263,8 @@ pub(crate) fn emit_flow_usage(
             }
             if let Some(payload) = payload {
                 w.push_str(" of ");
-                if let Some(n) = &payload.value.name {
-                    w.push_str(&format_name(n));
+                if let Some(n) = payload.value.name {
+                    w.push_declaration_name(&format!("{path}/payload"), n)?;
                     if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
                         w.push_str(" : ");
                     }
@@ -1357,7 +1349,7 @@ fn emit_transition_accept(
 ) -> Result<(), EmitError> {
     match accept {
         crate::ast::TransitionAccept::Payload(p, via) => {
-            w.push_str(&format_name(&p.name));
+            w.push_declaration_name(&format!("{path}/payload"), p.name)?;
             if let Some(ty) = p.type_name {
                 w.push_str(" : ");
                 w.push_qualified_reference(path, ty)?;
@@ -1392,8 +1384,8 @@ fn emit_transition(
     t: &crate::ast::Transition,
 ) -> Result<(), EmitError> {
     w.push_str("transition ");
-    if let Some(name) = &t.name {
-        w.push_str(&format_name(name));
+    if let Some(name) = t.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
         w.push_char(' ');
     }
     if let Some(source) = &t.source {
@@ -1437,8 +1429,8 @@ pub(crate) fn emit_first_stmt(
             emit_multiplicity(w, &mult.value)?;
             w.push_char(' ');
         }
-        if let Some(name) = &first.succession_name {
-            w.push_str(&format_name(name));
+        if let Some(name) = first.succession_name {
+            w.push_declaration_name(&format!("{path}/succession-name"), name)?;
             w.push_char(' ');
         }
         if let Some(ty) = first.succession_type {
@@ -1619,7 +1611,7 @@ pub(crate) fn emit_occurrence_def(
         w.push_str("individual ");
     }
     w.push_str("occurrence def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1646,15 +1638,11 @@ pub(crate) fn emit_occurrence_usage(
         // → `occurrence_usage_tail`).
         w.push_str("occurrence ");
     }
-    if let Some(short_name) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short_name));
-        w.push_str("> ");
-    }
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
-    } else if let Some(reference) = usage.occurrence_reference {
+    w.push_short_name_prefix(&format!("{path}/short-name"), usage.short_name)?;
+    if let Some(reference) = usage.occurrence_reference {
         w.push_qualified_reference(&format!("{path}/occurrence"), reference)?;
+    } else if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     // `ref individual :>> vehicleUnderTest : TestVehicle1` declares no label, so the prefix's
     // trailing space has nothing to separate and the clause below brings its own.
@@ -1784,8 +1772,8 @@ fn emit_occurrence_exhibit(
     w.push_str("exhibit ");
     if let Some(reference) = usage.state_reference {
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
-    } else if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    } else if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -1816,8 +1804,8 @@ pub(crate) fn emit_succession_usage(
         emit_multiplicity(w, &mult.value)?;
         w.push_char(' ');
     }
-    if let Some(name) = &succ.name {
-        w.push_str(&format_name(name));
+    if let Some(name) = succ.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
         w.push_char(' ');
     }
     if let Some(type_name) = succ.type_name {

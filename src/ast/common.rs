@@ -51,15 +51,42 @@ pub struct UnsupportedGrammarNode {
     pub production: UnsupportedProduction,
     pub diagnostic: ParseErrorNode,
 }
+/// An authored declaration name or short name (`NAME`: `BASIC_NAME` or `UNRESTRICTED_NAME`).
+///
+/// The document source is authoritative for the spelling, so this is a typed span into it rather
+/// than a copy of the token: the span covers the exact authored token, including the quotes and
+/// escapes of an unrestricted name. Resolve it through the owning document with
+/// [`crate::ast::ParsedDocument::declaration_name`] (authored spelling) or
+/// [`crate::ast::ParsedDocument::decoded_declaration_name`] (decoded `NAME` value).
+///
+/// It is a declaration label, not a reference: it never resolves to a
+/// [`crate::ast::QualifiedReferenceId`], and equality compares provenance, not spelling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DeclarationName {
+    pub(crate) span: Span,
+}
+
+impl DeclarationName {
+    pub(crate) fn new(span: Span) -> Self {
+        Self { span }
+    }
+
+    /// The exact source span of the authored token.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
 /// Identification: optional short name in `< >`, optional name.
 /// BNF: ( '<' declaredShortName = NAME '>' )? ( declaredName = NAME )?
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Identification {
     /// Short name inside `< ... >`, if present.
-    pub short_name: Option<String>,
-    /// Main declared name (may be quoted, e.g. '1a-Parts Tree').
-    pub name: Option<String>,
+    pub short_name: Option<DeclarationName>,
+    /// Main declared name (may be quoted, e.g. `'1a-Parts Tree'`).
+    pub name: Option<DeclarationName>,
 }
 
 /// Visibility for imports and members.

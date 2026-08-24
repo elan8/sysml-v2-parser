@@ -10,7 +10,12 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement>> {
+fn package_elements(
+    input: &str,
+) -> (
+    sysml_v2_parser::ParsedDocument,
+    Vec<sysml_v2_parser::Node<PackageBodyElement>>,
+) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -21,10 +26,11 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    match &pkg.body {
+    let elements = match &pkg.body {
         PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
-    }
+    };
+    (result.document, elements)
 }
 
 fn connection_def_elements(
@@ -50,7 +56,8 @@ fn connection_def_elements(
 fn end_decl_accepts_trailing_redefines_after_typed_form() {
     let input =
         "package P {\nconnection def C {\nend source: Anything :>> BinaryLinkObject::source;\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (_, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let end = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -73,7 +80,8 @@ fn end_decl_accepts_trailing_redefines_after_typed_form() {
 fn connection_def_body_accepts_private_assert_constraint() {
     let input =
         "package P {\nconnection def C {\nprivate assert constraint disjointCauseEffect {\ntrue\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (doc, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let assert_member = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -82,7 +90,9 @@ fn connection_def_body_accepts_private_assert_constraint() {
         })
         .expect("expected assert constraint member");
     assert_eq!(
-        assert_member.declaration_name.as_deref(),
+        assert_member
+            .declaration_name
+            .and_then(|n| doc.declaration_name(n)),
         Some("disjointCauseEffect")
     );
     assert_eq!(
@@ -99,7 +109,8 @@ fn connection_def_body_accepts_private_assert_constraint() {
 #[test]
 fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicity() {
     let input = "package P {\nconnection def C {\nabstract constant ref occurrence causes[1..*] :>> causes :> participant {\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (_, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let occurrence = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -128,7 +139,8 @@ fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicit
 #[test]
 fn connection_def_body_accepts_named_succession_usage() {
     let input = "package P {\nconnection def C {\nprivate succession causalOrdering first [1] causes then [1] effects {\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (doc, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let succession = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -136,7 +148,10 @@ fn connection_def_body_accepts_named_succession_usage() {
             _ => None,
         })
         .expect("expected succession usage");
-    assert_eq!(succession.name.as_deref(), Some("causalOrdering"));
+    assert_eq!(
+        succession.name.and_then(|n| doc.declaration_name(n)),
+        Some("causalOrdering")
+    );
     assert_eq!(
         succession.membership.visibility,
         Some(sysml_v2_parser::ast::Visibility::Private)
@@ -193,7 +208,7 @@ fn interface_def_body_accepts_anonymous_ref_port_with_redefines_type_and_modifie
             .is_some(),
         "the `ref` belongs to the port usage's own BasicUsagePrefix"
     );
-    assert_eq!(port.name, "");
+    assert!(port.name.is_none());
     assert_eq!(
         port.redefines.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -212,7 +227,8 @@ fn interface_def_body_accepts_anonymous_ref_port_with_redefines_type_and_modifie
 #[test]
 fn connection_def_body_accepts_ref_requirement_with_redefines_and_subsets() {
     let input = "package P {\nrequirement def R1;\nrequirement def R2;\nconnection def C {\nref requirement originalRequirement[1] :>> R1 :> participant {\n}\nref requirement :>> R2[1..*] :> participant {\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (doc, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let ref_decls: Vec<_> = elements
         .iter()
         .filter_map(|e| match &e.value {
@@ -223,7 +239,7 @@ fn connection_def_body_accepts_ref_requirement_with_redefines_and_subsets() {
     assert_eq!(ref_decls.len(), 2);
     let named = ref_decls
         .iter()
-        .find(|r| r.name == "originalRequirement")
+        .find(|r| r.name.and_then(|n| doc.declaration_name(n)) == Some("originalRequirement"))
         .expect("expected named ref requirement");
     assert_eq!(
         named.redefines.as_ref().map(|n| n.value.target.len()),
@@ -235,7 +251,7 @@ fn connection_def_body_accepts_ref_requirement_with_redefines_and_subsets() {
     );
     let anonymous = ref_decls
         .iter()
-        .find(|r| r.name.is_empty())
+        .find(|r| r.name.is_none())
         .expect("expected anonymous ref requirement");
     assert_eq!(
         anonymous.redefines.as_ref().map(|n| n.value.target.len()),

@@ -134,13 +134,15 @@ mod tests {
     /// subset (`dependency z to x, y { feature e; }`, kerml `dependencies` fixture).
     #[test]
     fn dependency_body_owns_feature_members() {
-        let (dependency, _source, _arena) = parsed("dependency z to x, y { feature e; }");
+        let (dependency, source, _arena) = parsed("dependency z to x, y { feature e; }");
         let elements = dependency.body.braced_elements().expect("braced body");
         assert_eq!(elements.len(), 1);
         let crate::ast::RelationshipBodyElement::KermlFeature(feature) = &elements[0].value else {
             panic!("expected KermlFeature member");
         };
-        assert_eq!(feature.value.name, "e");
+        let name = feature.value.name.expect("named feature");
+        let span = name.span();
+        assert_eq!(&source.as_str()[span.offset..span.offset + span.len], "e");
     }
 
     #[test]
@@ -151,7 +153,11 @@ mod tests {
             dependency
                 .identification
                 .as_ref()
-                .and_then(|i| i.name.as_deref()),
+                .and_then(|i| i.name)
+                .map(|n| {
+                    let span = n.span();
+                    &source.as_str()[span.offset..span.offset + span.len]
+                }),
             Some("Use")
         );
         assert_eq!(

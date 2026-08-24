@@ -3,7 +3,7 @@
 use super::behavior::{emit_flow_usage, emit_perform};
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_identification, emit_import};
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
@@ -28,7 +28,7 @@ pub(crate) fn emit_part_def(
         w.push_str("individual ");
     }
     w.push_str("part def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -54,23 +54,16 @@ pub(crate) fn emit_part_usage(
     // (`: Type`, `:>> target`, `:> target`) emits its own leading space, so `part :>> elements`
     // came back out as `part  :>> elements` and `in part : Engine` as `in part  : Engine`.
     // Mirrors `emit_attribute_usage`'s identical handling.
-    if usage.short_name.is_none() && usage.name_span.is_none() {
+    if usage.short_name.is_none() && usage.name.is_none() {
         w.push_str("part");
     } else {
         w.push_str("part ");
     }
-    if let Some(short) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if !usage.name.is_empty() {
-        let Some(name_span) = &usage.name_span else {
-            return w.unsupported(path, "part usage name without an authored source span");
-        };
-        w.push_authored_name(&format!("{path}/name"), name_span)?;
-    }
-    let target_only = usage.name.is_empty() && usage.redefines.is_some();
+    let target_only = usage.name.is_none() && usage.redefines.is_some();
     if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -79,7 +72,7 @@ pub(crate) fn emit_part_usage(
     }
     // Redefines-only form (`part :>> target[0..1];`) attaches multiplicity after `:>> target`
     // (BNF / `part_usage_redefines_only`), not before the clause.
-    let redefines_only = usage.name.is_empty()
+    let redefines_only = usage.name.is_none()
         && usage.redefines.is_some()
         && usage.typing.is_none()
         && usage.subsets.is_none();
@@ -129,12 +122,10 @@ pub(crate) fn emit_attribute_def(
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("attribute def ");
-    if let Some(short) = &def.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
+    w.push_short_name_prefix("attribute-def/short_name", def.short_name)?;
+    if let Some(name) = def.name {
+        w.push_declaration_name("attribute-def/name", name)?;
     }
-    w.push_str(&format_name(&def.name));
     if let Some(typing) = &def.typing {
         emit_typing_clause(w, &typing.value)?;
     }
@@ -171,19 +162,15 @@ pub(crate) fn emit_attribute_usage(
     }
     // No trailing space for the anonymous target-only forms: the subsetting clause emits its
     // own leading space (`attribute :>> target;`, previously double-spaced).
-    if usage.short_name.is_none() && usage.name_span.is_none() {
+    if usage.short_name.is_none() && usage.name.is_none() {
         w.push_str("attribute");
     } else {
         w.push_str("attribute ");
     }
-    if let Some(short) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
-    }
-    // `name_span` is `None` only for the `PrefixRedefines`/`PrefixReferences`/`PrefixSubsets`
-    // target-only forms (`attribute :>> target : Type[1];` etc., src/parser/attribute.rs).
-    // `usage.name` stays empty because no declaration name was written; the target spelling lives
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    // `usage.name` is `None` only for the `PrefixRedefines`/`PrefixReferences`/`PrefixSubsets`
+    // target-only forms (`attribute :>> target : Type[1];` etc., src/parser/attribute.rs):
+    // no declaration name was written, and the target spelling lives
     // only in its arena-backed relationship. Any typing/multiplicity/`ordered`/`nonunique` were
     // parsed *after* the target reference (they trail the clause in source, e.g. `Mass Roll-up Example/
     // MassConstraintExample.sysml:18`'s `attribute :>> m : MassValue;`), not after a name.
@@ -192,11 +179,9 @@ pub(crate) fn emit_attribute_usage(
     // here too would strand them before any name at all (`attribute : Type :>> target;`, which
     // reparses as the *unrelated* anonymous-colon-typed form instead of a redefines clause).
     // Mirrors `emit_part_usage`'s `redefines_only` handling.
-    let target_only = usage.name_span.is_none();
-    if let Some(name_span) = &usage.name_span {
-        w.push_authored_name(&format!("{path}/name"), name_span)?;
-    } else if !usage.name.is_empty() {
-        return w.unsupported(path, "attribute usage name without an authored source span");
+    let target_only = usage.name.is_none();
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if !target_only {
         if let Some(typing) = &usage.typing {
@@ -693,7 +678,7 @@ pub(crate) fn emit_port_def(
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("port def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -713,23 +698,16 @@ pub(crate) fn emit_port_usage(
     // No trailing space for the anonymous target-only forms: whichever clause follows (`: Type`,
     // `:>> target`, `:> target`) emits its own leading space, so `port :>> pe` came back out as
     // `port  :>> pe`. Mirrors `emit_part_usage`/`emit_attribute_usage`.
-    if usage.short_name.is_none() && usage.name_span.is_none() {
+    if usage.short_name.is_none() && usage.name.is_none() {
         w.push_str("port");
     } else {
         w.push_str("port ");
     }
-    if let Some(short) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if !usage.name.is_empty() {
-        let Some(name_span) = &usage.name_span else {
-            return w.unsupported(path, "port usage name without an authored source span");
-        };
-        w.push_authored_name(&format!("{path}/name"), name_span)?;
-    }
-    let target_only = usage.name.is_empty() && usage.redefines.is_some();
+    let target_only = usage.name.is_none() && usage.redefines.is_some();
     if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -907,7 +885,7 @@ fn emit_connection_end(w: &mut EmitWriter<'_>, end: &ConnectionEnd) -> Result<()
         w.push_char(' ');
     }
     if let Some(declared) = &end.declared_name {
-        w.push_str(&format_name(&declared.name.value));
+        w.push_declaration_name("interface-end/declared_name", declared.name)?;
         match declared.operator {
             InterfaceEndReferenceOperator::Symbol { .. } => w.push_str(" ::> "),
             InterfaceEndReferenceOperator::Keyword { .. } => w.push_str(" references "),
@@ -927,7 +905,7 @@ pub(crate) fn emit_interface_def(
         w.push_str("individual ");
     }
     w.push_str("interface def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1016,11 +994,7 @@ pub(crate) fn emit_end_decl(
         EndDeclIntroducer::Reference { .. } => w.push_str("ref "),
         EndDeclIntroducer::KerMLFeature { .. } => w.push_str("feature "),
     }
-    if let Some(short_name) = &end.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short_name));
-        w.push_str("> ");
-    }
+    w.push_short_name_prefix("end/short_name", end.short_name)?;
     match &end.identity {
         EndIdentity::Anonymous => w.trim_trailing_space(),
         EndIdentity::Declaration(name) => {
@@ -1122,7 +1096,7 @@ pub(crate) fn emit_interface_usage(
             w.push_str("interface");
             if let Some(n) = name {
                 w.push_char(' ');
-                w.push_str(&format_name(n));
+                w.push_declaration_name("interface/name", *n)?;
             }
             if let Some(ty) = interface_type {
                 w.push_str(" : ");
@@ -1166,7 +1140,7 @@ pub(crate) fn emit_interface_usage(
             w.push_str("interface");
             if let Some(n) = name {
                 w.push_char(' ');
-                w.push_str(&format_name(n));
+                w.push_declaration_name("interface/name", *n)?;
             }
             if let Some(ty) = interface_type {
                 w.push_str(" : ");
@@ -1231,7 +1205,7 @@ fn emit_interface_end(
             operator,
             target,
         } => {
-            w.push_str(&format_name(&name.value));
+            w.push_declaration_name("interface-end/name", *name)?;
             match operator {
                 InterfaceEndReferenceOperator::Symbol { .. } => w.push_str(" ::> "),
                 InterfaceEndReferenceOperator::Keyword { .. } => w.push_str(" references "),
@@ -1325,19 +1299,16 @@ pub(crate) fn emit_ref_decl(
         w.push_char(' ');
         w.push_str(kind.as_str());
     }
-    if let Some(short_name) = &decl.short_name {
+    if let Some(short_name) = decl.short_name {
         w.push_str(" <");
-        w.push_str(&format_name(short_name));
+        w.push_declaration_name(&format!("{path}/short_name"), short_name)?;
         w.push_char('>');
     }
     // Anonymous `ref :>> target;` / `ref redefines a, b;` declarations have no name; emitting
     // `''` fabricated a quoted empty name the author never wrote (spec42 Gap 49d fallout).
-    if !decl.name.is_empty() {
+    if let Some(name) = decl.name {
         w.push_char(' ');
-        let Some(name_span) = &decl.name_span else {
-            return w.unsupported(path, "ref declaration name without an authored source span");
-        };
-        w.push_authored_name(&format!("{path}/name"), name_span)?;
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     } else if decl.kind_keyword.is_some() && decl.multiplicity.is_some() {
         // Keep the anonymous kind keyword lexically separate from its leading multiplicity.
         // `ref requirement[1..*]` parses `requirement` as a declaration name; the authored
@@ -1403,9 +1374,9 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, path: &str, bind: &Bind) -> Resu
             w.push_char(' ');
             emit_multiplicity(w, &mult.value)?;
         }
-        if let Some(name) = &bind.binding_name {
+        if let Some(name) = bind.binding_name {
             w.push_char(' ');
-            w.push_str(&format_name(name));
+            w.push_declaration_name("binding/name", name)?;
         }
         if let Some(ty) = &bind.binding_type {
             w.push_str(" : ");
@@ -1437,12 +1408,12 @@ pub(crate) fn emit_binding_connector_usage(
     if usage.all {
         w.push_str(" all");
     }
-    if let Some(name_span) = &usage.name_span {
+    if let Some(name) = usage.name {
         w.push_char(' ');
-        w.push_authored_name("binding-connector-usage/name", name_span)?;
+        w.push_declaration_name("binding-connector-usage/name", name)?;
     }
     if let Some(mult) = &usage.multiplicity {
-        if usage.name_span.is_none() {
+        if usage.name.is_none() {
             w.push_char(' ');
         }
         emit_multiplicity(w, &mult.value)?;
@@ -1763,7 +1734,7 @@ pub(crate) fn emit_alias_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, alias.membership.visibility);
     w.push_str("alias ");
-    emit_identification(w, &alias.identification);
+    emit_identification(w, &alias.identification)?;
     w.push_str(" for ");
     w.push_qualified_reference("alias target", alias.target)?;
     emit_relationship_body(w, path, &alias.body)
@@ -1819,7 +1790,7 @@ pub(crate) fn emit_item_def(
         w.push_str("individual ");
     }
     w.push_str("item def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1834,7 +1805,7 @@ pub(crate) fn emit_individual_def(
     emit_visibility(w, def.membership.visibility);
     emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("individual def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1857,13 +1828,9 @@ pub(crate) fn emit_default_reference_usage(
     if usage.prefix.constant_span.is_some() {
         w.push_str("constant ");
     }
-    if let Some(short_name) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short_name));
-        w.push_str("> ");
-    }
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    w.push_short_name_prefix("item-usage/short_name", usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name("item-usage/name", name)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -1905,7 +1872,7 @@ pub(crate) fn emit_metadata_def(
         w.push_str("abstract ");
     }
     w.push_str("metadata def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -1919,7 +1886,7 @@ pub(crate) fn emit_metadata_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("metadata ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name("metadata-usage/name", usage.name)?;
     if let Some(ty) = usage.type_reference {
         w.push_str(" : ");
         w.push_qualified_reference("metadata type", ty)?;
@@ -1943,7 +1910,7 @@ pub(crate) fn emit_enum_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     w.push_str("enum def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -2090,7 +2057,7 @@ pub(crate) fn emit_metadata_annotation(
         crate::ast::MetadataFeatureIntroducer::Metadata { .. } => w.push_str("metadata "),
     }
     if let Some(declared) = &ann.declared_name {
-        emit_identification(w, &declared.value.identification);
+        emit_identification(w, &declared.value.identification)?;
         match declared.value.typed_by {
             crate::ast::MetadataTypedBy::Colon => w.push_str(" : "),
             crate::ast::MetadataTypedBy::TypedBy => w.push_str(" typed by "),
@@ -2143,7 +2110,7 @@ pub(crate) fn emit_connection_def(
     w.push_str("connection def");
     if def.identification.short_name.is_some() || def.identification.name.is_some() {
         w.push_char(' ');
-        emit_identification(w, &def.identification);
+        emit_identification(w, &def.identification)?;
     }
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
@@ -2161,8 +2128,8 @@ pub(crate) fn emit_connection_usage(
         w.push_str("ref ");
     }
     w.push_str("connection ");
-    if let Some(name) = &usage.name {
-        w.push_str(&format_name(name));
+    if let Some(name) = usage.name {
+        w.push_declaration_name("connection-usage/name", name)?;
     }
     if let Some(ty) = usage.type_reference {
         w.push_str(" : ");

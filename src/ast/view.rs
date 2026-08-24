@@ -1,5 +1,6 @@
 use super::behavior::InOutDecl;
 use super::body::Body;
+use super::common::DeclarationName;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
@@ -51,8 +52,8 @@ pub struct ConstraintUsage {
     /// (Systems Library `Constraints.sysml:20`) was shredded into a bare `'ref';` expression plus
     /// a separate constraint usage, with no diagnostic.
     pub prefix: crate::ast::OccurrenceUsagePrefix,
-    pub name: String,
-    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Usage-level `:>` subsetting, e.g. `constraint c :> Base;`. Mirrors
@@ -323,8 +324,8 @@ pub struct ReturnDecl {
     /// Library `Observation.kerml`/`Triggers.kerml`).
     pub kind_keyword: Option<ReturnKindKeyword>,
     /// Empty for anonymous `return : Type [= expr];` (validation `10c`, `10d`).
-    pub name: String,
-    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     /// `None` for the untyped named forms `return result [1..1];` / `return sampling = ...;`
     /// (Domain Libraries `SampledFunctions.sysml`).
     pub type_name: Option<QualifiedReferenceId>,
@@ -440,7 +441,7 @@ pub enum ViewDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewRenderingUsage {
-    pub name: String,
+    pub name: DeclarationName,
     pub type_name: Option<QualifiedReferenceId>,
     pub body: RenderingUsageBody,
     pub membership: Membership,
@@ -542,8 +543,8 @@ pub enum RenderingDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
-    pub name: String,
-    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Subsets target, e.g. `baseView` in `view v :> baseView { ... }`.
     pub subsets: Option<Node<SubsettingRelationship>>,
@@ -610,7 +611,7 @@ pub struct ExposeMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointUsage {
-    pub name: String,
+    pub name: DeclarationName,
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>` subsets clause (spec42 gap 25), mirroring [`ViewUsage::subsets`]. Previously parsed
     /// by the shared usage header and discarded.
@@ -627,9 +628,9 @@ pub struct ViewpointUsage {
 pub struct RenderingUsage {
     /// Leading `abstract` keyword (BNF `RefPrefix`). Previously parsed and discarded.
     pub is_abstract: bool,
-    /// Declared name. Empty for the anonymous redefinition form (`rendering :>>
+    /// Declared name. `None` for the anonymous redefinition form (`rendering :>>
     /// subrenderings[0..*] = columnView.viewRendering;`, Systems Library `Views.sysml`).
-    pub name: String,
+    pub name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity clause (BNF `MultiplicityPart`), e.g. `asTreeDiagram :
     /// GraphicalRendering[1]` (Systems Library `Views.sysml`). Previously parsed and discarded

@@ -7,7 +7,7 @@ use super::structure::{
     emit_definition_prefix, emit_multiplicity, emit_multiplicity_modifiers, emit_subsetting_clause,
     emit_typing_clause,
 };
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AssertConstraintMember, CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef,
@@ -25,7 +25,7 @@ pub(crate) fn emit_constraint_def(
         w.push_str("individual ");
     }
     w.push_str("constraint def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -44,14 +44,14 @@ pub(crate) fn emit_constraint_usage(
     // No trailing space for the anonymous body-only form (`constraint { ... }`, spec42
     // Gap 49a): the body emits its own leading space.
     w.push_str("constraint");
-    if let Some(short_name) = &usage.short_name {
+    if let Some(short_name) = usage.short_name {
         w.push_str(" <");
-        w.push_str(&format_name(short_name));
+        w.push_declaration_name(&format!("{path}/short_name"), short_name)?;
         w.push_char('>');
     }
-    if !usage.name.is_empty() {
+    if let Some(name) = usage.name {
         w.push_char(' ');
-        w.push_str(&format_name(&usage.name));
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
@@ -137,7 +137,7 @@ pub(crate) fn emit_constraint_body_element(
                 && a.value.direction.is_none()
                 && !a.value.is_end
                 && a.value.short_name.is_none()
-                && a.value.name.is_empty()
+                && a.value.name.is_none()
             {
                 super::requirement::emit_redefinition_attribute_binding(w, path, &a.value)
             } else {
@@ -158,7 +158,7 @@ pub(crate) fn emit_calc_def(
         w.push_str("individual ");
     }
     w.push_str("calc def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         super::structure::emit_typing_clause(w, &spec.value)?;
     }
@@ -191,7 +191,7 @@ pub(crate) fn emit_calc_usage(
         w.push_str(":>> ");
         w.push_qualified_reference(&format!("{path}/redefines[0]"), target)?;
     } else {
-        emit_identification(w, &usage.identification);
+        emit_identification(w, &usage.identification)?;
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
@@ -332,12 +332,12 @@ fn emit_owned_cross_feature(
 ) -> Result<(), EmitError> {
     let mut head: Vec<&str> = Vec::new();
     push_basic_feature_prefix(&mut head, &cross.prefix);
-    let name = format_name(&cross.name);
-    if !cross.name.is_empty() {
-        head.push(&name);
-    }
     if !head.is_empty() {
         w.push_str(&head.join(" "));
+        w.push_char(' ');
+    }
+    if let Some(name) = cross.name {
+        w.push_declaration_name("owned-cross-feature/name", name)?;
         w.push_char(' ');
     }
     if let Some(multiplicity) = &cross.multiplicity {
@@ -408,11 +408,13 @@ pub(crate) fn emit_kerml_feature(
     if feature.is_all {
         head.push("all");
     }
-    let name = format_name(&feature.name);
-    if !feature.name.is_empty() {
-        head.push(&name);
-    }
     w.push_str(&head.join(" "));
+    if let Some(name) = feature.name {
+        if !head.is_empty() {
+            w.push_char(' ');
+        }
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
     if let Some(typing) = &feature.typing {
         emit_typing_clause(w, &typing.value)?;
     }
@@ -489,9 +491,9 @@ pub(crate) fn emit_kerml_invariant_member(
     if invariant.is_negated {
         w.push_str(" not");
     }
-    if !invariant.name.is_empty() {
+    if let Some(name) = invariant.name {
         w.push_char(' ');
-        w.push_str(&format_name(&invariant.name));
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     emit_calc_body(w, path, &invariant.body)
 }
@@ -523,12 +525,12 @@ pub(crate) fn emit_kerml_connector_member(
     if connector.is_all {
         w.push_str(" all");
     }
-    if !connector.name.is_empty() {
+    if let Some(name) = connector.name {
         w.push_char(' ');
-        w.push_str(&format_name(&connector.name));
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(typing) = connector.typing {
-        if connector.name.is_empty() {
+        if connector.name.is_none() {
             // The anonymous library form is spelled with no space: `connector :HappensDuring`.
             w.push_str(" :");
         } else {
@@ -537,7 +539,7 @@ pub(crate) fn emit_kerml_connector_member(
         w.push_qualified_reference(&format!("{path}/type"), typing)?;
     }
     if let Some(multiplicity) = &connector.multiplicity {
-        if connector.name.is_empty() && connector.typing.is_none() {
+        if connector.name.is_none() && connector.typing.is_none() {
             // `connector [0..1] ...` -- keep the keyword and the multiplicity separated.
             w.push_char(' ');
         }
@@ -559,8 +561,8 @@ pub(crate) fn emit_kerml_binding_member(
 ) -> Result<(), EmitError> {
     emit_visibility(w, binding.membership.visibility);
     w.push_str("binding ");
-    if !binding.name.is_empty() {
-        w.push_str(&format_name(&binding.name));
+    if let Some(name) = binding.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
         w.push_str(" of ");
     }
     emit_kerml_connector_end(w, &format!("{path}/left"), &binding.left.value)?;
@@ -579,8 +581,8 @@ pub(crate) fn emit_kerml_succession_member(
     if succession.is_all {
         w.push_str("all ");
     }
-    if !succession.name.is_empty() {
-        w.push_str(&format_name(&succession.name));
+    if let Some(name) = succession.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
         if let Some(multiplicity) = &succession.multiplicity {
             emit_multiplicity(w, &multiplicity.value)?;
         }
@@ -602,19 +604,15 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         w.push_str(kind.as_str());
         w.push_char(' ');
     }
-    if let Some(short_name) = &ret.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short_name));
-        w.push_str("> ");
-    }
-    if !ret.name.is_empty() {
-        w.push_str(&format_name(&ret.name));
+    w.push_short_name_prefix("calc-return/short_name", ret.short_name)?;
+    if let Some(name) = ret.name {
+        w.push_declaration_name("calc-return/name", name)?;
     }
     if let Some(type_name) = ret.type_name {
         if ret.is_subsetting {
-            w.push_str(if ret.name.is_empty() { ":> " } else { " :> " });
+            w.push_str(if ret.name.is_none() { ":> " } else { " :> " });
         } else {
-            w.push_str(if ret.name.is_empty() { ": " } else { " : " });
+            w.push_str(if ret.name.is_none() { ": " } else { " : " });
         }
         w.push_qualified_reference("calc-return/type", type_name)?;
     }
@@ -649,9 +647,9 @@ pub(crate) fn emit_assert_constraint(
         // emitter supplies its own leading space.
         w.push_str("constraint");
     }
-    if let Some(name) = &assert.declaration_name {
+    if let Some(name) = assert.declaration_name {
         w.push_char(' ');
-        w.push_str(&format_name(name));
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = assert.type_name {
         w.push_str(" : ");
@@ -671,7 +669,7 @@ pub(crate) fn emit_view_def(
         w.push_str("individual ");
     }
     w.push_str("view def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -736,18 +734,14 @@ pub(crate) fn emit_view_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("view ");
-    if let Some(short_name) = &usage.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short_name));
-        w.push_str("> ");
-    }
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     // The anonymous redefinition form parses `:>> target [mult]` (multiplicity after the
     // target); the named form parses the multiplicity before the trailing subsets clause
     // (`view columnView[0..*] ordered :> views`). Emit each in the order its parser reparses.
-    if usage.name.is_empty() {
+    if usage.name.is_none() {
         if let Some(redefines) = &usage.redefines {
             emit_typing_clause_as_subset(w, &redefines.value)?;
         }
@@ -846,7 +840,7 @@ fn emit_view_rendering(
     r: &crate::ast::ViewRenderingUsage,
 ) -> Result<(), EmitError> {
     w.push_str("render ");
-    w.push_str(&format_name(&r.name));
+    w.push_declaration_name(&format!("{path}/name"), r.name)?;
     if let Some(ty) = &r.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
@@ -899,7 +893,7 @@ pub(crate) fn emit_viewpoint_def(
         w.push_str("individual ");
     }
     w.push_str("viewpoint def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -913,7 +907,7 @@ pub(crate) fn emit_viewpoint_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("viewpoint ");
-    w.push_str(&format_name(&usage.name));
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), type_name)?;
@@ -938,7 +932,7 @@ pub(crate) fn emit_rendering_def(
         w.push_str("individual ");
     }
     w.push_str("rendering def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -991,9 +985,9 @@ pub(crate) fn emit_rendering_usage(
         w.push_str("abstract ");
     }
     w.push_str("rendering");
-    if !usage.name.is_empty() {
+    if let Some(name) = usage.name {
         w.push_char(' ');
-        w.push_str(&format_name(&usage.name));
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");

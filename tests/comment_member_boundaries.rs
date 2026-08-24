@@ -10,17 +10,18 @@
 use sysml_v2_parser::ast::{AnnotatingMember, PackageBodyElement, RootElement};
 use sysml_v2_parser::{parse, parse_for_editor};
 
-fn package_members(source: &str) -> Vec<PackageBodyElement> {
+fn package_members(source: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let root = parse(source).unwrap_or_else(|error| panic!("parse: {error}\n{source}"));
     let RootElement::Package(package) = &root.elements[0].value else {
         panic!("expected a package");
     };
-    package
+    let members = package
         .value
         .body
         .members()
         .map(|member| member.value.clone())
-        .collect()
+        .collect();
+    (root, members)
 }
 
 fn kinds(members: &[PackageBodyElement]) -> Vec<&'static str> {
@@ -48,7 +49,7 @@ fn a_member_after_a_comment_survives() {
     ] {
         let source = body(&format!("  comment /* first */\n{following}"));
         assert_eq!(
-            kinds(&package_members(&source)),
+            kinds(&package_members(&source).1),
             vec!["comment", expected],
             "the member after a comment was absorbed:\n{source}"
         );
@@ -61,7 +62,7 @@ fn a_member_after_a_comment_survives() {
 
 #[test]
 fn an_anonymous_comment_keeps_its_own_text() {
-    let members = package_members(&body("  comment /* first */\n  comment /* second */\n"));
+    let (_, members) = package_members(&body("  comment /* first */\n  comment /* second */\n"));
     let texts: Vec<String> = members
         .iter()
         .map(|member| match member {
@@ -77,7 +78,7 @@ fn an_anonymous_comment_keeps_its_own_text() {
 /// The optional parts still parse: a name, a locale, and the `about` clause each precede the body.
 #[test]
 fn the_optional_clauses_still_parse() {
-    let named = package_members(&body("  comment named /* text */\n"));
+    let (doc, named) = package_members(&body("  comment named /* text */\n"));
     let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &named[0] else {
         panic!("expected a comment");
     };
@@ -86,11 +87,12 @@ fn the_optional_clauses_still_parse() {
             .value
             .identification
             .as_ref()
-            .and_then(|id| id.name.clone()),
-        Some("named".to_owned())
+            .and_then(|id| id.name)
+            .and_then(|n| doc.declaration_name(n)),
+        Some("named")
     );
 
-    let localized = package_members(&body("  comment locale \"en_US\" /* text */\n"));
+    let (_, localized) = package_members(&body("  comment locale \"en_US\" /* text */\n"));
     let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &localized[0] else {
         panic!("expected a comment");
     };
@@ -101,7 +103,7 @@ fn the_optional_clauses_still_parse() {
     );
 
     // `about` names annotated elements, not the comment, so it must not become an identification.
-    let about = package_members(&body("  comment about a /* text */\n"));
+    let (_, about) = package_members(&body("  comment about a /* text */\n"));
     let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &about[0] else {
         panic!("expected a comment");
     };

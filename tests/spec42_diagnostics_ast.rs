@@ -63,9 +63,9 @@ fn transition_accept_retained_with_spans() {
     let typed = transitions[1].accept.as_ref().expect("typed accept");
     match typed {
         TransitionAccept::Payload(p, via) => {
-            assert_eq!(p.name, "evt");
+            assert_eq!(root.declaration_name(p.name), Some("evt"));
             assert!(p.type_name.is_some());
-            assert!(p.name_span.len > 0);
+            assert!(p.name.span().len > 0);
             assert!(p.type_span.is_some());
             assert!(via.is_none(), "fixture has no `via` clause on this trigger");
         }
@@ -92,9 +92,12 @@ fn final_state_members_parsed() {
         _ => panic!("expected brace state body"),
     };
     assert_eq!(finals.len(), 2);
-    assert_eq!(finals[0].state_name, "expired");
-    assert_eq!(finals[1].state_name, "completed");
-    assert!(finals[0].name_span.len > 0);
+    assert_eq!(root.declaration_name(finals[0].state_name), Some("expired"));
+    assert_eq!(
+        root.declaration_name(finals[1].state_name),
+        Some("completed")
+    );
+    assert!(finals[0].state_name.span().len > 0);
 }
 
 #[test]
@@ -115,13 +118,16 @@ fn send_payload_on_control_node_action() {
             .expect("send action usage"),
         _ => panic!("expected brace action body"),
     };
-    assert_eq!(send_usage.name, "send");
+    assert!(
+        send_usage.name.is_none(),
+        "a standalone `send` control node has no authored declaration name"
+    );
     let send = send_usage.send.as_ref().expect("send payload");
     match send {
         sysml_v2_parser::ast::SendPayload::Typed(p) => {
-            assert_eq!(p.name, "message");
+            assert_eq!(root.declaration_name(p.name), Some("message"));
             assert!(p.type_name.is_some());
-            assert!(p.name_span.len > 0);
+            assert!(p.name.span().len > 0);
             assert!(p.type_span.is_some());
         }
         other => panic!("expected a Typed payload, got {other:?}"),
@@ -196,8 +202,11 @@ fn verification_local_attribute_has_name_span() {
             .expect("attribute usage"),
         _ => panic!("expected brace verification body"),
     };
-    assert_eq!(attr.name, "count");
-    assert!(attr.name_span.is_some());
+    assert_eq!(
+        attr.name.and_then(|n| root.declaration_name(n)),
+        Some("count")
+    );
+    assert!(attr.name.is_some());
     assert_eq!(attr.typing.as_ref().map(|n| n.value.target.len()), Some(1));
 }
 
@@ -388,10 +397,15 @@ fn typed_stakeholder_parameter_parsed() {
         })
         .collect();
     assert_eq!(stakeholders.len(), 2);
-    assert_eq!(stakeholders[0].declaration_name, "driver");
+    assert_eq!(
+        stakeholders[0]
+            .declaration_name
+            .and_then(|n| root.declaration_name(n)),
+        Some("driver")
+    );
     assert!(stakeholders[0].target.is_none());
     assert!(stakeholders[0].type_name.is_some());
-    assert!(stakeholders[1].declaration_name.is_empty());
+    assert!(stakeholders[1].declaration_name.is_none());
     assert_eq!(
         stakeholders[1]
             .target
@@ -469,7 +483,12 @@ fn metadata_annotation_about_clause_parses_targets() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(pd)
-                if pd.value.identification.name.as_deref() == Some("Design") =>
+                if pd
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| root.declaration_name(n))
+                    == Some("Design") =>
             {
                 Some(&pd.value)
             }
@@ -604,10 +623,10 @@ fn metadata_def_shorthand_annotated_element() {
         })
         .expect("annotatedElement shorthand binding");
     assert!(
-        attr.name.is_empty(),
+        attr.name.is_none(),
         "the target is not an authored declaration name"
     );
-    assert!(attr.name_span.is_none());
+    assert!(attr.name.is_none());
     assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.len()), Some(1));
     assert_eq!(attr.typing.as_ref().map(|n| n.value.target.len()), Some(1));
 }
@@ -696,7 +715,7 @@ fn requirement_metadata_def_body_no_errors() {
             metadata_def
                 .identification
                 .name
-                .as_deref()
+                .and_then(|n| root.declaration_name(n))
                 .unwrap_or("<unnamed>")
         );
     }
@@ -780,10 +799,16 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl (plain return), got {other:?}"),
     };
-    assert_eq!(ret1.declaration_name, "verdict");
+    assert_eq!(
+        ret1.declaration_name.and_then(|n| root.declaration_name(n)),
+        Some("verdict")
+    );
     assert!(ret1.target.is_none());
     assert!(ret1.type_name.is_some());
-    assert!(ret1.name_span.is_some(), "name_span should be set");
+    assert!(
+        ret1.declaration_name.is_some(),
+        "the declaration name should be set"
+    );
     assert!(
         ret1.value.is_some(),
         "plain return initializer should be retained"
@@ -794,12 +819,12 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl (:>> form), got {other:?}"),
     };
-    assert!(ret2.declaration_name.is_empty());
+    assert!(ret2.declaration_name.is_none());
     let target = root
         .qualified_reference(ret2.target.expect("return redefinition target"))
         .expect("target ID resolves in parsed document");
     assert_eq!(target.authored_text(), "result");
-    assert!(ret2.name_span.is_none());
+    assert!(ret2.declaration_name.is_none());
     assert!(
         ret2.value.is_some(),
         "redefined return initializer should be retained"
@@ -810,7 +835,10 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl (attribute form), got {other:?}"),
     };
-    assert_eq!(ret3.declaration_name, "score");
+    assert_eq!(
+        ret3.declaration_name.and_then(|n| root.declaration_name(n)),
+        Some("score")
+    );
     assert!(ret3.type_name.is_some());
     assert!(
         ret3.value.is_some(),
@@ -830,7 +858,10 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl in analysis body, got {other:?}"),
     };
-    assert_eq!(ret4.declaration_name, "thrust");
+    assert_eq!(
+        ret4.declaration_name.and_then(|n| root.declaration_name(n)),
+        Some("thrust")
+    );
     assert!(ret4.type_name.is_some());
     assert!(
         ret4.value.is_none(),

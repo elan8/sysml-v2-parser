@@ -54,7 +54,7 @@ fn test_parse_vehicle_annex_a_example_does_not_crash() {
     assert!(
         matches!(
             &result.document.root.elements[0].value,
-            RootElement::Package(p) if p.value.identification.simple_name() == Some("SimpleVehicleModel")
+            RootElement::Package(p) if p.value.identification.simple_name().and_then(|n| result.document.declaration_name(n)) == Some("SimpleVehicleModel")
         ),
         "expected the single top-level element to be the `SimpleVehicleModel` package"
     );

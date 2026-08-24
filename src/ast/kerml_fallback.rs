@@ -1,6 +1,6 @@
 //! KerML fallback and modeled declaration nodes.
 
-use crate::ast::{Multiplicity, Node, Span};
+use crate::ast::{DeclarationName, Multiplicity, Node, Span};
 
 /// A structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
 /// Covers the shape shared by declarations such as `datatype DeferredType;`,
@@ -18,7 +18,7 @@ pub struct KermlBareDeclaration {
     pub keyword: KermlBareDeclarationKeyword,
     /// Span of the declared name, when present. The name text itself lives in the document
     /// source and is resolved through it rather than copied into this node.
-    pub name_span: Option<Span>,
+    pub name: Option<DeclarationName>,
     /// The `[...]` multiplicity clause, when present.
     pub multiplicity: Option<Node<Multiplicity>>,
 }
@@ -376,7 +376,7 @@ pub struct KermlFeature {
     pub is_all: bool,
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form
     /// (`portion feature redefines spaceBoundary [1];`).
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// `:` typing clause (multi-target).
     pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// Multiplicity clause, accepted before or after the typing (and after a leading
@@ -445,7 +445,7 @@ pub struct KermlInvariantMember {
     /// `inv not` negated form (KerML `isNegated`).
     pub is_negated: bool,
     /// Declared name; empty for the anonymous form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Body holding the invariant's boolean expression(s) via the shared type-body grammar.
     pub body: crate::ast::CalcDefBody,
     pub membership: crate::ast::Membership,
@@ -472,7 +472,7 @@ pub struct KermlConnectorEnd {
 pub struct KermlConnectorMember {
     pub is_all: bool,
     /// Declared name; empty for the anonymous `connector :Type` form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// `:` type target.
     pub typing: Option<crate::ast::QualifiedReferenceId>,
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
@@ -491,7 +491,7 @@ pub struct KermlConnectorMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlBindingMember {
     /// Declared name before `of`; empty for the unnamed form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Multiplicity on the declared name (`binding instant[instantNum] of ...`,
     /// `Triggers.kerml`).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
@@ -513,7 +513,7 @@ pub struct KermlSuccessionMember {
     pub is_all: bool,
     /// Declared succession name, present only with the `first` keyword form (`succession
     /// triggerAfter [taNum] first [0..1] transitionLinkSource then ...;`); empty otherwise.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// The succession's own multiplicity in the named `first` form (`[taNum]` above).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
     pub first: Node<KermlConnectorEnd>,

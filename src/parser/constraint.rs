@@ -103,9 +103,10 @@ fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Constrain
     let (input, name_str) = {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b"{") {
-            (input, String::new())
+            (input, None)
         } else {
-            name(input)?
+            let (input, n) = name(input)?;
+            (input, Some(n))
         }
     };
     let (input, header) = feature_usage_header(input)?;
@@ -782,7 +783,7 @@ fn kerml_connector_member_inner(
                 rest,
                 crate::ast::KermlConnectorMember {
                     is_all: is_all.is_some(),
-                    name: String::new(),
+                    name: None,
                     typing: None,
                     multiplicity: None,
                     from: Some(from),
@@ -800,10 +801,10 @@ fn kerml_connector_member_inner(
         || peek.fragment().starts_with(b"[")
         || from_keyword_next
     {
-        (input, String::new())
+        (input, None)
     } else {
         let (input, n) = preceded(ws_and_comments, name).parse(input)?;
-        (input, n)
+        (input, Some(n))
     };
     let (input, typing) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
@@ -882,7 +883,10 @@ fn kerml_binding_member_inner(
         |(n, m, _, _)| (n, m),
     ))
     .parse(input)?;
-    let (name_str, decl_multiplicity) = named.unwrap_or((String::new(), None));
+    let (name_str, decl_multiplicity) = match named {
+        Some((n, m)) => (Some(n), m),
+        None => (None, None),
+    };
     let (input, left) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, right) = kerml_connector_end(input)?;
@@ -937,7 +941,10 @@ fn kerml_succession_member_inner(
         |(n, m, _, _)| (n, m),
     ))
     .parse(input)?;
-    let (name_str, decl_multiplicity) = named.unwrap_or((String::new(), None));
+    let (name_str, decl_multiplicity) = match named {
+        Some((n, m)) => (Some(n), m),
+        None => (None, None),
+    };
     let (input, first) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -982,7 +989,7 @@ fn calc_named_binding_inner(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, (name_span, name_str)) = crate::parser::with_span(name).parse(input)?;
+    let (input, name_str) = name(input)?;
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -993,7 +1000,7 @@ fn calc_named_binding_inner(
     let (input, typing) = crate::parser::usage::optional_typings(input)?;
     let typing = typing.map(|(span, is_conjugated, targets, spelling)| {
         crate::ast::Node::new(
-            span.clone(),
+            span,
             crate::ast::TypingRelationship {
                 target: targets,
                 kind: crate::ast::TypingKind::Typing,
@@ -1027,7 +1034,7 @@ fn calc_named_binding_inner(
     // This production accepts only the semicolon body alternative. Delegate its token capture to
     // the shared body parser so the serialized body delimiter remains source-backed.
     let (input, body) = semicolon_body(input)?;
-    let typing_span = typing.as_ref().map(|t| t.span.clone());
+    let typing_span = typing.as_ref().map(|t| t.span);
     Ok((
         input,
         node_from_to(
@@ -1035,7 +1042,7 @@ fn calc_named_binding_inner(
             input,
             crate::ast::DefaultReferenceUsage {
                 prefix: crate::ast::RefPrefix::default(),
-                name: name_str,
+                name: Some(name_str),
                 short_name: None,
                 typing,
                 subsets: None,
@@ -1046,7 +1053,6 @@ fn calc_named_binding_inner(
                 value,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
                 multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
-                name_span: Some(name_span),
                 typing_span,
                 membership: Membership::feature(visibility, visibility_span),
                 body,
@@ -1126,10 +1132,10 @@ fn owned_cross_feature(
     // `FeatureIdentification` is optional here: `end [1] feature transferSource references
     // source;` (`Transfers.kerml`) crosses a multiplicity with no name.
     let (input, name_str) = if input.fragment().starts_with(b"[") {
-        (input, String::new())
+        (input, None)
     } else {
         let (input, parsed) = name(input)?;
-        (input, parsed)
+        (input, Some(parsed))
     };
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
@@ -1140,7 +1146,7 @@ fn owned_cross_feature(
     let (input, subsets) =
         opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
-    if name_str.is_empty()
+    if name_str.is_none()
         && multiplicity.is_none()
         && subsets.is_none()
         && !prefix.is_authored()
@@ -1228,7 +1234,7 @@ fn kerml_feature_type_relationship_part(
     Ok((
         input,
         Node::new(
-            span.clone(),
+            span,
             crate::ast::KermlTypeRelationship {
                 keyword,
                 targets,
@@ -1249,13 +1255,13 @@ fn kerml_feature_relationship_parts(
 ) -> IResult<Input<'_>, Vec<Node<crate::ast::FeatureRelationshipPart>>> {
     let mut parts = Vec::new();
     if let Some(intersecting) = intersecting {
-        let span = intersecting.span.clone();
+        let span = intersecting.span;
         let relationship = Node::new(
-            span.clone(),
+            span,
             crate::ast::KermlTypeRelationship {
                 keyword: crate::ast::KermlTypeRelationshipKeyword::Intersects,
                 targets: intersecting.value.target,
-                span: span.clone(),
+                span,
             },
         );
         parts.push(Node::new(
@@ -1304,7 +1310,7 @@ fn kerml_feature_relationship_parts(
             let mut targets = vec![first];
             targets.extend(more);
             let span = crate::parser::span_from_to(start, rest);
-            let featuring = Node::new(span.clone(), crate::ast::TypeFeaturingPart { targets });
+            let featuring = Node::new(span, crate::ast::TypeFeaturingPart { targets });
             parts.push(Node::new(
                 span,
                 crate::ast::FeatureRelationshipPart::TypeFeaturing(featuring),
@@ -1315,7 +1321,7 @@ fn kerml_feature_relationship_parts(
             &[b"disjoint", b"unions", b"intersects", b"differences"],
         ) {
             let (rest, relationship) = kerml_feature_type_relationship_part(after_ws)?;
-            let span = relationship.span.clone();
+            let span = relationship.span;
             parts.push(Node::new(
                 span,
                 crate::ast::FeatureRelationshipPart::TypeRelationship(relationship),
@@ -1373,17 +1379,17 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // directly: `step :> monitor.startObservation { ... }`, `private composite step : add
     // { ... }` (`Observation.kerml`, `SequenceFunctions.kerml`).
     let (input, name_str) = if leading_redefines.is_some() {
-        (input, String::new())
+        (input, None)
     } else {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":")
             || peek.fragment().starts_with(b"[")
             || peek.fragment().starts_with(b"{")
         {
-            (input, String::new())
+            (input, None)
         } else {
             let (input, n) = preceded(ws_and_comments, name).parse(input)?;
-            (input, n)
+            (input, Some(n))
         }
     };
     let (input, leading_multiplicity) = opt(preceded(
@@ -1394,7 +1400,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
         crate::ast::Node::new(
-            span.clone(),
+            span,
             crate::ast::TypingRelationship {
                 target: targets,
                 kind: crate::ast::TypingKind::Typing,
@@ -1512,7 +1518,7 @@ fn kerml_invariant_member_inner(
             input,
             crate::ast::KermlInvariantMember {
                 is_negated: is_negated.is_some(),
-                name: name_str.unwrap_or_default(),
+                name: name_str,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -2087,10 +2093,10 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     let (input, _) = ws_and_comments(input)?;
     // Anonymous typed form: `return : Type [= expr];`
     let (input, n) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-        (input, String::new())
+        (input, None)
     } else {
         let (input, n) = name(input)?;
-        (input, n)
+        (input, Some(n))
     };
     let (input, _) = ws_and_comments(input)?;
     // The typing is optional on named results: `return result [1..1];`, `return sampling =
@@ -2104,7 +2110,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             let (input, _) = tag(&b":"[..]).parse(input)?;
             let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, false, Some(target))
-        } else if n.is_empty() {
+        } else if n.is_none() {
             // Nothing declared at all -- not a return declaration.
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -2200,20 +2206,25 @@ mod const_prefix_tests {
     /// wrapping a feature that offered `end` and `const` all over again.
     #[test]
     fn const_prefix_is_retained_on_end_members() {
-        let (rest, node) =
-            kerml_feature(input("const end [1] feature a;")).expect("const end member");
+        let src = input("const end [1] feature a;");
+        let (rest, node) = kerml_feature(src).expect("const end member");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let crate::ast::FeaturePrefixHead::End { prefix, cross } = &node.value.prefix.head else {
             panic!("expected the end alternative of FeaturePrefix");
         };
         assert!(prefix.constant_span.is_some(), "const span");
         let cross = cross.as_ref().expect("owned cross feature");
-        assert!(cross.value.name.is_empty(), "the cross feature is unnamed");
+        assert!(cross.value.name.is_none(), "the cross feature is unnamed");
         assert!(
             cross.value.multiplicity.is_some(),
             "[1] is the cross feature's"
         );
-        assert_eq!(node.value.name, "a");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"a"[..])
+        );
     }
 
     /// `const end feature b;` takes `FeaturePrefix`'s `EndFeaturePrefix` alternative (KerML BNF
@@ -2221,7 +2232,8 @@ mod const_prefix_tests {
     /// independently settable flag beside `end`.
     #[test]
     fn const_prefix_is_retained_on_feature_members() {
-        let (rest, node) = kerml_feature(input("const end feature b;")).expect("const end feature");
+        let src = input("const end feature b;");
+        let (rest, node) = kerml_feature(src).expect("const end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let end = node
             .value
@@ -2232,7 +2244,12 @@ mod const_prefix_tests {
         assert!(end.constant_span.is_some(), "const span");
         assert!(node.value.prefix.is_end());
         assert!(node.value.prefix.is_constant());
-        assert_eq!(node.value.name, "b");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"b"[..])
+        );
     }
 
     /// `var const feature b;` spells one slot twice: `BasicFeaturePrefix`'s last group is
@@ -2352,9 +2369,15 @@ mod constraint_usage_tests {
 
     #[test]
     fn constraint_usage_accepts_simple_typed_semicolon_form() {
-        let (rest, node) = constraint_usage(input("constraint c : C;")).expect("constraint usage");
+        let src = input("constraint c : C;");
+        let (rest, node) = constraint_usage(src).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "c");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"c"[..])
+        );
         assert!(node.value.type_name.is_some());
         assert_eq!(
             node.value.membership.kind,
@@ -2364,23 +2387,29 @@ mod constraint_usage_tests {
 
     #[test]
     fn constraint_usage_accepts_typed_braced_form() {
-        let (rest, node) = constraint_usage(input(
-            "constraint mc : MassConstraint4 {\n    in totalMass : MassValue;\n}",
-        ))
-        .expect("constraint usage");
+        let src = input("constraint mc : MassConstraint4 {\n    in totalMass : MassValue;\n}");
+        let (rest, node) = constraint_usage(src).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "mc");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"mc"[..])
+        );
         assert!(node.value.type_name.is_some());
         assert!(matches!(node.value.body, ConstraintDefBody::Brace { .. }));
     }
 
     #[test]
     fn constraint_usage_accepts_untyped_braced_form() {
-        let (_, node) = constraint_usage(input(
-            "constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}",
-        ))
-        .expect("constraint usage");
-        assert_eq!(node.value.name, "hasLegalProfileDepth");
+        let src = input("constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}");
+        let (_, node) = constraint_usage(src).expect("constraint usage");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"hasLegalProfileDepth"[..])
+        );
         assert_eq!(node.value.type_name, None);
     }
 
@@ -2390,12 +2419,15 @@ mod constraint_usage_tests {
     /// existed (CHANGELOG 0.33.0).
     #[test]
     fn constraint_usage_accepts_the_real_library_constraint_checks_form() {
-        let (rest, node) = constraint_usage(input(
-            "abstract constraint constraintChecks: ConstraintCheck[0..*] nonunique :> booleanEvaluations {\n}",
-        ))
-        .expect("constraint usage");
+        let src = input("abstract constraint constraintChecks: ConstraintCheck[0..*] nonunique :> booleanEvaluations {\n}");
+        let (rest, node) = constraint_usage(src).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "constraintChecks");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"constraintChecks"[..])
+        );
         assert!(node.value.type_name.is_some());
     }
 
@@ -2403,12 +2435,15 @@ mod constraint_usage_tests {
     /// + multi-target subsetting only, no typing at all.
     #[test]
     fn constraint_usage_accepts_subsetting_only_multi_target_form() {
-        let (rest, node) = constraint_usage(input(
-            "abstract constraint assertedConstraintChecks :> constraintChecks, trueEvaluations {\n}",
-        ))
-        .expect("constraint usage");
+        let src = input("abstract constraint assertedConstraintChecks :> constraintChecks, trueEvaluations {\n}");
+        let (rest, node) = constraint_usage(src).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "assertedConstraintChecks");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"assertedConstraintChecks"[..])
+        );
         assert_eq!(node.value.type_name, None);
     }
 
@@ -2417,12 +2452,15 @@ mod constraint_usage_tests {
     /// then multi-target subsetting.
     #[test]
     fn constraint_usage_accepts_leading_multiplicity_then_subsetting() {
-        let (rest, node) = constraint_usage(input(
-            "constraint assumptions[0..*] :> constraintChecks, subperformances {\n}",
-        ))
-        .expect("constraint usage");
+        let src = input("constraint assumptions[0..*] :> constraintChecks, subperformances {\n}");
+        let (rest, node) = constraint_usage(src).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "assumptions");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"assumptions"[..])
+        );
         assert_eq!(node.value.type_name, None);
     }
 
@@ -2431,12 +2469,15 @@ mod constraint_usage_tests {
     /// semicolon body.
     #[test]
     fn constraint_usage_accepts_redefinition_with_qualified_target() {
-        let (rest, node) = constraint_usage(input(
-            "constraint assumptions :>> RequirementConstraintCheck::assumptions;",
-        ))
-        .expect("constraint usage");
+        let src = input("constraint assumptions :>> RequirementConstraintCheck::assumptions;");
+        let (rest, node) = constraint_usage(src).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "assumptions");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"assumptions"[..])
+        );
         assert_eq!(node.value.type_name, None);
         assert!(matches!(
             node.value.body,
@@ -2446,7 +2487,8 @@ mod constraint_usage_tests {
 
     #[test]
     fn constraint_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) = constraint_usage(input("public constraint c1;")).expect("constraint usage");
+        let src = input("public constraint c1;");
+        let (_, node) = constraint_usage(src).expect("constraint usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Public)
@@ -2459,7 +2501,8 @@ mod constraint_usage_tests {
 
     #[test]
     fn constraint_usage_without_visibility_prefix_has_no_membership_visibility() {
-        let (_, node) = constraint_usage(input("constraint c1;")).expect("constraint usage");
+        let src = input("constraint c1;");
+        let (_, node) = constraint_usage(src).expect("constraint usage");
         assert_eq!(node.value.membership.visibility, None);
     }
 

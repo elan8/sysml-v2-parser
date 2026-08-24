@@ -1,11 +1,11 @@
 //! Span, Node, Expression, and shared AST traits.
 
-use super::{QualifiedReferenceId, ReferenceSeparator};
+use super::{DeclarationName, QualifiedReferenceId, ReferenceSeparator};
 
 /// Source location: byte offset, line, column, and length in the source file.
 /// Line and column are **1-based**. Use [`crate::ast::ParsedDocument::range`] when deriving
 /// navigation or diagnostic ranges; a span alone cannot correctly calculate a multiline end.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Span {
     pub offset: usize,
@@ -105,7 +105,7 @@ pub trait AstNode {
 
 impl<T> AstNode for Node<T> {
     fn span(&self) -> Span {
-        self.span.clone()
+        self.span
     }
 }
 
@@ -868,7 +868,7 @@ pub struct ConnectionEnd {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectorEndName {
-    pub name: Node<String>,
+    pub name: DeclarationName,
     pub operator: crate::ast::InterfaceEndReferenceOperator,
 }
 

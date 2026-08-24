@@ -1,4 +1,5 @@
 use super::body::Body;
+use super::common::DeclarationName;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::membership::Membership;
 use super::requirement::RequirementUsage;
@@ -225,7 +226,7 @@ pub struct InOutDecl {
     /// Whether the declaration used the KerML `var` time-varying prefix (`out var y1;`).
     pub is_var: bool,
     /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// `:>` subsets clause (`out voltage :> ISQ::electricPotential = ...;`, spec42 evsample;
     /// Gap 45 fallout). Previously the `:>` spelling was silently folded into `type_name`.
     pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
@@ -266,9 +267,8 @@ pub enum InOut {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadClause {
-    pub name: String,
+    pub name: DeclarationName,
     pub type_name: Option<QualifiedReferenceId>,
-    pub name_span: Span,
     pub type_span: Option<Span>,
 }
 
@@ -332,7 +332,7 @@ pub enum TransitionEffect {
     /// brace body are independently optional (SysML BNF 1324-1325; Pilot `EffectBehaviorUsage`
     /// 1917-1919), so `do action { ... }` retains a body without inventing a declaration name.
     Perform {
-        name: Option<String>,
+        name: Option<DeclarationName>,
         type_name: Option<QualifiedReferenceId>,
         body: Option<ActionDefBody>,
     },
@@ -361,10 +361,29 @@ pub enum TransitionEffect {
     Expression(Node<Expression>),
 }
 
+/// The keyword that introduced an [`ActionUsage`].
+///
+/// A standalone control node (`accept x : T;`, `send new S() via p;`; BNF `AcceptNode`,
+/// `SendNode`) is represented as an `ActionUsage` carrying its payload. Its introducing keyword
+/// is a syntactic fact of its own, kept here rather than encoded in a fabricated declaration
+/// name: an accept node has no `NAME`, so [`ActionUsage::name`] is `None` for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ActionUsageKeyword {
+    /// `action`, the ordinary `ActionUsage` production.
+    Action,
+    /// `accept`, a standalone `AcceptNode`; [`ActionUsage::accept`] holds its payload.
+    Accept,
+    /// `send`, a standalone `SendNode`; [`ActionUsage::send`] holds its payload.
+    Send,
+}
+
 /// Action usage: `(abstract|variation)? (ref)? action` name (`:` type)? (`[mult]`)? (`:>`/` :>>` …)? body.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionUsage {
+    /// Which production this usage was authored as; see [`ActionUsageKeyword`].
+    pub keyword: ActionUsageKeyword,
     /// Leading `abstract` keyword (Systems Library e.g. `abstract ref action performedActions`).
     pub is_abstract: bool,
     /// Leading `variation` keyword (`RefPrefix.isVariation`, GH-13). Mutually exclusive with
@@ -376,8 +395,8 @@ pub struct ActionUsage {
     /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
     /// action a : AP1;` (`Simple Tests/IndividualTest.sysml:30`).
     pub is_individual: bool,
-    pub name: String,
-    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Structured typing clause (multi-target capable), mirroring `PartUsage.typing`.
     pub typing: Option<Node<TypingRelationship>>,
@@ -408,8 +427,6 @@ pub struct ActionUsage {
     /// this usage (Systems Library `LoopAction` style). The grammar requires `;` or `{ ... }`,
     /// so this records that neither was written rather than pretending a `;` was.
     pub body: Option<ActionUsageBody>,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
@@ -422,7 +439,8 @@ pub struct ActionUsage {
 
 impl PartialEq for ActionUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.is_abstract == other.is_abstract
+        self.keyword == other.keyword
+            && self.is_abstract == other.is_abstract
             && self.is_variation == other.is_variation
             && self.is_reference == other.is_reference
             && self.is_individual == other.is_individual
@@ -540,7 +558,7 @@ pub enum FlowUsageKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadFeature {
-    pub name: Option<String>,
+    pub name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -601,7 +619,7 @@ pub struct FirstStmt {
     /// Name of the succession itself, e.g. `succession s first a then b;`. `None` when the
     /// bare `first ... then ...` form is used (no `succession` keyword) or the `succession`
     /// prefix is unnamed.
-    pub succession_name: Option<String>,
+    pub succession_name: Option<DeclarationName>,
     /// Type of the succession itself, e.g. `succession s1 : AB first a then b;`.
     pub succession_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the succession feature itself, e.g. `succession [seBeforeNum] first ...`.
@@ -946,7 +964,7 @@ pub struct AllocationDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationUsage {
-    pub name: String,
+    pub name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
     /// `:>` subsets clause (spec42 gap 27), previously parsed by the shared usage header and
@@ -1066,7 +1084,7 @@ pub struct EntryAction {
     /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
     /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
     /// `action_reference`, which the reference form keeps.
-    pub declared_name: Option<String>,
+    pub declared_name: Option<DeclarationName>,
     /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>> target` redefinition on the declaration form.
@@ -1090,7 +1108,7 @@ pub struct DoAction {
     /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
     /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
     /// `action_reference`, which the reference form keeps.
-    pub declared_name: Option<String>,
+    pub declared_name: Option<DeclarationName>,
     /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>> target` redefinition on the declaration form.
@@ -1114,7 +1132,7 @@ pub struct ExitAction {
     /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
     /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
     /// `action_reference`, which the reference form keeps.
-    pub declared_name: Option<String>,
+    pub declared_name: Option<DeclarationName>,
     /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>> target` redefinition on the declaration form.
@@ -1137,8 +1155,7 @@ pub struct ThenStmt {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FinalState {
-    pub state_name: String,
-    pub name_span: Span,
+    pub state_name: DeclarationName,
 }
 
 impl PartialEq for FinalState {
@@ -1166,7 +1183,7 @@ pub struct StateUsage {
     pub is_reference: bool,
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Referenced state path when an `exhibit path` is represented in an occurrence body.
     pub state_reference: Option<QualifiedReferenceId>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -1192,7 +1209,7 @@ pub struct StateUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Transition {
-    pub name: Option<String>,
+    pub name: Option<DeclarationName>,
     /// If omitted, form is `transition name then target;`.
     pub source: Option<Node<Expression>>,
     /// When `first` is present on a transition, the source state is also an initial state.

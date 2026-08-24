@@ -88,7 +88,14 @@ fn part_usage_body_rejects_arbitrary_non_sysml_text() {
     let part_usage = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(p) if p.value.name == "wheel" => Some(&p.value),
+            PackageBodyElement::PartUsage(p)
+                if p.value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("wheel") =>
+            {
+                Some(&p.value)
+            }
             _ => None,
         })
         .expect("part usage should remain a real PartUsage, not ExtendedLibraryDecl");

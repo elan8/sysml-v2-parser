@@ -15,7 +15,6 @@ use crate::parser::usage::{
     feature_usage_header, multiplicity_node, optional_typings, prefix_redefinition_target,
     specialization_clauses, typing_node, typing_relationship_node,
 };
-use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -136,7 +135,10 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
 
 const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
 
-fn is_reserved_shorthand_starter(name: &str) -> bool {
+fn is_reserved_shorthand_starter(name: &[u8]) -> bool {
+    let Ok(name) = std::str::from_utf8(name) else {
+        return false;
+    };
     matches!(
         name,
         "interface"
@@ -444,7 +446,8 @@ pub(crate) fn attribute_feature_binding(
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (_, (target_span, target_spelling)) = with_span(name).parse(input)?;
+    let (_, target_spelling) = name(input)?;
+    let target_bytes = crate::parser::lex::name_bytes(input, target_spelling);
     // The prefixed forms take the same comma-separated multi-target list as every other
     // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
     // Gap 49b); the unprefixed binding keeps its single name-reference.
@@ -454,20 +457,20 @@ pub(crate) fn attribute_feature_binding(
         let (input, target) = qualified_reference(input)?;
         (input, vec![target])
     };
-    if is_reserved_shorthand_starter(&target_spelling) {
+    if is_reserved_shorthand_starter(target_bytes) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
         )));
     }
     // Covers the whole `(':>>' | ':>')? name` fragment -- the leading operator token itself
-    // (before `name_span`) isn't separately tracked here, matching how this ad hoc prefix shape
+    // (before the name) isn't separately tracked here, matching how this ad hoc prefix shape
     // (distinct from `usage::specialization_clauses`) has always worked.
     let prefix_span = crate::parser::span_from_to(start, input);
     let target_only = prefix.is_some();
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
+        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
@@ -502,11 +505,7 @@ pub(crate) fn attribute_feature_binding(
             AttributeUsage {
                 // A prefix form (`:>> target` / `:> target`) names a semantic target, not a new
                 // declaration. Its spelling lives only in the arena-backed relationship.
-                name: if target_only {
-                    String::new()
-                } else {
-                    target_spelling
-                },
+                name: (!target_only).then_some(target_spelling),
                 short_name: None,
                 typing,
                 subsets,
@@ -516,7 +515,6 @@ pub(crate) fn attribute_feature_binding(
                 intersects: None,
                 value,
                 body,
-                name_span: (!target_only).then_some(target_span),
                 typing_span,
                 redefines_span: None,
                 direction: None,
@@ -555,20 +553,16 @@ fn default_reference_usage_inner(
     let (input, prefix) = crate::parser::occurrence_prefix::ref_prefix(input);
     let identification_start = input;
     let (input, identification) = identification(input)?;
-    if identification.name.as_deref().is_some_and(|name| {
-        is_reserved_shorthand_starter(name)
-            || crate::parser::lex::is_reserved_keyword(name.as_bytes())
+    if identification.name.is_some_and(|name| {
+        let bytes = crate::parser::lex::name_bytes(identification_start, name);
+        is_reserved_shorthand_starter(bytes) || crate::parser::lex::is_reserved_keyword(bytes)
     }) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let name_span = identification
-        .name
-        .as_ref()
-        .map(|_| crate::parser::span_from_to(identification_start, input));
-    let name = identification.name.unwrap_or_default();
+    let name = identification.name;
     let short_name = identification.short_name;
     // `UsageDeclaration` accepts an empty Identification, so a keyword-less usage can begin
     // immediately with a `FeatureSpecializationPart`, for example
@@ -577,7 +571,7 @@ fn default_reference_usage_inner(
     // the pinned grammar admits leading relationships, typing, multiplicity, modifiers, a second
     // typing, and trailing relationships (SysML BNF 424--426).
     let (input, header) = feature_usage_header(input)?;
-    let typing_span = header.typing.as_ref().map(|typing| typing.span.clone());
+    let typing_span = header.typing.as_ref().map(|typing| typing.span);
     let leading_value = header
         .subsetting_value
         .map(crate::parser::feature_value::wrap_bind_expression);
@@ -602,7 +596,6 @@ fn default_reference_usage_inner(
                 value: value.or(leading_value),
                 multiplicity: header.multiplicity,
                 multiplicity_modifiers: header.multiplicity_modifiers,
-                name_span,
                 typing_span,
                 membership: Membership::feature(visibility, visibility_span),
                 body,
@@ -708,23 +701,20 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = preceded(tag(&b"def"[..]), ws1).parse(input)?;
-    let ident_start = input;
     let (input, ident) = identification(input)?;
-    let name_span = ident
-        .name
-        .as_ref()
-        .map(|_| crate::parser::span_from_to(ident_start, input));
-    let name_str = ident
-        .name
-        .clone()
-        .or_else(|| ident.short_name.clone())
-        .ok_or_else(|| {
-            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
-        })?;
-    let short_name = ident.short_name.clone();
+    // `Definition` requires an `Identification`, but either half suffices: `attribute def
+    // <'1'> : Real;` has only a short name and declares no `NAME`.
+    if ident.name.is_none() && ident.short_name.is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let name_str = ident.name;
+    let short_name = ident.short_name;
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
+        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
@@ -738,9 +728,9 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
                 // the `:>`/`subsets` fragment (unlike the dummy span this used before subsetting
                 // clauses were themselves typed with real spans).
                 (
-                    Some(rel.span.clone()),
+                    Some(rel.span),
                     Some(typing_relationship_node(
-                        rel.span.clone(),
+                        rel.span,
                         TypingKind::Subclassification,
                         false,
                         rel.value.target,
@@ -757,7 +747,7 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
     let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let value_span = value.as_ref().map(|node| node.span.clone());
+    let value_span = value.as_ref().map(|node| node.span);
     let (input, _) = specialization_clauses(input)?;
     let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
@@ -774,7 +764,6 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
                 multiplicity: mods.multiplicity,
                 value,
                 body,
-                name_span,
                 typing_span,
                 value_span,
                 multiplicity_modifiers: mods.modifiers.clone(),
@@ -824,8 +813,7 @@ pub(crate) fn directed_attribute_usage(
 pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
     enum AttributeUsageHead {
         Named {
-            name_span: crate::ast::Span,
-            name: String,
+            name: Option<crate::ast::DeclarationName>,
         },
         PrefixRedefines {
             redefines_span: crate::ast::Span,
@@ -913,13 +901,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             && !peek.fragment().starts_with(b":>>"))
             || starts_with_keyword(peek.fragment(), b"defined")
         {
-            (
-                input,
-                AttributeUsageHead::Named {
-                    name_span: crate::ast::Span::dummy(),
-                    name: String::new(),
-                },
-            )
+            (input, AttributeUsageHead::Named { name: None })
         } else {
             alt((
                 map(
@@ -939,15 +921,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                         subsets_value,
                     },
                 ),
-                map(with_span(name), |(name_span, name)| {
-                    AttributeUsageHead::Named { name_span, name }
-                }),
+                map(name, |name| AttributeUsageHead::Named { name: Some(name) }),
             ))
             .parse(input)?
         };
     let (
         input,
-        name_span,
         name_str,
         typing_span,
         typing,
@@ -965,15 +944,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s, sp)| {
-                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
-                })
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
-                String::new(),
                 typing_span,
                 typing,
                 Some(redefines_span),
@@ -988,15 +964,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s, sp)| {
-                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
-                })
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
-                String::new(),
                 typing_span,
                 typing,
                 None,
@@ -1014,15 +987,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s, sp)| {
-                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
-                })
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
-                String::new(),
                 typing_span,
                 typing,
                 None,
@@ -1033,7 +1003,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 mods0,
             )
         }
-        AttributeUsageHead::Named { name_span, name } => {
+        AttributeUsageHead::Named { name } => {
             // §6 G10: the multiplicity may precede the typing clause -- `attribute
             // occurs[0..1]: Real;` (OMG spec Annex `14c-Language Extensions.sysml`). Only the
             // trailing position (`attribute a : Real[0..1];`) was accepted before, so the
@@ -1042,14 +1012,11 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s, sp)| {
-                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
-                })
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
-                Some(name_span),
                 name,
                 typing_span,
                 typing,
@@ -1108,7 +1075,6 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 intersects,
                 value,
                 body,
-                name_span,
                 typing_span,
                 redefines_span,
                 // `RefPrefix`'s direction slot. `directed_attribute_usage` still overwrites this
@@ -1147,7 +1113,8 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (_, (target_span, target_spelling)) = with_span(name).parse(input)?;
+    let (_, target_spelling) = name(input)?;
+    let target_bytes = crate::parser::lex::name_bytes(input, target_spelling);
     // The prefixed forms take the same comma-separated multi-target list as every other
     // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
     // Gap 49b); the unprefixed binding keeps its single name-reference.
@@ -1157,7 +1124,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
         let (input, target) = qualified_reference(input)?;
         (input, vec![target])
     };
-    if is_reserved_shorthand_starter(&target_spelling) {
+    if is_reserved_shorthand_starter(target_bytes) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
@@ -1168,7 +1135,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let prefix_span = crate::parser::span_from_to(start, input);
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
+        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
@@ -1202,11 +1169,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             start,
             input,
             AttributeUsage {
-                name: if prefix.is_some() {
-                    String::new()
-                } else {
-                    target_spelling
-                },
+                name: prefix.is_none().then_some(target_spelling),
                 short_name: None,
                 typing,
                 subsets,
@@ -1216,11 +1179,6 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 intersects: None,
                 value,
                 body: AttributeBody::Semicolon { semicolon_span },
-                name_span: if prefix.is_some() {
-                    None
-                } else {
-                    Some(target_span)
-                },
                 typing_span,
                 redefines_span: None,
                 direction: None,
@@ -1363,7 +1321,7 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let redefines = node.value.redefines.as_ref().expect("redefines clause");
         assert_eq!(redefines.value.target.len(), 2);
-        assert!(node.value.name.is_empty());
+        assert!(node.value.name.is_none());
     }
 
     /// Spec42 Gap 40: `metadata def` bodies dispatch the same structured members as other
@@ -1394,8 +1352,8 @@ mod attribute_body_tests {
     /// `KermlClassifierDecl` production.
     #[test]
     fn attribute_body_dispatches_nested_kerml_classifiers() {
-        let (rest, node) =
-            attribute_body_element(input("classifier C1;")).expect("nested classifier");
+        let source = input("classifier C1;");
+        let (rest, node) = attribute_body_element(source).expect("nested classifier");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let AttributeBodyElement::KermlClassifier(decl) = node.value else {
             panic!("expected KermlClassifier");
@@ -1404,7 +1362,13 @@ mod attribute_body_tests {
             decl.value.keyword,
             crate::ast::KermlClassifierKeyword::Classifier
         );
-        assert_eq!(decl.value.identification.name.as_deref(), Some("C1"));
+        assert_eq!(
+            decl.value
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"C1"[..])
+        );
     }
 
     #[test]
@@ -1426,8 +1390,7 @@ mod attribute_body_tests {
         let source = input(":> annotatedElement : SysML::Usage;");
         let (rest, node) = metadata_binding(source).expect("metadata subsetting binding");
         assert!(rest.fragment().is_empty());
-        assert!(node.value.name.is_empty());
-        assert!(node.value.name_span.is_none());
+        assert!(node.value.name.is_none());
         assert_eq!(
             node.value
                 .subsets
@@ -1443,7 +1406,12 @@ mod attribute_body_tests {
         let source = input(text);
         let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "zeroDegreeCelsiusInKelvin");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"zeroDegreeCelsiusInKelvin"[..])
+        );
         assert_eq!(
             node.value
                 .typing
@@ -1510,10 +1478,17 @@ mod attribute_body_tests {
     #[test]
     fn attribute_body_element_dispatches_visibility_prefixed_declaration_to_usage_not_def() {
         let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
-        let (_, node) = attribute_body_element(input(text)).expect("attribute body element");
+        let source = input(text);
+        let (_, node) = attribute_body_element(source).expect("attribute body element");
         match node.value {
             AttributeBodyElement::AttributeUsage(usage) => {
-                assert_eq!(usage.value.name, "zeroDegreeCelsiusInKelvin");
+                assert_eq!(
+                    usage
+                        .value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"zeroDegreeCelsiusInKelvin"[..])
+                );
             }
             other => panic!("expected AttributeUsage, got {other:?}"),
         }
@@ -1580,21 +1555,33 @@ mod attribute_body_tests {
     #[test]
     fn attribute_usage_retains_derived_prefix() {
         let text = "derived attribute total: Real = a + b;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_derived);
         assert!(!node.value.is_constant);
-        assert_eq!(node.value.name, "total");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"total"[..])
+        );
     }
 
     #[test]
     fn attribute_usage_retains_constant_prefix() {
         let text = "constant attribute pi: Real = 3.14159;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_constant);
         assert!(!node.value.is_derived);
-        assert_eq!(node.value.name, "pi");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"pi"[..])
+        );
     }
 
     #[test]
@@ -1614,14 +1601,20 @@ mod attribute_body_tests {
     #[test]
     fn attribute_usage_retains_end_prefix() {
         let text = "end attribute mass: Real;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_end);
         // `end` and `derived`/`constant` are mutually exclusive alternatives per BNF
         // `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix`.
         assert!(!node.value.is_derived);
         assert!(!node.value.is_constant);
-        assert_eq!(node.value.name, "mass");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"mass"[..])
+        );
     }
 
     #[test]
@@ -1646,8 +1639,18 @@ mod attribute_body_tests {
         let source = input(text);
         let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("wcf"));
-        assert_eq!(node.value.name, "wheelCoordinateFrame");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"wcf"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"wheelCoordinateFrame"[..])
+        );
         assert_eq!(
             node.value
                 .typing
@@ -1663,8 +1666,18 @@ mod attribute_body_tests {
         let source = input(text);
         let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("lbpr"));
-        assert_eq!(node.value.name, "lugBoltPlacementRadius");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"lbpr"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"lugBoltPlacementRadius"[..])
+        );
         assert_eq!(
             node.value
                 .redefines
@@ -1754,7 +1767,7 @@ mod attribute_body_tests {
                     .expect("basic head")
                     .reference_span
                     .is_some());
-                assert!(part.value.name.is_empty());
+                assert!(part.value.name.is_none());
                 assert!(part.value.redefines.is_some());
                 assert!(part.value.typing.is_some());
             }
@@ -1764,8 +1777,8 @@ mod attribute_body_tests {
 
     #[test]
     fn attribute_body_reads_ref_part_name_as_a_part_usage() {
-        let (rest, node) =
-            attribute_body_element(input("ref part subscriber;")).expect("ref part name");
+        let source = input("ref part subscriber;");
+        let (rest, node) = attribute_body_element(source).expect("ref part name");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match &node.value {
             AttributeBodyElement::PartUsage(part) => {
@@ -1776,7 +1789,12 @@ mod attribute_body_tests {
                     .expect("basic head")
                     .reference_span
                     .is_some());
-                assert_eq!(part.value.name, "subscriber");
+                assert_eq!(
+                    part.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"subscriber"[..])
+                );
             }
             other => panic!("expected PartUsage, got {other:?}"),
         }
@@ -1786,11 +1804,18 @@ mod attribute_body_tests {
     /// kind keyword, and a kinded `ref` for a family that has not migrated.
     #[test]
     fn attribute_body_still_reads_a_bare_ref_as_a_ref_declaration() {
-        let (rest, node) =
-            attribute_body_element(input("ref subscriber : Person;")).expect("bare ref");
+        let source = input("ref subscriber : Person;");
+        let (rest, node) = attribute_body_element(source).expect("bare ref");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match &node.value {
-            AttributeBodyElement::RefDecl(decl) => assert_eq!(decl.value.name, "subscriber"),
+            AttributeBodyElement::RefDecl(decl) => {
+                assert_eq!(
+                    decl.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"subscriber"[..])
+                )
+            }
             other => panic!("expected RefDecl, got {other:?}"),
         }
     }

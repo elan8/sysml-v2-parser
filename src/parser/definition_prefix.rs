@@ -414,7 +414,13 @@ mod tests {
             prefix.basic_prefix.as_ref().map(|node| node.value),
             Some(DefinitionPrefix::Abstract)
         );
-        assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
+        assert_eq!(
+            prefix
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"Foo"[..])
+        );
         assert_eq!(
             prefix
                 .specializes
@@ -431,7 +437,13 @@ mod tests {
         let (rest, prefix) =
             parse_definition_prefix(input, DefinitionPrefixOptions::new(b"connection"))
                 .expect("prefix");
-        assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
+        assert_eq!(
+            prefix
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"connections"[..])
+        );
         assert_eq!(
             prefix
                 .specializes
@@ -491,7 +503,13 @@ mod tests {
             prefix.basic_prefix.as_ref().map(|node| node.value),
             Some(DefinitionPrefix::Abstract)
         );
-        assert_eq!(prefix.identification.name.as_deref(), Some("X"));
+        assert_eq!(
+            prefix
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"X"[..])
+        );
         assert_eq!(prefix.visibility, Some(crate::ast::Visibility::Private));
     }
 

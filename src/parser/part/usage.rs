@@ -22,11 +22,13 @@ fn usage_ordered_modifier(
 /// The tails take this by reference and clone it into the node they build. Before this seam each
 /// tail defaulted six prefix fields and each head assigned over them one by one, which is how
 /// `part_def_or_usage` came to accept a different set of slots than `part_usage`.
+use crate::ast::DeclarationName;
+
 pub(crate) struct PartUsageHead {
     prefix: crate::ast::OccurrenceUsagePrefix,
     /// `SourceSuccessionMember`'s `then`, which precedes the membership and therefore the prefix.
     then_span: Option<crate::ast::Span>,
-    short_name: Option<String>,
+    short_name: Option<DeclarationName>,
     membership: Membership,
 }
 
@@ -57,9 +59,9 @@ fn part_usage_redefines_only<'a>(
             input,
             PartUsage {
                 prefix: head.prefix.clone(),
-                then_span: head.then_span.clone(),
-                name: String::new(),
-                short_name: head.short_name.clone(),
+                then_span: head.then_span,
+                name: None,
+                short_name: head.short_name,
                 typing,
                 multiplicity: multiplicity_opt,
                 multiplicity_modifiers,
@@ -67,7 +69,6 @@ fn part_usage_redefines_only<'a>(
                 redefines: Some(redefines_qname),
                 value,
                 body,
-                name_span: None,
                 type_ref_span,
                 membership: head.membership.clone(),
             },
@@ -83,7 +84,7 @@ fn part_usage_named<'a>(
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, name_str) = name(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, multiplicity_modifiers) =
         usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
@@ -98,7 +99,7 @@ fn part_usage_named<'a>(
     } else {
         optional_typings(input)?
     };
-    let type_ref_span = type_result.as_ref().map(|(span, _, _, _)| span.clone());
+    let type_ref_span = type_result.as_ref().map(|(span, _, _, _)| *span);
     let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
         typing_node(span, is_conjugated, targets, spelling)
     });
@@ -129,9 +130,9 @@ fn part_usage_named<'a>(
             input,
             PartUsage {
                 prefix: head.prefix.clone(),
-                then_span: head.then_span.clone(),
-                name: name_str,
-                short_name: head.short_name.clone(),
+                then_span: head.then_span,
+                name: Some(name_str),
+                short_name: head.short_name,
                 typing,
                 multiplicity: multiplicity_opt,
                 multiplicity_modifiers,
@@ -139,7 +140,6 @@ fn part_usage_named<'a>(
                 redefines,
                 value,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 membership: head.membership.clone(),
             },
@@ -236,12 +236,7 @@ fn anonymous_part_usage<'a>(
     let (input, multiplicity_modifiers) =
         usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, (type_ref_span, is_conjugated, targets, spelling)) = typings(input)?;
-    let typing = Some(typing_node(
-        type_ref_span.clone(),
-        is_conjugated,
-        targets,
-        spelling,
-    ));
+    let typing = Some(typing_node(type_ref_span, is_conjugated, targets, spelling));
     let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
     let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
@@ -258,9 +253,9 @@ fn anonymous_part_usage<'a>(
             input,
             PartUsage {
                 prefix: head.prefix.clone(),
-                then_span: head.then_span.clone(),
-                name: String::new(),
-                short_name: head.short_name.clone(),
+                then_span: head.then_span,
+                name: None,
+                short_name: head.short_name,
                 typing,
                 multiplicity: multiplicity_opt,
                 multiplicity_modifiers,
@@ -268,7 +263,6 @@ fn anonymous_part_usage<'a>(
                 redefines: clauses.redefines,
                 value,
                 body,
-                name_span: None,
                 type_ref_span: Some(type_ref_span),
                 membership: head.membership.clone(),
             },
@@ -619,7 +613,7 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
 /// Systems Library `Domain Libraries/Geometry/ShapeItems.sysml` mirrors `succession [seBeforeNum]
 /// first ...` in `Flows.sysml`).
 type BindingPrefix = (
-    Option<String>,
+    Option<DeclarationName>,
     Option<crate::ast::QualifiedReferenceId>,
     Option<Node<crate::ast::Multiplicity>>,
 );
@@ -762,9 +756,9 @@ fn connection_end_with_multiplicity(
     declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<Expression>,
 ) -> Node<ConnectionEnd> {
-    let span = expr.span.clone();
+    let span = expr.span;
     Node::new(
-        span.clone(),
+        span,
         ConnectionEnd {
             declared_name,
             expression: expr,
@@ -795,12 +789,12 @@ fn interface_usage_body_element(
                 }
             },
             |port| {
-                let span = port.span.clone();
+                let span = port.span;
                 Node::new(span, InterfaceUsageBodyElement::PortUsage(Box::new(port)))
             },
         ),
         map(interface_usage_end_decl, |end| {
-            let span = end.span.clone();
+            let span = end.span;
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
         }),
         interface_usage_other_body_element,
@@ -825,7 +819,7 @@ fn interface_usage_perform(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     map(alt((perform_action_decl, perform_usage)), |perform| {
-        let span = perform.span.clone();
+        let span = perform.span;
         Node::new(span, InterfaceUsageBodyElement::Perform(Box::new(perform)))
     })
     .parse(input)
@@ -833,7 +827,7 @@ fn interface_usage_perform(
 
 fn interface_usage_flow(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     map(crate::parser::flow::flow_usage_member, |flow| {
-        let span = flow.span.clone();
+        let span = flow.span;
         Node::new(span, InterfaceUsageBodyElement::FlowUsage(Box::new(flow)))
     })
     .parse(input)
@@ -938,9 +932,7 @@ fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd
     // named shape only after its grammar-owned `::>` / `references` separator is visible;
     // otherwise a failed optional branch would silently consume the label as a direct endpoint
     // and leave the operator for the enclosing `InterfacePart`.
-    let (input, target) = if let Ok((after_name, (name_span, end_name))) =
-        with_span(name).parse(input)
-    {
+    let (input, target) = if let Ok((after_name, end_name)) = name(input) {
         let (after_trivia, _) = ws_and_comments(after_name)?;
         let operator = if after_trivia.fragment().starts_with(b"::>") {
             let (after_operator, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
@@ -964,7 +956,7 @@ fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd
             (
                 input,
                 InterfaceEndTarget::Named {
-                    name: Node::new(name_span, end_name),
+                    name: end_name,
                     operator,
                     target,
                 },
@@ -1265,7 +1257,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // and left the whole member to recovery; `connector::ref_decl`, which owns the same
     // production in the definition-body scopes, already reads it.
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, (name_span, name_str)) = preceded(ws_and_comments, with_span(name)).parse(input)?;
+    let (input, name_str) = preceded(ws_and_comments, name).parse(input)?;
     let (input, leading_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
@@ -1317,7 +1309,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
                 is_constant: prefix.is_constant,
                 direction,
                 kind_keyword: None,
-                name: name_str,
+                name: Some(name_str),
                 typing,
                 redefines,
                 subsets,
@@ -1325,7 +1317,6 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
                 multiplicity_modifiers,
                 value,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
@@ -1772,8 +1763,8 @@ mod par_002_nested_def_tests {
     /// `part c { ... }`, KerML `time_varying_car_driver`).
     #[test]
     fn part_usage_body_dispatches_nested_kerml_classifiers() {
-        let (rest, node) = part_usage_body_element(input("struct Car1_ { feature wheels; }"))
-            .expect("nested struct");
+        let source = input("struct Car1_ { feature wheels; }");
+        let (rest, node) = part_usage_body_element(source).expect("nested struct");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let PartUsageBodyElement::KermlClassifier(decl) = node.value else {
             panic!("expected KermlClassifier");
@@ -1782,7 +1773,13 @@ mod par_002_nested_def_tests {
             decl.value.keyword,
             crate::ast::KermlClassifierKeyword::Struct
         );
-        assert_eq!(decl.value.identification.name.as_deref(), Some("Car1_"));
+        assert_eq!(
+            decl.value
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"Car1_"[..])
+        );
     }
 
     #[test]
@@ -2105,10 +2102,21 @@ mod short_name_tests {
 
     #[test]
     fn part_usage_captures_short_name() {
-        let (rest, node) = part_usage(input("part <eng> engine : Engine;")).expect("part usage");
+        let source = input("part <eng> engine : Engine;");
+        let (rest, node) = part_usage(source).expect("part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("eng"));
-        assert_eq!(node.value.name, "engine");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"eng"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"engine"[..])
+        );
         assert_eq!(
             node.value
                 .typing
@@ -2124,9 +2132,15 @@ mod short_name_tests {
     // leading-`:>>`-discard shape.
     #[test]
     fn part_usage_captures_short_name_with_redefines() {
-        let (rest, node) = part_usage(input("part <e> :>> engines[5];")).expect("part usage");
+        let source = input("part <e> :>> engines[5];");
+        let (rest, node) = part_usage(source).expect("part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("e"));
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"e"[..])
+        );
         assert_eq!(
             node.value.redefines.as_ref().map(|n| n.value.target.len()),
             Some(1)
@@ -2142,8 +2156,8 @@ mod short_name_tests {
     /// GH-10: `ref part` is `PartUsage` with `is_reference` and full specialization.
     #[test]
     fn part_usage_accepts_ref_prefix_with_typing_and_subsetting() {
-        let (rest, node) =
-            part_usage(input("ref part origin : Remote :> remotes;")).expect("ref part usage");
+        let source = input("ref part origin : Remote :> remotes;");
+        let (rest, node) = part_usage(source).expect("ref part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node
             .value
@@ -2152,7 +2166,12 @@ mod short_name_tests {
             .expect("basic head")
             .reference_span
             .is_some());
-        assert_eq!(node.value.name, "origin");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"origin"[..])
+        );
         assert_eq!(
             node.value
                 .typing
@@ -2210,7 +2229,7 @@ mod short_name_tests {
             .expect("basic head")
             .reference_span
             .is_some());
-        assert!(node.value.name.is_empty());
+        assert!(node.value.name.is_none());
         assert!(node.value.redefines.is_some());
         assert_eq!(
             node.value
@@ -2235,8 +2254,8 @@ mod gh16_interface_usage_tests {
     /// optional, so this is legal -- ends would be declared inside the body instead, or omitted).
     #[test]
     fn interface_usage_accepts_typed_declaration_with_no_connect_clause() {
-        let (rest, node) =
-            interface_usage(input("interface hubToRim : SpokeInterface;")).expect("declaration");
+        let source = input("interface hubToRim : SpokeInterface;");
+        let (rest, node) = interface_usage(source).expect("declaration");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             InterfaceUsage::Declaration {
@@ -2244,7 +2263,10 @@ mod gh16_interface_usage_tests {
                 interface_type,
                 ..
             } => {
-                assert_eq!(name.as_deref(), Some("hubToRim"));
+                assert_eq!(
+                    name.map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"hubToRim"[..])
+                );
                 assert!(interface_type.is_some());
             }
             other => panic!("expected Declaration, got {other:?}"),
@@ -2365,9 +2387,15 @@ mod gh48_bind_prefix_and_multiplicity_tests {
     /// line 23.
     #[test]
     fn bind_accepts_named_binding_prefix() {
-        let (rest, node) = bind_(input("binding ab bind a = b;")).expect("binding ab bind a = b;");
+        let source = input("binding ab bind a = b;");
+        let (rest, node) = bind_(source).expect("binding ab bind a = b;");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.binding_name.as_deref(), Some("ab"));
+        assert_eq!(
+            node.value
+                .binding_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"ab"[..])
+        );
         assert!(node.value.binding_type.is_none());
     }
 
@@ -2375,10 +2403,15 @@ mod gh48_bind_prefix_and_multiplicity_tests {
     /// prefix. Real usage: `ConnectionTest.sysml` line 24.
     #[test]
     fn bind_accepts_named_typed_binding_prefix() {
-        let (rest, node) =
-            bind_(input("binding ab1 : AB bind a = b;")).expect("binding ab1 : AB bind a = b;");
+        let source = input("binding ab1 : AB bind a = b;");
+        let (rest, node) = bind_(source).expect("binding ab1 : AB bind a = b;");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.binding_name.as_deref(), Some("ab1"));
+        assert_eq!(
+            node.value
+                .binding_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"ab1"[..])
+        );
         assert!(node.value.binding_type.is_some());
     }
 

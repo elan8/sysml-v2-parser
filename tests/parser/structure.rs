@@ -39,7 +39,15 @@ fn test_use_case_def_body_parses_members() {
             _ => None,
         })
         .expect("objective should be present");
-    assert_eq!(objective.requirement.value.name, "objective");
+    assert_eq!(
+        objective
+            .requirement
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        // `objective` authors no `NAME`; the keyword is the member's syntax, not its name.
+        None
+    );
     assert!(objective.requirement.value.type_name.is_none());
 }
 
@@ -57,7 +65,10 @@ fn test_occurrence_usage_parse() {
     };
     match &elements[0].value {
         PackageBodyElement::OccurrenceUsage(occ) => {
-            assert_eq!(occ.name, "sample");
+            assert_eq!(
+                occ.name.and_then(|n| result.declaration_name(n)),
+                Some("sample")
+            );
             assert!(occ.type_name.is_some());
         }
         _ => panic!("expected OccurrenceUsage"),
@@ -319,7 +330,7 @@ part def D {
         "unexpected errors: {:?}",
         result.errors
     );
-    let root = result.document.root;
+    let root = &result.document.root;
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
@@ -329,13 +340,18 @@ part def D {
     };
 
     fn attribute_def_value<'a>(
+        doc: &ParsedDocument,
         elements: &'a [Node<PackageBodyElement>],
         name: &str,
     ) -> &'a FeatureValue {
         let value_opt: &Option<Node<FeatureValue>> = elements
             .iter()
             .find_map(|e| match &e.value {
-                PackageBodyElement::AttributeDef(a) if a.value.name == name => Some(&a.value.value),
+                PackageBodyElement::AttributeDef(a)
+                    if a.value.name.and_then(|n| doc.declaration_name(n)) == Some(name) =>
+                {
+                    Some(&a.value.value)
+                }
                 _ => None,
             })
             .unwrap_or_else(|| panic!("expected AttributeDef {name}"));
@@ -345,23 +361,23 @@ part def D {
             .value
     }
 
-    let bind = attribute_def_value(elements, "bindAttr");
+    let bind = attribute_def_value(&result.document, elements, "bindAttr");
     assert_eq!(bind.kind, FeatureValueKind::Bind);
     assert!(!bind.is_default);
 
-    let assign = attribute_def_value(elements, "assignAttr");
+    let assign = attribute_def_value(&result.document, elements, "assignAttr");
     assert_eq!(assign.kind, FeatureValueKind::Assign);
     assert!(!assign.is_default);
 
-    let default_bind = attribute_def_value(elements, "defaultBindAttr");
+    let default_bind = attribute_def_value(&result.document, elements, "defaultBindAttr");
     assert_eq!(default_bind.kind, FeatureValueKind::Bind);
     assert!(default_bind.is_default);
 
-    let default_assign = attribute_def_value(elements, "defaultAssignAttr");
+    let default_assign = attribute_def_value(&result.document, elements, "defaultAssignAttr");
     assert_eq!(default_assign.kind, FeatureValueKind::Assign);
     assert!(default_assign.is_default);
 
-    let default_bare = attribute_def_value(elements, "defaultBareAttr");
+    let default_bare = attribute_def_value(&result.document, elements, "defaultBareAttr");
     assert_eq!(default_bare.kind, FeatureValueKind::Bind);
     assert!(default_bare.is_default);
 
@@ -369,7 +385,11 @@ part def D {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("D") =>
+                if p.value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("D") =>
             {
                 Some(&p.value)
             }
@@ -385,13 +405,16 @@ part def D {
     };
 
     fn attribute_usage_value<'a>(
+        doc: &ParsedDocument,
         elements: &'a [Node<PartDefBodyElement>],
         name: &str,
     ) -> &'a FeatureValue {
         let value_opt: &Option<Node<FeatureValue>> = elements
             .iter()
             .find_map(|e| match &e.value {
-                PartDefBodyElement::AttributeUsage(a) if a.value.name == name => {
+                PartDefBodyElement::AttributeUsage(a)
+                    if a.value.name.and_then(|n| doc.declaration_name(n)) == Some(name) =>
+                {
                     Some(&a.value.value)
                 }
                 _ => None,
@@ -403,34 +426,40 @@ part def D {
             .value
     }
 
-    let bind = attribute_usage_value(part_elements, "bindUsage");
+    let bind = attribute_usage_value(&result.document, part_elements, "bindUsage");
     assert_eq!(bind.kind, FeatureValueKind::Bind);
     assert!(!bind.is_default);
 
-    let assign = attribute_usage_value(part_elements, "assignUsage");
+    let assign = attribute_usage_value(&result.document, part_elements, "assignUsage");
     assert_eq!(assign.kind, FeatureValueKind::Assign);
     assert!(!assign.is_default);
 
-    let default_bind = attribute_usage_value(part_elements, "defaultBindUsage");
+    let default_bind = attribute_usage_value(&result.document, part_elements, "defaultBindUsage");
     assert_eq!(default_bind.kind, FeatureValueKind::Bind);
     assert!(default_bind.is_default);
 
-    let default_assign = attribute_usage_value(part_elements, "defaultAssignUsage");
+    let default_assign =
+        attribute_usage_value(&result.document, part_elements, "defaultAssignUsage");
     assert_eq!(default_assign.kind, FeatureValueKind::Assign);
     assert!(default_assign.is_default);
 
-    let default_bare = attribute_usage_value(part_elements, "defaultBareUsage");
+    let default_bare = attribute_usage_value(&result.document, part_elements, "defaultBareUsage");
     assert_eq!(default_bare.kind, FeatureValueKind::Bind);
     assert!(default_bare.is_default);
 
     fn part_usage_value<'a>(
+        doc: &ParsedDocument,
         elements: &'a [Node<PartDefBodyElement>],
         name: &str,
     ) -> &'a FeatureValue {
         let value_opt: &Option<Node<FeatureValue>> = elements
             .iter()
             .find_map(|e| match &e.value {
-                PartDefBodyElement::PartUsage(p) if p.value.name == name => Some(&p.value.value),
+                PartDefBodyElement::PartUsage(p)
+                    if p.value.name.and_then(|n| doc.declaration_name(n)) == Some(name) =>
+                {
+                    Some(&p.value.value)
+                }
                 _ => None,
             })
             .unwrap_or_else(|| panic!("expected PartUsage {name}"));
@@ -440,30 +469,37 @@ part def D {
             .value
     }
 
-    let bind = part_usage_value(part_elements, "bindPart");
+    let bind = part_usage_value(&result.document, part_elements, "bindPart");
     assert_eq!(bind.kind, FeatureValueKind::Bind);
     assert!(!bind.is_default);
 
-    let assign = part_usage_value(part_elements, "assignPart");
+    let assign = part_usage_value(&result.document, part_elements, "assignPart");
     assert_eq!(assign.kind, FeatureValueKind::Assign);
     assert!(!assign.is_default);
 
-    let default_bind = part_usage_value(part_elements, "defaultBindPart");
+    let default_bind = part_usage_value(&result.document, part_elements, "defaultBindPart");
     assert_eq!(default_bind.kind, FeatureValueKind::Bind);
     assert!(default_bind.is_default);
 
-    let default_assign = part_usage_value(part_elements, "defaultAssignPart");
+    let default_assign = part_usage_value(&result.document, part_elements, "defaultAssignPart");
     assert_eq!(default_assign.kind, FeatureValueKind::Assign);
     assert!(default_assign.is_default);
 
-    let default_bare = part_usage_value(part_elements, "defaultBarePart");
+    let default_bare = part_usage_value(&result.document, part_elements, "defaultBarePart");
     assert_eq!(default_bare.kind, FeatureValueKind::Bind);
     assert!(default_bare.is_default);
 
     let ref_decl = part_elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::Ref(r) if r.value.name == "bindRef" => Some(&r.value),
+            PartDefBodyElement::Ref(r)
+                if r.value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("bindRef") =>
+            {
+                Some(&r.value)
+            }
             _ => None,
         })
         .expect("expected ref decl bindRef");
@@ -616,7 +652,12 @@ part def Sensor {
             .map(|e| format!("{:?}", e.value))
             .collect::<Vec<_>>()
     );
-    assert_eq!(defs[0].name, "LocalValueType");
+    assert_eq!(
+        defs[0]
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("LocalValueType")
+    );
 
     let usages: Vec<_> = elements
         .iter()
@@ -636,13 +677,23 @@ part def Sensor {
     );
     assert!(usages
         .iter()
-        .any(|u| u.name == "typed" && u.typing.as_ref().map(|n| n.value.target.len()) == Some(1)));
+        .any(
+            |u| u.name.and_then(|n| result.document.declaration_name(n)) == Some("typed")
+                && u.typing.as_ref().map(|n| n.value.target.len()) == Some(1)
+        ));
     assert!(usages
         .iter()
-        .any(|u| u.name == "untyped" && u.typing.is_none()));
-    assert!(usages.iter().any(|u| u.name == "initialized"
-        && u.typing.as_ref().map(|n| n.value.target.len()) == Some(1)
-        && u.value.is_some()));
+        .any(
+            |u| u.name.and_then(|n| result.document.declaration_name(n)) == Some("untyped")
+                && u.typing.is_none()
+        ));
+    assert!(usages
+        .iter()
+        .any(
+            |u| u.name.and_then(|n| result.document.declaration_name(n)) == Some("initialized")
+                && u.typing.as_ref().map(|n| n.value.target.len()) == Some(1)
+                && u.value.is_some()
+        ));
 }
 
 #[test]
@@ -739,7 +790,11 @@ fn test_parse_interface_usage_named_with_multiplicity() {
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Home") =>
+                if p.value
+                    .identification
+                    .name
+                    .and_then(|n| result.declaration_name(n))
+                    == Some("Home") =>
             {
                 Some(&p.value)
             }
@@ -754,7 +809,7 @@ fn test_parse_interface_usage_named_with_multiplicity() {
         .iter()
         .find_map(|e| match &e.value {
             sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p)
-                if p.value.name == "livingRoom" =>
+                if p.value.name.and_then(|n| result.declaration_name(n)) == Some("livingRoom") =>
             {
                 Some(&p.value)
             }
@@ -980,7 +1035,10 @@ occurrence event typed by Mission::Event subsets events redefines oldEvent;
         PackageBodyElement::OccurrenceUsage(o) => o,
         other => panic!("expected occurrence usage, got {:?}", other),
     };
-    assert_eq!(occ.value.name, "event");
+    assert_eq!(
+        occ.value.name.and_then(|n| result.declaration_name(n)),
+        Some("event")
+    );
     assert!(occ.value.type_name.is_some());
     assert_eq!(
         occ.value.subsets.as_ref().map(|n| n.value.target.len()),
@@ -1585,7 +1643,12 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
     let robot = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(p) if p.value.name == "AutonomousFloorCleaningRobot" => {
+            PackageBodyElement::PartUsage(p)
+                if p.value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("AutonomousFloorCleaningRobot") =>
+            {
                 Some(&p.value)
             }
             _ => None,
@@ -1601,7 +1664,12 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
             _ => None,
         })
         .expect("typed attribute usage in part usage body");
-    assert_eq!(attribute.name, "totalMassKg");
+    assert_eq!(
+        attribute
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("totalMassKg")
+    );
     assert_eq!(
         attribute.typing.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -1646,7 +1714,12 @@ fn test_attribute_usage_accepts_defined_by_typing() {
             _ => None,
         })
         .expect("attribute usage");
-    assert_eq!(attribute.name, "mass");
+    assert_eq!(
+        attribute
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("mass")
+    );
     assert_eq!(
         attribute.typing.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -1690,7 +1763,12 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
             _ => None,
         })
         .expect("attribute usage");
-    assert_eq!(attribute.name, "speed");
+    assert_eq!(
+        attribute
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("speed")
+    );
     assert_eq!(
         attribute.typing.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -1735,7 +1813,7 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
             _ => None,
         })
         .expect("attribute usage");
-    assert!(attribute.name.is_empty());
+    assert!(attribute.name.is_none());
     assert_eq!(
         attribute.redefines.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -1783,7 +1861,12 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
             _ => None,
         })
         .expect("attribute usage");
-    assert_eq!(attribute.name, "outlet");
+    assert_eq!(
+        attribute
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("outlet")
+    );
     assert_eq!(
         attribute.typing.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -1815,7 +1898,12 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
             _ => None,
         })
         .expect("attribute definition");
-    assert_eq!(attribute.name, "length");
+    assert_eq!(
+        attribute
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("length")
+    );
     assert_eq!(
         attribute.typing.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -1843,7 +1931,7 @@ fn test_attribute_def_accepts_untyped_multiplicity_uniqueness_brace_body() {
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.value.name == "measuresOfEffectiveness")),
+            .any(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.value.name.and_then(|n| result.document.declaration_name(n)) == Some("measuresOfEffectiveness"))),
         "attribute definition should be dedicated, not fallback"
     );
 }
@@ -1903,7 +1991,7 @@ fn test_attribute_def_accepts_multiple_specialization_targets() {
     assert!(
         elements.iter().any(|e| matches!(
             &e.value,
-            PackageBodyElement::AttributeDef(a) if a.value.name == "TranslationRotationSequence"
+            PackageBodyElement::AttributeDef(a) if a.value.name.and_then(|n| result.document.declaration_name(n)) == Some("TranslationRotationSequence")
         )),
         "attribute definition should be dedicated"
     );
@@ -1934,7 +2022,12 @@ fn test_attribute_def_accepts_constructor_default_value() {
             _ => None,
         })
         .expect("attribute definition");
-    assert_eq!(attribute.name, "one");
+    assert_eq!(
+        attribute
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("one")
+    );
     assert!(attribute.value.is_some(), "constructor value should parse");
 }
 
@@ -1972,7 +2065,15 @@ fn test_part_usage_body_ref_part_assignments_parse() {
     let system = elements
         .iter()
         .find_map(|element| match &element.value {
-            PackageBodyElement::PartUsage(part) if part.value.name == "system" => Some(&part.value),
+            PackageBodyElement::PartUsage(part)
+                if part
+                    .value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("system") =>
+            {
+                Some(&part.value)
+            }
             _ => None,
         })
         .expect("system part usage");
@@ -1982,7 +2083,13 @@ fn test_part_usage_body_ref_part_assignments_parse() {
     let earth_orbit = elements
         .iter()
         .find_map(|element| match &element.value {
-            PartUsageBodyElement::PartUsage(part) if part.value.name == "earthOrbit" => {
+            PartUsageBodyElement::PartUsage(part)
+                if part
+                    .value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("earthOrbit") =>
+            {
                 Some(&part.value)
             }
             _ => None,
@@ -2009,10 +2116,20 @@ fn test_part_usage_body_ref_part_assignments_parse() {
         })
         .collect();
     assert_eq!(refs.len(), 2, "expected two ref part assignments");
-    assert_eq!(refs[0].name, "centralBody");
+    assert_eq!(
+        refs[0]
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("centralBody")
+    );
     assert!(refs[0].typing.is_none());
     assert!(refs[0].value.is_some());
-    assert_eq!(refs[1].name, "orbitingBody");
+    assert_eq!(
+        refs[1]
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("orbitingBody")
+    );
     assert!(refs[1].typing.is_some());
     assert!(refs[1].value.is_some());
 }
@@ -2061,7 +2178,14 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
     let w = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(p) if p.value.name == "w" => Some(&p.value),
+            PackageBodyElement::PartUsage(p)
+                if p.value
+                    .name
+                    .and_then(|n| usage_result.document.declaration_name(n))
+                    == Some("w") =>
+            {
+                Some(&p.value)
+            }
             _ => None,
         })
         .expect("part w");
@@ -2071,7 +2195,14 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
     let origin = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartUsageBodyElement::PartUsage(p) if p.value.name == "origin" => Some(&p.value),
+            PartUsageBodyElement::PartUsage(p)
+                if p.value
+                    .name
+                    .and_then(|n| usage_result.document.declaration_name(n))
+                    == Some("origin") =>
+            {
+                Some(&p.value)
+            }
             _ => None,
         })
         .expect("ref part origin as PartUsage");
@@ -2112,7 +2243,13 @@ part def Carrier {
         sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
         other => panic!("expected part usage, got {:?}", other),
     };
-    assert_eq!(part_usage.value.name, "engine");
+    assert_eq!(
+        part_usage
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("engine")
+    );
     assert_eq!(
         part_usage
             .value
@@ -2160,7 +2297,13 @@ part def Carrier {
         sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
         other => panic!("expected part usage, got {:?}", other),
     };
-    assert_eq!(part_usage.value.name, "engine");
+    assert_eq!(
+        part_usage
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("engine")
+    );
     assert_eq!(
         part_usage
             .value
@@ -2258,7 +2401,7 @@ part def Carrier {
         sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
         other => panic!("expected part usage, got {:?}", other),
     };
-    assert!(part_usage.value.name.is_empty());
+    assert!(part_usage.value.name.is_none());
     assert_eq!(
         part_usage
             .value
@@ -2279,7 +2422,7 @@ part def FourCylinderEngine :> Engine {
 }"#;
     let result = parse(input).expect("part redefines-only keyword should parse");
     let part_usage = part_def_body_part_usage(&result, 0, 0);
-    assert!(part_usage.name.is_empty());
+    assert!(part_usage.name.is_none());
     assert_eq!(
         part_usage.redefines.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -2306,7 +2449,12 @@ part def logicalDriveUnit {
         diag.errors
     );
     let part_usage = nested_part_usage_in_part_usage(&diag.document.root, 0, 0, 0);
-    assert_eq!(part_usage.name, "tire1");
+    assert_eq!(
+        part_usage
+            .name
+            .and_then(|n| diag.document.declaration_name(n)),
+        Some("tire1")
+    );
     assert_eq!(
         part_usage.redefines.as_ref().map(|n| n.value.target.len()),
         Some(1)
@@ -2326,7 +2474,10 @@ port def DebrisPort {
 }"#;
     let result = parse(input).expect("directed item inout should parse");
     let item = port_def_body_item_usage(&result, 0, 0);
-    assert_eq!(item.name, "debris");
+    assert_eq!(
+        item.name.and_then(|n| result.declaration_name(n)),
+        Some("debris")
+    );
     assert_eq!(
         item.prefix
             .basic()
@@ -2371,7 +2522,10 @@ port def AirPort {
     };
     match &body[0].value {
         sysml_v2_parser::ast::PortDefBodyElement::InOutDecl(decl) => {
-            assert_eq!(decl.value.name, "volume");
+            assert_eq!(
+                decl.value.name.and_then(|n| result.declaration_name(n)),
+                Some("volume")
+            );
             assert_eq!(decl.value.direction, sysml_v2_parser::ast::InOut::Out);
             // Spec42 Gap 45 fallout: the authored `:>` is a subsets clause, no longer folded
             // into `type_name`.
@@ -2405,7 +2559,10 @@ port def FuelPort {
     };
     match &body[0].value {
         sysml_v2_parser::ast::PortDefBodyElement::InOutDecl(decl) => {
-            assert_eq!(decl.value.name, "fuel");
+            assert_eq!(
+                decl.value.name.and_then(|n| result.declaration_name(n)),
+                Some("fuel")
+            );
             assert_eq!(decl.value.direction, sysml_v2_parser::ast::InOut::Out);
         }
         other => panic!("expected InOutDecl, got {:?}", other),
@@ -2803,7 +2960,7 @@ end systemOfInterest references theSystem;
     let EndIdentity::Declaration(party_name) = &party.identity else {
         panic!("expected declaration identity for first end");
     };
-    assert_eq!(party_name.value, "party");
+    assert_eq!(result.document.declaration_name(*party_name), Some("party"));
     assert!(party.typing.is_none());
     let party_refs = party
         .references
@@ -2819,7 +2976,10 @@ end systemOfInterest references theSystem;
     let EndIdentity::Declaration(system_name) = &system_of_interest.identity else {
         panic!("expected declaration identity for second end");
     };
-    assert_eq!(system_name.value, "systemOfInterest");
+    assert_eq!(
+        result.document.declaration_name(*system_name),
+        Some("systemOfInterest")
+    );
     assert!(system_of_interest.typing.is_none());
     let soi_refs = system_of_interest
         .references
@@ -2911,7 +3071,7 @@ end consumer references b;
                     if matches!(
                         &end.value.identity,
                         sysml_v2_parser::ast::EndIdentity::Declaration(name)
-                            if name.value == expected_name
+                            if result.document.declaration_name(*name) == Some(expected_name)
                     ) =>
                 {
                     Some(&end.value)
@@ -3002,7 +3162,7 @@ end device ::> sensorFeed[1];
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, PackageBodyElement::ConnectionDef(d) if d.value.identification.name.as_deref() == Some("DeviceConnection"))),
+            .any(|e| matches!(&e.value, PackageBodyElement::ConnectionDef(d) if d.value.identification.name.and_then(|n| result.document.declaration_name(n)) == Some("DeviceConnection"))),
         "`connection def DeviceConnection {{ ... }}` should still be a ConnectionDef: {:?}",
         elements
     );
@@ -3013,7 +3173,10 @@ end device ::> sensorFeed[1];
             _ => None,
         })
         .expect("`connection connection1 : DeviceConnection { ... }` should be a ConnectionUsage, not a ConnectionDef");
-    assert_eq!(usage.name.as_deref(), Some("connection1"));
+    assert_eq!(
+        usage.name.and_then(|n| result.document.declaration_name(n)),
+        Some("connection1")
+    );
     assert!(usage.type_reference.is_some());
 }
 
@@ -3056,7 +3219,7 @@ fn test_package_level_explicit_def_typed_connection_stays_connection_def() {
     };
     assert!(
         elements.iter().any(|e| matches!(&e.value,
-            PackageBodyElement::ConnectionDef(d) if d.value.identification.name.as_deref() == Some("Foo"))),
+            PackageBodyElement::ConnectionDef(d) if d.value.identification.name.and_then(|n| result.declaration_name(n)) == Some("Foo"))),
         "explicit `connection def Foo : Base {{ ... }}` must stay a ConnectionDef: {:?}",
         elements
     );
@@ -3096,7 +3259,7 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
     assert!(
         matches!(
             &end.identity,
-            sysml_v2_parser::ast::EndIdentity::Declaration(name) if name.value == "party"
+            sysml_v2_parser::ast::EndIdentity::Declaration(name) if result.document.declaration_name(*name) == Some("party")
         ),
         "`party` must parse as one name, not keyword `part` + name `y`"
     );
@@ -3238,7 +3401,12 @@ part def RequiredSensor {
         .iter()
         .find_map(|element| match &element.value {
             PackageBodyElement::PartDef(part)
-                if part.value.identification.name.as_deref() == Some("RequiredSensor") =>
+                if part
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.declaration_name(n))
+                    == Some("RequiredSensor") =>
             {
                 Some(part)
             }
@@ -3254,7 +3422,7 @@ part def RequiredSensor {
         &element.value,
         PartDefBodyElement::Dependency(dependency)
             if dependency.value.identification.as_ref()
-                .and_then(|identification| identification.name.as_deref())
+                .and_then(|identification| identification.name.and_then(|n| result.declaration_name(n)))
                 == Some("selectedImplementation")
     )));
 }
@@ -3301,7 +3469,13 @@ part def Foo {
         sysml_v2_parser::ast::SatisfiedRequirement::Declaration(declaration) => &declaration.value,
         other => panic!("expected the inline-declaration alternative, got {other:?}"),
     };
-    assert_eq!(declaration.identification.name.as_deref(), Some("myReq"));
+    assert_eq!(
+        declaration
+            .identification
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("myReq")
+    );
     assert!(declaration.identification.short_name.is_none());
     assert!(satisfy.typing.is_some());
     let subject = satisfy.subject.as_ref().expect("authored `by` clause");
@@ -3580,7 +3754,10 @@ part def Foo {
         })
         .expect("expected an EnumerationUsage member");
     assert!(enum_usage.is_end);
-    assert_eq!(enum_usage.name, "status");
+    assert_eq!(
+        diag.document.declaration_name(enum_usage.name),
+        Some("status")
+    );
 }
 
 fn alias_def_target(pkg_elements: &[Node<PackageBodyElement>]) -> &AliasDef {

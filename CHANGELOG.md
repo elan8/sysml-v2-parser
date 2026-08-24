@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Declaration names and short names are typed source spans.** Every `name`, `short_name`,
+  `declared_name`, `declaration_name`, `state_name`, `succession_name` and `binding_name` field
+  that used to copy the token into a `String` is now a `DeclarationName { span }` resolved through
+  the owning document: `ParsedDocument::declaration_name` returns the authored spelling (quotes and
+  escapes intact) and `ParsedDocument::decoded_declaration_name` the decoded `NAME` value,
+  allocating only for an escaped unrestricted name. The parallel `name_span` fields are gone --
+  the name *is* the span -- and so are the `""` sentinels: a usage that admits an anonymous form
+  (`part :>> target`, `constraint { … }`, `actor : Person;`, `return : T`, …) now has
+  `name: Option<DeclarationName>`. The emitter streams names from their spans instead of
+  re-quoting a decoded string, so `format_name` is gone; the semantic projection still shows the
+  decoded value. `ast::DeclarationName` (the `Simple | Qualified` namespace-name enum) is renamed
+  `ast::NamespaceName`. Standalone `accept`/`send` control nodes were identified by a fabricated
+  `ActionUsage.name == "accept"`; they now carry `ActionUsage::keyword: ActionUsageKeyword` and
+  no name, and the semantic projection adds a `(keyword …)` slot to `action-usage`. `Span` is
+  now `Copy`. **AST version 240.**
 - **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
   Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
   whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,

@@ -174,7 +174,7 @@ impl Visitor for ProvenanceValidator<'_> {
     }
 
     fn enter_node(&mut self, span: &Span) {
-        self.owners.push(span.clone());
+        self.owners.push(*span);
     }
 
     fn leave_node(&mut self, _span: &Span) {

@@ -1,8 +1,8 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    ClassifierDecl, DeclarationName, ExtendedLibraryDecl, FeatureDecl, FilterMember,
-    KermlFeatureDecl, KermlSemanticDecl, LibraryPackage, NamespaceDecl, Node, Package, PackageBody,
+    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, FilterMember, KermlFeatureDecl,
+    KermlSemanticDecl, LibraryPackage, NamespaceDecl, NamespaceName, Node, Package, PackageBody,
     PackageBodyElement, QualifiedIdentification, RootElement, RootNamespace, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
@@ -74,8 +74,8 @@ fn required_package_identification(
     let (input, decl_name) = opt(preceded(
         ws_and_comments,
         alt((
-            map(qualified_declaration_name, DeclarationName::Qualified),
-            map(name, DeclarationName::Simple),
+            map(qualified_declaration_name, NamespaceName::Qualified),
+            map(name, NamespaceName::Simple),
         )),
     ))
     .parse(input)?;
@@ -405,15 +405,15 @@ fn binding_connector_usage_inner(
         .map(|(i, o)| (i, o.is_some()))?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
-    let (input, name_span) = if all
+    let (input, binding_name) = if all
         || frag.starts_with(b"[")
         || starts_with_keyword(frag, b"of")
         || starts_with_keyword(frag, b"bind")
     {
         (input, None)
     } else {
-        let (input, (span, _text)) = crate::parser::span::with_span(name).parse(input)?;
-        (input, Some(span))
+        let (input, binding_name) = name(input)?;
+        (input, Some(binding_name))
     };
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
@@ -450,7 +450,7 @@ fn binding_connector_usage_inner(
             input,
             crate::ast::BindingConnectorUsage {
                 all,
-                name_span,
+                name: binding_name,
                 multiplicity,
                 uses_of_keyword,
                 uses_bind_keyword,
@@ -630,9 +630,7 @@ fn kerml_bare_declaration(
         })?;
     let (input, _) = nom::bytes::complete::tag(*keyword_bytes).parse(input)?;
     let keyword = *keyword;
-    let (input, name_span) =
-        opt(preceded(ws1, crate::parser::span::with_span(name))).parse(input)?;
-    let name_span = name_span.map(|(span, _text)| span);
+    let (input, bare_name) = opt(preceded(ws1, name)).parse(input)?;
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -647,7 +645,7 @@ fn kerml_bare_declaration(
             input,
             crate::ast::KermlBareDeclaration {
                 keyword,
-                name_span,
+                name: bare_name,
                 multiplicity,
             },
         ),
@@ -999,7 +997,7 @@ pub(crate) fn kerml_type_relationship_clauses(
         targets.extend(more);
         let span = crate::parser::span_from_to(before, rest);
         out.push(Node::new(
-            span.clone(),
+            span,
             crate::ast::KermlTypeRelationship {
                 keyword,
                 targets,
@@ -1067,7 +1065,7 @@ fn kerml_classifier_structured_inner(
             (
                 input,
                 Some(Node::new(
-                    span.clone(),
+                    span,
                     crate::ast::TypingRelationship {
                         target: vec![target],
                         kind: crate::ast::TypingKind::Typing,
@@ -1145,7 +1143,7 @@ fn kerml_conjugation_part(
     Ok((
         input,
         Some(Node::new(
-            span.clone(),
+            span,
             crate::ast::Conjugation {
                 target,
                 spelling,
@@ -2628,14 +2626,20 @@ mod tests {
 
     #[test]
     fn package_body_accepts_connection_usage_with_inline_connect_clause() {
+        let source = parse_input("connection link : Link connect a to b;");
         let (rest, node) =
-            package_body_element(parse_input("connection link : Link connect a to b;"))
-                .expect("connection usage with connect clause");
+            package_body_element(source).expect("connection usage with connect clause");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let PackageBodyElement::ConnectionUsage(usage) = node.value else {
             panic!("expected ConnectionUsage, got {:?}", node.value);
         };
-        assert_eq!(usage.value.name.as_deref(), Some("link"));
+        assert_eq!(
+            usage
+                .value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"link"[..])
+        );
         assert!(usage.value.type_reference.is_some());
         assert!(usage.value.connect_from.is_some());
         assert!(usage.value.connect_to.is_some());

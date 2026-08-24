@@ -4,7 +4,7 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -18,7 +18,8 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Simple Tests/ConnectionTest.sysml:31-35`:
@@ -33,7 +34,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// Previously: `connection_def_body_element` had no `part_usage` dispatch at all.
 #[test]
 fn gh89_1_bare_part_usage_in_connection_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             abstract connection def C {
                 part p;
@@ -52,7 +53,7 @@ fn gh89_1_bare_part_usage_in_connection_def_body() {
         _ => None,
     });
     let part = part.expect("expected a PartUsage element");
-    assert_eq!(part.name, "p");
+    assert_eq!(part.name.and_then(|n| doc.declaration_name(n)), Some("p"));
 }
 
 /// Same gap, but for the anonymous, unnamed `connection { ... }` form (Simple Tests/
@@ -61,7 +62,7 @@ fn gh89_1_bare_part_usage_in_connection_def_body() {
 /// `connection_def_body_element` dispatch as the named def form above.
 #[test]
 fn gh89_1_bare_part_usage_in_anonymous_connection_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             part def T;
             connection {
@@ -81,7 +82,7 @@ fn gh89_1_bare_part_usage_in_anonymous_connection_body() {
         _ => None,
     });
     let part = part.expect("expected a PartUsage element");
-    assert_eq!(part.name, "q");
+    assert_eq!(part.name.and_then(|n| doc.declaration_name(n)), Some("q"));
 }
 
 /// Real usage: `Camera Example/Camera.sysml:4`:
@@ -102,7 +103,7 @@ fn gh89_1_bare_part_usage_in_anonymous_connection_body() {
 /// Previously: `alias_def` was only dispatched at package-body scope.
 #[test]
 fn gh89_3_alias_in_part_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             part def P1 {
                 port porig1;
@@ -121,7 +122,13 @@ fn gh89_3_alias_in_part_def_body() {
         _ => None,
     });
     let alias = alias.expect("expected an AliasDef element");
-    assert_eq!(alias.identification.name.as_deref(), Some("po1"));
+    assert_eq!(
+        alias
+            .identification
+            .name
+            .and_then(|n| doc.declaration_name(n)),
+        Some("po1")
+    );
 }
 
 /// Same gap, but for a part *usage* body (Simple Tests/AliasTest.sysml:14-17):
@@ -133,7 +140,7 @@ fn gh89_3_alias_in_part_def_body() {
 /// ```
 #[test]
 fn gh89_3_alias_in_part_usage_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             part def P1;
             part p2 : P1 {
@@ -153,7 +160,13 @@ fn gh89_3_alias_in_part_usage_body() {
         _ => None,
     });
     let alias = alias.expect("expected an AliasDef element");
-    assert_eq!(alias.identification.name.as_deref(), Some("pd1"));
+    assert_eq!(
+        alias
+            .identification
+            .name
+            .and_then(|n| doc.declaration_name(n)),
+        Some("pd1")
+    );
 }
 
 /// Real usage: `Simple Tests/UseCaseTest.sysml:32-36`:
@@ -169,7 +182,7 @@ fn gh89_3_alias_in_part_usage_body() {
 /// `PartDefBodyElement` but not `PartUsageBodyElement`, so `use case uc1 : UC1;` failed too.
 #[test]
 fn gh89_4_include_and_use_case_usage_in_part_usage_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             use case def UC1;
             use case uc2;
@@ -200,7 +213,7 @@ fn gh89_4_include_and_use_case_usage_in_part_usage_body() {
         _ => None,
     });
     let use_case = use_case.expect("expected a UseCaseUsage element");
-    assert_eq!(use_case.name, "uc1");
+    assert_eq!(doc.declaration_name(use_case.name), Some("uc1"));
 }
 
 /// Real usage: `Simple Tests/ConstraintTest.sysml:78-81`:
@@ -218,7 +231,7 @@ fn gh89_4_include_and_use_case_usage_in_part_usage_body() {
 /// constraint ...` form.
 #[test]
 fn gh89_5_named_assert_without_constraint_keyword() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def Component { attribute mass = 1.0; }
             part vehicle : Component;
@@ -260,7 +273,7 @@ fn gh89_5_named_assert_without_constraint_keyword() {
 /// attribute) but not at package scope.
 #[test]
 fn gh89_5_assert_not_at_package_scope() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             attribute mass = 1.0;
             attribute massLimit = 2.0;
@@ -293,7 +306,7 @@ fn gh89_5_assert_not_at_package_scope() {
 /// *definition* bodies, not plain part usage bodies.
 #[test]
 fn gh89_6_verification_usage_in_part_usage_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             verification def VerificationPlan;
             part def V;
@@ -316,7 +329,10 @@ fn gh89_6_verification_usage_in_part_usage_body() {
         _ => None,
     });
     let verification = verification.expect("expected a VerificationCaseUsage element");
-    assert_eq!(verification.name, "verificationPlan");
+    assert_eq!(
+        doc.declaration_name(verification.name),
+        Some("verificationPlan")
+    );
 }
 
 /// Real usage: `Simple Tests/ViewTest.sysml:23-32`:
@@ -333,7 +349,7 @@ fn gh89_6_verification_usage_in_part_usage_body() {
 /// *name* and the following `r1: R[0..1]` broke the header parse.
 #[test]
 fn gh89_8_render_rendering_member_in_view_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package ViewTest {
             rendering def R;
             view def V {
@@ -352,7 +368,7 @@ fn gh89_8_render_rendering_member_in_view_def_body() {
         _ => None,
     });
     let rendering = rendering.expect("expected a ViewRenderingUsage element");
-    assert_eq!(rendering.name, "r1");
+    assert_eq!(doc.declaration_name(rendering.name), Some("r1"));
     assert!(rendering.type_name.is_some());
 }
 
@@ -368,7 +384,7 @@ fn gh89_8_render_rendering_member_in_view_def_body() {
 /// usage member.
 #[test]
 fn gh89_9_directed_item_usage_in_part_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package TimeVaryingAttribute {
             item def PwrCmd;
             part def Transport2 {
@@ -387,7 +403,10 @@ fn gh89_9_directed_item_usage_in_part_def_body() {
         _ => None,
     });
     let item = item.expect("expected an ItemUsage element");
-    assert_eq!(item.name, "pwrCmd");
+    assert_eq!(
+        item.name.and_then(|n| doc.declaration_name(n)),
+        Some("pwrCmd")
+    );
     assert!(item.type_name.is_some());
     assert_eq!(
         item.prefix

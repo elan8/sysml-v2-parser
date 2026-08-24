@@ -781,7 +781,7 @@ enum FrameKind {
     /// Arrow-invocation argument list: postfix `->` name `(` args `)` applied to `base`.
     ArrowInvocation {
         base: Node<Expression>,
-        member: String,
+        op: CollectionOperator,
     },
     /// Constructor argument list: `new` type_name `(` args `)`.
     Constructor {
@@ -974,11 +974,11 @@ fn build_frame_node<'a>(
                 close_bracket_span: crate::parser::span_from_to(close_start, end),
             },
         ),
-        FrameKind::ArrowInvocation { base, member } => node_from_to(
+        FrameKind::ArrowInvocation { base, op } => node_from_to(
             open_at,
             end,
             Expression::CollectionOp {
-                op: CollectionOperator::from_name(&member),
+                op,
                 base: Box::new(base),
                 args: items,
                 brace_body: None,
@@ -1222,7 +1222,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 // `expr.metadata` is a dedicated KerML production (MetadataAccessExpression, BNF
                 // 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`), distinct from ordinary
                 // member access.
-                let expr = if member_text == "metadata" {
+                let expr = if crate::parser::lex::name_is(member_input, member_text, b"metadata") {
                     Expression::MetadataAccess(Box::new(atom))
                 } else {
                     let (_, member) = qualified_reference(member_input)?;
@@ -1241,12 +1241,16 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 let (next, _) = ws_and_comments(next)?;
                 let member_input = next;
                 let (next, member) = name(next)?;
+                let op = CollectionOperator::from_name(
+                    std::str::from_utf8(crate::parser::lex::name_bytes(member_input, member))
+                        .unwrap_or_default(),
+                );
                 let (after_name, _) = ws_and_comments(next)?;
                 // Brace-body form: `collection->forAll { in ref w; expr }`
                 if after_name.fragment().starts_with(b"{") {
                     let (after_brace, body) = collection_operator_body(after_name)?;
                     let expr = Expression::CollectionOp {
-                        op: CollectionOperator::from_name(&member),
+                        op,
                         base: Box::new(atom),
                         args: Vec::new(),
                         brace_body: Some(Box::new(body)),
@@ -1263,7 +1267,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                     if empty_peek.fragment().starts_with(b")") {
                         let (after_close, _) = tag(&b")"[..]).parse(empty_peek)?;
                         let expr = Expression::CollectionOp {
-                            op: CollectionOperator::from_name(&member),
+                            op,
                             base: Box::new(atom),
                             args: Vec::new(),
                             brace_body: None,
@@ -1275,7 +1279,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                     }
                     stack.push((
                         Frame::new(
-                            FrameKind::ArrowInvocation { base: atom, member },
+                            FrameKind::ArrowInvocation { base: atom, op },
                             primary_start,
                             after_paren,
                             crate::parser::span_from_to(after_name, after_paren),
@@ -1311,7 +1315,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                     if let Ok((after_ref, func_ref)) = qualified_reference(after_name) {
                         let span = crate::parser::span_from_to(after_name, after_ref);
                         let expr = Expression::CollectionOp {
-                            op: CollectionOperator::from_name(&member),
+                            op,
                             base: Box::new(atom),
                             args: vec![Argument {
                                 parameter: None,
@@ -1410,7 +1414,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
             let comma_start = peek;
             let (next, _) = tag(&b","[..]).parse(peek)?;
             let comma_span = crate::parser::span_from_to(comma_start, next);
-            frame.comma_spans.push(comma_span.clone());
+            frame.comma_spans.push(comma_span);
             let (after_comma, _) = ws_and_comments(next)?;
             if is_sequence && after_comma.fragment().first() == Some(&close_delimiter) {
                 frame.trailing_comma_span = Some(comma_span);

@@ -1,5 +1,5 @@
 use crate::ast::{
-    CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, PurposeMember,
+    CommentAnnotation, ConcernUsage, DeclarationName, DocComment, FrameMember, Node, PurposeMember,
     RequireConstraint, RequirementActorDecl, RequirementDef, RequirementDefBody,
     RequirementDefBodyElement, RequirementUsage, SatisfactionSubject, SatisfiedRequirement,
     SatisfyRequirementUsage, StakeholderMember, SubjectDecl, SubjectRef, TextualRepresentation,
@@ -332,18 +332,16 @@ fn requirement_def_body_element(
     Ok((rest, node_from_to(start, rest, elem)))
 }
 
-pub(crate) fn parse_requirement_usage_payload<'a>(
-    input: Input<'a>,
-    default_name: Option<&str>,
-) -> IResult<Input<'a>, RequirementUsage> {
-    parse_requirement_usage_payload_with_abstract(input, default_name, false)
+pub(crate) fn parse_requirement_usage_payload(
+    input: Input<'_>,
+) -> IResult<Input<'_>, RequirementUsage> {
+    parse_requirement_usage_payload_with_abstract(input, false)
 }
 
-pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
-    input: Input<'a>,
-    default_name: Option<&str>,
+pub(crate) fn parse_requirement_usage_payload_with_abstract(
+    input: Input<'_>,
     already_abstract: bool,
-) -> IResult<Input<'a>, RequirementUsage> {
+) -> IResult<Input<'_>, RequirementUsage> {
     let (input, _) = ws_and_comments(input)?;
     // Support usage extension keywords where this parser already tolerates them.
     let (input, abstract_kws) = many0(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -360,17 +358,13 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
             || starts_with_keyword(peek.fragment(), b"references")
             || starts_with_keyword(peek.fragment(), b"redefines")
             || starts_with_keyword(peek.fragment(), b"subsets");
-        if let Some(default) = default_name {
-            if starts_body_or_spec {
-                (input, default.to_string())
-            } else {
-                preceded(ws_and_comments, name).parse(input)?
-            }
-        } else if starts_body_or_spec {
-            // Anonymous usage: `requirement references X { … }` / `requirement : Type { … }`.
-            (input, String::new())
+        // The anonymous `requirement references X { … }` / `requirement : Type { … }` forms
+        // leave the name unauthored.
+        if starts_body_or_spec {
+            (input, None)
         } else {
-            preceded(ws_and_comments, name).parse(input)?
+            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            (input, Some(n))
         }
     };
     let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
@@ -428,7 +422,7 @@ fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyR
     let (input, member) = if let Ok((input, _)) =
         tag::<_, _, nom::error::Error<Input>>(&b"requirement"[..]).parse(input)
     {
-        let (input, requirement) = parse_requirement_usage_payload(input, None)?;
+        let (input, requirement) = parse_requirement_usage_payload(input)?;
         (
             input,
             VerifyRequirementMember {
@@ -472,7 +466,7 @@ fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyR
 
 fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
-    let (input, decl) = requirement_parameter_decl(input, b"stakeholder", "stakeholder")?;
+    let (input, decl) = requirement_parameter_decl(input, b"stakeholder")?;
     Ok((
         input,
         node_from_to(
@@ -506,7 +500,7 @@ fn stakeholder_shorthand_member_inner(
             start,
             input,
             StakeholderMember {
-                declaration_name: String::new(),
+                declaration_name: None,
                 target: Some(target),
                 type_name: None,
                 is_redefinition: false,
@@ -536,7 +530,7 @@ fn stakeholder_redefinition_member_inner(
             start,
             input,
             StakeholderMember {
-                declaration_name: String::new(),
+                declaration_name: None,
                 target: Some(target),
                 type_name: None,
                 is_redefinition: true,
@@ -590,7 +584,7 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
             input,
             FrameMember {
                 has_concern_keyword: concern_keyword.is_some(),
-                name: ident.name.unwrap_or_default(),
+                name: ident.name,
                 short_name: ident.short_name,
                 type_name: header.type_reference,
                 multiplicity: header.multiplicity,
@@ -637,10 +631,10 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
             .iter()
             .any(|keyword| crate::parser::lex::starts_with_keyword(input.fragment(), keyword))
         {
-            (input, String::new())
+            (input, None)
         } else {
             let (input, n) = name(input)?;
-            (input, n)
+            (input, Some(n))
         }
     };
     // `:>>` may be authored before the typing (`subject subj :>> Case::subj;`, Systems Library
@@ -658,7 +652,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     // 305-315; Pilot `SysML.xtext` 2053, 592-605). The body is part of this member's syntax,
     // so retain it rather than parsing a constraint-body surrogate and discarding its members.
     let (input, body) = semicolon_or_structured_definition_body(input)?;
-    if n.is_empty()
+    if n.is_none()
         && header.typing.is_none()
         && header.subsets.is_none()
         && header.redefines.is_none()
@@ -699,7 +693,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
 
 pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementActorDecl>> {
     let start = input;
-    let (input, decl) = requirement_parameter_decl(input, b"actor", "actor")?;
+    let (input, decl) = requirement_parameter_decl(input, b"actor")?;
     Ok((
         input,
         node_from_to(
@@ -716,8 +710,8 @@ pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Requiremen
 }
 
 struct RequirementParameterDecl {
-    name: String,
-    short_name: Option<String>,
+    name: Option<DeclarationName>,
+    short_name: Option<DeclarationName>,
     type_name: crate::ast::QualifiedReferenceId,
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
 }
@@ -725,18 +719,17 @@ struct RequirementParameterDecl {
 fn requirement_parameter_decl<'a>(
     input: Input<'a>,
     keyword: &'a [u8],
-    default_name: &'a str,
 ) -> IResult<Input<'a>, RequirementParameterDecl> {
     let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, n) = {
         let (after_gap, _) = ws_and_comments(input)?;
         if after_gap.fragment().starts_with(b":") {
-            (after_gap, default_name.to_string())
+            (after_gap, None)
         } else {
             let (input, _) = ws1(input)?;
             let (input, n) = name(input)?;
-            (input, n)
+            (input, Some(n))
         }
     };
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
@@ -1259,12 +1252,11 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, (name_span, ident)) = with_span(name).parse(input)?;
+    let (input, ident) = name(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
-        name_span,
         is_abstract: abstract_kw.is_some(),
         is_individual: individual_kw.is_some(),
         type_name: header.type_reference,
@@ -1298,7 +1290,7 @@ pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Req
         input
     };
     let (input, mut val) =
-        parse_requirement_usage_payload_with_abstract(input, None, abstract_kw.is_some())?;
+        parse_requirement_usage_payload_with_abstract(input, abstract_kw.is_some())?;
     val.is_variation = variation_kw.is_some();
     val.membership = crate::ast::Membership::feature(visibility, visibility_span);
     Ok((input, node_from_to(start, input, val)))
@@ -1366,7 +1358,7 @@ mod typed_reference_tests {
     fn stakeholder_reference_is_separate_from_declaration_name() {
         let (stakeholder, source, arena) =
             parse_node("stakeholder $::Concerns::Safety;", stakeholder_member);
-        assert!(stakeholder.value.declaration_name.is_empty());
+        assert!(stakeholder.value.declaration_name.is_none());
         let target = stakeholder.value.target.expect("stakeholder target");
         assert_absolute_two_segment_reference(&source, &arena, target, "$::Concerns::Safety");
     }
@@ -1468,10 +1460,14 @@ mod membership_tests {
 
     #[test]
     fn concern_usage_def_form_is_a_definition() {
-        let (rest, node) = concern_usage(input("concern def ConcernType;")).expect("concern def");
+        let src = input("concern def ConcernType;");
+        let (rest, node) = concern_usage(src).expect("concern def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_definition);
-        assert_eq!(node.value.name, "ConcernType");
+        assert_eq!(
+            crate::parser::lex::name_bytes(src, node.value.name),
+            b"ConcernType"
+        );
     }
 
     #[test]
@@ -1501,13 +1497,23 @@ mod membership_tests {
 
     #[test]
     fn requirement_usage_accepts_short_name() {
-        let (rest, node) = requirement_usage(input(
+        let src = input(
             "requirement <'1.1'> vehicleMass1: MassLimitationRequirement { subject vehicle : Vehicle; }",
-        ))
-        .expect("requirement usage with short name");
+        );
+        let (rest, node) = requirement_usage(src).expect("requirement usage with short name");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("1.1"));
-        assert_eq!(node.value.name, "vehicleMass1");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"'1.1'"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"vehicleMass1"[..])
+        );
         assert!(node.value.type_name.is_some());
     }
 }

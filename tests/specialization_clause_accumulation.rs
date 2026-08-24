@@ -23,7 +23,7 @@ fn first_subsets_span(document: &ParsedDocument) -> Option<Span> {
     impl Visitor for FindSubsets {
         fn visit_subsetting_relationship(&mut self, node: &Node<SubsettingRelationship>) {
             if node.value.kind == SubsettingKind::Subsets && self.span.is_none() {
-                self.span = Some(node.value.span.clone());
+                self.span = Some(node.value.span);
             }
         }
     }

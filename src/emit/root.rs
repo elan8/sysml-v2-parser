@@ -1,11 +1,11 @@
 //! Root namespace / package / import emission.
 
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
-    CommentAnnotation, DeclarationName, DocComment, FilterMember, Identification, Import,
-    ImportShape, ImportTarget, LibraryPackage, Package, PackageBody, PackageBodyElement,
+    CommentAnnotation, DocComment, FilterMember, Identification, Import, ImportShape, ImportTarget,
+    LibraryPackage, NamespaceName, Package, PackageBody, PackageBodyElement,
     QualifiedIdentification, RootElement, RootNamespace, TextualRepresentation,
 };
 
@@ -74,7 +74,7 @@ fn emit_extended_definition(
         w.push_char(' ');
     }
     w.push_str("def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         structure::emit_typing_clause(w, &spec.value)?;
     }
@@ -147,7 +147,7 @@ fn emit_kerml_relationship_decl(
         if decl.declaration_keyword_span.is_some() {
             w.push_str(declaration_keyword);
             if let Some(identification) = &decl.identification {
-                emit_identification(w, identification);
+                emit_identification(w, identification)?;
                 w.push_char(' ');
             }
         } else if let Some(identification) = &decl.identification {
@@ -155,7 +155,7 @@ fn emit_kerml_relationship_decl(
             // keyword: `typing t1 typing f typed by B;` (`kerml/coverage_relationships`).
             w.push_str(decl.keyword.as_str());
             w.push_char(' ');
-            emit_identification(w, identification);
+            emit_identification(w, identification)?;
             w.push_char(' ');
         }
     }
@@ -163,7 +163,7 @@ fn emit_kerml_relationship_decl(
     w.push_char(' ');
     if decl.keyword == Kw::Featuring {
         if let Some(identification) = &decl.identification {
-            emit_identification(w, identification);
+            emit_identification(w, identification)?;
             w.push_str(" of ");
         }
     }
@@ -217,7 +217,7 @@ pub(crate) fn emit_kerml_classifier_decl(
         w.push_str(" all");
     }
     w.push_char(' ');
-    emit_identification(w, &decl.identification);
+    emit_identification(w, &decl.identification)?;
     if let Some(multiplicity) = &decl.multiplicity {
         structure::emit_multiplicity(w, &multiplicity.value)?;
     }
@@ -253,9 +253,9 @@ fn emit_kerml_bare_declaration(
     declaration: &crate::ast::KermlBareDeclaration,
 ) -> Result<(), EmitError> {
     w.push_str(declaration.keyword.as_str());
-    if let Some(name_span) = &declaration.name_span {
+    if let Some(name) = declaration.name {
         w.push_char(' ');
-        w.push_authored_name("kerml-bare-declaration/name", name_span)?;
+        w.push_declaration_name("kerml-bare-declaration/name", name)?;
     }
     if let Some(multiplicity) = &declaration.multiplicity {
         w.push_char(' ');
@@ -503,10 +503,13 @@ pub(crate) fn emit_annotating_member(
     }
 }
 
-pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
-    if let Some(short) = &id.short_name {
+pub(crate) fn emit_identification(
+    w: &mut EmitWriter<'_>,
+    id: &Identification,
+) -> Result<(), EmitError> {
+    if let Some(short) = id.short_name {
         w.push_char('<');
-        w.push_str(&format_name(short));
+        w.push_declaration_name("identification/short-name", short)?;
         w.push_char('>');
         // The separator belongs between the two halves, not to the short name. Writing it
         // unconditionally left a trailing space on `Identification = ( '<' NAME '>' )? ( NAME )?`
@@ -516,9 +519,10 @@ pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
             w.push_char(' ');
         }
     }
-    if let Some(name) = &id.name {
-        w.push_str(&format_name(name));
+    if let Some(name) = id.name {
+        w.push_declaration_name("identification/name", name)?;
     }
+    Ok(())
 }
 
 fn emit_qualified_identification(
@@ -526,14 +530,12 @@ fn emit_qualified_identification(
     path: &str,
     id: &QualifiedIdentification,
 ) -> Result<(), EmitError> {
-    if let Some(short) = &id.short_name {
-        w.push_char('<');
-        w.push_str(&format_name(short));
-        w.push_str("> ");
-    }
+    w.push_short_name_prefix(&format!("{path}/short-name"), id.short_name)?;
     match &id.name {
-        Some(DeclarationName::Simple(name)) => w.push_str(&format_name(name)),
-        Some(DeclarationName::Qualified(name)) => {
+        Some(NamespaceName::Simple(name)) => {
+            w.push_declaration_name(&format!("{path}/declaration-name"), *name)?
+        }
+        Some(NamespaceName::Qualified(name)) => {
             w.push_qualified_reference(&format!("{path}/declaration-name"), name.storage_id())?
         }
         None => {}
@@ -548,7 +550,7 @@ pub(crate) fn emit_doc(w: &mut EmitWriter<'_>, doc: &DocComment) -> Result<(), E
     w.push_str("doc");
     if let Some(id) = &doc.identification {
         w.push_char(' ');
-        emit_identification(w, id);
+        emit_identification(w, id)?;
     }
     if let Some(locale) = &doc.locale {
         w.push_str(" locale \"");
@@ -578,7 +580,7 @@ pub(crate) fn emit_comment(
             if has_keyword {
                 w.push_char(' ');
             }
-            emit_identification(w, id);
+            emit_identification(w, id)?;
         }
         // `about` follows the identification in the production, and the elements it names are
         // part of what the comment says. Omitting them once cost the reader the annotation
@@ -612,7 +614,7 @@ fn emit_textual_rep(w: &mut EmitWriter<'_>, rep: &TextualRepresentation) -> Resu
     }
     if let Some(id) = &rep.rep_identification {
         w.push_str("rep ");
-        emit_identification(w, id);
+        emit_identification(w, id)?;
         w.push_char(' ');
     }
     w.push_str("language \"");

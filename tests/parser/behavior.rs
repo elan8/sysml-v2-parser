@@ -446,7 +446,7 @@ state def S {
     let typed_accept = transitions[1].accept.as_ref().expect("typed accept");
     match typed_accept {
         sysml_v2_parser::ast::TransitionAccept::Payload(payload, via) => {
-            assert_eq!(payload.name, "evt");
+            assert_eq!(result.declaration_name(payload.name), Some("evt"));
             assert!(payload.type_name.is_some());
             let via = via.as_ref().expect("expected via clause on typed accept");
             assert!(matches!(&via.value, Expression::FeatureRef(_)));

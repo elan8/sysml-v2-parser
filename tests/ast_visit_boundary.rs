@@ -68,12 +68,12 @@ struct SpanAudit {
 
 impl Visitor for SpanAudit {
     fn visit_span(&mut self, span: &Span) {
-        self.spans.push(span.clone());
+        self.spans.push(*span);
     }
 
     fn visit_attribute_usage(&mut self, node: &Node<AttributeUsage>) {
         self.attribute_name_span_presence
-            .push(node.value.name_span.is_some());
+            .push(node.value.name.is_some());
         walk_attribute_usage(self, node);
     }
 }

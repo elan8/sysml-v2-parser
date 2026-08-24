@@ -141,13 +141,12 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         .parse(input)
         .map(|(input, kw)| (input, kw.map(|_| crate::ast::RefDeclKind::Action)))?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
-    let (input, parsed_name) = opt(with_span(name)).parse(input)?;
+    let (input, parsed_name) = opt(name).parse(input)?;
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     // `ReferenceUsage` owns the same `Redefinitions` production as the other feature usages
     // (SysML BNF 335, KerML BNF 472). Keep its complete typed target list rather than manually
@@ -169,7 +168,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             let (input, _) = preceded(ws_and_comments, tag(&b":>"[..])).parse(input)?;
             let (input, (span, target)) =
                 preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
-            let typing = Some(single_target_typing(span.clone(), target));
+            let typing = Some(single_target_typing(span, target));
             (input, Some(span), typing)
         } else {
             let (input, typing_result) = optional_typings(input)?;
@@ -227,7 +226,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
                 is_constant: prefix.is_constant,
                 direction: prefix.direction,
                 kind_keyword,
-                name: name_str,
+                name: parsed_name,
                 typing,
                 redefines,
                 subsets,
@@ -235,7 +234,6 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
                 multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 value,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
             },
@@ -274,7 +272,7 @@ fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody
 
 fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMergeBodyElement>> {
     let (input, member) = action_def_body_element(input)?;
-    let span = member.span.clone();
+    let span = member.span;
     let value = match member.value {
         // BNF `MergeNode`/`DecisionNode`/`JoinNode`/`ForkNode` (SysML-textual-bnf.kebnf §8.2.2.17.3)
         // all use the same `ActionBody` production as a plain action definition body, so a
@@ -315,7 +313,7 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::ThenAction(_)
         | ActionDefBodyElement::DefaultReferenceUsage(_)
         | ActionDefBodyElement::VariantUsage(_)) => {
-            FirstMergeBodyElement::Member(Box::new(Node::new(span.clone(), value)))
+            FirstMergeBodyElement::Member(Box::new(Node::new(span, value)))
         }
     };
     Ok((input, Node::new(span, value)))
@@ -384,7 +382,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                     direction,
                     is_reference: false,
                     is_var: false,
-                    name: String::new(),
+                    name: None,
                     subsets: None,
                     type_name,
                     multiplicity,
@@ -408,9 +406,10 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         let (peek_anon, _) = ws_and_comments(input)?;
         let (input, param_name) =
             if peek_anon.fragment().starts_with(b":") && !peek_anon.fragment().starts_with(b":>") {
-                (input, String::new())
+                (input, None)
             } else {
-                name(input)?
+                let (input, n) = name(input)?;
+                (input, Some(n))
             };
         // BNF `FeatureSpecializationPart` allows the `MultiplicityPart` before or after the
         // typing: `in transitionLinkSource[1]: StateAction :>> ...` (Systems Library
@@ -1044,7 +1043,7 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
 /// `succession s1 : AB first a then b;` (name, and name + type).
 /// `(name, type, multiplicity)` of a parsed `succession` prefix, all `None` when absent.
 type SuccessionPrefix = (
-    Option<String>,
+    Option<crate::ast::DeclarationName>,
     Option<crate::ast::QualifiedReferenceId>,
     Option<Node<Multiplicity>>,
 );
@@ -1458,7 +1457,7 @@ fn loop_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
 /// A single `then <target>;`/`else <target>;` shorthand statement (GH-86): a branch member with
 /// no braces of its own.
 fn then_action_branch(node: Node<ThenAction>) -> crate::ast::ActionBranchBody {
-    let span = node.span.clone();
+    let span = node.span;
     crate::ast::ActionBranchBody::Shorthand(Box::new(Node::new(
         span,
         ActionDefBodyElement::ThenAction(node),
@@ -1468,7 +1467,7 @@ fn then_action_branch(node: Node<ThenAction>) -> crate::ast::ActionBranchBody {
 /// A nested `else if ...` (BNF `IfNode`'s `IfNodeParameterMember` else-alternative, GH-86),
 /// likewise written without braces.
 fn if_stmt_branch(node: Node<IfStmt>) -> crate::ast::ActionBranchBody {
-    let span = node.span.clone();
+    let span = node.span;
     crate::ast::ActionBranchBody::Shorthand(Box::new(Node::new(
         span,
         ActionDefBodyElement::IfStmt(node),
@@ -1929,16 +1928,17 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // (`action :>> subactions :> middle { ... }`, Systems Library `States.sysml`) -- the
     // clauses themselves are picked up by `specialization_clauses` below, mirroring
     // `attribute_usage`'s `PrefixRedefines`/`PrefixSubsets` heads.
-    let (input, (name_span, name_str)) = if after_gap.fragment().starts_with(b":")
+    let (input, name_str) = if after_gap.fragment().starts_with(b":")
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")
         || is_anonymous_accept_or_send_payload(after_gap.fragment())
     {
-        (after_gap, (crate::ast::Span::dummy(), String::new()))
+        (after_gap, None)
     } else {
         let (input, _) = ws1(input)?;
-        with_span(name).parse(input)?
+        let (input, n) = name(input)?;
+        (input, Some(n))
     };
     // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
     // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).
@@ -2006,7 +2006,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let type_ref_span = accept
         .as_ref()
         .and_then(|accept| match accept {
-            crate::ast::TransitionAccept::Payload(payload, _) => payload.type_span.clone(),
+            crate::ast::TransitionAccept::Payload(payload, _) => payload.type_span,
             crate::ast::TransitionAccept::Shorthand(_, _)
             | crate::ast::TransitionAccept::TimeTrigger(_, _) => None,
         })
@@ -2042,6 +2042,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             start,
             input,
             ActionUsage {
+                keyword: crate::ast::ActionUsageKeyword::Action,
                 is_abstract,
                 is_variation,
                 is_reference: is_reference.is_some(),
@@ -2059,7 +2060,6 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 via,
                 to,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
@@ -2080,10 +2080,15 @@ mod in_out_decl_tests {
     /// typed declaration.
     #[test]
     fn in_out_decl_accepts_trailing_redefinition_after_typing() {
-        let (rest, node) = in_out_decl(input("in transitionLinkSource : Action :>> T::t;"))
-            .expect("trailing redefinition");
+        let source = input("in transitionLinkSource : Action :>> T::t;");
+        let (rest, node) = in_out_decl(source).expect("trailing redefinition");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "transitionLinkSource");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"transitionLinkSource"[..])
+        );
         assert!(node.value.type_name.is_some());
         let redefines = node.value.redefines.as_ref().expect("redefines");
         assert_eq!(redefines.value.target.len(), 1);
@@ -2209,12 +2214,17 @@ mod control_node_gap_tests {
     /// `ConnectionTest.sysml`).
     #[test]
     fn action_body_accepts_named_succession_prefix() {
-        let (rest, node) = action_def_body_element(input("succession s first a then b;"))
-            .expect("named succession stmt");
+        let source = input("succession s first a then b;");
+        let (rest, node) = action_def_body_element(source).expect("named succession stmt");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
-                assert_eq!(f.value.succession_name.as_deref(), Some("s"));
+                assert_eq!(
+                    f.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"s"[..])
+                );
                 assert_eq!(f.value.succession_type, None);
             }
             other => panic!("expected FirstStmt, got {other:?}"),
@@ -2230,7 +2240,12 @@ mod control_node_gap_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
-                assert_eq!(f.value.succession_name.as_deref(), Some("s1"));
+                assert_eq!(
+                    f.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"s1"[..])
+                );
                 assert_eq!(
                     f.value
                         .succession_type
@@ -2269,12 +2284,18 @@ mod control_node_gap_tests {
     #[test]
     fn action_body_accepts_named_succession_with_end_multiplicities_and_brace_body() {
         let source = "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates { in pin; }";
-        let (rest, node) = action_def_body_element(input(source))
+        let parsed = input(source);
+        let (rest, node) = action_def_body_element(parsed)
             .expect("named succession with multiplicities + brace body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
-                assert_eq!(f.value.succession_name.as_deref(), Some("stateSequencing"));
+                assert_eq!(
+                    f.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(parsed, n)),
+                    Some(&b"stateSequencing"[..])
+                );
                 assert!(f.value.first_multiplicity.is_some());
                 assert!(f.value.then_multiplicity.is_some());
                 let FirstMergeBody::Brace {
@@ -2415,13 +2436,19 @@ mod control_node_gap_tests {
     /// to an opaque keyword/text pair).
     #[test]
     fn nested_action_def_retains_its_declaration() {
-        let (rest, node) =
-            action_def_body_element(input("action def Nested { in signal; }")).expect("action def");
+        let source = input("action def Nested { in signal; }");
+        let (rest, node) = action_def_body_element(source).expect("action def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let ActionDefBodyElement::ActionDef(def) = node.value else {
             panic!("expected ActionDef");
         };
-        assert_eq!(def.value.identification.name.as_deref(), Some("Nested"));
+        assert_eq!(
+            def.value
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"Nested"[..])
+        );
         let ActionDefBody::Brace { elements, .. } = &def.value.body else {
             panic!("expected brace body");
         };
@@ -2463,7 +2490,7 @@ mod control_node_gap_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value.target {
             ThenTarget::Action(a) => {
-                assert!(a.value.name.is_empty(), "expected anonymous action");
+                assert!(a.value.name.is_none(), "expected anonymous action");
                 assert!(a.value.accept.is_some());
             }
             other => panic!("expected Action target, got {other:?}"),
@@ -2486,10 +2513,18 @@ mod control_node_gap_tests {
     /// GH-13 / BNF `ActionBodyItem` → `StructureUsageMember` → `PartUsage`.
     #[test]
     fn action_body_accepts_part_usage() {
-        let (rest, node) = action_def_body_element(input("part rim : Wheel;")).expect("part usage");
+        let source = input("part rim : Wheel;");
+        let (rest, node) = action_def_body_element(source).expect("part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
-            ActionDefBodyElement::PartUsage(p) => assert_eq!(p.value.name, "rim"),
+            ActionDefBodyElement::PartUsage(p) => {
+                assert_eq!(
+                    p.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"rim"[..])
+                )
+            }
             other => panic!("expected PartUsage, got {other:?}"),
         }
     }
@@ -2507,10 +2542,18 @@ mod control_node_gap_tests {
     #[test]
     fn action_body_accepts_item_usage_and_for_loop() {
         let src = "item spokes : Spoke[*];";
-        let (rest, node) = action_def_body_element(input(src)).expect("item usage");
+        let source = input(src);
+        let (rest, node) = action_def_body_element(source).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
-            ActionDefBodyElement::ItemUsage(i) => assert_eq!(i.value.name, "spokes"),
+            ActionDefBodyElement::ItemUsage(i) => {
+                assert_eq!(
+                    i.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"spokes"[..])
+                )
+            }
             other => panic!("expected ItemUsage, got {other:?}"),
         }
 
@@ -2536,16 +2579,19 @@ mod control_node_gap_tests {
     /// GH-13 / BNF `RefPrefix.isVariation` on `ActionUsage`.
     #[test]
     fn action_body_accepts_variation_action_usage() {
-        let (rest, node) = action_def_body_element(input(
-            "variation action method { action byHand; action byJig; }",
-        ))
-        .expect("variation action");
+        let source = input("variation action method { action byHand; action byJig; }");
+        let (rest, node) = action_def_body_element(source).expect("variation action");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::ActionUsage(a) => {
                 assert!(a.value.is_variation);
                 assert!(!a.value.is_abstract);
-                assert_eq!(a.value.name, "method");
+                assert_eq!(
+                    a.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"method"[..])
+                );
             }
             other => panic!("expected ActionUsage, got {other:?}"),
         }
@@ -2554,7 +2600,8 @@ mod control_node_gap_tests {
     /// GH-13 / BNF `StructureUsageMember` → `PortionUsage` (`snapshot`).
     #[test]
     fn action_body_accepts_snapshot_usage() {
-        let (rest, node) = action_def_body_element(input("snapshot trued { }")).expect("snapshot");
+        let source = input("snapshot trued { }");
+        let (rest, node) = action_def_body_element(source).expect("snapshot");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::OccurrenceUsage(o) => {
@@ -2562,7 +2609,12 @@ mod control_node_gap_tests {
                     o.value.prefix.portion().map(|node| node.value),
                     Some(crate::ast::OccurrencePortionKind::Snapshot)
                 );
-                assert_eq!(o.value.name, "trued");
+                assert_eq!(
+                    o.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"trued"[..])
+                );
             }
             other => panic!("expected OccurrenceUsage, got {other:?}"),
         }
@@ -2681,7 +2733,12 @@ mod membership_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_abstract);
         assert!(node.value.is_reference);
-        assert_eq!(node.value.name, "performedActions");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"performedActions"[..])
+        );
         assert_eq!(
             node.value
                 .type_name

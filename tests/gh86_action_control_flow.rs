@@ -7,7 +7,7 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -21,7 +21,8 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Analysis Examples/Dynamics.sysml:64`:
@@ -33,7 +34,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// empty for this form.
 #[test]
 fn gh86_6_in_out_decl_redefinition_accepts_trailing_type_clause() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             action def AD {
                 action a1 : AD {
@@ -79,7 +80,7 @@ fn gh86_6_in_out_decl_redefinition_accepts_trailing_type_clause() {
         "expected structured redefinition target"
     );
     assert!(
-        usage.name.is_empty(),
+        usage.name.is_none(),
         "a redefinition target is not a declaration name"
     );
     assert!(
@@ -107,7 +108,7 @@ fn gh86_6_in_out_decl_redefinition_accepts_trailing_type_clause() {
 /// form, so it fell through to a parse error inside action bodies.
 #[test]
 fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             action def ComputeDynamics {
                 metadata ToolExecution {
@@ -127,7 +128,10 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
         _ => None,
     });
     let metadata_usage = metadata_usage.expect("expected a MetadataUsage element");
-    assert_eq!(metadata_usage.name, "ToolExecution");
+    assert_eq!(
+        doc.declaration_name(metadata_usage.name),
+        Some("ToolExecution")
+    );
 }
 
 /// Real usage: `Simple Tests/TextualRepresentationTest.sysml:14-18`:
@@ -143,7 +147,7 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
 /// any action body at all. Both fixed together for GH-86.
 #[test]
 fn gh86_5_bare_language_textual_representation_dispatched_inside_action_def_body() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             item def C { attribute x : Real; }
             action def setX {
@@ -185,7 +189,7 @@ fn gh86_5_bare_language_textual_representation_dispatched_inside_action_def_body
 /// shape (`TransitionAccept::Shorthand`) already fully parses after a state `transition`.
 #[test]
 fn gh86_2_then_accept_shorthand_target() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             attribute def S;
             action a1 {
@@ -235,7 +239,7 @@ fn gh86_2_then_accept_shorthand_target() {
 /// `TransitionSuccessionMember`), not a parser convenience.
 #[test]
 fn gh86_3_if_then_non_brace_shorthand_without_else() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             action def AD {
                 attribute x = 1;
@@ -270,7 +274,7 @@ fn gh86_3_if_then_non_brace_shorthand_without_else() {
 /// Same fixture, second/third lines: `if x > 1 then A2; else A3;` -- non-brace then *and* else.
 #[test]
 fn gh86_3_if_then_else_non_brace_shorthand() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             action def AD {
                 attribute x = 1;
@@ -318,7 +322,7 @@ fn gh86_3_if_then_else_non_brace_shorthand() {
 /// itself be another `IfNode`).
 #[test]
 fn gh86_3_else_if_chaining() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             action def AD {
                 attribute i = 0;
@@ -367,7 +371,7 @@ fn gh86_3_else_if_chaining() {
 /// rather than `action def`.
 #[test]
 fn gh86_4_bare_metadata_keyword_dispatched_inside_action_usage_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             action def AD;
             action a1 : AD {
@@ -390,7 +394,10 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_usage_body() {
         _ => None,
     });
     let metadata_usage = metadata_usage.expect("expected a MetadataUsage element");
-    assert_eq!(metadata_usage.name, "ToolExecution");
+    assert_eq!(
+        doc.declaration_name(metadata_usage.name),
+        Some("ToolExecution")
+    );
 }
 
 /// Real usage: `Interaction Sequencing Examples/ServerSequenceOutsideRealization-2.sysml`:
@@ -405,7 +412,7 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_usage_body() {
 /// `SenderReceiverPart` adds the optional `via`/`to` targeting clauses.
 #[test]
 fn gh86_1_send_expression_payload_with_via() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             item def Publish;
             action def AD {
@@ -423,7 +430,11 @@ fn gh86_1_send_expression_payload_with_via() {
         panic!("expected brace action def body");
     };
     let publish = elements.iter().find_map(|e| match &e.value {
-        ActionDefBodyElement::ActionUsage(a) if a.value.name == "publish" => Some(&a.value),
+        ActionDefBodyElement::ActionUsage(a)
+            if a.value.name.and_then(|n| doc.declaration_name(n)) == Some("publish") =>
+        {
+            Some(&a.value)
+        }
         _ => None,
     });
     let publish = publish.expect("expected the `publish` ActionUsage");
@@ -456,7 +467,7 @@ fn gh86_1_send_expression_payload_with_via() {
 /// (`EmptyParameterMember 'to' NodeParameterMember`).
 #[test]
 fn gh86_1_send_expression_payload_with_to_only() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             item def Subscribe;
             action def AD {
@@ -474,7 +485,11 @@ fn gh86_1_send_expression_payload_with_to_only() {
         panic!("expected brace action def body");
     };
     let subscribe = elements.iter().find_map(|e| match &e.value {
-        ActionDefBodyElement::ActionUsage(a) if a.value.name == "subscribe" => Some(&a.value),
+        ActionDefBodyElement::ActionUsage(a)
+            if a.value.name.and_then(|n| doc.declaration_name(n)) == Some("subscribe") =>
+        {
+            Some(&a.value)
+        }
         _ => None,
     });
     let subscribe = subscribe.expect("expected the `subscribe` ActionUsage");
@@ -490,7 +505,7 @@ fn gh86_1_send_expression_payload_with_to_only() {
 /// keep working after widening the payload to also accept a general expression.
 #[test]
 fn gh86_1_send_typed_payload_still_works() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             attribute def T;
             action def AD {
@@ -507,7 +522,11 @@ fn gh86_1_send_typed_payload_still_works() {
         panic!("expected brace action def body");
     };
     let a1 = elements.iter().find_map(|e| match &e.value {
-        ActionDefBodyElement::ActionUsage(a) if a.value.name == "a1" => Some(&a.value),
+        ActionDefBodyElement::ActionUsage(a)
+            if a.value.name.and_then(|n| doc.declaration_name(n)) == Some("a1") =>
+        {
+            Some(&a.value)
+        }
         _ => None,
     });
     let a1 = a1.expect("expected the `a1` ActionUsage");
@@ -516,13 +535,17 @@ fn gh86_1_send_typed_payload_still_works() {
         panic!("expected brace action usage body");
     };
     let send = elements.iter().find_map(|e| match &e.value {
-        ActionUsageBodyElement::ActionUsage(a) if a.value.name == "send" => Some(&a.value),
+        ActionUsageBodyElement::ActionUsage(a)
+            if a.value.name.is_none() && a.value.send.is_some() =>
+        {
+            Some(&a.value)
+        }
         _ => None,
     });
     let send = send.expect("expected the standalone `send` control-node ActionUsage");
     match send.send.as_ref().expect("expected a send payload") {
         sysml_v2_parser::ast::SendPayload::Typed(p) => {
-            assert_eq!(p.name, "payload");
+            assert_eq!(doc.declaration_name(p.name), Some("payload"));
             assert!(p.type_name.is_some());
         }
         other => panic!("expected a Typed payload, got {other:?}"),
@@ -541,7 +564,7 @@ fn gh86_1_send_typed_payload_still_works() {
 /// parsing whenever the payload was omitted.
 #[test]
 fn gh86_1_send_no_payload_with_via_and_to() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             action def AD {
                 attribute this = 1;
@@ -557,7 +580,11 @@ fn gh86_1_send_no_payload_with_via_and_to() {
         panic!("expected brace action def body");
     };
     let snd2 = elements.iter().find_map(|e| match &e.value {
-        ActionDefBodyElement::ActionUsage(a) if a.value.name == "snd2" => Some(&a.value),
+        ActionDefBodyElement::ActionUsage(a)
+            if a.value.name.and_then(|n| doc.declaration_name(n)) == Some("snd2") =>
+        {
+            Some(&a.value)
+        }
         _ => None,
     });
     let snd2 = snd2.expect("expected the `snd2` ActionUsage");

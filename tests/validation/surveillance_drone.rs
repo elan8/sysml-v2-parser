@@ -77,7 +77,10 @@ fn test_parse_surveillance_drone() {
         other => panic!("expected root to be a Package, got {:?}", other),
     };
     assert_eq!(
-        package.identification.simple_name(),
+        package
+            .identification
+            .simple_name()
+            .and_then(|n| root.declaration_name(n)),
         Some("SurveillanceDrone"),
         "root package should be named SurveillanceDrone"
     );
@@ -143,7 +146,8 @@ fn test_parse_surveillance_drone() {
             }
         })
         .find(|p: &&PartDef| {
-            p.identification.name.as_deref() == Some("SurveillanceQuadrotorDroneWithBehavior")
+            p.identification.name.and_then(|n| root.declaration_name(n))
+                == Some("SurveillanceQuadrotorDroneWithBehavior")
                 && p.specializes.as_ref().map(|n| n.value.target.len()) == Some(1)
         });
     let part_def = part_def_specializes_span
@@ -249,7 +253,10 @@ fn test_surveillance_drone_errors_fixture_now_parses_cleanly() {
         ),
     };
     assert_eq!(
-        first.identification.simple_name(),
+        first
+            .identification
+            .simple_name()
+            .and_then(|n| result.document.declaration_name(n)),
         Some("SurveillanceDroneFirst"),
         "first package should be SurveillanceDroneFirst"
     );

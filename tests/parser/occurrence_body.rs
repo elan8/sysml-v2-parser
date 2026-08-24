@@ -2,12 +2,13 @@
 
 use sysml_v2_parser::ast::*;
 
-fn parse_package(input: &str) -> Package {
+fn parse_package(input: &str) -> (ParsedDocument, Package) {
     let result = sysml_v2_parser::parse(input).expect("parse should succeed");
-    match result.elements[0].value.clone() {
+    let package = match result.elements[0].value.clone() {
         RootElement::Package(package) => package.value,
         _ => panic!("expected package"),
-    }
+    };
+    (result, package)
 }
 
 fn brace_package_elements(pkg: &Package) -> &[Node<PackageBodyElement>] {
@@ -24,7 +25,11 @@ fn brace_definition_elements(body: &DefinitionBody) -> &[Node<DefinitionBodyElem
     }
 }
 
-fn has_occurrence_attribute_member(elements: &[Node<DefinitionBodyElement>], name: &str) -> bool {
+fn has_occurrence_attribute_member(
+    doc: &ParsedDocument,
+    elements: &[Node<DefinitionBodyElement>],
+    name: &str,
+) -> bool {
     elements.iter().any(|element| {
         matches!(
             &element.value,
@@ -32,13 +37,17 @@ fn has_occurrence_attribute_member(elements: &[Node<DefinitionBodyElement>], nam
                 if matches!(
                     &member.value,
                     OccurrenceBodyElement::AttributeUsage(attribute)
-                        if attribute.value.name == name
+                        if attribute.value.name.and_then(|n| doc.declaration_name(n)) == Some(name)
                 )
         )
     })
 }
 
-fn has_occurrence_part_member(elements: &[Node<DefinitionBodyElement>], name: &str) -> bool {
+fn has_occurrence_part_member(
+    doc: &ParsedDocument,
+    elements: &[Node<DefinitionBodyElement>],
+    name: &str,
+) -> bool {
     elements.iter().any(|element| {
         matches!(
             &element.value,
@@ -46,7 +55,7 @@ fn has_occurrence_part_member(elements: &[Node<DefinitionBodyElement>], name: &s
                 if matches!(
                     &member.value,
                     OccurrenceBodyElement::PartUsage(part)
-                        if part.value.name == name
+                        if part.value.name.and_then(|n| doc.declaration_name(n)) == Some(name)
                 )
         )
     })
@@ -67,21 +76,22 @@ fn has_occurrence_doc_member(elements: &[Node<DefinitionBodyElement>]) -> bool {
 
 #[test]
 fn flow_def_body_parses_inner_attribute() {
-    let pkg = parse_package("package P { flow def Power { attribute rate : Real; } }");
+    let (doc, pkg) = parse_package("package P { flow def Power { attribute rate : Real; } }");
     let flow = match &brace_package_elements(&pkg)[0].value {
         PackageBodyElement::FlowDef(flow) => flow,
         _ => panic!("expected FlowDef"),
     };
     let elements = brace_definition_elements(&flow.value.body);
     assert!(
-        has_occurrence_attribute_member(elements, "rate"),
+        has_occurrence_attribute_member(&doc, elements, "rate"),
         "expected attribute rate in flow def body"
     );
 }
 
 #[test]
 fn flow_def_body_parses_nested_part() {
-    let pkg = parse_package("package P { part def Wheel; flow def Event { part wheel : Wheel; } }");
+    let (doc, pkg) =
+        parse_package("package P { part def Wheel; flow def Event { part wheel : Wheel; } }");
     let elements = brace_package_elements(&pkg);
     let flow = match &elements[1].value {
         PackageBodyElement::FlowDef(flow) => flow,
@@ -89,14 +99,14 @@ fn flow_def_body_parses_nested_part() {
     };
     let body_elements = brace_definition_elements(&flow.value.body);
     assert!(
-        has_occurrence_part_member(body_elements, "wheel"),
+        has_occurrence_part_member(&doc, body_elements, "wheel"),
         "expected part wheel in flow def body"
     );
 }
 
 #[test]
 fn flow_usage_brace_body_parses_attribute() {
-    let pkg = parse_package(
+    let (doc, pkg) = parse_package(
         "package P { item def Payload; flow cargo : Payload { attribute weight : Real; } }",
     );
     let flow = brace_package_elements(&pkg)
@@ -108,28 +118,28 @@ fn flow_usage_brace_body_parses_attribute() {
         .expect("expected FlowUsage");
     let elements = brace_definition_elements(&flow.body);
     assert!(
-        has_occurrence_attribute_member(elements, "weight"),
+        has_occurrence_attribute_member(&doc, elements, "weight"),
         "expected attribute weight in flow usage body"
     );
 }
 
 #[test]
 fn allocation_def_body_parses_attribute() {
-    let pkg = parse_package("package P { allocation def Map { attribute id : String; } }");
+    let (doc, pkg) = parse_package("package P { allocation def Map { attribute id : String; } }");
     let alloc = match &brace_package_elements(&pkg)[0].value {
         PackageBodyElement::AllocationDef(alloc) => alloc,
         _ => panic!("expected AllocationDef"),
     };
     let elements = brace_definition_elements(&alloc.value.body);
     assert!(
-        has_occurrence_attribute_member(elements, "id"),
+        has_occurrence_attribute_member(&doc, elements, "id"),
         "expected attribute id in allocation def body"
     );
 }
 
 #[test]
 fn flow_def_doc_only_body_regression() {
-    let pkg = parse_package("package P { flow def Power { doc /* note */ } }");
+    let (_, pkg) = parse_package("package P { flow def Power { doc /* note */ } }");
     let flow = match &brace_package_elements(&pkg)[0].value {
         PackageBodyElement::FlowDef(flow) => flow,
         _ => panic!("expected FlowDef"),
@@ -146,7 +156,7 @@ fn flow_def_body_parses_standalone_succession_usage() {
     // Regression: bare `succession first A then B;` directly in a definition body was
     // swallowed as opaque text via `DEFINITION_BODY_OPAQUE_STARTERS` (which listed
     // "succession"). It's now a real `SuccessionUsage` node.
-    let pkg =
+    let (_, pkg) =
         parse_package("package P { flow def Sequence { succession first stepA then stepB; } }");
     let flow = match &brace_package_elements(&pkg)[0].value {
         PackageBodyElement::FlowDef(flow) => flow,
@@ -177,7 +187,7 @@ fn flow_def_body_parses_standalone_succession_usage() {
 fn flow_def_body_still_parses_succession_flow_as_flow_usage_not_succession_usage() {
     // "Didn't break the neighbor" check: `succession flow X to Y;` must keep routing through
     // `flow_usage_member` (FlowUsageKind::SuccessionFlow), not the new `succession_usage()`.
-    let pkg = parse_package(
+    let (_, pkg) = parse_package(
         "package P { part def Image; part def Camera { part image : Image; } part def Target { part image : Image; } flow def Relay { succession flow focus.image to shoot.image; } }",
     );
     let flow = brace_package_elements(&pkg)

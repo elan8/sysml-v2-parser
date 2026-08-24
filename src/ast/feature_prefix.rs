@@ -71,6 +71,7 @@
 //! TimeVaryingCarDriver.kerml:100`).
 
 use super::behavior::InOut;
+use super::common::DeclarationName;
 use super::core::{Node, Span};
 use super::occurrence_prefix::UsageExtensionKeyword;
 
@@ -250,7 +251,7 @@ pub struct OwnedCrossFeature {
     pub prefix: BasicFeaturePrefix,
     /// `FeatureIdentification`'s declared name. Empty for the unnamed spelling
     /// `end [1] feature transferSource references source;` (`Transfers.kerml`).
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Multiplicity clause on the cross feature.
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
     /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
