@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An integer literal that does not fit `i64` is refused instead of silently parsing as `0`.**
+  The enclosing expression now recovers with a diagnostic, so an unrepresentable value can no
+  longer masquerade as a successfully parsed literal.
 - **Three round-trip and dispatch gaps in the last corpus snapshots.** A KerML classifier's
   `ConjugationPart` (`type Conjugate4 ~ Conjugate1;`, `Types.kerml`) was parsed but neither
   emitted nor projected, so it vanished silently; an interface *usage* body did not dispatch the

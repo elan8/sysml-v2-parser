@@ -87,10 +87,18 @@ fn literal_integer(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
             nom::error::ErrorKind::Digit,
         )));
     }
+    // A spelling that does not fit `i64` is not an integer literal this parser can represent;
+    // refuse it here so the enclosing expression recovers with a diagnostic instead of
+    // silently reading `0`.
     let value = std::str::from_utf8(token)
         .ok()
         .and_then(|text| text.parse().ok())
-        .unwrap_or(0);
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::TooLarge,
+            ))
+        })?;
     Ok((
         input,
         node_from_to(start, input, Expression::LiteralInteger(value)),
@@ -1493,6 +1501,18 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn integer_literal_beyond_i64_is_refused_rather_than_read_as_zero() {
+        let input = crate::parser::span::test_input("99999999999999999999");
+        assert!(literal_integer(input).is_err());
+        let doc =
+            crate::parse_with_diagnostics("package P { attribute a = 99999999999999999999; }");
+        assert!(
+            !doc.errors.is_empty(),
+            "an unrepresentable integer must surface as a diagnostic"
+        );
+    }
 
     fn span_input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
