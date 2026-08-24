@@ -172,7 +172,22 @@ pub(crate) fn metadata_keyword_head(
 pub(crate) fn metadata_keyword_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
+    refuse_unless_hash(input)?;
     crate::parser::span::reference_transaction(input, metadata_keyword_usage_inner)
+}
+
+/// Speculated at many member starts; refuse on the first non-trivia byte before entering an
+/// arena transaction for a `#` that is not there.
+fn refuse_unless_hash(input: Input<'_>) -> Result<(), nom::Err<nom::error::Error<Input<'_>>>> {
+    let (after_trivia, _) = ws_and_comments(input)?;
+    if after_trivia.fragment().first() == Some(&b'#') {
+        Ok(())
+    } else {
+        Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )))
+    }
 }
 
 fn metadata_keyword_usage_inner(
@@ -378,6 +393,7 @@ fn extended_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast:
 pub(crate) fn metadata_keyword_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
+    refuse_unless_hash(input)?;
     crate::parser::span::reference_transaction(input, metadata_keyword_prefix_inner)
 }
 

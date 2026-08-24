@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **~30% fewer speculative parser transactions on the snapshot corpus** (~+3.5% throughput).
+  `.?` (SelectExpression) and `.**` (CollectExpression) are recognized as postfix operators in
+  the iterative expression engine instead of speculatively re-parsing every primary expression
+  for each form; `annotating_member` selects `doc`/`comment` by keyword instead of trying each
+  parser; and the `#`-metadata and `import` parsers refuse on their first non-trivia byte before
+  opening an arena transaction.
 - **Declaration names and short names are typed source spans.** Every `name`, `short_name`,
   `declared_name`, `declaration_name`, `state_name`, `succession_name` and `binding_name` field
   that used to copy the token into a `String` is now a `DeclarationName { span }` resolved through

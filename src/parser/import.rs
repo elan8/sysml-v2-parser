@@ -134,6 +134,17 @@ pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> 
 
 /// Import: visibility? 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
 pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
+    // Speculated at many member starts; `import` or a visibility keyword must lead, so refuse
+    // on the first non-trivia byte before entering an arena transaction.
+    {
+        let (after_trivia, _) = crate::parser::lex::ws_and_comments(input)?;
+        if !matches!(after_trivia.fragment().first(), Some(b'i' | b'p')) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     reference_transaction(input, import_inner)
 }
 
