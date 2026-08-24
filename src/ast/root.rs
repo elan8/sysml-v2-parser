@@ -9,7 +9,7 @@ use super::qualified_reference::{
     decode_authored_name, QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView,
     SourceRange, SourceStorage,
 };
-use crate::ast::common::DeclarationName;
+use crate::ast::common::{normalize_comment_body, CommentBody, DeclarationName};
 use crate::ast::core::{decode_string_literal, Node, RealLiteral, Span, StringLiteral};
 use std::borrow::Cow;
 
@@ -150,6 +150,18 @@ impl ParsedDocument {
     /// literal containing an escape allocates.
     pub fn decoded_string_literal(&self, literal: StringLiteral) -> Option<Cow<'_, str>> {
         decode_string_literal(self.string_literal(literal)?)
+    }
+
+    /// The authored bytes of a `REGULAR_COMMENT` body, without its `/*` `*/` delimiters.
+    pub fn comment_body(&self, body: CommentBody) -> Option<&str> {
+        self.source.slice(body.span())
+    }
+
+    /// A comment body with the pinned processing rules applied; see
+    /// [`normalize_comment_body`](crate::ast::normalize_comment_body). Borrows when the rules
+    /// change nothing.
+    pub fn normalized_comment_body(&self, body: CommentBody) -> Option<Cow<'_, str>> {
+        Some(normalize_comment_body(self.comment_body(body)?))
     }
 
     /// Resolve a qualified declaration name without erasing its declaration role in the AST.

@@ -147,7 +147,7 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
 /// any action body at all. Both fixed together for GH-86.
 #[test]
 fn gh86_5_bare_language_textual_representation_dispatched_inside_action_def_body() {
-    let (_, elements) = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             item def C { attribute x : Real; }
             action def setX {
@@ -170,8 +170,13 @@ fn gh86_5_bare_language_textual_representation_dispatched_inside_action_def_body
     });
     let rep = rep.expect("expected a TextualRep element");
     assert!(rep.rep_identification.is_none());
-    assert_eq!(rep.language, "alf");
-    assert!(rep.text.contains("c.x = newX;"));
+    assert_eq!(
+        rep.language.and_then(|l| doc.string_literal(l)),
+        Some("\"alf\"")
+    );
+    assert!(doc
+        .comment_body(rep.body)
+        .is_some_and(|text| text.contains("c.x = newX;")));
 }
 
 /// Real usage: `Simple Tests/ActionTest.sysml:17`:

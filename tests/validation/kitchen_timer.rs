@@ -38,7 +38,10 @@ fn test_parse_kitchen_timer() {
                 sysml_v2_parser::ast::AnnotatingMember::Comment(comment),
             ) => {
                 assert!(comment.value.keyword_span.is_none());
-                assert!(comment.value.text.contains("Kitchen Timer"));
+                assert!(result
+                    .document
+                    .comment_body(comment.value.body)
+                    .is_some_and(|text| text.contains("Kitchen Timer")));
             }
             other => panic!("expected the header comment, got {other:?}"),
         },

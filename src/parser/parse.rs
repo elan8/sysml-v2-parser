@@ -107,7 +107,7 @@ fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootName
                 return Err(missing_closing_brace_error_at_eof(bytes));
             }
             if rest.fragment().is_empty() {
-                if let Some(error) = collect_recovery_errors(&root).into_iter().next() {
+                if let Some(error) = collect_recovery_errors(source, &root).into_iter().next() {
                     log::debug!(
                         "parse_root: rejecting document with embedded recovery diagnostic: {:?}",
                         error.code
@@ -399,7 +399,7 @@ fn parse_with_diagnostics_document(
     }
 
     let root = RootNamespace { elements };
-    errors.extend(collect_recovery_errors(&root));
+    errors.extend(collect_recovery_errors(source, &root));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);

@@ -34,7 +34,7 @@ fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<Packag
 /// "..." /* ... */` with no `comment` keyword at all was never dispatched at package scope.
 #[test]
 fn gh91_1_bare_locale_package_member() {
-    let (_, elements) = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             locale "en_US" /* AAAA */
         }"#,
@@ -43,8 +43,14 @@ fn gh91_1_bare_locale_package_member() {
         panic!("expected Comment, got {:?}", elements[0]);
     };
     assert!(c.value.identification.is_none());
-    assert_eq!(c.value.locale.as_deref(), Some("en_US"));
-    assert_eq!(c.value.text.trim(), "AAAA");
+    assert_eq!(
+        c.value
+            .locale
+            .and_then(|l| doc.decoded_string_literal(l))
+            .as_deref(),
+        Some("en_US")
+    );
+    assert_eq!(doc.comment_body(c.value.body).map(str::trim), Some("AAAA"));
 }
 
 /// Real usage: `Simple Tests/CommentTest.sysml:32`:
@@ -56,7 +62,7 @@ fn gh91_1_bare_locale_package_member() {
 /// keyword names), leaving nothing for the subsequent `locale` keyword check to match.
 #[test]
 fn gh91_1_doc_locale_without_identification() {
-    let (_, elements) = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             doc locale "en_US" /* Documentation about Package */
         }"#,
@@ -65,8 +71,17 @@ fn gh91_1_doc_locale_without_identification() {
         panic!("expected Doc, got {:?}", elements[0]);
     };
     assert!(d.value.identification.is_none());
-    assert_eq!(d.value.locale.as_deref(), Some("en_US"));
-    assert_eq!(d.value.text.trim(), "Documentation about Package");
+    assert_eq!(
+        d.value
+            .locale
+            .and_then(|l| doc.decoded_string_literal(l))
+            .as_deref(),
+        Some("en_US")
+    );
+    assert_eq!(
+        doc.comment_body(d.value.body).map(str::trim),
+        Some("Documentation about Package")
+    );
 }
 
 /// Real usage: `Analysis Examples/Turbojet Stage Analysis.sysml:88` (nested inside `part

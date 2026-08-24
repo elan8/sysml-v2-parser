@@ -62,12 +62,12 @@ fn a_member_after_a_comment_survives() {
 
 #[test]
 fn an_anonymous_comment_keeps_its_own_text() {
-    let (_, members) = package_members(&body("  comment /* first */\n  comment /* second */\n"));
-    let texts: Vec<String> = members
+    let (doc, members) = package_members(&body("  comment /* first */\n  comment /* second */\n"));
+    let texts: Vec<&str> = members
         .iter()
         .map(|member| match member {
             PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) => {
-                comment.value.text.trim().to_owned()
+                doc.comment_body(comment.value.body).expect("body").trim()
             }
             other => panic!("expected a comment, got {other:?}"),
         })
@@ -92,18 +92,25 @@ fn the_optional_clauses_still_parse() {
         Some("named")
     );
 
-    let (_, localized) = package_members(&body("  comment locale \"en_US\" /* text */\n"));
+    let (doc, localized) = package_members(&body("  comment locale \"en_US\" /* text */\n"));
     let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &localized[0] else {
         panic!("expected a comment");
     };
-    assert_eq!(comment.value.locale.as_deref(), Some("en_US"));
+    assert_eq!(
+        comment
+            .value
+            .locale
+            .and_then(|l| doc.decoded_string_literal(l))
+            .as_deref(),
+        Some("en_US")
+    );
     assert!(
         comment.value.identification.is_none(),
         "`locale` is not a declaration name"
     );
 
     // `about` names annotated elements, not the comment, so it must not become an identification.
-    let (_, about) = package_members(&body("  comment about a /* text */\n"));
+    let (doc, about) = package_members(&body("  comment about a /* text */\n"));
     let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &about[0] else {
         panic!("expected a comment");
     };
@@ -111,5 +118,8 @@ fn the_optional_clauses_still_parse() {
         comment.value.identification.is_none(),
         "`about` is a clause keyword, not the comment's name"
     );
-    assert_eq!(comment.value.text.trim(), "text");
+    assert_eq!(
+        doc.comment_body(comment.value.body).map(str::trim),
+        Some("text")
+    );
 }

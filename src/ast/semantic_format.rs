@@ -17,9 +17,9 @@ use super::{
     InterfaceDefBodyElement, Node, PackageBody, PackageBodyElement, ParsedDocument, PartDefBody,
     PartDefBodyElement, PerformBody, PerformBodyElement, PortDefBody, PortDefBodyElement,
     QualifiedReferenceId, ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement,
-    RootElement, Span, StateDefBody, StateDefBodyElement, SubsettingKind, SubsettingRelationship,
-    TypeCheckKind, TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement, Visibility,
+    RootElement, Span, StateDefBody, StateDefBodyElement, StringLiteral, SubsettingKind,
+    SubsettingRelationship, TypeCheckKind, TypingKind, TypingRelationship, UseCaseDefBody,
+    UseCaseDefBodyElement, ViewBody, ViewBodyElement, Visibility,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -4127,12 +4127,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.write_reference(*target)?;
         }
         self.writer.write_str(") (locale ")?;
-        match &comment.locale {
-            Some(locale) => write_quoted(self.writer, locale)?,
-            None => self.writer.write_str("none")?,
-        }
+        self.write_optional_string_literal(comment.locale)?;
         self.writer.write_str(") ")?;
-        self.write_annotation_body(&comment.body_span, &comment.normalized_text())?;
+        self.write_annotation_body(comment.body)?;
         self.writer.write_char(')')
     }
 
@@ -4143,12 +4140,28 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// showed both would be showing the same fact twice. The normalized text is shown because
     /// every consumer is required to agree on it, and an invariant nobody can see is one that
     /// drifts.
-    fn write_annotation_body(&mut self, body_span: &Span, normalized: &str) -> io::Result<()> {
+    fn write_annotation_body(&mut self, body: super::CommentBody) -> io::Result<()> {
         self.writer.write_str("(body ")?;
-        write_span(self.writer, body_span)?;
+        write_span(self.writer, body.span())?;
         self.writer.write_str(" (normalized ")?;
-        write_quoted(self.writer, normalized)?;
+        let normalized = self
+            .document
+            .normalized_comment_body(body)
+            .ok_or_else(|| invalid_span("comment body", body.span()))?;
+        write_quoted(self.writer, &normalized)?;
         self.writer.write_str("))")
+    }
+
+    /// A `STRING_VALUE` projected as its decoded contents, or `none`.
+    fn write_optional_string_literal(&mut self, literal: Option<StringLiteral>) -> io::Result<()> {
+        let Some(literal) = literal else {
+            return self.writer.write_str("none");
+        };
+        let decoded = self
+            .document
+            .decoded_string_literal(literal)
+            .ok_or_else(|| invalid_span("string literal", literal.span()))?;
+        write_quoted(self.writer, &decoded)
     }
 
     /// One projection for a metadata feature, shared by every scope that owns one.
@@ -4575,12 +4588,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     None => self.writer.write_str("none")?,
                 }
                 self.writer.write_str(") (locale ")?;
-                match &doc.value.locale {
-                    Some(locale) => write_quoted(self.writer, locale)?,
-                    None => self.writer.write_str("none")?,
-                }
+                self.write_optional_string_literal(doc.value.locale)?;
                 self.writer.write_str(") ")?;
-                self.write_annotation_body(&doc.value.body_span, &doc.value.normalized_text())?;
+                self.write_annotation_body(doc.value.body)?;
                 self.writer.write_char(')')
             }
             // The keyword and the locale are grammatical facts, not formatting: a comment member
@@ -4602,9 +4612,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     None => self.writer.write_str("none")?,
                 }
                 self.writer.write_str(") (language ")?;
-                write_quoted(self.writer, &rep.value.language)?;
+                self.write_optional_string_literal(rep.value.language)?;
                 self.writer.write_str(") ")?;
-                self.write_annotation_body(&rep.value.body_span, &rep.value.normalized_text())?;
+                self.write_annotation_body(rep.value.body)?;
                 self.writer.write_char(')')
             }
             super::AnnotatingMember::MetadataAnnotation(annotation) => {

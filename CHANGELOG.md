@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ParsedDocument::real_literal`, `string_literal` (authored, quotes and escapes intact) and
   `decoded_string_literal`. The emitter streams both from the source, which also fixes string
   literals losing their `\"` escapes on round trip.
+- **Comment bodies and `locale`/`language` tokens are typed source spans.** `DocComment`,
+  `CommentAnnotation` and `TextualRepresentation` carry a `body: CommentBody` span (replacing the
+  `text` copy and its parallel `body_span`) and `StringLiteral` spans for `locale` and `language`
+  (`TextualRepresentation::language` is now `Option<StringLiteral>`, replacing the
+  `language`/`language_span` pair). `ParsedDocument::comment_body` returns the authored body and
+  `normalized_comment_body` the pinned-normalized view, borrowing when nothing changes;
+  `normalize_comment_body` now returns a `Cow`.
 - **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
   Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
   whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,

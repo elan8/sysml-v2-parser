@@ -2084,22 +2084,21 @@ macro_rules! ast_traversal {
         pub fn walk_doc_comment<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DocComment>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DocComment { identification, locale, text, body_span } = &$($mutability)? node.value;
+            let DocComment { identification, locale, body } = &$($mutability)? node.value;
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
             }
             if let Some(inner) = locale {
-                visitor.visit_text(inner);
+                visitor.visit_span(&$($mutability)? inner.span);
             }
-            visitor.visit_text(text);
-            visitor.visit_span(body_span);
+            visitor.visit_span(&$($mutability)? body.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_comment_annotation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CommentAnnotation>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CommentAnnotation { keyword_span, identification, about_targets, locale, text, body_span } = &$($mutability)? node.value;
+            let CommentAnnotation { keyword_span, identification, about_targets, locale, body } = &$($mutability)? node.value;
             if let Some(inner) = keyword_span {
                 visitor.visit_span(inner);
             }
@@ -2110,26 +2109,23 @@ macro_rules! ast_traversal {
                 visitor.visit_qualified_reference(inner);
             }
             if let Some(inner) = locale {
-                visitor.visit_text(inner);
+                visitor.visit_span(&$($mutability)? inner.span);
             }
-            visitor.visit_text(text);
-            visitor.visit_span(body_span);
+            visitor.visit_span(&$($mutability)? body.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_textual_representation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<TextualRepresentation>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let TextualRepresentation { rep_identification, language, language_span, text, body_span } = &$($mutability)? node.value;
+            let TextualRepresentation { rep_identification, language, body } = &$($mutability)? node.value;
             if let Some(inner) = rep_identification {
                 visitor.visit_identification(inner);
             }
-            visitor.visit_text(language);
-            if let Some(inner) = language_span {
-                visitor.visit_span(inner);
+            if let Some(inner) = language {
+                visitor.visit_span(&$($mutability)? inner.span);
             }
-            visitor.visit_text(text);
-            visitor.visit_span(body_span);
+            visitor.visit_span(&$($mutability)? body.span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

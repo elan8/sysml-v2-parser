@@ -1320,10 +1320,10 @@ Addresses: front ToF 0x29, left ToF 0x2A, right ToF 0x2B, IMU 0x68.
     );
     match &members[0].value {
         PortBodyElement::Annotating(AnnotatingMember::Doc(doc)) => {
+            let text = result.comment_body(doc.value.body).expect("doc body");
             assert!(
-                doc.value.text.contains("Addresses: front ToF 0x29"),
-                "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
-                doc.value.text
+                text.contains("Addresses: front ToF 0x29"),
+                "doc text should retain the colon-and-comma-list line verbatim, got {text:?}"
             );
         }
         PortBodyElement::Error(err) => panic!(
@@ -2735,10 +2735,10 @@ end b : B;
         sysml_v2_parser::ast::ConnectionDefBodyElement::Annotating(
             sysml_v2_parser::ast::AnnotatingMember::Doc(doc),
         ) => {
+            let text = result.comment_body(doc.value.body).expect("doc body");
             assert!(
-                doc.value.text.contains("Addresses: front ToF 0x29"),
-                "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
-                doc.value.text
+                text.contains("Addresses: front ToF 0x29"),
+                "doc text should retain the colon-and-comma-list line verbatim, got {text:?}"
             );
         }
         other => panic!("expected Doc member, got {:?}", other),
@@ -2816,10 +2816,10 @@ doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
     );
     match &body_elements[0].value {
         InterfaceUsageBodyElement::Annotating(AnnotatingMember::Doc(doc)) => {
+            let text = result.comment_body(doc.value.body).expect("doc body");
             assert!(
-                doc.value.text.contains("Addresses: front ToF 0x29"),
-                "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
-                doc.value.text
+                text.contains("Addresses: front ToF 0x29"),
+                "doc text should retain the colon-and-comma-list line verbatim, got {text:?}"
             );
         }
         other => panic!("expected Doc member, got {:?}", other),

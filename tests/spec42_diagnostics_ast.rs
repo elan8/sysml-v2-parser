@@ -230,8 +230,12 @@ fn requirement_body_rep_language_parsed() {
             .expect("textual rep"),
         _ => panic!("expected brace requirement body"),
     };
-    assert_eq!(rep.language, "sysml");
-    assert!(rep.language_span.is_some());
+    assert_eq!(
+        rep.language
+            .and_then(|l| root.decoded_string_literal(l))
+            .as_deref(),
+        Some("sysml")
+    );
 }
 
 #[test]

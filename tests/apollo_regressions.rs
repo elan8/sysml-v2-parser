@@ -963,7 +963,10 @@ fn part_definition_comment_members_parse_structurally() {
             .and_then(|id| id.name.and_then(|n| result.document.declaration_name(n))),
         Some("source")
     );
-    assert!(comment.text.contains("https://example.test/source"));
+    assert!(result
+        .document
+        .comment_body(comment.body)
+        .is_some_and(|text| text.contains("https://example.test/source")));
 }
 
 #[test]

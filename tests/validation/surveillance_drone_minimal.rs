@@ -173,11 +173,13 @@ fn test_perform_body_doc_comment_parsed_as_element() {
     match &perform_body[0].value {
         sysml_v2_parser::ast::PerformBodyElement::Annotating(
             sysml_v2_parser::ast::AnnotatingMember::Doc(d),
-        ) => assert!(
-            d.value.text.contains("allocation comment"),
-            "doc text should contain the comment content, got {:?}",
-            d.value.text
-        ),
+        ) => {
+            let text = root.comment_body(d.value.body).expect("doc body");
+            assert!(
+                text.contains("allocation comment"),
+                "doc text should contain the comment content, got {text:?}"
+            )
+        }
         other => panic!("expected first element Doc, got {:?}", other),
     }
     match &perform_body[1].value {

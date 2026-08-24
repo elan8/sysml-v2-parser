@@ -4,8 +4,8 @@ use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
-    CommentAnnotation, DocComment, FilterMember, Identification, Import, ImportShape, ImportTarget,
-    LibraryPackage, NamespaceName, Package, PackageBody, PackageBodyElement,
+    CommentAnnotation, CommentBody, DocComment, FilterMember, Identification, Import, ImportShape,
+    ImportTarget, LibraryPackage, NamespaceName, Package, PackageBody, PackageBodyElement,
     QualifiedIdentification, RootElement, RootNamespace, TextualRepresentation,
 };
 
@@ -552,14 +552,12 @@ pub(crate) fn emit_doc(w: &mut EmitWriter<'_>, doc: &DocComment) -> Result<(), E
         w.push_char(' ');
         emit_identification(w, id)?;
     }
-    if let Some(locale) = &doc.locale {
-        w.push_str(" locale \"");
-        w.push_str(locale);
-        w.push_char('"');
+    if let Some(locale) = doc.locale {
+        w.push_str(" locale ");
+        w.push_authored_span("doc locale", locale.span())?;
     }
     w.newline();
-    emit_regular_comment_body(w, &doc.text);
-    Ok(())
+    emit_regular_comment_body(w, doc.body)
 }
 
 pub(crate) fn emit_comment(
@@ -594,18 +592,16 @@ pub(crate) fn emit_comment(
                 w.push_qualified_reference("comment about target", *target)?;
             }
         }
-        if let Some(locale) = &comment.locale {
+        if let Some(locale) = comment.locale {
             if has_keyword || comment.identification.is_some() {
                 w.push_char(' ');
             }
-            w.push_str("locale \"");
-            w.push_str(locale);
-            w.push_char('"');
+            w.push_str("locale ");
+            w.push_authored_span("comment locale", locale.span())?;
         }
         w.newline();
     }
-    emit_regular_comment_body(w, &comment.text);
-    Ok(())
+    emit_regular_comment_body(w, comment.body)
 }
 
 fn emit_textual_rep(w: &mut EmitWriter<'_>, rep: &TextualRepresentation) -> Result<(), EmitError> {
@@ -617,12 +613,14 @@ fn emit_textual_rep(w: &mut EmitWriter<'_>, rep: &TextualRepresentation) -> Resu
         emit_identification(w, id)?;
         w.push_char(' ');
     }
-    w.push_str("language \"");
-    w.push_str(&rep.language);
-    w.push_char('"');
+    // A `rep` without its `language` clause is a recovered, diagnosed shape; re-emitting it
+    // without the clause reproduces what was authored rather than inventing one.
+    if let Some(language) = rep.language {
+        w.push_str("language ");
+        w.push_authored_span("rep language", language.span())?;
+    }
     w.newline();
-    emit_regular_comment_body(w, &rep.text);
-    Ok(())
+    emit_regular_comment_body(w, rep.body)
 }
 
 pub(crate) fn emit_filter(w: &mut EmitWriter<'_>, filter: &FilterMember) -> Result<(), EmitError> {
@@ -633,8 +631,9 @@ pub(crate) fn emit_filter(w: &mut EmitWriter<'_>, filter: &FilterMember) -> Resu
     Ok(())
 }
 
-fn emit_regular_comment_body(w: &mut EmitWriter<'_>, text: &str) {
+fn emit_regular_comment_body(w: &mut EmitWriter<'_>, body: CommentBody) -> Result<(), EmitError> {
     w.push_str("/*");
-    w.push_str(text);
+    w.push_authored_span("comment body", body.span())?;
     w.push_str("*/");
+    Ok(())
 }
