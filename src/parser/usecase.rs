@@ -206,6 +206,7 @@ fn use_case_usage_tail(
             is_abstract,
             multiplicity: header.multiplicity,
             subsets: header.subsets,
+            redefines: header.redefines,
             body,
             membership,
         },
@@ -1055,5 +1056,59 @@ mod membership_tests {
         let parsed = return_ref(context.input(b"return ref result { return Ghost::value;"));
         assert!(parsed.is_err());
         assert!(context.finish().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod redefines_field_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Review comment 4: `UseCaseUsage` had no `redefines` field (same bug class as
+    /// `VerificationCaseUsage`, review comment 3), so `header.redefines` -- already parsed by the
+    /// shared `use_case_usage_tail`/`parse_feature_usage_header` -- was computed and then dropped.
+    /// Covers both call sites that share `use_case_usage_tail`: the plain member-position `use
+    /// case` (`use_case_usage`) and the `then use case ...` succession form
+    /// (`use_case_usage_in_body`).
+    #[test]
+    fn use_case_usage_keeps_its_redefines_clause() {
+        let (rest, node) =
+            use_case_usage(input("use case uc :>> BaseUC;")).expect("use case uc");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            node.value.redefines.is_some(),
+            "the :>> redefines clause must not be discarded"
+        );
+    }
+
+    #[test]
+    fn then_use_case_usage_keeps_its_redefines_clause() {
+        let (rest, node) =
+            use_case_usage_in_body(input("use case uc :>> BaseUC;")).expect("then use case");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            node.value.redefines.is_some(),
+            "the :>> redefines clause must not be discarded"
+        );
+    }
+
+    /// The full defect the review comment reported: `use case uc :>> BaseUC;` used to re-emit as
+    /// `use case uc;`, silently losing the redefinition on a parse/emit round trip. See
+    /// `case::redefines_field_tests::verification_case_usage_round_trips_its_redefines_clause`
+    /// for the shared BNF grounding (`CaseUsage`, `VerificationCaseUsage` and `UseCaseUsage` all
+    /// derive from the same `ConstraintUsageDeclaration` chain, so all three admit `:>>`
+    /// identically).
+    #[test]
+    fn use_case_usage_round_trips_its_redefines_clause() {
+        let source = "use case def UC {\n\tuse case uc :>> BaseUC;\n}\n";
+        let document = crate::parse(source).expect("parse use case def");
+        let emitted = crate::emit_sysml(&document).expect("emit use case def");
+        assert!(
+            emitted.contains(":>> BaseUC"),
+            "redefines clause lost on round trip, emitted:\n{emitted}"
+        );
     }
 }

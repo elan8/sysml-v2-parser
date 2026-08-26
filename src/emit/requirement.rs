@@ -555,6 +555,9 @@ pub(crate) fn emit_use_case_usage(
     if let Some(subsets) = &usage.subsets {
         crate::emit::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
     emit_use_case_body(w, path, &usage.body)
 }
 
@@ -636,6 +639,9 @@ pub(crate) fn emit_verification_case_usage(
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }

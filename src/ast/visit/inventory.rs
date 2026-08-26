@@ -6775,12 +6775,15 @@ macro_rules! ast_traversal {
         pub fn walk_verification_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerificationCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VerificationCaseUsage { name, type_name, multiplicity, subsets, is_abstract, body, membership } = &$($mutability)? node.value;
+            let VerificationCaseUsage { name, type_name, multiplicity, subsets, redefines, is_abstract, body, membership } = &$($mutability)? node.value;
             visitor.visit_declaration_name(name);
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
             if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = type_name {
@@ -6795,12 +6798,15 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseUsage { name, type_name, is_abstract, multiplicity, subsets, body, membership } = &$($mutability)? node.value;
+            let UseCaseUsage { name, type_name, is_abstract, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
             visitor.visit_declaration_name(name);
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
             if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = type_name {

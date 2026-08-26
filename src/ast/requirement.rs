@@ -678,6 +678,11 @@ pub struct VerificationCaseUsage {
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `:>` subsets clause, which may name several comma-separated targets.
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` redefines clause, which may name several comma-separated targets. See
+    /// [`CaseUsage::redefines`]; this was previously parsed by the shared
+    /// `parse_feature_usage_header` header and then silently discarded when this struct was
+    /// built, e.g. `verification v :>> BaseV;` re-emitted as `verification v;`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract verification ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -700,6 +705,12 @@ pub struct UseCaseUsage {
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `:>` subsets clause, which may name several comma-separated targets.
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` redefines clause, which may name several comma-separated targets. See
+    /// [`CaseUsage::redefines`]; this was previously parsed by the shared
+    /// `parse_feature_usage_header` header and then silently discarded when this struct was
+    /// built, e.g. `use case uc :>> BaseUC;` re-emitted as `use case uc;`. Shared by both the
+    /// member-position `use case` and the `then use case ...` succession form.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; captures real visibility at member position
     /// (`use_case_usage`), `visibility: None` at the `then use case ...` control-flow position

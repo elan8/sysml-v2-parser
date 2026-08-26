@@ -191,6 +191,7 @@ pub(crate) fn verification_case_usage(
                 type_name: usage.type_name,
                 multiplicity: usage.multiplicity,
                 subsets: usage.subsets,
+                redefines: usage.redefines,
                 is_abstract: usage.is_abstract,
                 body: usage.body,
                 membership: usage.membership,
@@ -329,6 +330,48 @@ mod membership_tests {
         assert_eq!(
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+}
+
+#[cfg(test)]
+mod redefines_field_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Review comment 3: `VerificationCaseUsage` had no `redefines` field, so `header.redefines`
+    /// (already parsed by the shared `case_like_usage_body`/`parse_feature_usage_header`) was
+    /// computed and then dropped when the struct was built.
+    #[test]
+    fn verification_case_usage_keeps_its_redefines_clause() {
+        let (rest, node) =
+            verification_case_usage(input("verification v :>> BaseV;")).expect("verification v");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            node.value.redefines.is_some(),
+            "the :>> redefines clause must not be discarded"
+        );
+    }
+
+    /// The full defect the review comment reported: `verification v :>> BaseV;` used to
+    /// re-emit as `verification v;`, silently losing the redefinition on a parse/emit round
+    /// trip. `CaseUsage`/`AnalysisCaseUsage` already keep this; `VerificationCaseUsage` must
+    /// match, since `CaseUsage`, `VerificationCaseUsage` and `UseCaseUsage` all derive from the
+    /// same `ConstraintUsageDeclaration` -> `UsageDeclaration` -> `FeatureSpecializationPart`
+    /// BNF chain (`FeatureSpecialization = Typings | Subsettings | References | Crosses |
+    /// Redefinitions`, SysML v2.0 Part 1 8.2.2.6.2 / KerML v1.0), so all three are grammatically
+    /// required to admit a `:>>` clause identically.
+    #[test]
+    fn verification_case_usage_round_trips_its_redefines_clause() {
+        let source = "verification def V {\n\tverification v :>> BaseV;\n}\n";
+        let document = crate::parse(source).expect("parse verification def");
+        let emitted = crate::emit_sysml(&document).expect("emit verification def");
+        assert!(
+            emitted.contains(":>> BaseV"),
+            "redefines clause lost on round trip, emitted:\n{emitted}"
         );
     }
 }
