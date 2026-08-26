@@ -374,8 +374,22 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // `BasicUsagePrefix = RefPrefix ('ref')?` -- see `connector::ref_decl`.
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
-    let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
+    // GH-review-comment-1: this slot used to recognize only the literal `state` keyword and
+    // discard it, so every other `RefDeclKind` keyword (`ref concern foo : Foo;` etc.) fell
+    // through and was misread as the declared name, silently dropping the real name and typing
+    // that followed. Route through the same alternation `connector::ref_decl` uses for the 12
+    // real keywords. `state` itself is not a `RefDeclKind` -- a well-formed `ref state <name>`
+    // is routed earlier through the typed `StateUsage` production (`state_def_body_element`), so
+    // reaching this generic fallback with a leading `state` token means that attempt already
+    // failed; still consume it defensively here, same as before, rather than let it be misread
+    // as the declared name.
+    let (input, kind_keyword) = opt(alt((
+        map(crate::parser::connector::ref_decl_kind_keyword, Some),
+        map((tag(&b"state"[..]), ws1), |_| None),
+    )))
+    .parse(input)?;
+    let kind_keyword = kind_keyword.flatten();
     let (input, name) = opt(name).parse(input)?;
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
@@ -448,7 +462,7 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,
                 direction: prefix.direction,
-                kind_keyword: None,
+                kind_keyword,
                 name,
                 typing,
                 redefines,
@@ -1154,5 +1168,47 @@ mod state_body_member_tests {
             node.value,
             StateDefBodyElement::AssertConstraint(_)
         ));
+    }
+
+    /// Review comment 1: `ref concern foo : Foo;` used to fall through the generic `RefDecl`
+    /// fallback with `kind_keyword` hardcoded to `None` (only the literal, non-`RefDeclKind`
+    /// `state` token was recognized here), so `concern` was misread as the declared name and
+    /// `foo : Foo` was silently discarded as unparsed shorthand.
+    #[test]
+    fn state_body_ref_decl_recognizes_a_non_state_kind_keyword() {
+        let src = input("ref concern foo : Foo;");
+        let (rest, node) = state_def_body_element(src).expect("ref concern member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let StateDefBodyElement::Ref(decl) = node.value else {
+            panic!("expected Ref, got {:?}", node.value);
+        };
+        assert_eq!(decl.value.kind_keyword, Some(crate::ast::RefDeclKind::Concern));
+        assert_eq!(
+            decl.value.name.map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"foo"[..]),
+            "the declared name must not be the swallowed kind keyword"
+        );
+        assert!(
+            decl.value.typing.is_some(),
+            "the `: Foo` typing clause must not be silently discarded"
+        );
+    }
+
+    /// The pre-existing `ref state <name>` fallback shape (well-formed input is routed earlier
+    /// through the typed `StateUsage` production; this exercises the generic `RefDecl` fallback
+    /// directly, same as before the fix) must keep working: `state` is not a `RefDeclKind` and
+    /// `kind_keyword` stays `None`.
+    #[test]
+    fn state_body_ref_decl_still_accepts_the_legacy_state_fallback_spelling() {
+        let src = input("ref state fallbackName;");
+        let (rest, node) = state_ref(src).expect("ref state fallback");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.kind_keyword, None);
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"fallbackName"[..])
+        );
     }
 }

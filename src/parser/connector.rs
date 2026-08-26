@@ -264,6 +264,51 @@ pub(crate) fn end_decl(
     ))
 }
 
+/// The one alternation of all 12 `RefDeclKind` keywords a `ref` declaration may carry, shared by
+/// every scope that owns a `RefDecl`-shaped member.
+///
+/// Each scope used to hand-roll its own subset of this alternation (typically only the one
+/// keyword its author had a fixture for), so an unrecognized keyword silently fell through and
+/// was misread as the declared name instead of being rejected or reported. Route every
+/// `ref`-declaration scope through this one alternation rather than adding a fixture-driven
+/// keyword here and a different one there.
+pub(crate) fn ref_decl_kind_keyword(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::RefDeclKind> {
+    alt((
+        map((tag(&b"part"[..]), ws1), |_| crate::ast::RefDeclKind::Part),
+        map((tag(&b"port"[..]), ws1), |_| crate::ast::RefDeclKind::Port),
+        map((tag(&b"item"[..]), ws1), |_| crate::ast::RefDeclKind::Item),
+        map((tag(&b"requirement"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::Requirement
+        }),
+        // `ref use case self : UseCase :>> Case::self;` (Systems Library `UseCases.sysml`;
+        // spec42 Gap 34).
+        map((tag(&b"use"[..]), ws1, tag(&b"case"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::UseCase
+        }),
+        map((tag(&b"concern"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::Concern
+        }),
+        map((tag(&b"viewpoint"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::Viewpoint
+        }),
+        map((tag(&b"rendering"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::Rendering
+        }),
+        map((tag(&b"view"[..]), ws1), |_| crate::ast::RefDeclKind::View),
+        map((tag(&b"action"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::Action
+        }),
+        // After the `use case` arm above, so `use case` is never read as a bare `case`.
+        map((tag(&b"case"[..]), ws1), |_| crate::ast::RefDeclKind::Case),
+        map((tag(&b"verification"[..]), ws1), |_| {
+            crate::ast::RefDeclKind::Verification
+        }),
+    ))
+    .parse(input)
+}
+
 /// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`
 /// type)? (`nonunique`|`ordered`)* body.
 ///
@@ -298,41 +343,8 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         let (rest, _) = ws_and_comments(rest)?;
         input = rest;
     }
-    let (input, kind_keyword) = opt(preceded(
-        ws_and_comments,
-        alt((
-            map((tag(&b"part"[..]), ws1), |_| crate::ast::RefDeclKind::Part),
-            map((tag(&b"port"[..]), ws1), |_| crate::ast::RefDeclKind::Port),
-            map((tag(&b"item"[..]), ws1), |_| crate::ast::RefDeclKind::Item),
-            map((tag(&b"requirement"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::Requirement
-            }),
-            // `ref use case self : UseCase :>> Case::self;` (Systems Library `UseCases.sysml`;
-            // spec42 Gap 34).
-            map((tag(&b"use"[..]), ws1, tag(&b"case"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::UseCase
-            }),
-            map((tag(&b"concern"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::Concern
-            }),
-            map((tag(&b"viewpoint"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::Viewpoint
-            }),
-            map((tag(&b"rendering"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::Rendering
-            }),
-            map((tag(&b"view"[..]), ws1), |_| crate::ast::RefDeclKind::View),
-            map((tag(&b"action"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::Action
-            }),
-            // After the `use case` arm above, so `use case` is never read as a bare `case`.
-            map((tag(&b"case"[..]), ws1), |_| crate::ast::RefDeclKind::Case),
-            map((tag(&b"verification"[..]), ws1), |_| {
-                crate::ast::RefDeclKind::Verification
-            }),
-        )),
-    ))
-    .parse(input)?;
+    let (input, kind_keyword) =
+        opt(preceded(ws_and_comments, ref_decl_kind_keyword)).parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`. A relationship keyword
     // is never the declared name: `ref redefines Item::x, subobjects::x;` (Kernel Systems

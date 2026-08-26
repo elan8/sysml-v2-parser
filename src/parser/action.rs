@@ -145,9 +145,14 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     let (input, _) = ws1(input)?;
     // The kind keyword is retained: `RefDecl::kind_keyword` models it, and dropping it made
     // `derived ref action deferred : ActionUsage;` format back as `derived ref deferred : ...`.
-    let (input, kind_keyword) = opt(preceded(tag(&b"action"[..]), ws1))
-        .parse(input)
-        .map(|(input, kw)| (input, kw.map(|_| crate::ast::RefDeclKind::Action)))?;
+    //
+    // Review comment 2: this slot used to recognize only the literal `action` keyword, so the
+    // other 11 `RefDeclKind` keywords (`ref concern foo : Foo;` inside an action body, etc.)
+    // fell through and were misread as the declared name instead of being recognized. Route
+    // through the same alternation `connector::ref_decl` and `state.rs`'s `state_ref_inner` use;
+    // `action` is one of its 12 arms, so this is a pure widening with no behavior change for the
+    // existing `ref action ...` shape.
+    let (input, kind_keyword) = opt(crate::parser::connector::ref_decl_kind_keyword).parse(input)?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
     let (input, parsed_name) = opt(name).parse(input)?;
     let (input, multiplicity) = opt(preceded(
@@ -2777,6 +2782,64 @@ mod control_node_gap_tests {
             crate::parse(sample)
                 .unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
         }
+    }
+}
+
+#[cfg(test)]
+mod ref_decl_kind_keyword_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Review comment 2: `ref concern foo : Foo;` used to fall through with `kind_keyword`
+    /// recognizing only the literal `action` keyword, so `concern` was misread as the declared
+    /// name and `foo : Foo` was silently discarded as unparsed shorthand.
+    #[test]
+    fn action_body_ref_decl_recognizes_a_non_action_kind_keyword() {
+        let src = input("ref concern foo : Foo;");
+        let (rest, node) = action_def_body_element(src).expect("ref concern member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let ActionDefBodyElement::RefDecl(decl) = node.value else {
+            panic!("expected RefDecl, got {:?}", node.value);
+        };
+        assert_eq!(
+            decl.value.kind_keyword,
+            Some(crate::ast::RefDeclKind::Concern)
+        );
+        assert_eq!(
+            decl.value.name.map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"foo"[..]),
+            "the declared name must not be the swallowed kind keyword"
+        );
+        assert!(
+            decl.value.typing.is_some(),
+            "the `: Foo` typing clause must not be silently discarded"
+        );
+    }
+
+    /// The pre-existing `ref action <name>` shape must keep working unchanged: `action` is one
+    /// of the 12 `RefDeclKind` arms the shared alternation recognizes. `action_ref_decl` is
+    /// exercised directly (not through `action_def_body_element`) because a *well-formed*
+    /// `ref action ...` is claimed first by the typed `ActionUsage` production in the body-element
+    /// dispatcher (see the comment on `ref action`/`ref state` interception above
+    /// `action_def_body_dispatched_element`); `action_ref_decl` is the fallback the dispatcher
+    /// falls to only once that typed attempt fails, and this doc-commented shape
+    /// (`derived ref action deferred : ActionUsage;`, from `action_ref_decl_inner`'s own comment)
+    /// is exactly the case that motivated keeping `kind_keyword` in the first place.
+    #[test]
+    fn action_body_ref_decl_still_accepts_the_action_kind_keyword() {
+        let src = input("ref action deferred : ActionUsage;");
+        let (rest, node) = action_ref_decl(src).expect("ref action member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.kind_keyword, Some(crate::ast::RefDeclKind::Action));
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"deferred"[..])
+        );
     }
 }
 
