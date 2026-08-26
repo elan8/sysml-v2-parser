@@ -1182,9 +1182,14 @@ mod state_body_member_tests {
         let StateDefBodyElement::Ref(decl) = node.value else {
             panic!("expected Ref, got {:?}", node.value);
         };
-        assert_eq!(decl.value.kind_keyword, Some(crate::ast::RefDeclKind::Concern));
         assert_eq!(
-            decl.value.name.map(|n| crate::parser::lex::name_bytes(src, n)),
+            decl.value.kind_keyword,
+            Some(crate::ast::RefDeclKind::Concern)
+        );
+        assert_eq!(
+            decl.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"foo"[..]),
             "the declared name must not be the swallowed kind keyword"
         );

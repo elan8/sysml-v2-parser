@@ -1075,8 +1075,7 @@ mod redefines_field_tests {
     /// (`use_case_usage_in_body`).
     #[test]
     fn use_case_usage_keeps_its_redefines_clause() {
-        let (rest, node) =
-            use_case_usage(input("use case uc :>> BaseUC;")).expect("use case uc");
+        let (rest, node) = use_case_usage(input("use case uc :>> BaseUC;")).expect("use case uc");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(
             node.value.redefines.is_some(),

@@ -152,7 +152,8 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     // through the same alternation `connector::ref_decl` and `state.rs`'s `state_ref_inner` use;
     // `action` is one of its 12 arms, so this is a pure widening with no behavior change for the
     // existing `ref action ...` shape.
-    let (input, kind_keyword) = opt(crate::parser::connector::ref_decl_kind_keyword).parse(input)?;
+    let (input, kind_keyword) =
+        opt(crate::parser::connector::ref_decl_kind_keyword).parse(input)?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
     let (input, parsed_name) = opt(name).parse(input)?;
     let (input, multiplicity) = opt(preceded(
@@ -2809,7 +2810,9 @@ mod ref_decl_kind_keyword_tests {
             Some(crate::ast::RefDeclKind::Concern)
         );
         assert_eq!(
-            decl.value.name.map(|n| crate::parser::lex::name_bytes(src, n)),
+            decl.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"foo"[..]),
             "the declared name must not be the swallowed kind keyword"
         );
@@ -2833,7 +2836,10 @@ mod ref_decl_kind_keyword_tests {
         let src = input("ref action deferred : ActionUsage;");
         let (rest, node) = action_ref_decl(src).expect("ref action member");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.kind_keyword, Some(crate::ast::RefDeclKind::Action));
+        assert_eq!(
+            node.value.kind_keyword,
+            Some(crate::ast::RefDeclKind::Action)
+        );
         assert_eq!(
             node.value
                 .name

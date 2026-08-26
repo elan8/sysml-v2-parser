@@ -1535,17 +1535,16 @@ pub(crate) fn emit_basic_usage_prefix(
     if let Some(direction) = &ref_prefix.direction {
         emit_direction(w, direction.value);
     }
-    if ref_prefix.derived_span.is_some() {
-        w.push_str("derived ");
-    }
-    match ref_prefix.variance.as_ref().map(|node| node.value) {
-        Some(crate::ast::DefinitionPrefix::Abstract) => w.push_str("abstract "),
-        Some(crate::ast::DefinitionPrefix::Variation) => w.push_str("variation "),
-        None => {}
-    }
-    if ref_prefix.constant_span.is_some() {
-        w.push_str("constant ");
-    }
+    // `emit_ref_prefix` already spells `derived`/`abstract`|`variation`/`constant` in the one
+    // grammar-correct order (BNF `RefPrefix`, §8.2.2.6.2); this used to reimplement the
+    // `abstract`/`variation` half by hand, the fourth copy of a pattern `emit_ref_prefix` was
+    // built specifically to close out (see its own doc comment).
+    emit_ref_prefix(
+        w,
+        ref_prefix.derived_span.is_some(),
+        ref_prefix.variance.as_ref().map(|node| &node.value),
+        ref_prefix.constant_span.is_some(),
+    );
     if prefix.reference_span.is_some() {
         w.push_str("ref ");
     }
@@ -2230,5 +2229,27 @@ fn emit_connection_def_body_element(
         crate::ast::ConnectionDefBodyElement::SuccessionUsage(s) => {
             super::behavior::emit_succession_usage(w, path, &s.value)
         }
+    }
+}
+
+#[cfg(test)]
+mod basic_usage_prefix_tests {
+    /// Review comment 6: `emit_basic_usage_prefix` reimplemented the `abstract`/`variation` half
+    /// of `emit_ref_prefix` by hand instead of calling it -- the fourth copy of a pattern
+    /// `emit_ref_prefix`'s own doc comment says it was built specifically to close out ("each
+    /// usage emitter used to spell this inline and the three had drifted into three different
+    /// orders"). Every slot combination already round-trips via
+    /// `tests/occurrence_usage_prefix_owning_layer.rs`; this pins the one grammar-correct order
+    /// (`derived`, `abstract`/`variation`, `constant`, `ref`) as a direct, file-local check on
+    /// the function itself.
+    #[test]
+    fn every_ref_prefix_slot_emits_in_grammar_order() {
+        let source = "package P {\n    derived abstract constant ref occurrence o;\n}\n";
+        let parsed = crate::parse(source).expect("parse");
+        let emitted = crate::emit_sysml(&parsed).expect("emit");
+        assert!(
+            emitted.contains("derived abstract constant ref occurrence"),
+            "prefix slots out of grammar order, emitted:\n{emitted}"
+        );
     }
 }
