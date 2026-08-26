@@ -372,16 +372,12 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
                 match fragment[index] {
                     b'\'' => {
                         index += 1;
-                        while index < fragment.len() {
-                            if fragment[index] == b'\\' && index + 1 < fragment.len() {
-                                index += 2;
-                            } else if fragment[index] == b'\'' {
-                                index += 1;
-                                break;
-                            } else {
-                                index += 1;
-                            }
-                        }
+                        // Same escape rule as the real lexer (`lex::quoted_name_tail_len`): `\`
+                        // escapes only when immediately followed by `'`. Falling off the end of
+                        // this window without a closing quote just stops the scan here, same as
+                        // before -- this is a lookahead gate, not a real parse.
+                        index += crate::parser::lex::quoted_name_tail_len(&fragment[index..])
+                            .unwrap_or(fragment.len() - index);
                     }
                     byte if byte.is_ascii_alphanumeric() => index += 1,
                     b'_' | b':' | b'.' | b'$' => index += 1,
@@ -441,17 +437,12 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
                     index += 1;
                 }
             }
-            Some(b'\'') => {
-                let mut index = 1usize;
-                loop {
-                    match fragment.get(index) {
-                        Some(b'\\') => index += 2,
-                        Some(b'\'') => break index + 1,
-                        Some(_) => index += 1,
-                        None => return false,
-                    }
-                }
-            }
+            // Same escape rule as the real lexer (`lex::quoted_name_tail_len`): `\` escapes only
+            // when immediately followed by `'`.
+            Some(b'\'') => match crate::parser::lex::quoted_name_tail_len(&fragment[1..]) {
+                Some(tail_len) => 1 + tail_len,
+                None => return false,
+            },
             Some(byte) if byte.is_ascii_alphabetic() || *byte == b'_' => fragment
                 .iter()
                 .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')

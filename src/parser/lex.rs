@@ -1184,6 +1184,29 @@ pub(crate) fn name_is(input: Input<'_>, name: DeclarationName, spelling: &[u8]) 
     name_bytes(input, name) == spelling
 }
 
+/// The byte length of a quoted name's content plus its closing quote, given `after_open_quote`
+/// starting immediately after the opening `'`. `None` if the closing quote is never found
+/// (unterminated).
+///
+/// This is the one escape rule for a restricted name: `\` escapes only when the *immediately
+/// following* byte is `'`; any other `\` -- including one right before the true closing quote,
+/// as in `'a\\'` -- is an ordinary byte, not the first half of a pair. [`reference_name_span`]
+/// below and the lookahead gates in `occurrence_prefix::scan_prefix_for` all need "where does
+/// this quoted token end" and used to keep their own separately-maintained copy of this rule;
+/// the copies inside `scan_prefix_for` paired `\` with *any* following byte, so the two
+/// disagreed on inputs like `'a\\'` (an even run of backslashes right before the closing quote).
+pub(crate) fn quoted_name_tail_len(after_open_quote: &[u8]) -> Option<usize> {
+    let mut index = 0usize;
+    loop {
+        match after_open_quote.get(index) {
+            Some(b'\\') if after_open_quote.get(index + 1) == Some(&b'\'') => index += 2,
+            Some(b'\'') => return Some(index + 1),
+            Some(_) => index += 1,
+            None => return None,
+        }
+    }
+}
+
 /// Quoted name: '...' (content between single quotes; \' for escape).
 fn quoted_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = tag(&b"'"[..]).parse(input)?;
@@ -1223,23 +1246,10 @@ fn reference_name_span(input: Input<'_>) -> IResult<Input<'_>, Span> {
     };
 
     let consumed = if first == b'\'' {
-        let mut index = 1usize;
-        let mut closing_quote = None;
-        while index < fragment.len() {
-            if fragment[index] == b'\\'
-                && fragment.get(index + 1).is_some_and(|next| *next == b'\'')
-            {
-                index += 2;
-            } else if fragment[index] == b'\'' {
-                closing_quote = index.checked_add(1);
-                break;
-            } else {
-                index += 1;
-            }
-        }
-        closing_quote.ok_or_else(|| {
+        let tail_len = quoted_name_tail_len(&fragment[1..]).ok_or_else(|| {
             nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Char))
-        })?
+        })?;
+        1 + tail_len
     } else {
         if !(first.is_ascii_alphabetic() || first == b'_') {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -2202,5 +2212,71 @@ mod lexical_bnf_tests {
     fn crosses_operator_accepts_symbol_and_keyword() {
         let (_, _) = crosses_operator(span_input("=>")).expect("CROSSES");
         let (_, _) = crosses_operator(span_input("crosses ")).expect("CROSSES");
+    }
+}
+
+#[cfg(test)]
+mod quoted_name_escape_rule_tests {
+    use super::*;
+
+    /// Review comment 5: `\` escapes only when the *immediately following* byte is `'`. An even
+    /// run of backslashes right before the real closing quote (`'a\\'`: `a`, `\`, `\`, `'`) is
+    /// two ordinary bytes, not one escaped-quote pair -- the second `\` is immediately followed
+    /// by the real closing `'`, so it *is* an escape, and the string is unterminated (no closing
+    /// quote left). A scanner that instead pairs `\` with *any* following byte would consume the
+    /// two backslashes as one pair and wrongly land on that `'` as the terminator.
+    #[test]
+    fn an_even_backslash_run_before_the_closing_quote_leaves_the_name_unterminated() {
+        assert_eq!(quoted_name_tail_len(b"a\\\\'"), None);
+    }
+
+    /// The real closing quote, with no preceding backslash at all.
+    #[test]
+    fn a_plain_name_terminates_at_the_first_quote() {
+        assert_eq!(quoted_name_tail_len(b"a'"), Some(2));
+    }
+
+    /// `\'` is a single escaped quote, not a terminator: the name continues past it to the real
+    /// closing quote.
+    #[test]
+    fn an_escaped_quote_does_not_terminate_the_name() {
+        assert_eq!(quoted_name_tail_len(b"a\\'b'"), Some(5));
+    }
+
+    /// An odd run of backslashes: the last one escapes the following quote, so the name
+    /// continues; the *next* quote is the real terminator.
+    #[test]
+    fn an_odd_backslash_run_escapes_the_following_quote() {
+        assert_eq!(quoted_name_tail_len(b"a\\\\\\'b'"), Some(7));
+    }
+
+    #[test]
+    fn an_unterminated_name_with_no_quote_at_all_returns_none() {
+        assert_eq!(quoted_name_tail_len(b"abc"), None);
+    }
+
+    /// `reference_name_span` (the real lexer) and `occurrence_prefix::scan_prefix_for`'s
+    /// lookahead gates must now agree on the tricky `'a\\'` case they used to disagree on: both
+    /// must treat it as unterminated. `#'a\\'` in front of a real kind keyword used to make the
+    /// gate wrongly conclude the extension tag ended at the second backslash (pairing it with
+    /// the first) and admit `part` as following it, while the real lexer would instead read the
+    /// second backslash as escaping that same quote and fail to find a terminator at all.
+    #[test]
+    fn hash_extension_gate_and_the_real_lexer_agree_on_an_even_backslash_run() {
+        let context = crate::parser::span::ParseContext::new();
+        let text = b"#'a\\\\' part x;";
+        let gate_input = context.input(text);
+        assert!(
+            crate::parser::occurrence_prefix::hash_extension_follows(gate_input),
+            "the gate must recognize the leading `#` regardless of how the tag content scans"
+        );
+        // Past the `#`, the tag content itself is exactly the `'a\\'` case under test.
+        let after_hash = &text[1..];
+        assert_eq!(
+            quoted_name_tail_len(&after_hash[1..]),
+            None,
+            "the real lexer's rule must find the tag name unterminated, matching the gate's own
+             fallback of scanning to the end of its window rather than landing mid-tag"
+        );
     }
 }
