@@ -391,6 +391,11 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
+            CalcDefBodyElement::KermlRelationship(n) => {
+                if let Some(elements) = &n.value.body {
+                    walk_relationship_body_elements(report, &p, elements)
+                }
+            }
             CalcDefBodyElement::KermlFeature(n) => walk_kerml_feature(report, &p, &n.value),
             CalcDefBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Connector(n) => walk_calc_def_body(report, &p, &n.value.body),

@@ -243,6 +243,10 @@ pub enum CalcDefBodyElement {
     /// entry point is the only one that dispatches it. Splitting the two scopes into their own
     /// element enums is Phase-4 work; this variant does not make that debt worse.
     ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
+    /// A KerML explicit relationship declaration admitted through
+    /// `TypeBodyElement -> NonFeatureMember`, such as
+    /// `subset later.successors subsets earlier.successors;`.
+    KermlRelationship(Box<Node<crate::ast::KermlRelationshipDecl>>),
     /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
     /// s: Occurrence subsets a inverse of b { ... }`); see
     /// [`crate::ast::KermlFeature`].

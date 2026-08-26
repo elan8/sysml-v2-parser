@@ -7345,6 +7345,9 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::ActionMember(field_0) => {
                     visitor.visit_action_def_body_element(&$($mutability)? **field_0);
                 }
+                CalcDefBodyElement::KermlRelationship(field_0) => {
+                    visitor.visit_kerml_relationship_decl(&$($mutability)? **field_0);
+                }
                 CalcDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
