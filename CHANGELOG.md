@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **KerML binding connectors may own connector ends in their type body.**
+  `KermlBindingMember` now represents the grammar's optional declaration-level binary end pair
+  as one `KermlBindingEndPair`, rather than requiring detached `left` and `right` fields. A
+  declaration-only connector such as `binding tern { end feature e1; ... }` therefore retains all
+  body-owned end features, while inline `of a = b` remains structurally paired. Authored `all`,
+  `of`, and `=` spans are preserved and validated during deserialization. **AST version 245.**
+
 - **KerML feature specializations preserve authored clause boundaries and order.**
   `KermlFeature::specializations: Vec<FeatureSpecialization>` replaces the five optional
   typing/subsetting/redefinition/reference/cross mirrors for this grammar family. Repeated

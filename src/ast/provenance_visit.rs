@@ -10,9 +10,10 @@
 use super::visit::{
     walk_comment_annotation, walk_feature_specialization, walk_first_merge_body,
     walk_flow_payload_clause, walk_import_target, walk_in_out_decl, walk_interface_end,
-    walk_interface_part, walk_metadata_annotation, walk_metadata_body_usage,
-    walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
-    walk_usage_extension_keyword, Visitor,
+    walk_interface_part, walk_kerml_binding_end_pair, walk_kerml_binding_member,
+    walk_metadata_annotation, walk_metadata_body_usage, walk_metadata_keyword_usage,
+    walk_occurrence_usage_prefix, walk_satisfy_requirement_usage, walk_usage_extension_keyword,
+    Visitor,
 };
 use super::*;
 
@@ -115,6 +116,69 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_kerml_binding_member(&mut self, node: &Node<KermlBindingMember>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Some(all_span) = &node.value.all_span {
+            self.check(self.delimiter(all_span, "all", "binding connector `all` keyword"));
+            self.check(sigil_within(
+                all_span,
+                &node.span,
+                "binding connector `all` keyword",
+            ));
+            if node.value.name.is_some() || node.value.multiplicity.is_some() {
+                self.error = Some(
+                    "binding connector `all` alternative also contains a declared feature head"
+                        .to_owned(),
+                );
+                return;
+            }
+        }
+        if node.value.multiplicity.is_some() && node.value.name.is_none() {
+            self.error =
+                Some("binding connector declaration multiplicity has no declared name".to_owned());
+            return;
+        }
+        if node.value.name.is_some()
+            && node
+                .value
+                .inline_ends
+                .as_ref()
+                .is_some_and(|pair| pair.value.of_span.is_none())
+        {
+            self.error =
+                Some("declared binding connector inline ends have no `of` introducer".to_owned());
+            return;
+        }
+        walk_kerml_binding_member(self, node);
+    }
+
+    fn visit_kerml_binding_end_pair(&mut self, node: &Node<KermlBindingEndPair>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Some(of_span) = &node.value.of_span {
+            self.check(self.delimiter(of_span, "of", "binding connector `of` introducer"));
+            self.check(sigil_within(
+                of_span,
+                &node.span,
+                "binding connector `of` introducer",
+            ));
+        }
+        self.check(self.delimiter(
+            &node.value.equals_span,
+            "=",
+            "binding connector equals delimiter",
+        ));
+        self.check(sigil_within(
+            &node.value.equals_span,
+            &node.span,
+            "binding connector equals delimiter",
+        ));
+        walk_kerml_binding_end_pair(self, node);
+    }
+
     fn visit_feature_specialization(&mut self, node: &FeatureSpecialization) {
         if self.error.is_some() {
             return;

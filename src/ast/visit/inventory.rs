@@ -1568,6 +1568,11 @@ macro_rules! ast_traversal {
                 walk_kerml_binding_member(self, node)
             }
 
+            /// Visits [`KermlBindingEndPair`]; the default implementation walks its children.
+            fn visit_kerml_binding_end_pair(&mut self, node: &$($mutability)? Node<KermlBindingEndPair>) {
+                walk_kerml_binding_end_pair(self, node)
+            }
+
             /// Visits [`KermlSuccessionMember`]; the default implementation walks its children.
             fn visit_kerml_succession_member(&mut self, node: &$($mutability)? Node<KermlSuccessionMember>) {
                 walk_kerml_succession_member(self, node)
@@ -8124,17 +8129,34 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_binding_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlBindingMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlBindingMember { name, multiplicity, left, right, body, membership } = &$($mutability)? node.value;
+            let KermlBindingMember { all_span, name, multiplicity, inline_ends, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = all_span {
+                visitor.visit_span(inner);
+            }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            visitor.visit_kerml_connector_end(left);
-            visitor.visit_kerml_connector_end(right);
+            if let Some(inner) = inline_ends {
+                visitor.visit_kerml_binding_end_pair(inner);
+            }
             visitor.visit_calc_def_body(body);
             visitor.visit_membership(membership);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_kerml_binding_end_pair<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlBindingEndPair>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let KermlBindingEndPair { of_span, left, equals_span, right } = &$($mutability)? node.value;
+            if let Some(inner) = of_span {
+                visitor.visit_span(inner);
+            }
+            visitor.visit_kerml_connector_end(left);
+            visitor.visit_span(equals_span);
+            visitor.visit_kerml_connector_end(right);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

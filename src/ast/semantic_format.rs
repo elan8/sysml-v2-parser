@@ -4952,8 +4952,32 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// A KerML `binding` member owns a `TypeBody`; project it rather than reducing the member to
     /// a marker so nested annotating members remain observable.
     fn write_bind(&mut self, bind: &super::KermlBindingMember) -> io::Result<()> {
-        self.writer.write_str("(binding (name ")?;
+        self.writer.write_str("(binding (all ")?;
+        self.writer.write_str(if bind.all_span.is_some() {
+            "true"
+        } else {
+            "false"
+        })?;
+        self.writer.write_str(") (name ")?;
         self.write_optional_name(bind.name)?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(bind.multiplicity.as_ref())?;
+        self.writer.write_str(") (inline-ends ")?;
+        if let Some(pair) = &bind.inline_ends {
+            self.writer.write_str("(pair (of ")?;
+            self.writer.write_str(if pair.value.of_span.is_some() {
+                "true"
+            } else {
+                "false"
+            })?;
+            self.writer.write_str(") (left ")?;
+            self.write_kerml_connector_end(&pair.value.left.value)?;
+            self.writer.write_str(") (right ")?;
+            self.write_kerml_connector_end(&pair.value.right.value)?;
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&bind.body)?;
         self.writer.write_char(')')

@@ -570,14 +570,34 @@ pub(crate) fn emit_kerml_binding_member(
     binding: &crate::ast::KermlBindingMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, binding.membership.visibility);
-    w.push_str("binding ");
-    if let Some(name) = binding.name {
-        w.push_declaration_name(&format!("{path}/name"), name)?;
-        w.push_str(" of ");
+    w.push_str("binding");
+    if binding.all_span.is_some() {
+        w.push_str(" all");
     }
-    emit_kerml_connector_end(w, &format!("{path}/left"), &binding.left.value)?;
-    w.push_str(" = ");
-    emit_kerml_connector_end(w, &format!("{path}/right"), &binding.right.value)?;
+    if let Some(name) = binding.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+        if let Some(multiplicity) = &binding.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+    }
+    if let Some(pair) = &binding.inline_ends {
+        w.push_char(' ');
+        if pair.value.of_span.is_some() {
+            w.push_str("of ");
+        }
+        emit_kerml_connector_end(
+            w,
+            &format!("{path}/inline-ends/left"),
+            &pair.value.left.value,
+        )?;
+        w.push_str(" = ");
+        emit_kerml_connector_end(
+            w,
+            &format!("{path}/inline-ends/right"),
+            &pair.value.right.value,
+        )?;
+    }
     emit_calc_body(w, path, &binding.body)
 }
 
