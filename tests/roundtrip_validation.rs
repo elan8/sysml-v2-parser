@@ -180,6 +180,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/OccurrenceTest.sysml",
     "Simple Tests/MultiplicityTest.sysml",
     "Simple Tests/ParameterTest.sysml",
+    // Promoted by GH-115: port definition bodies now dispatch directed `ref` usages through the
+    // complete ReferenceUsage parser, retain comma-separated typings and nested part/port
+    // redefinitions, and accept the following AliasMember siblings.
+    "Simple Tests/PartTest.sysml",
     "Simple Tests/RootPackageTest.sysml",
     // Promoted by spec42 Gap 42 (see Turbojet Stage Analysis above).
     "Simple Tests/StateTest.sysml",

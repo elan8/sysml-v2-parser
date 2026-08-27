@@ -878,6 +878,11 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
             PortDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
+            PortDefBodyElement::AliasDef(n) => {
+                if let crate::ast::AliasBody::Brace { elements, .. } = &n.value.body {
+                    walk_relationship_body_elements(report, &p, elements);
+                }
+            }
             PortDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PortDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PortDefBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),

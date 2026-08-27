@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Port definition and usage bodies retain directed reference usages.** Declarations such as
+  `private in ref y : A, B { ... }` now preserve their direction, complete multi-target typing,
+  and nested usage body instead of being partially consumed as an input/output declaration.
+  Port-definition aliases are also represented by the typed `PortDefBodyElement::AliasDef`
+  variant. The official `Simple Tests/PartTest.sysml` fixture now round-trips without diagnostics.
+  **`PARSE_AST_VERSION` is now 249.**
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed
