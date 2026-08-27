@@ -1533,6 +1533,11 @@ macro_rules! ast_traversal {
                 walk_kerml_feature(self, node)
             }
 
+            /// Visits one ordered KerML [`FeatureSpecialization`] alternative.
+            fn visit_feature_specialization(&mut self, node: &$($mutability)? FeatureSpecialization) {
+                walk_feature_specialization(self, node)
+            }
+
             /// Visits [`KermlFeatureKind`]; the default implementation walks its children.
             fn visit_kerml_feature_kind(&mut self, node: &$($mutability)? Node<KermlFeatureKind>) {
                 walk_kerml_feature_kind(self, node)
@@ -8007,7 +8012,7 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, relationship_parts, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, name, specializations, multiplicity, multiplicity_modifiers, relationship_parts, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {
@@ -8017,25 +8022,13 @@ macro_rules! ast_traversal {
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
+            for inner in specializations {
+                visitor.visit_feature_specialization(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = references {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = crosses {
-                visitor.visit_subsetting_relationship(inner);
-            }
             for inner in relationship_parts {
                 visitor.visit_feature_relationship_part(inner);
             }
@@ -8045,6 +8038,19 @@ macro_rules! ast_traversal {
             visitor.visit_calc_def_body(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_feature_specialization<V: $Visitor>(visitor: &mut V, node: &$($mutability)? FeatureSpecialization) {
+            match node {
+                FeatureSpecialization::Typing(inner) => visitor.visit_typing_relationship(inner),
+                FeatureSpecialization::Subsetting { relationship, value } => {
+                    visitor.visit_subsetting_relationship(relationship);
+                    if let Some(value) = value { visitor.visit_expression(value); }
+                }
+                FeatureSpecialization::ReferenceSubsetting(inner)
+                | FeatureSpecialization::CrossSubsetting(inner)
+                | FeatureSpecialization::Redefinition(inner) => visitor.visit_subsetting_relationship(inner),
+            }
         }
 
         pub fn walk_kerml_feature_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureKind>) {

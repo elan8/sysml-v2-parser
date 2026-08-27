@@ -405,24 +405,16 @@ pub struct KermlFeature {
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form
     /// (`portion feature redefines spaceBoundary [1];`).
     pub name: Option<DeclarationName>,
-    /// `:` typing clause (multi-target).
-    pub typing: Option<Node<crate::ast::TypingRelationship>>,
+    /// Ordered `FeatureSpecialization+` alternatives. Clause identity is retained independently
+    /// from each clause's target list, so `crosses a crosses b` is not collapsed into the same
+    /// syntax as `crosses a, b`.
+    pub specializations: Vec<FeatureSpecialization>,
     /// Multiplicity clause, accepted before or after the typing (and after a leading
     /// redefinition target).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
     /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
     /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
-    /// `subsets`/`:>` clause (multi-target, chains allowed).
-    pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `redefines`/`:>>` clause (multi-target).
-    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `references`/`::>` clause.
-    pub references: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `crosses` cross-subsetting clause, e.g. `end feature shorterOccurrence: Occurrence
-    /// redefines sourceOccurrence crosses longerOccurrence.timeEnclosedOccurrences;`
-    /// (spec42 gap 32). Mirrors `ConnectionEnd`/`EndDecl`/`OccurrenceUsage`.
-    pub crosses: Option<Node<crate::ast::SubsettingRelationship>>,
     /// Ordered `FeatureRelationshipPart*` declaration tail. This replaces the
     /// superseded fixed `chains`, `inverse_of`, and `type_relationships` slots:
     /// the grammar permits any alternative to repeat and interleave.
@@ -432,6 +424,20 @@ pub struct KermlFeature {
     /// Body following the shared type-body member grammar: `;` or `{ ... }`.
     pub body: crate::ast::CalcDefBody,
     pub membership: crate::ast::Membership,
+}
+
+/// One ordered alternative of KerML `FeatureSpecialization` (BNF 643).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FeatureSpecialization {
+    Typing(Node<crate::ast::TypingRelationship>),
+    Subsetting {
+        relationship: Node<crate::ast::SubsettingRelationship>,
+        value: Option<Node<crate::ast::Expression>>,
+    },
+    ReferenceSubsetting(Node<crate::ast::SubsettingRelationship>),
+    CrossSubsetting(Node<crate::ast::SubsettingRelationship>),
+    Redefinition(Node<crate::ast::SubsettingRelationship>),
 }
 
 /// The kind keyword of a [`KermlFeature`].

@@ -715,6 +715,58 @@ pub(crate) fn specialization_clauses(
     }
 }
 
+/// Parse the ordered alternatives of KerML `FeatureSpecialization+` without merging repeated
+/// clauses. This is the typed component used by migrated owners whose consumers must distinguish
+/// clause count and authored order (spec42 Gap 66).
+pub(crate) fn feature_specializations(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<crate::ast::FeatureSpecialization>> {
+    let mut input = input;
+    let mut out = Vec::new();
+    loop {
+        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_typing, typing) = optional_typings(after_ws)?;
+        if let Some((span, is_conjugated, targets, spelling)) = typing {
+            let relationship = Node::new(
+                span,
+                crate::ast::TypingRelationship {
+                    target: targets,
+                    kind: crate::ast::TypingKind::Typing,
+                    span,
+                    is_conjugated,
+                    is_implied: false,
+                    spelling,
+                },
+            );
+            out.push(crate::ast::FeatureSpecialization::Typing(relationship));
+            input = after_typing;
+        } else if let Ok((rest, (relationship, value))) = subsetting(after_ws) {
+            out.push(crate::ast::FeatureSpecialization::Subsetting {
+                relationship,
+                value,
+            });
+            input = rest;
+        } else if let Ok((rest, relationship)) = reference_subsetting(after_ws) {
+            out.push(crate::ast::FeatureSpecialization::ReferenceSubsetting(
+                relationship,
+            ));
+            input = rest;
+        } else if let Ok((rest, relationship)) = cross_subsetting(after_ws) {
+            out.push(crate::ast::FeatureSpecialization::CrossSubsetting(
+                relationship,
+            ));
+            input = rest;
+        } else if let Ok((rest, relationship)) = redefinition(after_ws) {
+            out.push(crate::ast::FeatureSpecialization::Redefinition(
+                relationship,
+            ));
+            input = rest;
+        } else {
+            return Ok((input, out));
+        }
+    }
+}
+
 pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = multiplicity_modifier_slots(input)?;
     Ok((input, ()))

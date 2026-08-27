@@ -418,25 +418,32 @@ pub(crate) fn emit_kerml_feature(
         }
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(typing) = &feature.typing {
-        emit_typing_clause(w, &typing.value)?;
+    for specialization in &feature.specializations {
+        match specialization {
+            crate::ast::FeatureSpecialization::Typing(typing) => {
+                emit_typing_clause(w, &typing.value)?
+            }
+            crate::ast::FeatureSpecialization::Subsetting {
+                relationship,
+                value,
+            } => {
+                emit_subsetting_clause(w, &relationship.value)?;
+                if let Some(value) = value {
+                    w.push_str(" = ");
+                    emit_expression(w, &value.value)?;
+                }
+            }
+            crate::ast::FeatureSpecialization::ReferenceSubsetting(relationship)
+            | crate::ast::FeatureSpecialization::CrossSubsetting(relationship)
+            | crate::ast::FeatureSpecialization::Redefinition(relationship) => {
+                emit_subsetting_clause(w, &relationship.value)?
+            }
+        }
     }
     if let Some(multiplicity) = &feature.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
     emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
-    if let Some(redefines) = &feature.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
-    }
-    if let Some(subsets) = &feature.subsets {
-        emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(references) = &feature.references {
-        emit_subsetting_clause(w, &references.value)?;
-    }
-    if let Some(crosses) = &feature.crosses {
-        emit_subsetting_clause(w, &crosses.value)?;
-    }
     for (index, part) in feature.relationship_parts.iter().enumerate() {
         emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
     }

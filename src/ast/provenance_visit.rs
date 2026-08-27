@@ -8,10 +8,11 @@
 //! traversal knows about it -- there is no separate list here to keep in step.
 
 use super::visit::{
-    walk_comment_annotation, walk_first_merge_body, walk_flow_payload_clause, walk_import_target,
-    walk_in_out_decl, walk_interface_end, walk_interface_part, walk_metadata_annotation,
-    walk_metadata_body_usage, walk_metadata_keyword_usage, walk_occurrence_usage_prefix,
-    walk_satisfy_requirement_usage, walk_usage_extension_keyword, Visitor,
+    walk_comment_annotation, walk_feature_specialization, walk_first_merge_body,
+    walk_flow_payload_clause, walk_import_target, walk_in_out_decl, walk_interface_end,
+    walk_interface_part, walk_metadata_annotation, walk_metadata_body_usage,
+    walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
+    walk_usage_extension_keyword, Visitor,
 };
 use super::*;
 
@@ -114,6 +115,39 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_feature_specialization(&mut self, node: &FeatureSpecialization) {
+        if self.error.is_some() {
+            return;
+        }
+        let relationship = match node {
+            FeatureSpecialization::Typing(_) => None,
+            FeatureSpecialization::Subsetting { relationship, .. } => {
+                Some((relationship, SubsettingKind::Subsets, "subsetting"))
+            }
+            FeatureSpecialization::ReferenceSubsetting(relationship) => Some((
+                relationship,
+                SubsettingKind::References,
+                "reference subsetting",
+            )),
+            FeatureSpecialization::CrossSubsetting(relationship) => {
+                Some((relationship, SubsettingKind::Crosses, "cross subsetting"))
+            }
+            FeatureSpecialization::Redefinition(relationship) => {
+                Some((relationship, SubsettingKind::Redefines, "redefinition"))
+            }
+        };
+        if let Some((relationship, expected, role)) = relationship {
+            if relationship.value.kind != expected {
+                self.error = Some(format!(
+                    "feature specialization {role} contains {:?} relationship",
+                    relationship.value.kind
+                ));
+                return;
+            }
+        }
+        walk_feature_specialization(self, node);
+    }
+
     fn visit_flow_payload_clause(&mut self, node: &Node<FlowPayloadClause>) {
         if self.error.is_some() {
             return;

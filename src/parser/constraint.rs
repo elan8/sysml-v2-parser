@@ -1473,20 +1473,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
-        crate::ast::Node::new(
-            span,
-            crate::ast::TypingRelationship {
-                target: targets,
-                kind: crate::ast::TypingKind::Typing,
-                span,
-                is_conjugated,
-                is_implied: false,
-                spelling,
-            },
-        )
-    });
+    let (input, early_specializations) = crate::parser::usage::feature_specializations(input)?;
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
             ws_and_comments,
@@ -1497,7 +1484,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         (input, None)
     };
     let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
-    let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, trailing_specializations) = crate::parser::usage::feature_specializations(input)?;
     // `FeatureSpecializationPart` offers a second multiplicity position, after the specialization
     // clauses: `inout feature replacementValues : Anything redefines values [*] nonunique;`
     // (Kernel Semantic Library `FeatureReferencingPerformances.kerml:89`). Only the directed node
@@ -1518,11 +1505,19 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // whichever position lost.
     let (input, modifiers) =
         crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
-    let subsets = clauses.subsets.map(|(target, _value)| target);
-    let redefines = leading_redefines.or(clauses.redefines);
-    let references = clauses.references;
-    let crosses = clauses.crosses;
-    let (input, relationship_parts) = kerml_feature_relationship_parts(input, clauses.intersects)?;
+    let mut specializations = Vec::with_capacity(
+        usize::from(leading_redefines.is_some())
+            + early_specializations.len()
+            + trailing_specializations.len(),
+    );
+    if let Some(relationship) = leading_redefines {
+        specializations.push(crate::ast::FeatureSpecialization::Redefinition(
+            relationship,
+        ));
+    }
+    specializations.extend(early_specializations);
+    specializations.extend(trailing_specializations);
+    let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -1536,15 +1531,11 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 kind,
                 is_all: is_all.is_some(),
                 name: name_str,
-                typing,
+                specializations,
                 multiplicity: leading_multiplicity
                     .or(trailing_multiplicity)
                     .or(post_specialization_multiplicity),
                 multiplicity_modifiers: modifiers,
-                subsets,
-                redefines,
-                references,
-                crosses,
                 relationship_parts,
                 value,
                 body,

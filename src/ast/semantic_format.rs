@@ -2540,23 +2540,50 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             feature.is_member, feature.is_all
         )?;
         self.write_usage_declaration_name(feature.name)?;
-        self.writer.write_str(") (typing ")?;
-        match &feature.typing {
-            Some(typing) => self.write_typing(&typing.value)?,
-            None => self.writer.write_str("none")?,
+        self.writer.write_str(") (specializations")?;
+        for specialization in &feature.specializations {
+            self.writer.write_char(' ')?;
+            match specialization {
+                super::FeatureSpecialization::Typing(typing) => {
+                    self.writer.write_str("(typing ")?;
+                    self.write_typing(&typing.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Subsetting {
+                    relationship,
+                    value,
+                } => {
+                    self.writer.write_str("(subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_str(" (value ")?;
+                    if let Some(value) = value {
+                        self.write_expression(value)?;
+                    } else {
+                        self.writer.write_str("none")?;
+                    }
+                    self.writer.write_str("))")?;
+                }
+                super::FeatureSpecialization::ReferenceSubsetting(relationship) => {
+                    self.writer.write_str("(reference-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::CrossSubsetting(relationship) => {
+                    self.writer.write_str("(cross-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Redefinition(relationship) => {
+                    self.writer.write_str("(redefinition ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+            }
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("subsets", feature.subsets.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("redefines", feature.redefines.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("references", feature.references.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("crosses", feature.crosses.as_ref())?;
         self.writer.write_str(" (relationships")?;
         for part in &feature.relationship_parts {
             self.writer.write_char(' ')?;

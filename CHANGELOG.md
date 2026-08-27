@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **KerML feature specializations preserve authored clause boundaries and order.**
+  `KermlFeature::specializations: Vec<FeatureSpecialization>` replaces the five optional
+  typing/subsetting/redefinition/reference/cross mirrors for this grammar family. Repeated
+  `references` and `crosses` clauses now remain distinct from one comma-separated clause, and
+  interleaved alternatives retain their source order and exact relationship spelling through
+  emission, semantic snapshots, traversal, and validated serialization. **AST version 244.**
+
 - **Flow payload clauses are ordered, source-backed syntax.** The declaration-led
   `FlowDeclaration` now carries `payloads: Vec<Node<FlowPayloadClause>>` instead of one
   `Option<Node<PayloadFeature>>`. Each clause retains its exact `of` span and typed payload
