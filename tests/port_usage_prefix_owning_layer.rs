@@ -13,6 +13,12 @@
 //!
 //! The grammar is `planning/port-usage-prefix-matrix.md`.
 
+#[cfg(feature = "serde")]
+#[path = "common/serde_wire.rs"]
+mod serde_wire;
+
+#[cfg(feature = "serde")]
+use serde_wire::{basic_occurrence_prefix_head_mut, occurrence_prefix_mut};
 use sysml_v2_parser::{emit_sysml, parse, parse_for_editor};
 
 /// Formatting a document, parsing the result, and formatting again: the tree must survive the
@@ -177,10 +183,11 @@ fn a_refused_port_prefix_leaves_no_arena_entry() {
 fn a_port_prefix_keyword_span_covering_other_text_is_rejected() {
     let document = parse_for_editor("package P {\n    derived port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let prefix = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                  /value/PortUsage/value/prefix";
-    *tampered
-        .pointer_mut(&format!("{prefix}/basic/ref_prefix/derived_span/offset"))
+    *basic_occurrence_prefix_head_mut(&mut tampered, 0, 1)
+        .get_mut("basic")
+        .and_then(|basic| basic.get_mut("ref_prefix"))
+        .and_then(|ref_prefix| ref_prefix.get_mut("derived_span"))
+        .and_then(|span| span.get_mut("offset"))
         .expect("the `derived` keyword offset") = serde_json::json!(0);
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -197,10 +204,11 @@ fn a_port_prefix_keyword_span_covering_other_text_is_rejected() {
 fn a_port_direction_span_covering_a_different_keyword_is_rejected() {
     let document = parse_for_editor("package P {\n    inout port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let direction = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                     /value/PortUsage/value/prefix/basic/ref_prefix/direction";
-    *tampered
-        .pointer_mut(&format!("{direction}/value"))
+    *basic_occurrence_prefix_head_mut(&mut tampered, 0, 1)
+        .get_mut("basic")
+        .and_then(|basic| basic.get_mut("ref_prefix"))
+        .and_then(|ref_prefix| ref_prefix.get_mut("direction"))
+        .and_then(|direction| direction.get_mut("value"))
         .expect("the direction alternative") = serde_json::json!("In");
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -217,10 +225,11 @@ fn a_port_direction_span_covering_a_different_keyword_is_rejected() {
 fn a_port_variance_span_covering_a_different_keyword_is_rejected() {
     let document = parse_for_editor("package P {\n    abstract port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let variance = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                    /value/PortUsage/value/prefix/basic/ref_prefix/variance";
-    *tampered
-        .pointer_mut(&format!("{variance}/value"))
+    *basic_occurrence_prefix_head_mut(&mut tampered, 0, 1)
+        .get_mut("basic")
+        .and_then(|basic| basic.get_mut("ref_prefix"))
+        .and_then(|ref_prefix| ref_prefix.get_mut("variance"))
+        .and_then(|variance| variance.get_mut("value"))
         .expect("the variance alternative") = serde_json::json!("Variation");
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -237,10 +246,9 @@ fn a_port_variance_span_covering_a_different_keyword_is_rejected() {
 fn a_port_portion_span_covering_a_different_keyword_is_rejected() {
     let document = parse_for_editor("package P {\n    snapshot port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let portion = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                   /value/PortUsage/value/prefix/portion";
-    *tampered
-        .pointer_mut(&format!("{portion}/value"))
+    *basic_occurrence_prefix_head_mut(&mut tampered, 0, 1)
+        .get_mut("portion")
+        .and_then(|portion| portion.get_mut("value"))
         .expect("the portion alternative") = serde_json::json!("Timeslice");
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -263,21 +271,22 @@ fn a_port_portion_span_covering_a_different_keyword_is_rejected() {
 fn port_prefix_slots_written_out_of_order_are_rejected() {
     let document = parse_for_editor("package P {\n    ref individual port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let prefix = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                  /value/PortUsage/value/prefix";
-    let reference_span = tampered
-        .pointer(&format!("{prefix}/basic/reference_span"))
+    let head = basic_occurrence_prefix_head_mut(&mut tampered, 0, 1);
+    let reference_span = head
+        .get("basic")
+        .and_then(|basic| basic.get("reference_span"))
         .cloned()
         .expect("the `ref` keyword span");
-    let individual_span = tampered
-        .pointer(&format!("{prefix}/individual_span"))
+    let individual_span = head
+        .get("individual_span")
         .cloned()
         .expect("the `individual` keyword span");
-    *tampered
-        .pointer_mut(&format!("{prefix}/basic/reference_span"))
+    *head
+        .get_mut("basic")
+        .and_then(|basic| basic.get_mut("reference_span"))
         .expect("the `ref` keyword span") = individual_span;
-    *tampered
-        .pointer_mut(&format!("{prefix}/individual_span"))
+    *head
+        .get_mut("individual_span")
         .expect("the `individual` keyword span") = reference_span;
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -294,10 +303,12 @@ fn port_prefix_slots_written_out_of_order_are_rejected() {
 fn a_port_extension_keyword_sigil_covering_other_text_is_rejected() {
     let document = parse_for_editor("package P {\n    #Tag port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let sigil = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                 /value/PortUsage/value/prefix/extension_keywords/0/value/hash_span";
-    *tampered
-        .pointer_mut(&format!("{sigil}/offset"))
+    *occurrence_prefix_mut(&mut tampered, 0, 1)
+        .get_mut("extension_keywords")
+        .and_then(|keywords| keywords.get_mut(0))
+        .and_then(|keyword| keyword.get_mut("value"))
+        .and_then(|value| value.get_mut("hash_span"))
+        .and_then(|span| span.get_mut("offset"))
         .expect("the extension keyword sigil offset") = serde_json::json!(0);
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -314,10 +325,11 @@ fn a_port_extension_keyword_sigil_covering_other_text_is_rejected() {
 fn a_dangling_port_extension_keyword_reference_is_rejected() {
     let document = parse_for_editor("package P {\n    #Tag port p;\n}\n").document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let annotation = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                      /value/PortUsage/value/prefix/extension_keywords/0/value/annotation";
-    *tampered
-        .pointer_mut(annotation)
+    *occurrence_prefix_mut(&mut tampered, 0, 1)
+        .get_mut("extension_keywords")
+        .and_then(|keywords| keywords.get_mut(0))
+        .and_then(|keyword| keyword.get_mut("value"))
+        .and_then(|value| value.get_mut("annotation"))
         .expect("the extension keyword reference") = serde_json::json!(9999);
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
@@ -336,17 +348,14 @@ fn a_port_prefix_span_outside_its_own_declaration_is_rejected() {
         parse_for_editor("package P {\n    individual port p;\n    individual port q;\n}\n")
             .document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
-    let first = "/root/elements/0/value/Package/value/body/Brace/elements/0\
-                 /value/PortUsage/value/prefix/head/Basic/individual_span/offset";
-    let second_offset = tampered
-        .pointer(
-            "/root/elements/0/value/Package/value/body/Brace/elements/1\
-             /value/PortUsage/value/prefix/head/Basic/individual_span/offset",
-        )
+    let second_offset = basic_occurrence_prefix_head_mut(&mut tampered, 1, 2)
+        .get("individual_span")
+        .and_then(|span| span.get("offset"))
         .cloned()
         .expect("the second usage's `individual` keyword offset");
-    *tampered
-        .pointer_mut(first)
+    *basic_occurrence_prefix_head_mut(&mut tampered, 0, 2)
+        .get_mut("individual_span")
+        .and_then(|span| span.get_mut("offset"))
         .expect("the first usage's `individual` keyword offset") = second_offset;
 
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
