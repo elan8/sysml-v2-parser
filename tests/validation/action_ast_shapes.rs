@@ -22,7 +22,7 @@ fn fixture_path() -> PathBuf {
 }
 
 fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) {
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         return;
     };
 
@@ -33,7 +33,9 @@ fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) 
                 scan_action_def_body(&a.value.body, for_loops, then_assigns)
             }
             PackageBodyElement::ActionUsage(a) => {
-                scan_action_usage_body(&a.value.body, for_loops, then_assigns)
+                if let Some(body) = &a.value.body {
+                    scan_action_usage_body(body, for_loops, then_assigns);
+                }
             }
             PackageBodyElement::AnalysisCaseDef(a) => {
                 scan_use_case_body(&a.value.body, for_loops, then_assigns)
@@ -47,7 +49,7 @@ fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) 
 }
 
 fn scan_action_def_body(body: &ActionDefBody, for_loops: &mut usize, then_assigns: &mut usize) {
-    let ActionDefBody::Brace { elements } = body else {
+    let ActionDefBody::Brace { elements, .. } = body else {
         return;
     };
     for el in elements {
@@ -55,7 +57,9 @@ fn scan_action_def_body(body: &ActionDefBody, for_loops: &mut usize, then_assign
             ActionDefBodyElement::ForLoop(_) => *for_loops += 1,
             ActionDefBodyElement::Assign(a) if a.value.is_then => *then_assigns += 1,
             ActionDefBodyElement::ActionUsage(u) => {
-                scan_action_usage_body(&u.value.body, for_loops, then_assigns)
+                if let Some(body) = &u.value.body {
+                    scan_action_usage_body(body, for_loops, then_assigns);
+                }
             }
             _ => {}
         }
@@ -63,7 +67,7 @@ fn scan_action_def_body(body: &ActionDefBody, for_loops: &mut usize, then_assign
 }
 
 fn scan_action_usage_body(body: &ActionUsageBody, for_loops: &mut usize, then_assigns: &mut usize) {
-    let ActionUsageBody::Brace { elements } = body else {
+    let ActionUsageBody::Brace { elements, .. } = body else {
         return;
     };
     for el in elements {
@@ -71,7 +75,9 @@ fn scan_action_usage_body(body: &ActionUsageBody, for_loops: &mut usize, then_as
             ActionUsageBodyElement::ForLoop(_) => *for_loops += 1,
             ActionUsageBodyElement::Assign(a) if a.value.is_then => *then_assigns += 1,
             ActionUsageBodyElement::ActionUsage(u) => {
-                scan_action_usage_body(&u.value.body, for_loops, then_assigns)
+                if let Some(body) = &u.value.body {
+                    scan_action_usage_body(body, for_loops, then_assigns);
+                }
             }
             _ => {}
         }
@@ -79,14 +85,14 @@ fn scan_action_usage_body(body: &ActionUsageBody, for_loops: &mut usize, then_as
 }
 
 fn scan_use_case_body(body: &UseCaseDefBody, for_loops: &mut usize, then_assigns: &mut usize) {
-    let UseCaseDefBody::Brace { elements } = body else {
+    let UseCaseDefBody::Brace { elements, .. } = body else {
         return;
     };
     for el in elements {
         match &el.value {
             UseCaseDefBodyElement::ForLoop(fl) => {
                 *for_loops += 1;
-                scan_action_def_body(&fl.value.body, for_loops, then_assigns);
+                scan_action_def_body(&fl.value.body.body, for_loops, then_assigns);
             }
             UseCaseDefBodyElement::Assign(a) if a.value.is_then => *then_assigns += 1,
             _ => {}

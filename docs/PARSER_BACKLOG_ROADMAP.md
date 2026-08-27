@@ -62,7 +62,9 @@ Items that must close before Spec42 can release v1.0. Everything else is 1.x.
 - Diagnostic catalog string literals → named constants migration (§2.6)
 - `rep` in package-adjacent frame/concern bodies beyond what a Spec42 diagnostic requires (§2.2)
 - `head_span` gaps on non-critical annotation paths (§2.1)
-- Unified definition/usage/specialization grammar layer (§4, P5+)
+- Repository-wide completion of the grammar-production-owned definition/usage/specialization
+  layer (§4, P5+). Audited family-sized Phase 4 slices are active now; what is deferred is a broad
+  completion program or flag-day rewrite, not incremental correction of an in-scope production.
 - Full `OwnedExpression` / complete KerML expression family (§2.4)
 - User-defined declaration keywords (`metadata def` as header starter, deferred 1.5b)
 
@@ -119,7 +121,7 @@ See [`tests/validation/README.md`](../tests/validation/README.md) for layout and
 | Deep body fidelity | **Open** — many `advance_to_closing_brace` call sites remain |
 | Full `OwnedExpression` | **Open** — operator enums added; full KerML expression family not modeled |
 | Systems Library `ref <kind>` in part bodies | **Done** (0.46.0) — `ActionUsage`/`StateUsage` (+ Spec42 graph wire); not full P5+ |
-| Unified definition/usage grammar layer | **Open** — P5+ architectural work (still deferred; do not big-bang rewrite) |
+| Grammar-production-owned definition/usage components | **Active incrementally; repository-wide completion is P5+** — Phase 4 matrices and vertical slices only; no universal usage AST or big-bang rewrite |
 
 ```mermaid
 flowchart TB
@@ -252,14 +254,14 @@ Consolidated from [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) and
 
 | Theme | Priority | Notes |
 | ----- | -------- | ----- |
-| Unified definition / usage / specialization grammar layer | **P5+** | Largest architectural gap; do not big-bang rewrite. The 0.46.0 `ref action`/`ref state` part-body slice is **not** this rewrite — only the Systems Library forms that were opaque catch-alls. |
+| Grammar-production-owned definition / usage / specialization components | **P5+ horizon; incremental slices active** | Largest architectural gap. “Unified” means precise components corresponding to pinned productions, composed by distinct family ASTs. It does not mean a universal usage node, generic optional-field bag, parser framework, or flag-day rewrite. Phase 4 slices are active through [`planning/shared-grammar.md`](../planning/shared-grammar.md); the 0.46.0 `ref action`/`ref state` work was coverage, while the `OccurrenceUsagePrefix` seam is the first grammar-component slice. |
 | `DefaultReferenceUsage` AST (bare `name : Type;`) | **Done** (diagnostics-spec-audit) | Part def/usage bodies; was mis-modeled as `AttributeUsage` via shorthand |
-| Metadata `#` / `@` / user-defined keyword surface | Medium | Partial parse; remaining legal forms still hit `unsupported_annotation_syntax` (coverage Warning, not a language ban). §6's audit closed the `PrefixMetadataMember`-style `#<tag>` prefix syntactically (`metadata_keyword_prefix`, package/attribute bodies) — still doesn't resolve whether `<tag>` is an actually-declared `metadata def <tag>` short name (that semantic check + a package-local short-name index is the remaining 1.5b item, §2.1) |
+| Metadata `#` / `@` / user-defined keyword surface | Low | Closed syntactically by the metadata-sigil seam (`planning/metadata-sigil-matrix.md`): both sigils are reference-backed and dispatched in every owning scope, and `unsupported_annotation_syntax` now reaches only `ExtendedUsage` with an anonymous-but-specialized declaration (`#Tag : T;`, `#Tag :>> y;`), which belongs to the `ExtendedUsage` seam. A sigil with no reference behind it is the separate `malformed_annotation_head`. Still doesn't resolve whether `<tag>` is an actually-declared `metadata def <tag>` short name (that semantic check + a package-local short-name index is the remaining 1.5b item, §2.1) |
 | Part-body `ref action` / `ref state` (Systems Library) | **Done** (0.46.0) | Real `ActionUsage`/`StateUsage` with `is_reference`, `:>`/` :>>`, visibility on plain `ref` |
 | `take_until_terminator` header scraping → structured headers | Medium | Per-family as library fixtures expose gaps |
 | `part_def` prelude unify with `definition_prefix` | Low | Intentionally local for disambiguation |
 | `package_body_element` sub-dispatchers | **Done** (P2) | Maintain when adding keywords |
-| AST shape dedup (`DefinitionDecl` internal) | P5+ | Drive from grammar work |
+| AST shape dedup (`DefinitionDecl` internal) | P5+ | Drive only from a pinned production matrix and observable correctness need; similar fields or line-count reduction alone do not justify extraction |
 | Semantic conformance (types, resolution) | Out of scope | Spec42 / other tools |
 
 ---
@@ -275,7 +277,7 @@ recovery nodes instead of a real AST shape. Closed in this pass:
 | ---- | ------------- | ----- |
 | State `entry`/`do`/`exit` actions | `EntryAction`, `DoAction`, `ExitAction`, `StateDefBodyElement::{Entry,Do,Exit}` — [state.rs](../src/parser/state.rs) | Previously only `entry` was implemented |
 | Control nodes `decide`/`join`/`fork` | `DecisionStmt`, `JoinStmt`, `ForkStmt` — [action.rs](../src/parser/action.rs) | Keyword list had a typo (`decision` instead of spec's `decide`); `join`/`fork` had no parser at all |
-| `assert not` / negated satisfy | `AssertConstraintMember.is_negated`, `Satisfy.is_negated` — [occurrence_body.rs](../src/parser/occurrence_body.rs), [requirement.rs](../src/parser/requirement.rs) | `satisfy()` now accepts optional `assert`/`not` prefixes; bare `not satisfy X by Y;` (spec §7.x example) also parses |
+| `assert not` / negated satisfy | `AssertConstraintMember.is_negated`, `Satisfy.is_negated` — [occurrence_body.rs](../src/parser/occurrence_body.rs), [requirement.rs](../src/parser/requirement.rs) | `satisfy()` now accepts optional `assert`/`not` prefixes; bare `not satisfy X by Y;` (spec §7.x example) also parses. **Superseded** by the satisfy-requirement-usage seam (`planning/satisfy-requirement-usage-matrix.md`): `Satisfy.is_negated` is gone; `assert` and `not` each keep their authored span, `assert` is now emitted (it was parsed and discarded), and `assert satisfy` also parses at package scope |
 | Transition `do` effect | `TransitionEffect::{Perform,Accept,Send,Assign,Expression}` — [state.rs](../src/parser/state.rs) | Previously a raw `expression`; now recognizes `do action name : Type`, `do accept/send payload (via/to expr)?`, `do assign lhs := rhs` |
 | `for` loop range | `ForLoop.range: Node<Expression>` (was `String`) — [action.rs](../src/parser/action.rs) | Falls back to raw text only when the expression grammar can't parse the range (see open item below) |
 | `assign` LHS | `AssignStmt.lhs: Node<Expression>` (was `String`) — [action.rs](../src/parser/action.rs) | RHS is still raw `String` (out of scope for this pass) |
@@ -289,8 +291,8 @@ audit trail from the original pass isn't lost.
 - ~~**`if` / `while` / `terminate` control nodes**~~ — **Done.** `IfStmt`, `WhileStmt`, `TerminateStmt` + matching `ActionDefBodyElement`/`ActionUsageBodyElement` variants — [action.rs](../src/parser/action.rs), [behavior.rs](../src/ast/behavior.rs). `if`/`while` bodies are fully structured (`ActionDefBody`, reusing `action_def_body_brace`), not the opaque `FirstMergeBody` `decide`/`join`/`fork` use. `terminate` accepts an optional target expression. Both dispatcher `alt()`s needed nesting into a sub-`alt()` to stay under nom's 21-branch limit.
 - ~~**Standalone `succession` usage**~~ — **Done.** New `SuccessionUsage` AST node, `occurrence_body.rs`. Also supports the multiplicity-bearing form actually used by the SysML Systems Library (`succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;` in `Flows.sysml`) — discovered via the strict library gate failing on the first cut of this parser, which only handled the bare form.
 - ~~**Transition trigger `accept ... via port`**~~ — **Done.** `TransitionAccept::Payload`/`Shorthand` now each carry `Option<Node<Expression>>` for `via` — [payload.rs](../src/parser/payload.rs).
-- ~~**`satisfy requirement <name> : <Type> by <expr>`**~~ — **Done.** `Satisfy.inline_requirement: Option<InlineSatisfyRequirement>`, reusing `optional_typings()` from [usage.rs](../src/parser/usage.rs) — [requirement.rs](../src/parser/requirement.rs).
-- ~~**`assert constraint` / `satisfy` body wiring inconsistent across scopes**~~ — **Done.** Both now reachable from `part def` bodies (`PartDefBodyElement::AssertConstraint`/`Satisfy`) and `satisfy` also from `occurrence def` bodies (`OccurrenceBodyElement::Satisfy`) — [part/body.rs](../src/parser/part/body.rs), [occurrence_body.rs](../src/parser/occurrence_body.rs).
+- ~~**`satisfy requirement <name> : <Type> by <expr>`**~~ — **Done.** `Satisfy.inline_requirement: Option<InlineSatisfyRequirement>`, reusing `optional_typings()` from [usage.rs](../src/parser/usage.rs) — [requirement.rs](../src/parser/requirement.rs). **Superseded** by the satisfy-requirement-usage seam (`planning/satisfy-requirement-usage-matrix.md`): that shape synthesized an `Expression::FeatureRef` from the declaration *label* and cloned it into the `by` target when no `by` was written. The two alternatives are now a `SatisfiedRequirement` enum, the label is an `Identification`, and an omitted `by` stays omitted.
+- ~~**`assert constraint` / `satisfy` body wiring inconsistent across scopes**~~ — **Done.** Both now reachable from `part def` bodies (`PartDefBodyElement::AssertConstraint`/`Satisfy`) and `satisfy` also from `occurrence def` bodies (`OccurrenceBodyElement::Satisfy`) — [part/body.rs](../src/parser/part/body.rs), [occurrence_body.rs](../src/parser/occurrence_body.rs). The satisfy-requirement-usage seam added the remaining scopes it found (`RequirementDefBodyElement::Satisfy`, and the view usage body, which had owned a separate `SatisfyViewMember`); §3 of `planning/satisfy-requirement-usage-matrix.md` records the scopes still unwired.
 - ~~**KerML arrow-invocation operator** (`x->size()`)~~ — **Done.** New `->` branch in `postfix()` — [expr.rs](../src/parser/expr.rs). Desugars into the existing `Expression::MemberAccess`/`Invocation` shapes rather than a new variant, so no downstream exhaustive matches needed updating.
 - ~~**`AssignStmt.rhs` still a raw `String`**~~ — **Done**, unblocked by the arrow-invocation operator above — [action.rs](../src/parser/action.rs), [behavior.rs](../src/ast/behavior.rs).
 
@@ -446,6 +448,11 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 | P2 structured body loops | Complete | [PARSER_DEBT_P2_PLAN.md](./PARSER_DEBT_P2_PLAN.md) |
 | P3 AST split, action/requirement bodies | Complete | [PARSER_DEBT_P3_PLAN.md](./PARSER_DEBT_P3_PLAN.md) |
 | P4 view/part bodies, implies, part split | Complete | [PARSER_DEBT_P4_PLAN.md](./PARSER_DEBT_P4_PLAN.md) |
+| Shared grammar Phase 1-3 (traversal, body container, annotating members) | Complete | [shared-grammar.md](../planning/shared-grammar.md) |
+| Shared grammar Phase 4, first family: `OccurrenceUsagePrefix` | Complete for `OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage`, `PartUsage`, `ConstraintUsage`, `PortUsage`; every other family listed with what it still needs | [occurrence-usage-prefix-matrix.md](../planning/occurrence-usage-prefix-matrix.md) |
+| Shared grammar Phase 4, `PartUsage` slice | Complete — all fifteen owning scopes, five construction paths and six competing productions | [part-usage-prefix-matrix.md](../planning/part-usage-prefix-matrix.md) |
+| Shared grammar Phase 4, `ConstraintUsage` slice | Complete — moved because finishing the part-usage projection exposed two round-trip defects in it | [constraint-usage-prefix-matrix.md](../planning/constraint-usage-prefix-matrix.md) |
+| Shared grammar Phase 4, `PortUsage` slice | Complete — nine owning scopes, one construction path, six competing productions; `port def` no longer makes `def` optional. `ViewUsage`/`RenderingUsage` are the recommended next candidates | [port-usage-prefix-matrix.md](../planning/port-usage-prefix-matrix.md) |
 
 ---
 
@@ -454,7 +461,8 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 1. **Spec42 graph builders** for completed P0 AST (§ 1) — unlocks user-visible diagnostics.
 2. **Parser partials** that block Spec42 (§ 2.1 declaration keywords, § 2.2 rep diagnostics, § 2.3 action/requirement bodies).
 3. **LSP P0** (§ 3) in parallel with body fidelity.
-4. **Expression depth** (§ 2.4) and **P5 grammar layer** (§ 4) as longer horizons.
+4. **Expression depth** (§ 2.4) and repository-wide completion of the **P5 grammar-component
+   layer** (§ 4) as longer horizons; continue independently justified Phase 4 slices meanwhile.
 
 ---
 

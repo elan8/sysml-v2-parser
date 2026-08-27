@@ -1,0 +1,47 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "Qualified segments resolve from the innermost namespace"))
+~~~
+# SOURCE
+~~~sysml
+package A {
+    part def T;
+}
+package C {
+    package A {
+        part def T;
+    }
+    part p : A::T;
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "qualified_innermost_namespace.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package A {
+    part def T;
+}
+
+package C {
+    package A {
+        part def T;
+    }
+    part p : A::T;
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 97) (line 8) (column 14) (len 4)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 97) (line 8) (column 14) (len 1))) (segment 1 (token "T") (name "T") (separator colon-colon) (span (offset 100) (line 8) (column 17) (len 1)))))
+  )
+  (root (package (name "A") (body brace (part-def (name "T") (modifiers) (body semicolon)))) (package (name "C") (body brace (package (name "A") (body brace (part-def (name "T") (modifiers) (body semicolon)))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "p") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)))))
+)
+~~~

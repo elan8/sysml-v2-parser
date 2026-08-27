@@ -13,21 +13,22 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Systems Library/Requirements.sysml`'s `RequirementConstraintCheck`:
@@ -42,7 +43,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 #[test]
 fn constraint_def_body_dispatches_nested_constraint_members() {
     let input = "package P {\nprivate abstract constraint def RequirementConstraintCheck {\nconstraint assumptions[0..*] :> constraintChecks, subperformances {\n}\nconstraint constraints[0..*] :> constraintChecks, subperformances {\n}\n}\n}";
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     let constraint_def = elements
         .iter()
         .find_map(|e| match e {
@@ -51,17 +52,22 @@ fn constraint_def_body_dispatches_nested_constraint_members() {
         })
         .expect("expected constraint def");
     assert_eq!(
-        constraint_def.identification.name.as_deref(),
+        constraint_def
+            .identification
+            .name
+            .and_then(|n| doc.declaration_name(n)),
         Some("RequirementConstraintCheck")
     );
 
-    let ConstraintDefBody::Brace { elements } = &constraint_def.body else {
+    let ConstraintDefBody::Brace { elements, .. } = &constraint_def.body else {
         panic!("expected brace constraint def body");
     };
     let nested_names: Vec<&str> = elements
         .iter()
         .filter_map(|e| match &e.value {
-            ConstraintDefBodyElement::Constraint(c) => Some(c.value.name.as_str()),
+            ConstraintDefBodyElement::Constraint(c) => {
+                c.value.name.and_then(|n| doc.declaration_name(n))
+            }
             _ => None,
         })
         .collect();
@@ -85,7 +91,7 @@ fn constraint_def_body_dispatches_nested_constraint_members() {
 #[test]
 fn requirement_def_body_dispatches_nested_constraint_members() {
     let input = "package P {\nabstract requirement def RequirementCheck {\nconstraint assumptions :>> RequirementConstraintCheck::assumptions;\nconstraint constraints :>> RequirementConstraintCheck::constraints;\n}\n}";
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     let requirement_def = elements
         .iter()
         .find_map(|e| match e {
@@ -94,17 +100,22 @@ fn requirement_def_body_dispatches_nested_constraint_members() {
         })
         .expect("expected requirement def");
     assert_eq!(
-        requirement_def.identification.name.as_deref(),
+        requirement_def
+            .identification
+            .name
+            .and_then(|n| doc.declaration_name(n)),
         Some("RequirementCheck")
     );
 
-    let RequirementDefBody::Brace { elements } = &requirement_def.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement_def.body else {
         panic!("expected brace requirement def body");
     };
     let nested_names: Vec<&str> = elements
         .iter()
         .filter_map(|e| match &e.value {
-            RequirementDefBodyElement::Constraint(c) => Some(c.value.name.as_str()),
+            RequirementDefBodyElement::Constraint(c) => {
+                c.value.name.and_then(|n| doc.declaration_name(n))
+            }
             _ => None,
         })
         .collect();
@@ -123,7 +134,7 @@ fn requirement_def_body_dispatches_nested_constraint_members() {
 fn requirement_def_body_keeps_prefixed_require_constraint_distinct() {
     // Real usage: `sysml/src/examples/Requirements Examples/VehicleRequirementDerivation.sysml`.
     let input = "package P {\nrequirement def R {\nrequire constraint { mass <= massLimit }\n}\n}";
-    let elements = package_elements(input);
+    let (_, elements) = package_elements(input);
     let requirement_def = elements
         .iter()
         .find_map(|e| match e {
@@ -131,7 +142,7 @@ fn requirement_def_body_keeps_prefixed_require_constraint_distinct() {
             _ => None,
         })
         .expect("expected requirement def");
-    let RequirementDefBody::Brace { elements } = &requirement_def.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement_def.body else {
         panic!("expected brace requirement def body");
     };
     assert!(

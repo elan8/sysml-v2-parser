@@ -7,9 +7,9 @@
 //! body survives into the AST instead of silently vanishing.
 
 use sysml_v2_parser::ast::{
-    AliasBody, ConnectBody, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
-    PackageBodyElement, PartDefBody, PartDefBodyElement, RefBody, RefBodyElement,
-    RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    AliasBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
+    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
+    RefBody, RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -20,11 +20,11 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -41,13 +41,14 @@ fn alias_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected alias def");
-    let AliasBody::Brace { elements } = &alias.body else {
+    let AliasBody::Brace { elements, .. } = &alias.body else {
         panic!("expected brace alias body");
     };
     assert!(
-        elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in alias body, got: {elements:?}"
     );
 }
@@ -68,9 +69,10 @@ fn import_body_retains_doc_comment() {
         .as_ref()
         .expect("expected Some body_elements for a braced import body");
     assert!(
-        body_elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        body_elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in import body, got: {body_elements:?}"
     );
 }
@@ -88,13 +90,14 @@ fn dependency_body_retains_doc_comment() {
         })
         .expect("expected dependency");
     let body_elements = dependency
-        .body_elements
-        .as_ref()
-        .expect("expected Some body_elements for a braced dependency body");
+        .body
+        .braced_elements()
+        .expect("expected a braced dependency body");
     assert!(
-        body_elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        body_elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in dependency body, got: {body_elements:?}"
     );
 }
@@ -110,7 +113,7 @@ fn plain_connect_statement_retains_doc_comment() {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected brace connection def body");
     };
     let connect_stmt = elements
@@ -120,19 +123,30 @@ fn plain_connect_statement_retains_doc_comment() {
             _ => None,
         })
         .expect("expected connect statement");
-    assert!(matches!(connect_stmt.body, ConnectBody::Brace));
+    // `ConnectionUsage`'s body is a `UsageBody`, so the members are the usage member set.
+    let members = connect_stmt
+        .body
+        .braced_elements()
+        .expect("expected a brace connect statement body");
     assert!(
-        connect_stmt
-            .body_elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
-        "expected doc comment retained in connect statement body, got: {:?}",
-        connect_stmt.body_elements
+        members.iter().any(|e| matches!(
+            &e.value,
+            PartUsageBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
+        "expected doc comment retained in connect statement body, got: {members:?}"
     );
 }
 
+/// `ref part sensor : Anything { doc … }` in a `connection def` body keeps its annotation.
+///
+/// The member is a `PartUsage` whose `OccurrenceUsagePrefix` authored `ref`
+/// (`PartUsage = OccurrenceUsagePrefix 'part' Usage`), not a `ReferenceUsage`: `part` is a
+/// reserved keyword and so can never be the `NAME` a `ReferenceUsage`'s `Identification` would
+/// need. It was read as a `RefDecl` here until this scope gave the migrated part-usage parser
+/// first refusal on a contended `ref`. Its body is the same `Body<PartUsageBodyElement>` either
+/// way, which is what this test is about.
 #[test]
-fn connection_ref_body_retains_doc_comment() {
+fn connection_ref_part_body_retains_doc_comment() {
     let input =
         "package P {\nconnection def C {\nref part sensor : Anything {\ndoc /* ref annotation */\n}\n}\n}";
     let elements = package_elements(input);
@@ -143,23 +157,30 @@ fn connection_ref_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected brace connection def body");
     };
-    let ref_decl = elements
+    let part_usage = elements
         .iter()
         .find_map(|e| match &e.value {
-            ConnectionDefBodyElement::RefDecl(r) => Some(&r.value),
+            ConnectionDefBodyElement::PartUsage(part) => Some(&part.value),
             _ => None,
         })
-        .expect("expected ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
-        panic!("expected brace ref body");
+        .expect("expected ref part usage");
+    assert!(part_usage
+        .prefix
+        .basic()
+        .expect("basic head")
+        .reference_span
+        .is_some());
+    let PartUsageBody::Brace { elements, .. } = &part_usage.body else {
+        panic!("expected brace part usage body");
     };
     assert!(
-        elements
-            .iter()
-            .any(|e| matches!(&e.value, RefBodyElement::Doc(_))),
+        elements.iter().any(|e| matches!(
+            &e.value,
+            PartUsageBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in connection ref body, got: {elements:?}"
     );
 }
@@ -175,7 +196,7 @@ fn part_usage_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected part def");
-    let PartDefBody::Brace { elements } = &part_def.body else {
+    let PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected brace part def body");
     };
     let ref_decl = elements
@@ -185,13 +206,13 @@ fn part_usage_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
+    let RefBody::Brace { elements, .. } = &ref_decl.body else {
         panic!("expected brace ref body");
     };
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, RefBodyElement::PartUsage(_))),
+            .any(|e| matches!(&e.value, PartUsageBodyElement::AttributeUsage(_))),
         "expected real part-usage member (attribute) retained in part-usage ref body, got: {elements:?}"
     );
 }
@@ -207,7 +228,7 @@ fn bind_trailing_body_retains_real_member() {
             _ => None,
         })
         .expect("expected part def");
-    let PartDefBody::Brace { elements } = &part_def.body else {
+    let PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected brace part def body");
     };
     let bind = elements
@@ -217,9 +238,12 @@ fn bind_trailing_body_retains_real_member() {
             _ => None,
         })
         .expect("expected bind statement");
-    assert!(matches!(bind.body, Some(ConnectBody::Brace)));
+    let members = bind
+        .body
+        .braced_elements()
+        .expect("`bind x = y { ... }` wrote a brace body, not `;`");
     assert!(
-        !bind.body_elements.is_empty(),
+        !members.is_empty(),
         "expected real content retained in bind trailing body, got empty"
     );
 }
@@ -235,7 +259,7 @@ fn state_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected state def");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected brace state def body");
     };
     let ref_decl = elements
@@ -245,20 +269,19 @@ fn state_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
+    let RefBody::Brace { elements, .. } = &ref_decl.body else {
         panic!("expected brace ref body");
     };
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, RefBodyElement::State(_))),
+            .any(|e| matches!(&e.value, PartUsageBodyElement::AttributeUsage(_))),
         "expected real state member (attribute) retained in state ref body, got: {elements:?}"
     );
 }
 
-/// Confirms the already-real action-context `ref` body (unrelated to this fix, but sharing the
-/// same `RefBody`/`RefBodyElement` type after the redesign) still works: a `ref` nested in an
-/// action body keeps full nested action members, wrapped in `RefBodyElement::Action`.
+/// A `ref` nested in an action body keeps its members. Since `UsageBody = DefinitionBody`, those
+/// are the same usage members every other `ref` body holds, parsed by the same parser.
 #[test]
 fn action_ref_body_still_retains_action_members() {
     let input = "package P {\naction def Act {\nref x {\naction y;\n}\n}\n}";
@@ -273,9 +296,8 @@ fn action_ref_body_still_retains_action_members() {
     // predates this fix and already had dedicated coverage.
 }
 
-/// Sanity-check the constraint-body-adjacent sibling pattern (`ConnectBody` + separate
-/// `body_elements`, established by `Satisfy`/`Dependency`/`ConnectStmt`) is unaffected for a
-/// plain semicolon-terminated dependency: `body_elements` must stay `None`, not `Some(vec![])`.
+/// A semicolon body and an empty brace body stay distinct: `dependency A to B;` reports the
+/// semicolon form and offers no member list, rather than an empty one.
 #[test]
 fn dependency_semicolon_body_has_no_body_elements() {
     let input = "package P {\npart def A;\npart def B;\ndependency A to B;\n}";
@@ -287,6 +309,6 @@ fn dependency_semicolon_body_has_no_body_elements() {
             _ => None,
         })
         .expect("expected dependency");
-    assert!(matches!(dependency.body, ConnectBody::Semicolon));
-    assert!(dependency.body_elements.is_none());
+    assert!(dependency.body.is_semicolon());
+    assert!(dependency.body.braced_elements().is_none());
 }

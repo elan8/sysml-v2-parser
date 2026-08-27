@@ -1,27 +1,24 @@
 //! Attribute definition and usage parsing.
 
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership,
-    Multiplicity, Node, SubsettingKind, SubsettingRelationship, TypingKind,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, DefaultReferenceUsage,
+    InOut, Membership, Multiplicity, Node, SubsettingKind, SubsettingRelationship, TypingKind,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, short_name_prefix, starts_with_keyword,
+    identification, name, qualified_reference, short_name_prefix, starts_with_keyword,
     subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
-use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
-    multiplicity_node, optional_typings, prefix_redefinition_target, single_target_subsetting,
-    specialization_clauses, typing_node, typing_relationship_node, typings,
+    feature_usage_header, multiplicity_node, optional_typings, prefix_redefinition_target,
+    specialization_clauses, typing_node, typing_relationship_node,
 };
-use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt, value};
-use nom::multi::many0;
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -47,14 +44,52 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"connection",
     b"value",
     b"occurrence",
+    b"feature",
+    b"member",
+    b"var",
+    b"composite",
+    b"portion",
+    b"step",
+    b"expr",
+    b"bool",
+    b"inv",
+    b"connector",
+    b"class",
+    b"end",
+    // KerML classifier-keyword family dispatched via `kerml_classifier_structured`
+    // (spec42 Gap 38).
+    b"classifier",
+    b"struct",
+    b"datatype",
+    b"association",
+    b"assoc",
+    b"behavior",
+    b"interaction",
+    b"predicate",
+    b"metaclass",
+    b"function",
+    b"multiplicity",
+    b"type",
+    // The rest of FIRST(`OccurrenceUsagePrefix`), which a `PartUsage` in this scope now spells
+    // ahead of `part` -- see `planning/part-usage-prefix-matrix.md` §6. `#`, `abstract`,
+    // `derived`, `part` and `ref` were already listed.
+    b"constant",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
+    b"variant",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
-    b"item",
     // GH-90.1: `individual item ii : II1;` / `individual item :>> i : II2;` inside `item def`
-    // bodies (Simple Tests/IndividualTest.sysml:4,15) -- opaquely captured like the un-prefixed
-    // `item` starter above, matching this body's existing "not fully modeled, but accepted"
-    // convention for item/part usages.
+    // bodies (Simple Tests/IndividualTest.sysml:4,15) are structured by `item_usage` itself
+    // (which accepts the optional leading `individual`) via `AttributeBodyElement::ItemUsage`
+    // below; `individual` stays here only to opaquely capture non-`item` individual forms that
+    // reach this body.
     b"individual",
     b"constraint",
     b"private",
@@ -65,6 +100,9 @@ const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
     b":>>",
     b":>",
     b"attribute",
+    // `MetadataFeature` is an `AnnotatingElement` in AttributeBody. Keep its literal introducer
+    // in the recovery FIRST set so a malformed annotation synchronizes before a valid sibling.
+    b"metadata",
 ];
 
 const METADATA_BODY_STARTERS: &[&[u8]] = &[
@@ -78,11 +116,29 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
     b"derived",
     b"item",
     b"abstract",
+    // Structured members shared with `attribute_body_element` (spec42 Gap 40).
+    b"part",
+    b"connect",
+    b"assert",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) -- see
+    // `planning/part-usage-prefix-matrix.md` §6.
+    b"#",
+    b"constant",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
 
-fn is_reserved_shorthand_starter(name: &str) -> bool {
+fn is_reserved_shorthand_starter(name: &[u8]) -> bool {
+    let Ok(name) = std::str::from_utf8(name) else {
+        return false;
+    };
     matches!(
         name,
         "interface"
@@ -115,106 +171,196 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
             | "calc"
             | "enum"
             | "occurrence"
+            | "end"
     )
 }
 
-/// Multiplicity-adjacent modifiers from `MultiplicityPart` (BNF §8.2.2.6.6): an optional
-/// multiplicity range plus `ordered`/`nonunique` (and their negations `nonordered`/`unique`).
-/// Results are OR-merged / first-wins across every occurrence -- callers that invoke this more
-/// than once per declaration (leading and trailing modifier positions) fold the results together.
+/// Pilot's `DefaultReferenceUsage` adds an optional bare `end` before the pinned `RefPrefix`.
+/// Keep exactly that extension recoverable in SysML-owned bodies; KerML's distinct `end feature`
+/// production has a different following keyword and is not selected by this guard.
+pub(crate) fn is_pilot_end_default_reference(input: Input<'_>) -> bool {
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    if !starts_with_keyword(input.fragment(), b"end") {
+        return false;
+    }
+    let Ok((input, _)) = tag::<_, _, nom::error::Error<Input<'_>>>(&b"end"[..]).parse(input) else {
+        return false;
+    };
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    input.fragment().starts_with(b":")
+}
+
+/// One `MultiplicityPart` (BNF §8.2.2.6.6): an optional multiplicity range plus the ordering and
+/// uniqueness keyword slots, each admitted at most once.
+///
+/// Callers that accept the part on either side of the specializations -- the two positions
+/// `FeatureSpecializationPart` allows -- parse it at both and fold with [`Self::merge`],
+/// first-wins.
 #[derive(Default, Clone)]
 struct FeatureModifiers {
     multiplicity: Option<Node<Multiplicity>>,
-    ordered: bool,
-    nonunique: bool,
+    modifiers: crate::ast::MultiplicityModifiers,
 }
 
-impl FeatureModifiers {
-    fn merge(self, other: FeatureModifiers) -> FeatureModifiers {
-        FeatureModifiers {
-            multiplicity: self.multiplicity.or(other.multiplicity),
-            ordered: self.ordered || other.ordered,
-            nonunique: self.nonunique || other.nonunique,
-        }
-    }
-}
-
+/// Parse one `MultiplicityPart`: an optional multiplicity range followed by the ordering and
+/// uniqueness keyword slots (SysML BNF 492-496, KerML BNF 636-640).
+///
+/// ```text
+/// MultiplicityPart : Feature =
+///       ownedRelationship += OwnedMultiplicity
+///     | ( ownedRelationship += OwnedMultiplicity )?
+///       ( isOrdered ?= 'ordered' ... | ... 'nonunique' ... )
+/// ```
+///
+/// The production admits *one* `OwnedMultiplicity`, and it comes before the keywords. So this
+/// reads at most one range and then defers to
+/// [`crate::parser::usage::multiplicity_modifier_slots`], which owns the keyword spellings, their
+/// spans, and their own cardinality. A second range, or a range written after a keyword
+/// (`[1] ordered [2]`), is left unconsumed: the enclosing declaration fails at that `[` and the
+/// enclosing scope's member recovery captures the whole member by source span, so the excess is an
+/// explicit malformed node rather than a range the parser consumes and ignores.
+///
+/// The result is written straight into the returned struct: collecting into a `Vec` first would
+/// allocate on a path the grammar re-enters speculatively for every attribute declaration, only to
+/// fold the result into these same two fields.
 fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
-    #[derive(Clone)]
-    enum Modifier {
-        Multiplicity(Node<Multiplicity>),
-        Ordered,
-        NonUnique,
-        Unique,
-        NonOrdered,
-    }
-    let (input, mods) = many0(preceded(
-        ws_and_comments,
-        alt((
-            map(multiplicity_node, Modifier::Multiplicity),
-            value(Modifier::NonUnique, tag(&b"nonunique"[..])),
-            value(Modifier::Unique, tag(&b"unique"[..])),
-            value(Modifier::Ordered, tag(&b"ordered"[..])),
-            value(Modifier::NonOrdered, tag(&b"nonordered"[..])),
-        )),
-    ))
-    .parse(input)?;
-    let mut result = FeatureModifiers::default();
-    for m in mods {
-        match m {
-            Modifier::Multiplicity(node) if result.multiplicity.is_none() => {
-                result.multiplicity = Some(node);
-            }
-            Modifier::Multiplicity(_) => {}
-            Modifier::Ordered => result.ordered = true,
-            Modifier::NonUnique => result.nonunique = true,
-            Modifier::Unique | Modifier::NonOrdered => {}
-        }
-    }
-    Ok((input, result))
+    feature_modifiers_after(FeatureModifiers::default(), input)
 }
 
+/// [`feature_modifiers`] resuming from what an earlier position of the same declaration read.
+///
+/// A declaration may offer this position more than once, because `FeatureSpecializationPart`
+/// (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations.
+/// Threading the earlier result through as the accumulator keeps the whole declaration to one
+/// range and one spelling per keyword slot: a filled field stops consumption instead of consuming
+/// the excess and folding it away.
+fn feature_modifiers_after(
+    prior: FeatureModifiers,
+    input: Input<'_>,
+) -> IResult<Input<'_>, FeatureModifiers> {
+    let (input, multiplicity) = match prior.multiplicity {
+        // A range is already authored for this declaration, so a second one is not this
+        // production's; leave it for recovery.
+        already @ Some(_) => (input, already),
+        None => {
+            let (after_ws, _) = ws_and_comments(input)?;
+            match multiplicity_node(after_ws) {
+                Ok((rest, node)) => (rest, Some(node)),
+                // No range here: leave the whitespace before the next token unconsumed, as
+                // `preceded` did.
+                Err(_) => (input, None),
+            }
+        }
+    };
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(prior.modifiers, input)?;
+    Ok((
+        input,
+        FeatureModifiers {
+            multiplicity,
+            modifiers,
+        },
+    ))
+}
+
+#[derive(Clone, Copy)]
 enum MetadataBindingPrefix {
     Subsets,
     Redefines,
 }
 
-fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
+pub(crate) fn attribute_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    if is_pilot_end_default_reference(start) {
+        return Err(nom::Err::Failure(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
+    // `RefDecl` and `metadata_keyword_prefix` reads `#Tag` as a standalone member, and neither
+    // knows about the `part` keyword that follows, so `PartUsage` gets first refusal.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
+            let elem = AttributeBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
-        map(doc_comment, AttributeBodyElement::Doc),
         map(
-            |i| attribute_def(i, true),
-            AttributeBodyElement::AttributeDef,
+            crate::parser::body::attribute_annotating_member,
+            AttributeBodyElement::Annotating,
         ),
+        map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
-        map(value_keyword_binding, AttributeBodyElement::AttributeUsage),
         map(
-            attribute_feature_binding,
-            AttributeBodyElement::AttributeUsage,
+            default_reference_usage,
+            AttributeBodyElement::DefaultReferenceUsage,
         ),
+        // KerML type-body members: this body grammar also serves KerML `class`/`struct`/
+        // `datatype` bodies via `class_def`, whose members are feature members (`feature x :
+        // Natural[1];`, `member`/`derived`/`composite`/`portion`/`var` prefixed, `step`/`expr`/
+        // `bool` kinds), invariants, connectors, and nested class definitions.
+        map(crate::parser::constraint::kerml_feature, |n| {
+            AttributeBodyElement::KermlFeature(Box::new(n))
+        }),
+        map(crate::parser::constraint::kerml_invariant_member, |n| {
+            AttributeBodyElement::Invariant(Box::new(n))
+        }),
+        map(crate::parser::constraint::kerml_connector_member, |n| {
+            AttributeBodyElement::KermlConnector(Box::new(n))
+        }),
+        // The KerML classifier-keyword family (`class`, `struct`, `classifier`, `datatype`,
+        // `assoc`, `behavior`, ...) nested in a type body (spec42 Gap 38).
+        map(crate::parser::package::kerml_classifier_structured, |n| {
+            AttributeBodyElement::KermlClassifier(Box::new(n))
+        }),
+        map(value_keyword_binding, AttributeBodyElement::AttributeUsage),
         // §6 G27: this body is shared with `item def` / `item` usage bodies, which legally own
         // occurrence members. Placed after the bindings so a member merely *named* `occurrence`
         // still reaches them first.
         map(crate::parser::occurrence_body::occurrence_usage, |n| {
             AttributeBodyElement::OccurrenceUsage(Box::new(n))
         }),
-        // GH-90.2: `timeslice`/`snapshot` portion usages inside attribute/item bodies, e.g.
-        // `timeslice asPresident : Person [0..*] { ... }` (Individuals Examples/
-        // JohnIndividualExample.sysml:11). Both already fully parse via `timeslice_usage`/
-        // `snapshot_usage` (used elsewhere, e.g. part def bodies) -- just not dispatched here.
-        map(crate::parser::occurrence_body::timeslice_usage, |n| {
-            AttributeBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(crate::parser::occurrence_body::snapshot_usage, |n| {
-            AttributeBodyElement::OccurrenceUsage(Box::new(n))
-        }),
         // This body is also shared with `item def`/`item` usage bodies, which legally own
         // connector members (`connect a to b;`) and metadata tags (`#keyword`, bare or
         // prefixing the next member) -- see the OMG spec Annex `14c-Language Extensions.sysml`
         // FMEA library example, which uses both extensively.
-        map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+        // Members `PartUsageBodyElement`/`PartDefBodyElement` already reach that this shared
+        // body silently dropped to `Other` (spec42 Gap 49a): named/multiplicity-qualified
+        // binds, named/typed connections, nested calcs, and plain (non-`assert`) constraints
+        // (Geometry `ShapeItems.sysml`, Quantities and Units `Time.sysml`, Systems Library
+        // `Items.sysml`). `calc_def_required` before `calc_usage` for the usual bare-`def`
+        // reason; `connect_` rides in the same sub-alt to stay under nom's 21-branch limit.
+        alt((
+            map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+            map(crate::parser::part::bind_, |n| {
+                AttributeBodyElement::Bind(Box::new(n))
+            }),
+            map(crate::parser::part::connection_usage_member, |n| {
+                AttributeBodyElement::Connection(Box::new(n))
+            }),
+            map(crate::parser::constraint::calc_def_required, |n| {
+                AttributeBodyElement::CalcDef(Box::new(n))
+            }),
+            map(crate::parser::constraint::calc_usage, |n| {
+                AttributeBodyElement::CalcUsage(Box::new(n))
+            }),
+            map(crate::parser::constraint::constraint_usage, |n| {
+                AttributeBodyElement::ConstraintUsage(Box::new(n))
+            }),
+        )),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             AttributeBodyElement::MetadataKeywordUsage,
@@ -238,9 +384,25 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::part::part_usage, |n| {
             AttributeBodyElement::PartUsage(Box::new(n))
         }),
+        // Nested `item` usage in item / attribute bodies, e.g. `item picture : Picture;` inside
+        // `attribute def Show { ... }`. Before the opaque-capture fallback below so this common
+        // shape gets a structured node -- see `AttributeBodyElement::ItemUsage`'s doc comment.
+        map(crate::parser::item::item_usage, |n| {
+            AttributeBodyElement::ItemUsage(Box::new(n))
+        }),
         map(
-            |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
-            AttributeBodyElement::Other,
+            crate::parser::part::variant_usage,
+            AttributeBodyElement::VariantUsage,
+        ),
+        map(
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    ATTRIBUTE_OPAQUE_STARTERS,
+                    "attribute body",
+                )
+            },
+            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -265,7 +427,9 @@ fn value_keyword_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeU
 ///
 /// Catalog unit definitions use this shape for `unitConversion` redefinitions, e.g.
 /// `:>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }`.
-fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+pub(crate) fn attribute_feature_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = nom::combinator::opt(alt((
@@ -282,43 +446,53 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
+    let (_, target_spelling) = name(input)?;
+    let target_bytes = crate::parser::lex::name_bytes(input, target_spelling);
+    // The prefixed forms take the same comma-separated multi-target list as every other
+    // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
+    // Gap 49b); the unprefixed binding keeps its single name-reference.
+    let (input, targets) = if prefix.is_some() {
+        crate::parser::usage::specialization_targets(input)?
+    } else {
+        let (input, target) = qualified_reference(input)?;
+        (input, vec![target])
+    };
+    if is_reserved_shorthand_starter(target_bytes) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
         )));
     }
     // Covers the whole `(':>>' | ':>')? name` fragment -- the leading operator token itself
-    // (before `name_span`) isn't separately tracked here, matching how this ad hoc prefix shape
+    // (before the name) isn't separately tracked here, matching how this ad hoc prefix shape
     // (distinct from `usage::specialization_clauses`) has always worked.
     let prefix_span = crate::parser::span_from_to(start, input);
+    let target_only = prefix.is_some();
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods1.merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Subsets,
-                name_str.clone(),
+                prefix_span,
             )),
             None,
         ),
         Some(MetadataBindingPrefix::Redefines) => (
             None,
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Redefines,
-                name_str.clone(),
+                prefix_span,
             )),
         ),
         None => (None, None),
@@ -329,7 +503,9 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             start,
             input,
             AttributeUsage {
-                name: name_str,
+                // A prefix form (`:>> target` / `:> target`) names a semantic target, not a new
+                // declaration. Its spelling lives only in the arena-backed relationship.
+                name: (!target_only).then_some(target_spelling),
                 short_name: None,
                 typing,
                 subsets,
@@ -339,13 +515,11 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 intersects: None,
                 value,
                 body,
-                name_span: Some(name_span),
                 typing_span,
                 redefines_span: None,
                 direction: None,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived: false,
                 usage_prefix: None,
                 is_constant: false,
@@ -360,121 +534,150 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     ))
 }
 
-/// §6 G26: keyword-less `name = expr;` feature binding, i.e. a [`crate::ast::DefaultReferenceUsage`]
-/// that carries a value but no typing clause. Distinct from [`attribute_usage_shorthand`], which
-/// requires the `: Type` half; that stricter form stays the one dispatched from part bodies so
-/// their existing AST shape is untouched.
-///
-/// Real usage: `measurement = testVehicle.mass;` inside the perform body of the OMG spec Annex
-/// `9-Verification-simplified.sysml`.
-///
-/// The value is mandatory here deliberately: action bodies have a *targeted* recovery diagnostic
-/// for a bare identifier with no value at all (`invalid_bare_identifier_in_action_body`, "did you
-/// mean `perform batCap`?" -- `tests/recovery_actions.rs`), which a permissive bare-`name;` arm
-/// would silently swallow before that diagnostic ever runs. [`bare_or_valued_feature_binding`] is
-/// the value-optional sibling used outside action bodies, where no such diagnostic exists.
-pub(crate) fn feature_value_binding(
+/// SysML `DefaultReferenceUsage = RefPrefix Usage` (SysML BNF 332--333). This is the sole
+/// source-backed parser for keyword-less usages. The pinned grammar has no bare `end` slot;
+/// Pilot's extension remains a recovery case rather than successful syntax.
+pub(crate) fn default_reference_usage(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    // The keyword-less usage: nothing marks it, but its head is still constrained -- after the
+    // visibility and `RefPrefix` slots it must open a short name, an anonymous
+    // specialization/typing clause, or a declared name, and an unquoted reserved keyword can
+    // never be that name. Refusing those heads here keeps the sibling keyword-led members from
+    // paying an arena transaction to be told what their own keyword already said.
+    {
+        const SLOTS: &[&[u8]] = &[
+            b"public",
+            b"private",
+            b"protected",
+            b"inout",
+            b"in",
+            b"out",
+            b"derived",
+            b"abstract",
+            b"variation",
+            b"constant",
+        ];
+        let (mut cursor, _) = ws_and_comments(input)?;
+        loop {
+            let fragment = cursor.fragment();
+            match fragment.first() {
+                // `<short>`, `:`-led anonymous clauses, `=`-led defaults, and the bare `;`
+                // empty member (a `DefaultReferenceUsage` with every slot absent) are legal
+                // heads.
+                Some(b'<' | b':' | b'=' | b';') => break,
+                Some(b'\'') => break,
+                Some(byte) if byte.is_ascii_alphabetic() || *byte == b'_' => {}
+                _ => {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )));
+                }
+            }
+            if let Some(slot) = SLOTS
+                .iter()
+                .find(|candidate| starts_with_keyword(fragment, candidate))
+            {
+                let (rest, _) =
+                    nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(slot.len())
+                        .parse(cursor)?;
+                let (rest, _) = ws_and_comments(rest)?;
+                cursor = rest;
+                continue;
+            }
+            let word_len = fragment
+                .iter()
+                .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+                .count();
+            if is_reserved_shorthand_starter(&fragment[..word_len])
+                || crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
+            {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+            break;
+        }
+    }
+    crate::parser::span::reference_transaction(input, default_reference_usage_inner)
+}
+
+fn default_reference_usage_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::ref_prefix(input);
+    let identification_start = input;
+    let (input, identification) = identification(input)?;
+    if identification.name.is_some_and(|name| {
+        let bytes = crate::parser::lex::name_bytes(identification_start, name);
+        is_reserved_shorthand_starter(bytes) || crate::parser::lex::is_reserved_keyword(bytes)
+    }) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
         )));
     }
-    // GH-87: optional `:>`/`:>>` clause between the name and the value, e.g. `torquePerCurrent
-    // :> Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;` (State Space
-    // Representation Examples/EVSample.sysml:47). `subsetting()` (called by
-    // `specialization_clauses`) already optionally consumes its own trailing `= expr` as part of
-    // the `:>` clause itself -- reuse that captured value (via `wrap_bind_expression`, the same
-    // helper `attribute_feature_binding` already uses for this exact "subsets target = expr"
-    // shape) instead of also requiring a *second*, separate `= expr` afterward.
-    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
-    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
+    let name = identification.name;
+    let short_name = identification.short_name;
+    // `UsageDeclaration` accepts an empty Identification, so a keyword-less usage can begin
+    // immediately with a `FeatureSpecializationPart`, for example
+    // `:>> unitConversion : ConversionByConvention { ... }`.  Keep its ordering in the shared
+    // header rather than making DefaultReferenceUsage a second, narrower specialization parser:
+    // the pinned grammar admits leading relationships, typing, multiplicity, modifiers, a second
+    // typing, and trailing relationships (SysML BNF 424--426).
+    let (input, header) = feature_usage_header(input)?;
+    let typing_span = header.typing.as_ref().map(|typing| typing.span);
+    let leading_value = header
+        .subsetting_value
+        .map(crate::parser::feature_value::wrap_bind_expression);
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
-            .parse(input)?;
-    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let (input, value) = match value {
-        Some(v) => (input, v),
-        None => {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                start,
-                nom::error::ErrorKind::Tag,
-            )))
-        }
-    };
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+    let (input, body) = attribute_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing: None,
-                subsets: spec.subsets.map(|(target, _value)| target),
-                redefines: spec.redefines,
-                value: Some(value),
-                name_span: Some(name_span),
-                typing_span: None,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+            DefaultReferenceUsage {
+                prefix,
+                name,
+                short_name,
+                typing: header.typing,
+                subsets: header.subsets,
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                intersects: header.intersects,
+                value: value.or(leading_value),
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                typing_span,
+                membership: Membership::feature(visibility, visibility_span),
+                body,
             },
         ),
     ))
 }
 
-/// GH-87: the same keyword-less binding as [`feature_value_binding`], but with the value made
-/// optional -- a fully bare `name;` (no type, no value) is a legal `DefaultReferenceUsage` too,
-/// e.g. `part def V { m; }` (Simple Tests/AnalysisTest.sysml:4). Kept as a separate function
-/// (rather than widening `feature_value_binding` itself) so action bodies' targeted bare-identifier
-/// recovery diagnostic keeps firing -- see that function's doc comment.
-pub(crate) fn bare_or_valued_feature_binding(
+/// Narrow action/calc compatibility entry point: its owning scopes require a value to preserve
+/// their bare-identifier recovery contract, while all syntax and AST ownership stays shared.
+pub(crate) fn default_reference_value_binding(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    let (input, usage) = default_reference_usage(input)?;
+    if usage.value.value.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
-            start,
+            input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    // GH-87: optional `:>`/`:>>` clause between the name and the (also optional) value, e.g.
-    // `inflationPressure :> pressure;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel
-    // Package.sysml:21) -- no `=` value at all, the value is inherited from what it subsets.
-    // `subsetting()` (called by `specialization_clauses`) already optionally consumes its own
-    // trailing `= expr` as part of the `:>` clause itself (e.g. `torquePerCurrent :>
-    // Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;`, EVSample.sysml:47) --
-    // reuse that captured value (via `wrap_bind_expression`) instead of requiring a *second*,
-    // separate `= expr` afterward.
-    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
-    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
-    let (input, value) =
-        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
-    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing: None,
-                subsets: spec.subsets.map(|(target, _value)| target),
-                redefines: spec.redefines,
-                value,
-                name_span: Some(name_span),
-                typing_span: None,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
-            },
-        ),
-    ))
+    Ok((input, usage))
 }
 
 /// §6 G15: the same feature binding as [`attribute_feature_binding`], but with the `:>>` / `:>`
@@ -519,10 +722,16 @@ fn attribute_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBo
 pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, AttributeBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            AttributeBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ATTRIBUTE_BODY_STARTERS,
         "attribute body",
@@ -530,53 +739,45 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
         attribute_body_element,
         attribute_body_recovery,
     )?;
-    Ok((input, AttributeBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
-/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body
+/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body.
 ///
-/// When `disambiguate_from_usage` is true (definition bodies that also accept usages), any
-/// declaration without an explicit `def` keyword is left for [`attribute_usage`] — the `def`
-/// keyword is the sole discriminator between an `AttributeDef` and an `AttributeUsage`, never
-/// inferred from typing, modifiers, or the presence of a value. Package-level attributes pass
-/// false, since only definitions are legal there.
-pub(crate) fn attribute_def(
-    input: Input<'_>,
-    disambiguate_from_usage: bool,
-) -> IResult<Input<'_>, Node<AttributeDef>> {
+/// `def` is the sole grammar discriminator from [`attribute_usage`]. It is mandatory in every
+/// scope; a def-less attribute is always a usage, including at package level.
+pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `AttributeDefinition = DefinitionPrefix 'attribute' 'def' Definition` (SysML BNF 510; Pilot
+    // `SysML.xtext` 746), and `DefinitionPrefix` (BNF 225) reaches `BasicDefinitionPrefix` (BNF
+    // 219). This used to consume `abstract` and drop it on the floor, and refuse `variation`
+    // outright.
+    let (input, definition_prefix) =
+        crate::parser::definition_prefix::parse_basic_definition_prefix(
+            input,
+            crate::parser::definition_prefix::BasicPrefixSlot::Basic,
+        )?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let has_def = has_def.is_some();
-    if disambiguate_from_usage && !has_def {
+    let (input, _) = preceded(tag(&b"def"[..]), ws1).parse(input)?;
+    let (input, ident) = identification(input)?;
+    // `Definition` requires an `Identification`, but either half suffices: `attribute def
+    // <'1'> : Real;` has only a short name and declares no `NAME`.
+    if ident.name.is_none() && ident.short_name.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let ident_start = input;
-    let (input, ident) = identification(input)?;
-    let name_span = ident
-        .name
-        .as_ref()
-        .map(|_| crate::parser::span_from_to(ident_start, input));
-    let name_str = ident
-        .name
-        .clone()
-        .or_else(|| ident.short_name.clone())
-        .ok_or_else(|| {
-            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
-        })?;
-    let short_name = ident.short_name.clone();
+    let name_str = ident.name;
+    let short_name = ident.short_name;
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
@@ -588,12 +789,13 @@ pub(crate) fn attribute_def(
                 // the `:>`/`subsets` fragment (unlike the dummy span this used before subsetting
                 // clauses were themselves typed with real spans).
                 (
-                    Some(rel.span.clone()),
+                    Some(rel.span),
                     Some(typing_relationship_node(
-                        rel.span.clone(),
+                        rel.span,
                         TypingKind::Subclassification,
                         false,
                         rel.value.target,
+                        crate::ast::TypingSpelling::Operator,
                     )),
                     value,
                 )
@@ -606,10 +808,9 @@ pub(crate) fn attribute_def(
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
     let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let value_span = value.as_ref().map(|node| node.span.clone());
+    let value_span = value.as_ref().map(|node| node.span);
     let (input, _) = specialization_clauses(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods1.merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -617,16 +818,16 @@ pub(crate) fn attribute_def(
             start,
             input,
             AttributeDef {
+                definition_prefix,
                 name: name_str,
                 short_name,
                 typing,
+                multiplicity: mods.multiplicity,
                 value,
                 body,
-                name_span,
                 typing_span,
                 value_span,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 membership: Membership::owning(visibility, visibility_span),
             },
         ),
@@ -634,6 +835,13 @@ pub(crate) fn attribute_def(
 }
 
 pub(crate) fn direction_prefix(input: Input<'_>) -> IResult<Input<'_>, InOut> {
+    // Speculated at many member starts; refuse on the first byte before the `tag` trials.
+    if !matches!(input.fragment().first(), Some(b'i' | b'o')) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     alt((
         map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
         map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),
@@ -666,8 +874,7 @@ pub(crate) fn directed_attribute_usage(
 pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
     enum AttributeUsageHead {
         Named {
-            name_span: crate::ast::Span,
-            name: String,
+            name: Option<crate::ast::DeclarationName>,
         },
         PrefixRedefines {
             redefines_span: crate::ast::Span,
@@ -706,29 +913,20 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     // attribute minMass :> ISQ::mass;`, Mass Roll-up Example/MassRollup.sysml:21) -- a previous
     // assumption that `abstract`/`variation` "aren't legal on an attribute usage" was incorrect.
     // Skipped entirely when `end` already matched, since the two are alternatives.
-    let (input, is_derived, usage_prefix, is_constant, is_reference) = if is_end {
-        (input, false, None, false, false)
+    let (input, prefix, is_reference) = if is_end {
+        (input, crate::parser::usage::RefPrefix::default(), false)
     } else {
-        let (input, is_derived) =
-            nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
-        let is_derived = is_derived.is_some();
-        let (input, usage_prefix) = nom::combinator::opt(alt((
-            map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-                crate::ast::DefinitionPrefix::Abstract
-            }),
-            map(preceded(tag(&b"variation"[..]), ws1), |_| {
-                crate::ast::DefinitionPrefix::Variation
-            }),
-        )))
-        .parse(input)?;
-        let (input, is_constant) =
-            nom::combinator::opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
-        let is_constant = is_constant.is_some();
+        let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
         let (input, is_reference) =
             nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
-        let is_reference = is_reference.is_some();
-        (input, is_derived, usage_prefix, is_constant, is_reference)
+        (input, prefix, is_reference.is_some())
     };
+    let crate::parser::usage::RefPrefix {
+        direction: prefix_direction,
+        is_derived,
+        usage_prefix,
+        is_constant,
+    } = prefix;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     // SysML allows anonymous attribute usages: `attribute: Real;` (Identification may be empty).
     let (after_kw, _) = ws_and_comments(input)?;
@@ -764,13 +962,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             && !peek.fragment().starts_with(b":>>"))
             || starts_with_keyword(peek.fragment(), b"defined")
         {
-            (
-                input,
-                AttributeUsageHead::Named {
-                    name_span: crate::ast::Span::dummy(),
-                    name: String::new(),
-                },
-            )
+            (input, AttributeUsageHead::Named { name: None })
         } else {
             alt((
                 map(
@@ -790,15 +982,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                         subsets_value,
                     },
                 ),
-                map(with_span(name), |(name_span, name)| {
-                    AttributeUsageHead::Named { name_span, name }
-                }),
+                map(name, |name| AttributeUsageHead::Named { name: Some(name) }),
             ))
             .parse(input)?
         };
     let (
         input,
-        name_span,
         name_str,
         typing_span,
         typing,
@@ -816,19 +1005,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
-                redefines
-                    .value
-                    .first_target()
-                    .and_then(|t| t.local_name())
-                    .unwrap_or_default()
-                    .to_string(),
                 typing_span,
                 typing,
                 Some(redefines_span),
@@ -843,19 +1025,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
-                references
-                    .value
-                    .first_target()
-                    .and_then(|t| t.local_name())
-                    .unwrap_or_default()
-                    .to_string(),
                 typing_span,
                 typing,
                 None,
@@ -873,19 +1048,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
                 None,
-                subsets
-                    .value
-                    .first_target()
-                    .and_then(|t| t.local_name())
-                    .unwrap_or_default()
-                    .to_string(),
                 typing_span,
                 typing,
                 None,
@@ -896,7 +1064,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 mods0,
             )
         }
-        AttributeUsageHead::Named { name_span, name } => {
+        AttributeUsageHead::Named { name } => {
             // §6 G10: the multiplicity may precede the typing clause -- `attribute
             // occurs[0..1]: Real;` (OMG spec Annex `14c-Language Extensions.sysml`). Only the
             // trailing position (`attribute a : Real[0..1];`) was accepted before, so the
@@ -905,13 +1073,11 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
                 .unwrap_or((None, None));
-            let (input, mods0) = feature_modifiers(input)?;
-            let mods0 = pre_typing_mods.merge(mods0);
+            let (input, mods0) = feature_modifiers_after(pre_typing_mods, input)?;
             (
                 input,
-                Some(name_span),
                 name,
                 typing_span,
                 typing,
@@ -925,7 +1091,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         }
     };
     let (input, leading_clauses) = specialization_clauses(input)?;
-    let (input, mods1) = feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers_after(mods0, input)?;
     let leading_subsets_value = leading_clauses
         .subsets
         .as_ref()
@@ -935,8 +1101,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
-    let (input, mods2) = feature_modifiers(input)?;
-    let mods = mods0.merge(mods1).merge(mods2);
+    let (input, mods) = feature_modifiers_after(mods, input)?;
     let redefines = trailing_clauses
         .redefines
         .or(leading_clauses.redefines)
@@ -971,13 +1136,13 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 intersects,
                 value,
                 body,
-                name_span,
                 typing_span,
                 redefines_span,
-                direction: None,
+                // `RefPrefix`'s direction slot. `directed_attribute_usage` still overwrites this
+                // with the direction it consumed itself, which is the same value.
+                direction: prefix_direction,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived,
                 usage_prefix,
                 is_constant,
@@ -1009,8 +1174,18 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
+    let (_, target_spelling) = name(input)?;
+    let target_bytes = crate::parser::lex::name_bytes(input, target_spelling);
+    // The prefixed forms take the same comma-separated multi-target list as every other
+    // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
+    // Gap 49b); the unprefixed binding keeps its single name-reference.
+    let (input, targets) = if prefix.is_some() {
+        crate::parser::usage::specialization_targets(input)?
+    } else {
+        let (input, target) = qualified_reference(input)?;
+        (input, vec![target])
+    };
+    if is_reserved_shorthand_starter(target_bytes) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
@@ -1021,28 +1196,30 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let prefix_span = crate::parser::span_from_to(start, input);
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (semicolon_start, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+    let semicolon_span = crate::parser::span::span_from_to(semicolon_start, input);
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Subsets,
-                name_str.clone(),
+                prefix_span,
             )),
             None,
         ),
         Some(MetadataBindingPrefix::Redefines) => (
             None,
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Redefines,
-                name_str.clone(),
+                prefix_span,
             )),
         ),
         None => (None, None),
@@ -1053,7 +1230,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             start,
             input,
             AttributeUsage {
-                name: name_str,
+                name: prefix.is_none().then_some(target_spelling),
                 short_name: None,
                 typing,
                 subsets,
@@ -1062,14 +1239,12 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 crosses: None,
                 intersects: None,
                 value,
-                body: AttributeBody::Semicolon,
-                name_span: Some(name_span),
+                body: AttributeBody::Semicolon { semicolon_span },
                 typing_span,
                 redefines_span: None,
                 direction: None,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived: false,
                 usage_prefix: None,
                 is_constant: false,
@@ -1085,18 +1260,56 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
 
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
+    // `RefDecl` and `metadata_keyword_prefix` reads `#Tag` as a standalone member, and neither
+    // knows about the `part` keyword that follows, so `PartUsage` gets first refusal.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
+            let elem = AttributeBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
-        map(doc_comment, AttributeBodyElement::Doc),
         map(
-            |i| attribute_def(i, true),
-            AttributeBodyElement::AttributeDef,
+            crate::parser::body::annotating_member,
+            AttributeBodyElement::Annotating,
         ),
+        map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         map(metadata_binding, AttributeBodyElement::AttributeUsage),
+        // The same structured members `attribute_body_element` already dispatches (spec42
+        // Gap 40): previously this narrower grammar dropped e.g. `ref self : MetadataItem
+        // redefines Metaobject::self, Item::self;` (Systems Library `Metadata.sysml`) to
+        // opaque capture. Before the opaque fallback so they get structured nodes.
         map(
-            |i| capture_opaque_member(i, METADATA_OPAQUE_STARTERS),
-            AttributeBodyElement::Other,
+            crate::parser::connector::ref_decl,
+            AttributeBodyElement::RefDecl,
+        ),
+        map(crate::parser::part::part_usage, |n| {
+            AttributeBodyElement::PartUsage(Box::new(n))
+        }),
+        map(crate::parser::item::item_usage, |n| {
+            AttributeBodyElement::ItemUsage(Box::new(n))
+        }),
+        map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            AttributeBodyElement::AssertConstraint,
+        ),
+        map(
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    METADATA_OPAQUE_STARTERS,
+                    "metadata body",
+                )
+            },
+            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -1122,10 +1335,16 @@ fn metadata_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBod
 pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, AttributeBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            AttributeBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         METADATA_BODY_STARTERS,
         "metadata body",
@@ -1133,123 +1352,133 @@ pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBod
         metadata_body_element,
         metadata_body_recovery,
     )?;
-    Ok((input, AttributeBody::Brace { elements }))
-}
-
-/// SysML `DefaultReferenceUsage` shorthand: bare `name : Type (= value)?;` without the
-/// `attribute` keyword (commonly used inside part bodies).
-///
-/// Supports:
-/// - `name : Type ;`
-/// - `name : Type = expr ;`
-/// - `:>> name : Type = expr ;` (leading `:>>` ignored; treated as a usage)
-pub(crate) fn attribute_usage_shorthand(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            start,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (input, (typing_span, is_conjugated, targets)) = typings(input)?;
-    let typing = Some(typing_node(typing_span.clone(), is_conjugated, targets));
-    // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
-    let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
-            .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing,
-                // Leading `:>>` (before the name) is a different shape from GH-87's `name :>
-                // Target` (target after the name) -- see this function's doc comment; that form's
-                // target isn't captured here today, unchanged from before GH-87.
-                subsets: None,
-                redefines: None,
-                value,
-                name_span: Some(name_span),
-                typing_span: Some(typing_span),
-                // No visibility prefix on the no-keyword shorthand form.
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
-            },
-        ),
-    ))
+    Ok((input, members.into_body()))
 }
 
 #[cfg(test)]
 mod attribute_body_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
+    use crate::ast::{Expression, QualifiedReferenceId};
     use crate::parser::Input;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    fn target_texts(source: Input<'_>, targets: &[QualifiedReferenceId]) -> Vec<String> {
+        targets
+            .iter()
+            .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
+            .collect()
+    }
+
+    /// Spec42 Gap 49b: the bare `:>>`/`:>` shorthand (no `attribute` keyword) accepts the same
+    /// comma-separated multi-target list as every other redefinition clause (`SI.kerml`'s
+    /// `kelvin` member).
+    #[test]
+    fn bare_redefinition_shorthand_accepts_multiple_targets() {
+        let (rest, node) = attribute_feature_binding(input(":>> A::x::factors, B::y::factors;"))
+            .expect("bare multi-target redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let redefines = node.value.redefines.as_ref().expect("redefines clause");
+        assert_eq!(redefines.value.target.len(), 2);
+        assert!(node.value.name.is_none());
+    }
+
+    /// Spec42 Gap 40: `metadata def` bodies dispatch the same structured members as other
+    /// attribute-shaped bodies instead of dropping them to opaque capture (`ref self :
+    /// MetadataItem redefines Metaobject::self, Item::self;`, Systems Library `Metadata.sysml`).
+    #[test]
+    fn metadata_body_dispatches_structured_members() {
+        let (rest, body) = metadata_body(input(
+            "{ ref self : M redefines Metaobject::self, Item::self; item picture : Picture; }",
+        ))
+        .expect("metadata body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let AttributeBody::Brace { elements, .. } = body else {
+            panic!("expected brace body");
+        };
+        assert!(matches!(
+            elements[0].value,
+            AttributeBodyElement::RefDecl(_)
+        ));
+        assert!(matches!(
+            elements[1].value,
+            AttributeBodyElement::ItemUsage(_)
+        ));
+    }
+
+    /// Spec42 Gap 38: KerML classifier-keyword declarations (other than `class`, which stays on
+    /// `class_def`) nested inside an attribute-shaped body dispatch to the typed
+    /// `KermlClassifierDecl` production.
+    #[test]
+    fn attribute_body_dispatches_nested_kerml_classifiers() {
+        let source = input("classifier C1;");
+        let (rest, node) = attribute_body_element(source).expect("nested classifier");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let AttributeBodyElement::KermlClassifier(decl) = node.value else {
+            panic!("expected KermlClassifier");
+        };
+        assert_eq!(
+            decl.value.keyword,
+            crate::ast::KermlClassifierKeyword::Classifier
+        );
+        assert_eq!(
+            decl.value
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"C1"[..])
+        );
     }
 
     #[test]
     fn attribute_usage_captures_intersects() {
-        let (rest, node) = attribute_usage(input("attribute reading : Weight intersects a, b;"))
-            .expect("attribute usage");
+        let source = input("attribute reading : Weight intersects a, b;");
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value
                 .intersects
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("a, b".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["a".to_string(), "b".to_string()])
         );
     }
 
     #[test]
-    fn feature_binding_parses_unit_conversion_prefix_form() {
-        let text =
-            ":>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }";
-        let (rest, node) = attribute_feature_binding(input(text)).expect("feature binding");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+    fn metadata_subsetting_binding_has_no_declared_name() {
+        let source = input(":> annotatedElement : SysML::Usage;");
+        let (rest, node) = metadata_binding(source).expect("metadata subsetting binding");
+        assert!(rest.fragment().is_empty());
+        assert!(node.value.name.is_none());
         assert_eq!(
             node.value
-                .redefines
+                .subsets
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("unitConversion".to_string())
+                .map(|relationship| target_texts(source, &relationship.value.target)),
+            Some(vec!["annotatedElement".to_string()])
         );
-        assert_eq!(
-            node.value
-                .typing
-                .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("ConversionByPrefix".to_string())
-        );
-        let AttributeBody::Brace { elements } = &node.value.body else {
-            panic!("expected brace body");
-        };
-        assert_eq!(elements.len(), 2);
     }
 
     #[test]
     fn attribute_usage_accepts_leading_visibility_modifier() {
         let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "zeroDegreeCelsiusInKelvin");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"zeroDegreeCelsiusInKelvin"[..])
+        );
         assert_eq!(
             node.value
                 .typing
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("ThermodynamicTemperatureValue".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["ThermodynamicTemperatureValue".to_string()])
         );
         assert!(node.value.value.is_some());
     }
@@ -1284,7 +1513,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_visibility_prefix_is_captured_on_membership() {
         let text = "protected attribute def Samples: Real;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -1299,7 +1528,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_public_visibility_prefix_is_captured_on_membership() {
         let text = "public attribute def Samples: Real;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -1310,10 +1539,17 @@ mod attribute_body_tests {
     #[test]
     fn attribute_body_element_dispatches_visibility_prefixed_declaration_to_usage_not_def() {
         let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
-        let (_, node) = attribute_body_element(input(text)).expect("attribute body element");
+        let source = input(text);
+        let (_, node) = attribute_body_element(source).expect("attribute body element");
         match node.value {
             AttributeBodyElement::AttributeUsage(usage) => {
-                assert_eq!(usage.value.name, "zeroDegreeCelsiusInKelvin");
+                assert_eq!(
+                    usage
+                        .value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"zeroDegreeCelsiusInKelvin"[..])
+                );
             }
             other => panic!("expected AttributeUsage, got {other:?}"),
         }
@@ -1326,10 +1562,14 @@ mod attribute_body_tests {
         let text = "attribute readings: Real[0..*] ordered;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
-        assert!(!node.value.nonunique);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
+        assert!(node.value.multiplicity_modifiers.is_unique());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
-        assert_eq!(multiplicity.value.to_bracket_string(), "[0..*]");
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(multiplicity.value.upper.is_none());
     }
 
     #[test]
@@ -1337,15 +1577,14 @@ mod attribute_body_tests {
         let text = "attribute tags: String[0..*] nonunique;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.nonunique);
-        assert!(!node.value.ordered);
-        assert_eq!(
-            node.value
-                .multiplicity
-                .as_ref()
-                .map(|m| m.value.to_bracket_string()),
-            Some("[0..*]".to_owned())
-        );
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
+        let multiplicity = node.value.multiplicity.expect("multiplicity retained");
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(multiplicity.value.upper.is_none());
     }
 
     #[test]
@@ -1353,38 +1592,57 @@ mod attribute_body_tests {
         let text = "attribute a [0..1] ordered;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
-        assert_eq!(multiplicity.value.to_bracket_string(), "[0..1]");
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(matches!(
+            multiplicity.value.upper.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(1))
+        ));
     }
 
     #[test]
     fn attribute_def_retains_ordered_and_nonunique_modifiers() {
         let text = "attribute def Samples :> Real[0..*] ordered nonunique;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
-        assert!(node.value.nonunique);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
+        assert!(!node.value.multiplicity_modifiers.is_unique());
     }
 
     #[test]
     fn attribute_usage_retains_derived_prefix() {
         let text = "derived attribute total: Real = a + b;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_derived);
         assert!(!node.value.is_constant);
-        assert_eq!(node.value.name, "total");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"total"[..])
+        );
     }
 
     #[test]
     fn attribute_usage_retains_constant_prefix() {
         let text = "constant attribute pi: Real = 3.14159;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_constant);
         assert!(!node.value.is_derived);
-        assert_eq!(node.value.name, "pi");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"pi"[..])
+        );
     }
 
     #[test]
@@ -1393,8 +1651,8 @@ mod attribute_body_tests {
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.multiplicity.is_none());
-        assert!(!node.value.ordered);
-        assert!(!node.value.nonunique);
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
+        assert!(node.value.multiplicity_modifiers.is_unique());
         assert!(!node.value.is_derived);
         assert!(!node.value.is_constant);
     }
@@ -1404,14 +1662,20 @@ mod attribute_body_tests {
     #[test]
     fn attribute_usage_retains_end_prefix() {
         let text = "end attribute mass: Real;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_end);
         // `end` and `derived`/`constant` are mutually exclusive alternatives per BNF
         // `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix`.
         assert!(!node.value.is_derived);
         assert!(!node.value.is_constant);
-        assert_eq!(node.value.name, "mass");
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"mass"[..])
+        );
     }
 
     #[test]
@@ -1433,32 +1697,54 @@ mod attribute_body_tests {
     #[test]
     fn attribute_usage_captures_short_name() {
         let text = "attribute <wcf> wheelCoordinateFrame : CoordinateFrame;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("wcf"));
-        assert_eq!(node.value.name, "wheelCoordinateFrame");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"wcf"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"wheelCoordinateFrame"[..])
+        );
         assert_eq!(
             node.value
                 .typing
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("CoordinateFrame".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["CoordinateFrame".to_string()])
         );
     }
 
     #[test]
     fn attribute_usage_captures_short_name_with_redefines_and_value() {
         let text = "attribute <lbpr> lugBoltPlacementRadius :>> radius default 60 [mm];";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("lbpr"));
-        assert_eq!(node.value.name, "lugBoltPlacementRadius");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"lbpr"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"lugBoltPlacementRadius"[..])
+        );
         assert_eq!(
             node.value
                 .redefines
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("radius".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["radius".to_string()])
         );
         assert!(node.value.value.is_some());
     }
@@ -1496,8 +1782,10 @@ mod attribute_body_tests {
     fn attribute_body_accepts_metadata_tag_prefixing_a_connect() {
         let (rest, node) = attribute_body_element(input("#prevention connect a to b;"))
             .expect("prefix-form metadata tag");
-        // Only the tag is consumed; the prefixed connect is left for the next element.
-        assert_eq!(rest.fragment(), b"connect a to b;");
+        // Only the tag is consumed -- up to the end of its reference, not past the
+        // whitespace after it, so the node span covers `#prevention` and nothing else. The
+        // prefixed connect is left for the next element.
+        assert_eq!(rest.fragment(), b" connect a to b;");
         assert!(matches!(
             node.value,
             AttributeBodyElement::MetadataKeywordUsage(_)
@@ -1517,22 +1805,78 @@ mod attribute_body_tests {
         ));
     }
 
-    /// Attribute / item bodies own `ref` members (validation 15_11 / 17a).
+    /// Attribute / item bodies own `ref part` members (validation 15_11 / 17a).
+    ///
+    /// `ref part …` is a `PartUsage` whose `OccurrenceUsagePrefix` authored `ref`, not a
+    /// `ReferenceUsage`: `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` and
+    /// `Usage` opens with `Identification`, whose name is a `NAME` -- and `part` is a reserved
+    /// keyword, so it can never be one. This scope used to reach `connector::ref_decl` first,
+    /// which models the shape as a `RefDecl` carrying `RefDeclKind::Part`; the migrated
+    /// `PartUsage` now gets first refusal here as it already did in part, occurrence and action
+    /// bodies, so the same source is the same node in every scope.
     #[test]
-    fn attribute_body_accepts_ref_part_redefines() {
+    fn attribute_body_reads_ref_part_redefines_as_a_part_usage() {
         let (rest, node) =
             attribute_body_element(input("ref part :>> elements: Person;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(matches!(node.value, AttributeBodyElement::RefDecl(_)));
+        match &node.value {
+            AttributeBodyElement::PartUsage(part) => {
+                assert!(part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some());
+                assert!(part.value.name.is_none());
+                assert!(part.value.redefines.is_some());
+                assert!(part.value.typing.is_some());
+            }
+            other => panic!("expected PartUsage, got {other:?}"),
+        }
     }
 
     #[test]
-    fn attribute_body_accepts_ref_part_name() {
-        let (rest, node) =
-            attribute_body_element(input("ref part subscriber;")).expect("ref part name");
+    fn attribute_body_reads_ref_part_name_as_a_part_usage() {
+        let source = input("ref part subscriber;");
+        let (rest, node) = attribute_body_element(source).expect("ref part name");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match &node.value {
-            AttributeBodyElement::RefDecl(r) => assert_eq!(r.value.name, "subscriber"),
+            AttributeBodyElement::PartUsage(part) => {
+                assert!(part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some());
+                assert_eq!(
+                    part.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"subscriber"[..])
+                );
+            }
+            other => panic!("expected PartUsage, got {other:?}"),
+        }
+    }
+
+    /// The sibling shapes `connector::ref_decl` still owns are untouched: a bare `ref` with no
+    /// kind keyword, and a kinded `ref` for a family that has not migrated.
+    #[test]
+    fn attribute_body_still_reads_a_bare_ref_as_a_ref_declaration() {
+        let source = input("ref subscriber : Person;");
+        let (rest, node) = attribute_body_element(source).expect("bare ref");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match &node.value {
+            AttributeBodyElement::RefDecl(decl) => {
+                assert_eq!(
+                    decl.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"subscriber"[..])
+                )
+            }
             other => panic!("expected RefDecl, got {other:?}"),
         }
     }

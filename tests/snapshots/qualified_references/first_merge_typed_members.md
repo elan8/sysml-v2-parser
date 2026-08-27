@@ -1,0 +1,43 @@
+# META
+~~~sexpr
+(snapshot (type recovery) (description "First/merge brace bodies retain ordered typed pin members, structured action-body declaration members, malformed recovery nodes, delimiter provenance, and valid members after recovery."))
+~~~
+# SOURCE
+~~~sysml
+package ControlMembers {
+    part def Flow {
+        first Actions::start then Actions::finish {
+            out pin : Signals::Output;
+            calc opaque;
+            bogus ???;
+            in ref resumed : Signals::Input[4];
+        }
+    }
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "first_merge_typed_members.md"
+    (diagnostics
+      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 173) (line 6) (column 13) (len 23)) (message "unrecognized declaration `bogus` in first/merge body"))
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sexpr
+(stable-idempotent)
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 59) (line 3) (column 15) (len 14)) (segments (segment 0 (token "Actions") (name "Actions") (separator none) (span (offset 59) (line 3) (column 15) (len 7))) (segment 1 (token "start") (name "start") (separator colon-colon) (span (offset 68) (line 3) (column 24) (len 5)))))
+    (reference r1 (scope relative) (span (offset 79) (line 3) (column 35) (len 15)) (segments (segment 0 (token "Actions") (name "Actions") (separator none) (span (offset 79) (line 3) (column 35) (len 7))) (segment 1 (token "finish") (name "finish") (separator colon-colon) (span (offset 88) (line 3) (column 44) (len 6)))))
+    (reference r2 (scope relative) (span (offset 119) (line 4) (column 23) (len 15)) (segments (segment 0 (token "Signals") (name "Signals") (separator none) (span (offset 119) (line 4) (column 23) (len 7))) (segment 1 (token "Output") (name "Output") (separator colon-colon) (span (offset 128) (line 4) (column 32) (len 6)))))
+    (reference r3 (scope relative) (span (offset 213) (line 7) (column 30) (len 14)) (segments (segment 0 (token "Signals") (name "Signals") (separator none) (span (offset 213) (line 7) (column 30) (len 7))) (segment 1 (token "Input") (name "Input") (separator colon-colon) (span (offset 222) (line 7) (column 39) (len 5)))))
+  )
+  (root (package (name "ControlMembers") (body brace (part-def (name "Flow") (modifiers) (body brace (first (source (expression (span (offset 59) (line 3) (column 15) (len 14)) (ref r0))) (target (expression (span (offset 79) (line 3) (column 35) (len 15)) (ref r1))) (body brace (open-brace (span (offset 95) (line 3) (column 51) (len 1))) (members (in-out (direction out) (kind none) (reference false) (declaration "pin") (subsets none) (type (ref r2)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (redefines none) (value none) (span (offset 109) (line 4) (column 13) (len 26))) (calc-usage) (malformed (code "unrecognized_declaration_in_scope") (found "bogus ???;") (span (offset 173) (line 6) (column 13) (len 23))) (in-out (direction in) (kind none) (reference true) (declaration "resumed") (subsets none) (type (ref r3)) (multiplicity (lower (expression (span (offset 228) (line 7) (column 45) (len 1)) (integer 4))) (upper (expression (span (offset 228) (line 7) (column 45) (len 1)) (integer 4)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (redefines none) (value none) (span (offset 196) (line 7) (column 13) (len 35)))) (close-brace (span (offset 240) (line 8) (column 9) (len 1))))))))))
+)
+~~~

@@ -1,0 +1,180 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "Standard Library: Domain Libraries/Metadata/ImageMetadata"))
+~~~
+# SOURCE
+~~~sysml
+standard library package ImageMetadata {
+	doc
+	/*
+	 * This package provides attributive data and metadata to allow a model element to be
+	 * annotated with an image to be used in its graphical rendering or as a marker to
+	 * adorn graphical or textual renderings.
+	 */
+	 
+	private import ScalarValues::String;
+	
+	attribute def Image {
+		doc
+		/*
+		 * Image provides the data necessary for the physical definition of 
+		 * a graphical image.
+		 */
+		 
+		attribute content : String[0..1] {
+			doc
+			/*
+			 * Binary data for the image according to the given MIME type, 
+			 * encoded as given by the encoding.
+			 */
+		}
+		
+		attribute encoding : String[0..1] {
+			doc
+			/*
+			 * Describes how characters in the content are to be decoded into 
+			 * binary data. At least "base64", "hex", "identify", and "JSONescape"
+			 * shall be supported.
+			 */
+		}
+		
+		attribute type : String[0..1] {
+			doc
+			/*
+			 * The MIME type according to which the content should be interpreted.
+			 */
+		}
+		
+		attribute location : String[0..1] {
+			doc
+			/*
+			 * A URI for the location of a resource containing the image content,
+			 * as an alternative for embedding it in the content attribute.
+			 */
+		}
+	}
+	
+	metadata def Icon {
+		doc
+		/*
+		 * Icon metadata can be used to annotate a model element with an image to be used
+		 * to show render the element on a diagram and/or a small image to be used as an
+		 * adornment on a graphical or textual rendering. Alternatively, another metadata
+		 * definition can be annotated with an Icon to indicate that any model element 
+		 * annotated by the containing metadata can be rendered according to the Icon.
+		 */
+		 
+		attribute fullImage : Image[0..1] {
+			doc
+			/*
+			 * A full-sized image that can be used to render the annotated element on a
+			 * graphical view, potentially as an alternative to its standard rendering.
+			 */
+		}
+		
+		attribute smallImage : Image[0..1] {
+			doc
+			/*
+			 * A smaller image that can be used as an adornment on the graphical rendering
+			 * of the annotated element or as a marker in a textual rendering.
+			 */
+		}
+	}
+	
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "image_metadata.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+standard library package ImageMetadata {
+    doc
+    /*
+	 * This package provides attributive data and metadata to allow a model element to be
+	 * annotated with an image to be used in its graphical rendering or as a marker to
+	 * adorn graphical or textual renderings.
+	 */
+    private import ScalarValues::String;
+    attribute def Image {
+        doc
+        /*
+		 * Image provides the data necessary for the physical definition of 
+		 * a graphical image.
+		 */
+        attribute content : String[0..1] {
+            doc
+            /*
+			 * Binary data for the image according to the given MIME type, 
+			 * encoded as given by the encoding.
+			 */
+        }
+        attribute encoding : String[0..1] {
+            doc
+            /*
+			 * Describes how characters in the content are to be decoded into 
+			 * binary data. At least "base64", "hex", "identify", and "JSONescape"
+			 * shall be supported.
+			 */
+        }
+        attribute type : String[0..1] {
+            doc
+            /*
+			 * The MIME type according to which the content should be interpreted.
+			 */
+        }
+        attribute location : String[0..1] {
+            doc
+            /*
+			 * A URI for the location of a resource containing the image content,
+			 * as an alternative for embedding it in the content attribute.
+			 */
+        }
+    }
+    metadata def Icon {
+        doc
+        /*
+		 * Icon metadata can be used to annotate a model element with an image to be used
+		 * to show render the element on a diagram and/or a small image to be used as an
+		 * adornment on a graphical or textual rendering. Alternatively, another metadata
+		 * definition can be annotated with an Icon to indicate that any model element 
+		 * annotated by the containing metadata can be rendered according to the Icon.
+		 */
+        attribute fullImage : Image[0..1] {
+            doc
+            /*
+			 * A full-sized image that can be used to render the annotated element on a
+			 * graphical view, potentially as an alternative to its standard rendering.
+			 */
+        }
+        attribute smallImage : Image[0..1] {
+            doc
+            /*
+			 * A smaller image that can be used as an adornment on the graphical rendering
+			 * of the annotated element or as a marker in a textual rendering.
+			 */
+        }
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 288) (line 9) (column 17) (len 20)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 288) (line 9) (column 17) (len 12))) (segment 1 (token "String") (name "String") (separator colon-colon) (span (offset 302) (line 9) (column 31) (len 6)))))
+    (reference r1 (scope relative) (span (offset 473) (line 18) (column 23) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 473) (line 18) (column 23) (len 6)))))
+    (reference r2 (scope relative) (span (offset 645) (line 26) (column 24) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 645) (line 26) (column 24) (len 6)))))
+    (reference r3 (scope relative) (span (offset 876) (line 35) (column 20) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 876) (line 35) (column 20) (len 6)))))
+    (reference r4 (scope relative) (span (offset 1015) (line 42) (column 24) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 1015) (line 42) (column 24) (len 6)))))
+    (reference r5 (scope relative) (span (offset 1679) (line 61) (column 25) (len 5)) (segments (segment 0 (token "Image") (name "Image") (separator none) (span (offset 1679) (line 61) (column 25) (len 5)))))
+    (reference r6 (scope relative) (span (offset 1903) (line 69) (column 26) (len 5)) (segments (segment 0 (token "Image") (name "Image") (separator none) (span (offset 1903) (line 69) (column 26) (len 5)))))
+  )
+  (root (library-package (name "ImageMetadata") (standard true) (body brace (doc (name none) (locale none) (body (span (offset 49) (line 3) (column 4) (len 217)) (normalized "This package provides attributive data and metadata to allow a model element to be\nannotated with an image to be used in its graphical rendering or as a marker to\nadorn graphical or textual renderings.\n"))) (import (target (span (span (offset 288) (line 9) (column 17) (len 20))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def (declaration-name "Image") (short-name none) (modifiers) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 345) (line 13) (column 5) (len 99)) (normalized "Image provides the data necessary for the physical definition of \na graphical image.\n"))) (attribute-usage (declaration-name "content") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (doc (name none) (locale none) (body (span (offset 500) (line 20) (column 6) (len 112)) (normalized "Binary data for the image according to the given MIME type, \nencoded as given by the encoding.\n"))))) (attribute-usage (declaration-name "encoding") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (doc (name none) (locale none) (body (span (offset 672) (line 28) (column 6) (len 175)) (normalized "Describes how characters in the content are to be decoded into \nbinary data. At least \"base64\", \"hex\", \"identify\", and \"JSONescape\"\nshall be supported.\n"))))) (attribute-usage (declaration-name "type") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (doc (name none) (locale none) (body (span (offset 903) (line 37) (column 6) (len 79)) (normalized "The MIME type according to which the content should be interpreted.\n"))))) (attribute-usage (declaration-name "location") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r4)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (doc (name none) (locale none) (body (span (offset 1042) (line 44) (column 6) (len 145)) (normalized "A URI for the location of a resource containing the image content,\nas an alternative for embedding it in the content attribute.\n"))))))) (metadata-def (name "Icon") (abstract false) (specializes none) (body brace (doc (name none) (locale none) (body (span (offset 1230) (line 53) (column 5) (len 418)) (normalized "Icon metadata can be used to annotate a model element with an image to be used\nto show render the element on a diagram and/or a small image to be used as an\nadornment on a graphical or textual rendering. Alternatively, another metadata\ndefinition can be annotated with an Icon to indicate that any model element \nannotated by the containing metadata can be rendered according to the Icon.\n"))) (attribute-usage (declaration-name "fullImage") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (doc (name none) (locale none) (body (span (offset 1705) (line 63) (column 6) (len 163)) (normalized "A full-sized image that can be used to render the annotated element on a\ngraphical view, potentially as an alternative to its standard rendering.\n"))))) (attribute-usage (declaration-name "smallImage") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (doc (name none) (locale none) (body (span (offset 1929) (line 71) (column 6) (len 157)) (normalized "A smaller image that can be used as an adornment on the graphical rendering\nof the annotated element or as a marker in a textual rendering.\n"))))))))))
+)
+~~~

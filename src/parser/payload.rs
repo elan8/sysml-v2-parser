@@ -1,12 +1,12 @@
 //! Shared parsers for accept/send payload clauses and transition accept triggers.
 
 use crate::ast::{
-    ActionUsage, Expression, Node, PayloadClause, SendPayload, Span, TransitionAccept, TriggerKind,
+    ActionUsage, Expression, Node, PayloadClause, SendPayload, TransitionAccept, TriggerKind,
 };
 use crate::parser::action::action_usage_body;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_name, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -20,16 +20,15 @@ use nom::Parser;
 
 /// Required typed payload: `name : qualified_name`.
 pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, PayloadClause> {
-    let (input, (name_span, name)) = with_span(name).parse(input)?;
+    let (input, name) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (type_span, type_name)) =
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+        preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
     Ok((
         input,
         PayloadClause {
             name,
             type_name: Some(type_name),
-            name_span,
             type_span: Some(type_span),
         },
     ))
@@ -46,22 +45,62 @@ fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
     .parse(input)
 }
 
-/// After `accept` keyword: `name : Type` or shorthand expression, with an optional trailing
-/// `via <port>` clause (e.g. `accept TurnOn via commPort`).
+/// Transition-level `accept` trigger. Shares `AcceptParameterPart` with an action-node accept,
+/// including the three `TriggerKind` alternatives.
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
+    // Speculated at member starts it does not own; refuse unless one of this production's
+    // leading words follows the trivia, before entering an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        if !starts_with_keyword(cursor.fragment(), b"accept") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
+    crate::parser::span::reference_transaction(input, transition_accept_inner)
+}
+
+fn transition_accept_inner(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
+    accept_parameter_part(input, true)
+}
+
+/// `AcceptParameterPart` after its authored `accept` keyword. Both a direct `accept` action
+/// node and an inline `then action ... accept ...` use this boundary, so a bare payload reference
+/// stays a source-backed expression rather than becoming a decoded name string.
+///
+/// A trigger *is* admitted here. `AcceptNodeDeclaration = ActionNodeUsageDeclaration? 'accept'
+/// AcceptParameterPart`, `AcceptParameterPart = PayloadParameterMember ( 'via'
+/// NodeParameterMember )?`, and `PayloadParameter = Payload | Identification?
+/// PayloadFeatureSpecializationPart? TriggerValuePart` (SysML BNF 1446-1461; reference
+/// `SysML.xtext:1446-1484`) -- so `accept when <expr>;` and `accept at <expr>;` reach an accept
+/// node through `TriggerValuePart`, exactly as they reach a transition. This previously read
+/// `TriggerKind` as transition-only and recovered the whole member.
+pub(crate) fn action_accept_parameter(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
+    crate::parser::span::reference_transaction(input, |input| accept_parameter_part(input, true))
+}
+
+fn accept_parameter_part(
+    input: Input<'_>,
+    allow_trigger_kind: bool,
+) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = ws1(input)?;
     // §6 G8: a `TriggerKind` keyword replaces the payload entirely. Checked before `expression`,
     // which would otherwise take the keyword itself as a feature reference and leave the real
     // trigger expression to be misread as the transition's effect.
-    if let Ok((input, kind)) = trigger_kind(input) {
-        let (input, expr_node) = expression(input)?;
-        return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
+    if allow_trigger_kind {
+        if let Ok((input, kind)) = trigger_kind(input) {
+            let (input, expr_node) = expression(input)?;
+            return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
+        }
     }
+    let payload_name = name(input).ok().map(|(_, value)| value);
     let (input, expr_node) = expression(input)?;
     let (input, type_suffix) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
     let (input, via) = opt(preceded(
@@ -69,16 +108,15 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
         preceded(ws1, expression),
     ))
     .parse(input)?;
-    if let (Expression::FeatureRef(name), Some((type_span, type_name))) =
-        (&expr_node.value, type_suffix)
+    if let (Expression::FeatureRef(_), Some(name), Some((type_span, type_name))) =
+        (&expr_node.value, payload_name, type_suffix)
     {
         return Ok((
             input,
             TransitionAccept::Payload(
                 PayloadClause {
-                    name: name.clone(),
+                    name,
                     type_name: Some(type_name),
-                    name_span: expr_node.span.clone(),
                     type_span: Some(type_span),
                 },
                 via,
@@ -101,15 +139,14 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
 fn control_node_payload_stmt<'a>(
     input: Input<'a>,
     keyword: &'a [u8],
-    control_name: &'static str,
 ) -> IResult<Input<'a>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(keyword).parse(input)?;
-    let (input, _) = ws1(input)?;
     let is_send = keyword == b"send";
 
-    let (input, name_span, type_ref_span, accept, send) = if is_send {
+    let (input, type_ref_span, accept, send) = if is_send {
+        let (input, _) = ws1(input)?;
         // Peek for `via`/`to` first: neither is reserved in `name`/`expression`, so an empty
         // payload (BNF `EmptyParameterMember`) would otherwise be greedily consumed as a bare
         // feature reference instead of being left for the `via`/`to` clauses below.
@@ -124,28 +161,31 @@ fn control_node_payload_stmt<'a>(
         } else {
             (input, None)
         };
-        let name_span = match &payload {
-            Some(SendPayload::Typed(p)) => p.name_span.clone(),
-            Some(SendPayload::Expression(e)) => e.span.clone(),
-            None => Span::dummy(),
-        };
         let type_ref_span = match &payload {
-            Some(SendPayload::Typed(p)) => p.type_span.clone(),
+            Some(SendPayload::Typed(p)) => p.type_span,
             _ => None,
         };
-        (input, name_span, type_ref_span, None, payload)
+        (input, type_ref_span, None, payload)
     } else {
-        let (input, payload) = typed_payload_clause(input)?;
-        let name_span = payload.name_span.clone();
-        let type_ref_span = payload.type_span.clone();
-        (input, name_span, type_ref_span, Some(payload), None)
+        let (input, accept) = action_accept_parameter(input)?;
+        let type_ref_span = match &accept {
+            TransitionAccept::Payload(payload, _) => payload.type_span,
+            // A shorthand or trigger carries its own span inside the `accept` value; there is no
+            // separate type reference to point at.
+            TransitionAccept::Shorthand(..) | TransitionAccept::TimeTrigger(..) => None,
+        };
+        (input, type_ref_span, Some(accept), None)
     };
 
-    let (input, via) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"via"[..])),
-        preceded(ws1, expression),
-    ))
-    .parse(input)?;
+    let (input, via) = if is_send {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b"via"[..])),
+            preceded(ws1, expression),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, to) = if is_send {
         opt(preceded(
             preceded(ws_and_comments, tag(&b"to"[..])),
@@ -166,14 +206,22 @@ fn control_node_payload_stmt<'a>(
             start,
             input,
             ActionUsage {
+                keyword: if is_send {
+                    crate::ast::ActionUsageKeyword::Send
+                } else {
+                    crate::ast::ActionUsageKeyword::Accept
+                },
                 is_abstract: false,
                 is_variation: false,
                 is_reference: false,
                 is_individual: false,
-                name: control_name.to_string(),
-                type_name: String::new(),
+                // A control node has no `NAME`; its kind is `keyword`.
+                name: None,
+                short_name: None,
+                type_name: None,
                 typing: None,
                 multiplicity: None,
+                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 subsets: None,
                 redefines: None,
                 accept,
@@ -181,7 +229,6 @@ fn control_node_payload_stmt<'a>(
                 via,
                 to,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
                 // No visibility grammar at this standalone `accept`/`send` control-node-statement
                 // position. See `ActionUsage::membership`.
@@ -195,13 +242,32 @@ pub(crate) fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, 
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
     if starts_with_keyword(frag, b"accept") {
-        return control_node_payload_stmt(input, b"accept", "accept");
+        return control_node_payload_stmt(input, b"accept");
     }
     if starts_with_keyword(frag, b"send") {
-        return control_node_payload_stmt(input, b"send", "send");
+        return control_node_payload_stmt(input, b"send");
     }
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Tag,
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typed_payload_uses_arena_backed_qualified_reference() {
+        let source = crate::parser::span::test_input("signal : $::Signals::Command");
+        let (rest, payload) = typed_payload_clause(source).expect("typed payload");
+        assert!(rest.fragment().is_empty());
+        assert_eq!(
+            payload
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Signals::Command")
+        );
+    }
 }

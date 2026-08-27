@@ -5,21 +5,22 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Simple Tests/CalculationTest.sysml:14`:
@@ -34,7 +35,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// only `:>>` (redefines) was recognized as a name-standing-in prefix.
 #[test]
 fn gh88_1_reference_subsetting_operator_stands_in_for_name() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def VehiclePart { attribute m; }
             part def Vehicle;
@@ -47,7 +48,7 @@ fn gh88_1_reference_subsetting_operator_stands_in_for_name() {
     let PackageBodyElement::PartUsage(vehicle) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &vehicle.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &vehicle.value.body else {
         panic!("expected brace part usage body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -55,7 +56,7 @@ fn gh88_1_reference_subsetting_operator_stands_in_for_name() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "m");
+    assert!(attr.name.is_none());
     assert!(attr.references.is_some());
 }
 
@@ -72,7 +73,7 @@ fn gh88_1_reference_subsetting_operator_stands_in_for_name() {
 /// 'constant'?`).
 #[test]
 fn gh88_2_derived_constant_ref_attribute_modifier_stack() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             part def A {
                 constant attribute x[0..2];
@@ -83,7 +84,7 @@ fn gh88_2_derived_constant_ref_attribute_modifier_stack() {
     let PackageBodyElement::PartDef(a) = &elements[0] else {
         panic!("expected PartDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &a.value.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &a.value.body else {
         panic!("expected brace part def body");
     };
     let y = elements
@@ -92,7 +93,7 @@ fn gh88_2_derived_constant_ref_attribute_modifier_stack() {
             sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a) => Some(&a.value),
             _ => None,
         })
-        .find(|a| a.name == "y")
+        .find(|a| a.name.and_then(|n| doc.declaration_name(n)) == Some("y"))
         .expect("expected attribute y");
     assert!(y.is_derived);
     assert!(y.is_constant);
@@ -109,7 +110,7 @@ fn gh88_2_derived_constant_ref_attribute_modifier_stack() {
 /// Previously: `abstract` was not recognized as a valid attribute-usage prefix at all.
 #[test]
 fn gh88_3_abstract_prefix_on_plain_attribute_usage() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             part def CompositeThing;
             part filteredMassThing : CompositeThing {
@@ -120,7 +121,7 @@ fn gh88_3_abstract_prefix_on_plain_attribute_usage() {
     let PackageBodyElement::PartUsage(p) = &elements[1] else {
         panic!("expected PartUsage, got {:?}", elements[1]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &p.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &p.value.body else {
         panic!("expected brace part usage body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -128,7 +129,10 @@ fn gh88_3_abstract_prefix_on_plain_attribute_usage() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "minMass");
+    assert_eq!(
+        attr.name.and_then(|n| doc.declaration_name(n)),
+        Some("minMass")
+    );
     assert_eq!(
         attr.usage_prefix,
         Some(sysml_v2_parser::ast::DefinitionPrefix::Abstract)
@@ -145,7 +149,7 @@ fn gh88_3_abstract_prefix_on_plain_attribute_usage() {
 /// comma-separated multi-target type list already worked via `optional_typings`/`typings`).
 #[test]
 fn gh88_4_directed_ref_with_comma_separated_types() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             part def A;
             part def B;
@@ -157,7 +161,7 @@ fn gh88_4_directed_ref_with_comma_separated_types() {
     let PackageBodyElement::PartDef(c) = &elements[2] else {
         panic!("expected PartDef, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &c.value.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &c.value.body else {
         panic!("expected brace part def body");
     };
     let y = elements.iter().find_map(|e| match &e.value {
@@ -165,9 +169,12 @@ fn gh88_4_directed_ref_with_comma_separated_types() {
         _ => None,
     });
     let y = y.expect("expected a Ref element");
-    assert_eq!(y.name, "y");
+    assert_eq!(y.name.and_then(|n| doc.declaration_name(n)), Some("y"));
     assert_eq!(y.direction, Some(sysml_v2_parser::ast::InOut::In));
-    assert_eq!(y.type_name, "A, B");
+    assert_eq!(
+        y.typing.as_ref().map(|typing| typing.value.target.len()),
+        Some(2)
+    );
 }
 
 /// Real usage: `Geometry Examples/CarWithShapeAndCSG.sysml:84`:
@@ -181,7 +188,7 @@ fn gh88_4_directed_ref_with_comma_separated_types() {
 /// to opaque recovery.
 #[test]
 fn gh88_5_unnamed_attribute_subsets_usage() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def Q {
                 attribute :> differencesOf[1];
@@ -191,7 +198,7 @@ fn gh88_5_unnamed_attribute_subsets_usage() {
     let PackageBodyElement::PartDef(q) = &elements[0] else {
         panic!("expected PartDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &q.value.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &q.value.body else {
         panic!("expected brace part def body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -199,7 +206,7 @@ fn gh88_5_unnamed_attribute_subsets_usage() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "differencesOf");
+    assert!(attr.name.is_none());
     assert!(attr.subsets.is_some());
     assert!(attr.multiplicity.is_some());
 }

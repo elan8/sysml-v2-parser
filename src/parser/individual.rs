@@ -14,7 +14,6 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
         input,
         DefinitionPrefixOptions::new(b"individual")
             .def_required()
-            .no_abstract()
             .with_captured_visibility(),
     )?;
     let (input, body) = attribute_body(input)?;
@@ -24,6 +23,7 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
             start,
             input,
             IndividualDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -36,10 +36,9 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on IndividualDef ---

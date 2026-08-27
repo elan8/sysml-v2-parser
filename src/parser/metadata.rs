@@ -1,11 +1,12 @@
 //! Metadata definition and usage parsing (BNF MetadataDefinition / MetadataUsage).
 
 use crate::ast::{Membership, MetadataDef, MetadataUsage, Node};
-use crate::parser::attribute::metadata_body;
+use crate::parser::attribute::metadata_body as attribute_metadata_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::parse_about_targets;
+use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -14,22 +15,29 @@ use nom::IResult;
 use nom::Parser;
 
 /// Metadata definition: `metadata def` Identification body (optional `abstract` prefix).
+///
+/// `MetadataDefinition = ( isAbstract ?= 'abstract' )? DefinitionExtensionKeyword* 'metadata' 'def'
+/// Definition` (SysML BNF 1652; Pilot `SysML.xtext` 121) is one of only two definition productions
+/// in the pin that does *not* reach `BasicDefinitionPrefix`: it inlines the `abstract` flag and has
+/// no `variation` alternative, so this is the one definition kind whose prefix is genuinely a
+/// boolean rather than a one-of-two slot. See [`crate::parser::definition_prefix::BasicPrefixSlot`].
 pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
         DefinitionPrefixOptions::new(b"metadata")
             .def_required()
+            .abstract_only_prefix()
             .with_captured_visibility(),
     )?;
-    let (input, body) = metadata_body(input)?;
+    let (input, body) = attribute_metadata_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             MetadataDef {
-                is_abstract: prefix.is_abstract,
+                is_abstract: prefix.basic_prefix.is_some(),
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -60,7 +68,7 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
             input,
             MetadataUsage {
                 name,
-                type_name: header.type_name,
+                type_reference: header.type_reference,
                 about_targets,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
@@ -72,10 +80,9 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on MetadataDef/MetadataUsage ---

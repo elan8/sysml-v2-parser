@@ -1,0 +1,3575 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "Standard Library: Domain Libraries/Quantities and Units/ISQThermodynamics"))
+~~~
+# SOURCE
+~~~sysml
+standard library package ISQThermodynamics {
+    doc
+    /*
+     * International System of Quantities and Units
+     * Generated on 2025-03-13T15:00:05Z from standard ISO-80000-5:2019 "Thermodynamics"
+     * see also https://www.iso.org/standard/64976.html
+     * 
+     * Note 1: In documentation comments, AsciiMath notation (see http://asciimath.org/) is used for mathematical concepts,
+     * with Greek letters in Unicode encoding. In running text, AsciiMath is placed between backticks.
+     * Note 2: For vector and tensor quantities currently the unit and quantity value type for their (scalar) magnitude is 
+     * defined, as well as their typical Cartesian 3d VectorMeasurementReference (i.e. coordinate system) 
+     * or TensorMeasurementReference.
+     */
+
+    private import ScalarValues::Real;
+    private import Quantities::*;
+    private import MeasurementReferences::*;
+    private import ISQBase::*;
+
+    /* Quantity definitions referenced from other ISQ packages */
+
+
+    /* ISO-80000-5 item 5-1 thermodynamic temperature, temperature */
+    /* See package ISQBase for the declarations of ThermodynamicTemperatureValue and ThermodynamicTemperatureUnit */
+
+    alias TemperatureUnit for ThermodynamicTemperatureUnit;
+    alias TemperatureValue for ThermodynamicTemperatureValue;
+    alias temperature for thermodynamicTemperature;
+
+    /* ISO-80000-5 item 5-2 Celsius temperature */
+    attribute def CelsiusTemperatureValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-2 Celsius temperature
+         * symbol(s): `t`, `θ`
+         * application domain: generic
+         * name: CelsiusTemperature
+         * quantity dimension: Θ^1
+         * measurement unit(s): °C
+         * tensor order: 0
+         * definition: temperature difference from the thermodynamic temperature of the ice point is called the Celsius temperature t, which is defined by the quantity equation: `t = T - T_0` where `T` is thermodynamic temperature (item 5-1) and `T_0 = 273,15 K`
+         * remarks: The unit degree Celsius is a special name for the kelvin for use in stating values of Celsius temperature. The unit degree Celsius is by definition equal in magnitude to the kelvin. A difference or interval of temperature may be expressed in kelvin or in degrees Celsius. The thermodynamic temperature `T_0` is 0,01 K below the thermodynamic temperature of the triple point of water. The symbol °C for the degree Celsius shall be preceded by a space (see ISO 80000-1). Prefixes are not allowed in combination with the unit °C.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: CelsiusTemperatureUnit[1];
+    }
+
+    attribute celsiusTemperature: CelsiusTemperatureValue[*] nonunique :> scalarQuantities;
+
+    attribute def CelsiusTemperatureUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = 1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = thermodynamicTemperaturePF; }
+    }
+
+    /* ISO-80000-5 item 5-3.1 linear expansion coefficient */
+    attribute def LinearExpansionCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-3.1 linear expansion coefficient
+         * symbol(s): `α_l`
+         * application domain: generic
+         * name: LinearExpansionCoefficient
+         * quantity dimension: Θ^-1
+         * measurement unit(s): K^-1
+         * tensor order: 0
+         * definition: relative change of length with temperature: `α_l = 1/l * (dl)/(dT)` where l is length (ISO 80000-3) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: LinearExpansionCoefficientUnit[1];
+    }
+
+    attribute linearExpansionCoefficient: LinearExpansionCoefficientValue[*] nonunique :> scalarQuantities;
+
+    attribute def LinearExpansionCoefficientUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = thermodynamicTemperaturePF; }
+    }
+
+    /* ISO-80000-5 item 5-3.2 cubic expansion coefficient */
+    attribute def CubicExpansionCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-3.2 cubic expansion coefficient
+         * symbol(s): `α_V`, `γ`
+         * application domain: generic
+         * name: CubicExpansionCoefficient
+         * quantity dimension: Θ^-1
+         * measurement unit(s): K^-1
+         * tensor order: 0
+         * definition: relative change of volume with temperature: `α_V = 1/V * (dV)/(dT)` where `V` is volume (ISO 80000-3) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: Also called volumetric expansion coefficient. The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: CubicExpansionCoefficientUnit[1];
+    }
+
+    attribute cubicExpansionCoefficient: CubicExpansionCoefficientValue[*] nonunique :> scalarQuantities;
+
+    attribute def CubicExpansionCoefficientUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = thermodynamicTemperaturePF; }
+    }
+
+    /* ISO-80000-5 item 5-3.3 relative pressure coefficient */
+    attribute def RelativePressureCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-3.3 relative pressure coefficient
+         * symbol(s): `α_p`
+         * application domain: generic
+         * name: RelativePressureCoefficient
+         * quantity dimension: Θ^-1
+         * measurement unit(s): K^-1
+         * tensor order: 0
+         * definition: relative change of pressure with temperature at constant volume: `α_p = 1/p * ((partial p)/(partial T))_V` where `p` is pressure (ISO 80000-4), `T` is thermodynamic temperature (item 5-1), and `V` is volume (ISO 80000-3)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: RelativePressureCoefficientUnit[1];
+    }
+
+    attribute relativePressureCoefficient: RelativePressureCoefficientValue[*] nonunique :> scalarQuantities;
+
+    attribute def RelativePressureCoefficientUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = thermodynamicTemperaturePF; }
+    }
+
+    /* ISO-80000-5 item 5-4 pressure coefficient */
+    attribute def PressureCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-4 pressure coefficient
+         * symbol(s): `β`
+         * application domain: generic
+         * name: PressureCoefficient
+         * quantity dimension: L^-1*M^1*T^-2*Θ^-1
+         * measurement unit(s): Pa/K, kg*m^-1*s^-2*K^-1
+         * tensor order: 0
+         * definition: change of pressure with temperature at constant volume: `β = ((partial p)/(partial T))_V` where `p` is pressure (ISO 80000-4), `T` is thermodynamic temperature (item 5-1), and `V` is volume (ISO 80000-3)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: PressureCoefficientUnit[1];
+    }
+
+    attribute pressureCoefficient: PressureCoefficientValue[*] nonunique :> scalarQuantities;
+
+    attribute def PressureCoefficientUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = -1; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-5.1 isothermal compressibility */
+    attribute def IsothermalCompressibilityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-5.1 isothermal compressibility
+         * symbol(s): `ϰ_T`
+         * application domain: generic
+         * name: IsothermalCompressibility
+         * quantity dimension: L^1*M^-1*T^2
+         * measurement unit(s): Pa^-1, kg^-1*m*s^2
+         * tensor order: 0
+         * definition: negative relative change of volume with pressure at constant temperature: `ϰ_T = -1/V * ((partial V)/(partial p))_T` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `T` is thermodynamic temperature (item 5-1)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: IsothermalCompressibilityUnit[1];
+    }
+
+    attribute isothermalCompressibility: IsothermalCompressibilityValue[*] nonunique :> scalarQuantities;
+
+    attribute def IsothermalCompressibilityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 1; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = -1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = 2; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-5.2 isentropic compressibility */
+    attribute def IsentropicCompressibilityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-5.2 isentropic compressibility
+         * symbol(s): `ϰ_S`
+         * application domain: generic
+         * name: IsentropicCompressibility
+         * quantity dimension: L^1*M^-1*T^2
+         * measurement unit(s): Pa^-1, kg^-1*m*s^2
+         * tensor order: 0
+         * definition: negative relative change of volume with pressure at constant entropy: `ϰ_S = -1/V * ((partial V)/(partial p))_S` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `S` is entropy (item 5-18)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: IsentropicCompressibilityUnit[1];
+    }
+
+    attribute isentropicCompressibility: IsentropicCompressibilityValue[*] nonunique :> scalarQuantities;
+
+    attribute def IsentropicCompressibilityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 1; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = -1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = 2; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-6.1 heat, amount of heat */
+    attribute heat: EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-6.1 heat, amount of heat
+         * symbol(s): `Q`
+         * application domain: generic
+         * name: Heat (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: difference between the increase in the internal energy (item 5-20.2) of a system and the work (ISO 80000-4) done on the system, provided that the amounts of substances within the system are not changed
+         * remarks: The heat transferred in an isothermal phase transformation should be expressed as the change in the appropriate state functions, e.g. `T ΔS`, where `T` is thermodynamic temperature (item 5-1) and `S` is entropy (item 5-18), or `ΔH`, where `H` is enthalpy (item 5-20.3). NOTE A supply of heat can correspond to an increase in thermodynamic temperature or to other effects, such as phase change or chemical processes; see item 5-6.2.
+         */
+    }
+
+    alias amountOfHeat for heat;
+
+    /* ISO-80000-5 item 5-6.2 latent heat */
+    attribute latentHeat: EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-6.2 latent heat
+         * symbol(s): `Q`
+         * application domain: generic
+         * name: LatentHeat (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: energy released or absorbed by a system during a constant-temperature process
+         * remarks: Examples of latent heat are latent heat of fusion (melting) and latent heat of vaporization (boiling).
+         */
+    }
+
+    /* ISO-80000-5 item 5-7 heat flow rate */
+    attribute def HeatFlowRateValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-7 heat flow rate
+         * symbol(s): `dot(Q)`
+         * application domain: generic
+         * name: HeatFlowRate
+         * quantity dimension: L^2*M^1*T^-3
+         * measurement unit(s): W, J/s, kg*m^2*s^-3
+         * tensor order: 0
+         * definition: time rate at which heat (item 5-6.1) crosses a given surface
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: HeatFlowRateUnit[1];
+    }
+
+    attribute heatFlowRate: HeatFlowRateValue[*] nonunique :> scalarQuantities;
+
+    attribute def HeatFlowRateUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -3; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-8 density of heat flow rate */
+    attribute def DensityOfHeatFlowRateValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-8 density of heat flow rate
+         * symbol(s): `q`, `φ`
+         * application domain: generic
+         * name: DensityOfHeatFlowRate
+         * quantity dimension: M^1*T^-3
+         * measurement unit(s): W/m^2, kg*s^-3
+         * tensor order: 0
+         * definition: quotient of heat flow rate and area: `q = dot Q / A` where `dot Q` is heat flow rate (item 5-7) and A is area (ISO 80000-3) of a given surface
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: DensityOfHeatFlowRateUnit[1];
+    }
+
+    attribute densityOfHeatFlowRate: DensityOfHeatFlowRateValue[*] nonunique :> scalarQuantities;
+
+    attribute def DensityOfHeatFlowRateUnit :> DerivedUnit {
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -3; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (massPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-9 thermal conductivity */
+    attribute def ThermalConductivityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-9 thermal conductivity
+         * symbol(s): `λ_l`, `(ϰ)`
+         * application domain: generic
+         * name: ThermalConductivity
+         * quantity dimension: L^1*M^1*T^-3*Θ^-1
+         * measurement unit(s): W/(m*K), kg*m*s^-3*K^-1
+         * tensor order: 0
+         * definition: quotient of density of heat flow rate (item 5-8) and thermodynamic temperature gradient that has the same direction as the heat flow
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: ThermalConductivityUnit[1];
+    }
+
+    attribute thermalConductivity: ThermalConductivityValue[*] nonunique :> scalarQuantities;
+
+    attribute def ThermalConductivityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 1; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -3; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-10.1 coefficient of heat transfer */
+    attribute def CoefficientOfHeatTransferValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-10.1 coefficient of heat transfer
+         * symbol(s): `K`, `(k)`
+         * application domain: generic
+         * name: CoefficientOfHeatTransfer
+         * quantity dimension: M^1*T^-3*Θ^-1
+         * measurement unit(s): W/(m^2*K), kg*s^-3*K^-1
+         * tensor order: 0
+         * definition: quotient of density of heat flow rate (item 5-8) and thermodynamic temperature (item 5-1) difference
+         * remarks: In building technology, the coefficient of heat transfer is often called thermal transmittance, with the symbol U (no longer recommended). See remark to item 5-13.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: CoefficientOfHeatTransferUnit[1];
+    }
+
+    attribute coefficientOfHeatTransfer: CoefficientOfHeatTransferValue[*] nonunique :> scalarQuantities;
+
+    attribute def CoefficientOfHeatTransferUnit :> DerivedUnit {
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -3; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-10.2 surface coefficient of heat transfer */
+    attribute def SurfaceCoefficientOfHeatTransferValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-10.2 surface coefficient of heat transfer
+         * symbol(s): `h`, `(α)`
+         * application domain: generic
+         * name: SurfaceCoefficientOfHeatTransfer
+         * quantity dimension: M^1*T^-3*Θ^-1
+         * measurement unit(s): W/(m^2*K), kg*s^-3*K^-1
+         * tensor order: 0
+         * definition: quotient of density of heat flow rate and the difference of the temperature at the surface and a reference temperature: `h = q / (T_s - T_r)` where q is density of heat flow rate (item 5-8), `T_s` is the thermodynamic temperature (item 5-1) at the surface, and `T_r` is a reference thermodynamic temperature characterizing the adjacent surroundings
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SurfaceCoefficientOfHeatTransferUnit[1];
+    }
+
+    attribute surfaceCoefficientOfHeatTransfer: SurfaceCoefficientOfHeatTransferValue[*] nonunique :> scalarQuantities;
+
+    attribute def SurfaceCoefficientOfHeatTransferUnit :> DerivedUnit {
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -3; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-11 thermal insulance, coefficient of thermal insulance */
+    attribute def ThermalInsulanceValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-11 thermal insulance, coefficient of thermal insulance
+         * symbol(s): `M`
+         * application domain: generic
+         * name: ThermalInsulance
+         * quantity dimension: M^-1*T^3*Θ^1
+         * measurement unit(s): m^2*K/W, kg^-1*s^3*K
+         * tensor order: 0
+         * definition: inverse of coefficient of heat transfer `K`: `M = 1/K` where `K` is coefficient of heat transfer (item 5-10.1)
+         * remarks: In building technology, this quantity is often called thermal resistance, with the symbol R.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: ThermalInsulanceUnit[1];
+    }
+
+    attribute thermalInsulance: ThermalInsulanceValue[*] nonunique :> scalarQuantities;
+
+    attribute def ThermalInsulanceUnit :> DerivedUnit {
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = -1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = 3; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = 1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    alias CoefficientOfThermalInsulanceUnit for ThermalInsulanceUnit;
+    alias CoefficientOfThermalInsulanceValue for ThermalInsulanceValue;
+    alias coefficientOfThermalInsulance for thermalInsulance;
+
+    /* ISO-80000-5 item 5-12 thermal resistance */
+    attribute def ThermalResistanceValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-12 thermal resistance
+         * symbol(s): `R`
+         * application domain: generic
+         * name: ThermalResistance
+         * quantity dimension: L^-2*M^-1*T^3*Θ^1
+         * measurement unit(s): K/W, kg^-1*m^-2*s^3*K
+         * tensor order: 0
+         * definition: quotient of thermodynamic temperature (item 5-1) difference and heat flow rate (item 5-7)
+         * remarks: See remark to item 5-11.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: ThermalResistanceUnit[1];
+    }
+
+    attribute thermalResistance: ThermalResistanceValue[*] nonunique :> scalarQuantities;
+
+    attribute def ThermalResistanceUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = -2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = -1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = 3; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = 1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-13 thermal conductance */
+    attribute def ThermalConductanceValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-13 thermal conductance
+         * symbol(s): `G`, `(H)`
+         * application domain: generic
+         * name: ThermalConductance
+         * quantity dimension: L^2*M^1*T^-3*Θ^-1
+         * measurement unit(s): W/K, kg*m^2*s^-3*K^-1
+         * tensor order: 0
+         * definition: inverse of thermal resistance `R`: `G = 1/R` where `R` is thermal resistance (item 5-12)
+         * remarks: See remark to item 5-11. This quantity is also called heat transfer coefficient. See item 5-10.1.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: ThermalConductanceUnit[1];
+    }
+
+    attribute thermalConductance: ThermalConductanceValue[*] nonunique :> scalarQuantities;
+
+    attribute def ThermalConductanceUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -3; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-14 thermal diffusivity */
+    attribute def ThermalDiffusivityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-14 thermal diffusivity
+         * symbol(s): `a`
+         * application domain: generic
+         * name: ThermalDiffusivity
+         * quantity dimension: L^2*T^-1
+         * measurement unit(s): m^2*s^-1
+         * tensor order: 0
+         * definition: quotient of thermal conductivity and the product of mass density and specific heat capacity: `a = λ / (ρ C_p)` where `λ` is thermal conductivity (item 5-9), `ρ` is mass density (ISO 80000-4), and `c_p` is specific heat capacity at constant pressure (item 5-16.2)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: ThermalDiffusivityUnit[1];
+    }
+
+    attribute thermalDiffusivity: ThermalDiffusivityValue[*] nonunique :> scalarQuantities;
+
+    attribute def ThermalDiffusivityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-15 heat capacity */
+    attribute def HeatCapacityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-15 heat capacity
+         * symbol(s): `C`
+         * application domain: generic
+         * name: HeatCapacity
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: derivative of added heat with respect to thermodynamic temperature of a system: `C = (dQ)/(dT)` where `Q` is amount of heat (item 5-6.1) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: Heat capacity is not completely defined unless specified as seen in items 5-16.2, 5-16.3 and 5-16.4.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: HeatCapacityUnit[1];
+    }
+
+    attribute heatCapacity: HeatCapacityValue[*] nonunique :> scalarQuantities;
+
+    attribute def HeatCapacityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-16.1 specific heat capacity */
+    attribute def SpecificHeatCapacityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.1 specific heat capacity
+         * symbol(s): `c`
+         * application domain: generic
+         * name: SpecificHeatCapacity
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of heat capacity and mass: `c = C/m` where `C` is heat capacity (item 5-15) and `m` is mass (ISO 80000-4)
+         * remarks: For the corresponding quantities related to the amount of substance, see ISO 80000-9.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificHeatCapacityUnit[1];
+    }
+
+    attribute specificHeatCapacity: SpecificHeatCapacityValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificHeatCapacityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-16.2 specific heat capacity at constant pressure */
+    attribute def SpecificHeatCapacityAtConstantPressureValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.2 specific heat capacity at constant pressure
+         * symbol(s): `c_p`
+         * application domain: generic
+         * name: SpecificHeatCapacityAtConstantPressure
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: specific heat capacity (item 5-16.1) at constant pressure (ISO 80000-4)
+         * remarks: Also called specific isobaric heat capacity.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificHeatCapacityAtConstantPressureUnit[1];
+    }
+
+    attribute specificHeatCapacityAtConstantPressure: SpecificHeatCapacityAtConstantPressureValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificHeatCapacityAtConstantPressureUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-16.3 specific heat capacity at constant volume */
+    attribute def SpecificHeatCapacityAtConstantVolumeValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.3 specific heat capacity at constant volume
+         * symbol(s): `c_V`
+         * application domain: generic
+         * name: SpecificHeatCapacityAtConstantVolume
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: specific heat capacity (item 5-16.1) at constant volume (ISO 80000-3)
+         * remarks: Also called specific isochoric heat capacity.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificHeatCapacityAtConstantVolumeUnit[1];
+    }
+
+    attribute specificHeatCapacityAtConstantVolume: SpecificHeatCapacityAtConstantVolumeValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificHeatCapacityAtConstantVolumeUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-16.4 specific heat capacity at saturated vapour pressure */
+    attribute def SpecificHeatCapacityAtSaturatedVapourPressureValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.4 specific heat capacity at saturated vapour pressure
+         * symbol(s): `c_"sat"`
+         * application domain: generic
+         * name: SpecificHeatCapacityAtSaturatedVapourPressure
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: specific heat capacity (item 5-16.1) at saturated vapour pressure (ISO 80000-4)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificHeatCapacityAtSaturatedVapourPressureUnit[1];
+    }
+
+    attribute specificHeatCapacityAtSaturatedVapourPressure: SpecificHeatCapacityAtSaturatedVapourPressureValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificHeatCapacityAtSaturatedVapourPressureUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-17.1 ratio of specific heat capacities */
+    attribute def RatioOfSpecificHeatCapacitiesValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-17.1 ratio of specific heat capacities
+         * symbol(s): `γ`
+         * application domain: generic
+         * name: RatioOfSpecificHeatCapacities (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of specific heat capacity at constant pressure and specific heat capacity at constant volume: `γ = c_p/c_V` where `c_p` is specific heat capacity at constant pressure (item 5-16.2) and `c_V` is specific heat capacity at constant volume (item 5-16.3)
+         * remarks: This quantity can also be expressed by `γ = C_p/C_V` where `C_p` is heat capacity at constant pressure and `C_V` is heat capacity at constant volume.
+         */
+    }
+    attribute ratioOfSpecificHeatCapacities: RatioOfSpecificHeatCapacitiesValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-17.2 isentropic exponent, isentropic expansion factor */
+    attribute def IsentropicExponentValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-17.2 isentropic exponent, isentropic expansion factor
+         * symbol(s): `ϰ`
+         * application domain: generic
+         * name: IsentropicExponent (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: the negative of relative pressure change, divided by relative volume change, at constant entropy: `ϰ = -V/p * ((partial p)/(partial V))_S` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `S` is entropy (item 5-18)
+         * remarks: For an ideal gas, `ϰ` is equal to `γ` (item 5-17.1).
+         */
+    }
+    attribute isentropicExponent: IsentropicExponentValue :> scalarQuantities;
+
+    alias isentropicExpansionFactor for isentropicExponent;
+
+    /* ISO-80000-5 item 5-18 entropy */
+    attribute def EntropyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-18 entropy
+         * symbol(s): `S`
+         * application domain: generic
+         * name: Entropy
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: natural logarithm of number of equally probable microscopic configurations in a macroscopic system, multiplied by the Boltzmann constant: `S = k lnW` where `W` is number of configurations and `k` is the Boltzmann constant (ISO 80000-1)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: EntropyUnit[1];
+    }
+
+    attribute entropy: EntropyValue[*] nonunique :> scalarQuantities;
+
+    attribute def EntropyUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-19 specific entropy */
+    attribute def SpecificEntropyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-19 specific entropy
+         * symbol(s): `s`
+         * application domain: generic
+         * name: SpecificEntropy
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of entropy and mass: `s = S/m` where `S` is entropy (item 5-18) and `m` is mass (ISO 80000-4)
+         * remarks: For the corresponding quantity related to amount of substance, see ISO 80000-9.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificEntropyUnit[1];
+    }
+
+    attribute specificEntropy: SpecificEntropyValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificEntropyUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-20.1 energy */
+    attribute def EnergyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-20.1 energy
+         * symbol(s): `E`
+         * application domain: thermodynamics
+         * name: Energy
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: ability of a system to do work (ISO 80000-4)
+         * remarks: Energy exists in different forms that are mutually transformable into each other, either totally or partially. In contrast to internal energy (item 5-20.2), energy is not a state function.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: EnergyUnit[1];
+    }
+
+    attribute energy: EnergyValue[*] nonunique :> scalarQuantities;
+
+    attribute def EnergyUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-20.2 internal energy, thermodynamic energy */
+    attribute internalEnergy: EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.2 internal energy, thermodynamic energy
+         * symbol(s): `U`
+         * application domain: generic
+         * name: InternalEnergy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: energy of a system whose change is given by the amount of the heat (item 5-6.1) transferred to the system and the work (ISO 80000-4) done on the system, provided that the system is closed and no chemical reactions occur
+         * remarks: In thermodynamic text books, usually the formula `ΔU = Q + W` is used. Note that the zero of the energy is undefined.
+         */
+    }
+
+    alias thermodynamicEnergy for internalEnergy;
+
+    /* ISO-80000-5 item 5-20.3 enthalpy */
+    attribute enthalpy: EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.3 enthalpy
+         * symbol(s): `H`
+         * application domain: generic
+         * name: Enthalpy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: sum of internal energy of the system and the product of pressure and volume of the system: `H = U + p*V` where U is internal energy (item 5-20.2), `p` is pressure (ISO 80000-4), and `V` is volume (ISO 80000-3)
+         * remarks: None.
+         */
+    }
+
+    /* ISO-80000-5 item 5-20.4 Helmholtz energy, Helmholtz function */
+    attribute helmholtzEnergy: EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.4 Helmholtz energy, Helmholtz function
+         * symbol(s): `A`, `F`
+         * application domain: generic
+         * name: HelmholtzEnergy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: difference of internal energy of the system and the product of thermodynamic temperature and entropy of the system: `A = U - TS` where `U` is internal energy (item 5-20.2), `T` is thermodynamic temperature (item 5-1), and `S` is entropy (item 5-18)
+         * remarks: The name Helmholtz free energy is also used. However, this term is not recommended.
+         */
+    }
+
+    alias helmholtzFunction for helmholtzEnergy;
+
+    /* ISO-80000-5 item 5-20.5 Gibbs energy, Gibbs function */
+    attribute gibbsEnergy: EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.5 Gibbs energy, Gibbs function
+         * symbol(s): `G`
+         * application domain: generic
+         * name: GibbsEnergy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: difference of the enthalpy and the product of thermodynamic temperature and entropy of the system: `G = H - T*S` where H is enthalpy (item 5-20.3), `T` is thermodynamic temperature (item 5-1), and `S` is entropy (item 5-18)
+         * remarks: The name Gibbs free energy is also used. However, this term is not recommended.
+         */
+    }
+
+    alias gibbsFunction for gibbsEnergy;
+
+    /* ISO-80000-5 item 5-21.1 specific energy */
+    attribute def SpecificEnergyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-21.1 specific energy
+         * symbol(s): `e`
+         * application domain: generic
+         * name: SpecificEnergy
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of energy and mass: `e = E/m` where `E` is energy (item 5-20.1) and `m` is mass (ISO 80000-4)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificEnergyUnit[1];
+    }
+
+    attribute specificEnergy: SpecificEnergyValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificEnergyUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-21.2 specific internal energy, specific thermodynamic energy */
+    attribute specificInternalEnergy: SpecificEnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-21.2 specific internal energy, specific thermodynamic energy
+         * symbol(s): `u`
+         * application domain: generic
+         * name: SpecificInternalEnergy (specializes SpecificEnergy)
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of internal energy and mass: `u = U/m` where `U` is internal energy (item 5-20.2) and `m` is mass (ISO 80000-4)
+         * remarks: None.
+         */
+    }
+
+    alias specificThermodynamicEnergy for specificInternalEnergy;
+
+    /* ISO-80000-5 item 5-21.3 specific enthalpy */
+    attribute def SpecificEnthalpyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-21.3 specific enthalpy
+         * symbol(s): `h`
+         * application domain: generic
+         * name: SpecificEnthalpy
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of enthalpy and mass: `h = H/m` where `H` is enthalpy (item 5-20.3) and `m` is mass (ISO 80000-4)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificEnthalpyUnit[1];
+    }
+
+    attribute specificEnthalpy: SpecificEnthalpyValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificEnthalpyUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF); }
+    }
+
+    /* ISO-80000-5 item 5-21.4 specific Helmholtz energy, specific Helmholtz function */
+    attribute specificHelmholtzEnergy: SpecificEnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-21.4 specific Helmholtz energy, specific Helmholtz function
+         * symbol(s): `a`, `f`
+         * application domain: generic
+         * name: SpecificHelmholtzEnergy (specializes SpecificEnergy)
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of Helmholtz energy and mass: `a = A/m` where A is Helmholtz energy (item 5-20.4) and m is mass (ISO 80000-4)
+         * remarks: The name specific Helmholtz free energy is also used. However, this term is not recommended.
+         */
+    }
+
+    alias specificHelmholtzFunction for specificHelmholtzEnergy;
+
+    /* ISO-80000-5 item 5-21.5 specific Gibbs energy, specific Gibbs function */
+    attribute specificGibbsEnergy: SpecificEnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-21.5 specific Gibbs energy, specific Gibbs function
+         * symbol(s): `g`
+         * application domain: generic
+         * name: SpecificGibbsEnergy (specializes SpecificEnergy)
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of Gibbs energy and mass: `g = G/m` where `G` is Gibbs energy (item 5-20.5) and `m` is mass (ISO 80000-4)
+         * remarks: The name specific Gibbs free energy is also used. However, this term is not recommended.
+         */
+    }
+
+    alias specificGibbsFunction for specificGibbsEnergy;
+
+    /* ISO-80000-5 item 5-22 Massieu function */
+    attribute def MassieuFunctionValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-22 Massieu function
+         * symbol(s): `J`
+         * application domain: generic
+         * name: MassieuFunction
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of the negative of Helmholtz energy and temperature: `J = -A/T` where `A` is Helmholtz energy (item 5-20.4) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: MassieuFunctionUnit[1];
+    }
+
+    attribute massieuFunction: MassieuFunctionValue[*] nonunique :> scalarQuantities;
+
+    attribute def MassieuFunctionUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-23 Planck function */
+    attribute def PlanckFunctionValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-23 Planck function
+         * symbol(s): `Y`
+         * application domain: generic
+         * name: PlanckFunction
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of the negative of Gibbs energy and temperature: `Y = -G/T` where G is Gibbs energy (item 5-20.5) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: PlanckFunctionUnit[1];
+    }
+
+    attribute planckFunction: PlanckFunctionValue[*] nonunique :> scalarQuantities;
+
+    attribute def PlanckFunctionUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-24 Joule-Thomson coefficient */
+    attribute def JouleThomsonCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-24 Joule-Thomson coefficient
+         * symbol(s): `μ_"JT"`
+         * application domain: generic
+         * name: JouleThomsonCoefficient
+         * quantity dimension: L^1*M^-1*T^2*Θ^1
+         * measurement unit(s): K/Pa, kg^-1*m*s^2*K
+         * tensor order: 0
+         * definition: change of thermodynamic temperature with respect to pressure in a Joule-Thomson process at constant enthalpy: `μ_(JT) = ((partial T)/(partial p))_H` where `T` is thermodynamic temperature (item 5-1), `p` is pressure (ISO 80000-4) and H is enthalpy (item 5-20.3)
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: JouleThomsonCoefficientUnit[1];
+    }
+
+    attribute jouleThomsonCoefficient: JouleThomsonCoefficientValue[*] nonunique :> scalarQuantities;
+
+    attribute def JouleThomsonCoefficientUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 1; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = -1; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = 2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = 1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-25.1 thermal efficiency */
+    attribute def ThermalEfficiencyValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-25.1 thermal efficiency
+         * symbol(s): `η`
+         * application domain: thermodynamics
+         * name: ThermalEfficiency (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of work (ISO 80000-4) delivered by a heat engine and supplied heat: `η = W/Q` where `W` is work (ISO 80000-4) and `Q` is heat (item 5-6.1)
+         * remarks: None.
+         */
+    }
+    attribute thermalEfficiency: ThermalEfficiencyValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-25.2 maximum thermal efficiency */
+    attribute def MaximumThermalEfficiencyValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-25.2 maximum thermal efficiency
+         * symbol(s): `η_"max"`
+         * application domain: generic
+         * name: MaximumThermalEfficiency (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: efficiency determined by the quotient of the temperatures of the hot source and the cold sink: `η_max = 1 - T_c/T_h` where `T_c` is the thermodynamic temperature (item 5-1) of the cold sink and `T_h` is the thermodynamic temperature (item 5-1) of the hot source
+         * remarks: An ideal heat engine operating according to the Carnot process is delivering the maximum efficiency.
+         */
+    }
+    attribute maximumThermalEfficiency: MaximumThermalEfficiencyValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-26 specific gas constant */
+    attribute def SpecificGasConstantValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-26 specific gas constant
+         * symbol(s): `R_s`
+         * application domain: generic
+         * name: SpecificGasConstant
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of the Boltzmann constant `k` (ISO 80000-1) and the mass `m` (ISO 80000-4) of the gas particle
+         * remarks: None.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: SpecificGasConstantUnit[1];
+    }
+
+    attribute specificGasConstant: SpecificGasConstantValue[*] nonunique :> scalarQuantities;
+
+    attribute def SpecificGasConstantUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = 2; }
+        private attribute durationPF: QuantityPowerFactor[1] { :>> quantity = isq.T; :>> exponent = -2; }
+        private attribute thermodynamicTemperaturePF: QuantityPowerFactor[1] { :>> quantity = isq.'Θ'; :>> exponent = -1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF); }
+    }
+
+    /* ISO-80000-5 item 5-27 mass concentration of water */
+    attribute def MassConcentrationOfWaterValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-27 mass concentration of water
+         * symbol(s): `w`
+         * application domain: generic
+         * name: MassConcentrationOfWater
+         * quantity dimension: L^-3*M^1
+         * measurement unit(s): kg*m^-3
+         * tensor order: 0
+         * definition: quotient of mass of water and a specified volume: `w = m/V` where `m` is mass (ISO 80000-4) of water, irrespective of the form of aggregation state, and `V` is volume (ISO 80000-3)
+         * remarks: Mass concentration of water at saturation is denoted `w_"sat"`.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: MassConcentrationOfWaterUnit[1];
+    }
+
+    attribute massConcentrationOfWater: MassConcentrationOfWaterValue[*] nonunique :> scalarQuantities;
+
+    attribute def MassConcentrationOfWaterUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = -3; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF); }
+    }
+
+    /* ISO-80000-5 item 5-28 mass concentration of water vapour absolute humidity */
+    attribute def MassConcentrationOfWaterVapourAbsoluteHumidityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-28 mass concentration of water vapour absolute humidity
+         * symbol(s): `v`
+         * application domain: generic
+         * name: MassConcentrationOfWaterVapourAbsoluteHumidity
+         * quantity dimension: L^-3*M^1
+         * measurement unit(s): kg*m^-3
+         * tensor order: 0
+         * definition: quotient of mass of water vapour and a specified volume: `v = m/V` where m is mass (ISO 80000-4) of water vapour and `V` is volume (ISO 80000-3)
+         * remarks: Mass concentration of water vapour at saturation is denoted `v_"sat"`.
+         */
+        attribute :>> num: Real;
+        attribute :>> mRef: MassConcentrationOfWaterVapourAbsoluteHumidityUnit[1];
+    }
+
+    attribute massConcentrationOfWaterVapourAbsoluteHumidity: MassConcentrationOfWaterVapourAbsoluteHumidityValue[*] nonunique :> scalarQuantities;
+
+    attribute def MassConcentrationOfWaterVapourAbsoluteHumidityUnit :> DerivedUnit {
+        private attribute lengthPF: QuantityPowerFactor[1] { :>> quantity = isq.L; :>> exponent = -3; }
+        private attribute massPF: QuantityPowerFactor[1] { :>> quantity = isq.M; :>> exponent = 1; }
+        attribute :>> quantityDimension { :>> quantityPowerFactors = (lengthPF, massPF); }
+    }
+
+    /* ISO-80000-5 item 5-29 mass ratio of water to dry matter */
+    attribute def MassRatioOfWaterToDryMatterValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-29 mass ratio of water to dry matter
+         * symbol(s): `u`
+         * application domain: generic
+         * name: MassRatioOfWaterToDryMatter (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass of water and mass of dry matter: `u = m/m_d` where `m` is mass (ISO 80000-4) of water and `m_d` is mass of dry matter
+         * remarks: Mass ratio of water to dry matter at saturation is denoted `u_"sat"`.
+         */
+    }
+    attribute massRatioOfWaterToDryMatter: MassRatioOfWaterToDryMatterValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-30 mass ratio of water vapour to dry gas */
+    attribute def MassRatioOfWaterVapourToDryGasValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-30 mass ratio of water vapour to dry gas
+         * symbol(s): `r`, `(x)`
+         * application domain: generic
+         * name: MassRatioOfWaterVapourToDryGas (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass of water vapour and mass of dry gas: `r = m/m_d` where `m` is mass (ISO 80000-4) of water vapour and `m_d` is mass of dry gas
+         * remarks: Mass ratio of water vapour to dry gas at saturation is denoted `r_"sat"`. Mass ratio of water vapour to dry gas is also called mixing ratio.
+         */
+    }
+    attribute massRatioOfWaterVapourToDryGas: MassRatioOfWaterVapourToDryGasValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-31 mass fraction of water */
+    attribute def MassFractionOfWaterValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-31 mass fraction of water
+         * symbol(s): `w_(H_(2)O)`
+         * application domain: generic
+         * name: MassFractionOfWater (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quantity given by: `w_(H_(2)O) = u/(1+u)` where `u` is mass ratio of water to dry matter (item 5-29)
+         * remarks: None.
+         */
+    }
+    attribute massFractionOfWater: MassFractionOfWaterValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-32 mass fraction of dry matter */
+    attribute def MassFractionOfDryMatterValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-32 mass fraction of dry matter
+         * symbol(s): `w_d`
+         * application domain: generic
+         * name: MassFractionOfDryMatter (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quantity given by: `w_d = 1 - w_(H_(2)O)` where `w_(H_(2)O)` is mass fraction of water (item 5-31)
+         * remarks: None.
+         */
+    }
+    attribute massFractionOfDryMatter: MassFractionOfDryMatterValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-33 relative humidity */
+    attribute def RelativeHumidityValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-33 relative humidity
+         * symbol(s): `φ`
+         * application domain: generic
+         * name: RelativeHumidity (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of partial pressure of water vapour and partial pressure at its saturation: `φ = p/p_"sat"` where `p` is partial pressure (ISO 80000-4) of vapour and `p_"sat"` is its partial pressure at saturation at the same temperature
+         * remarks: Relative humidity is often referred to as RH and expressed in percent. See also remark in item 5-35.
+         */
+    }
+    attribute relativeHumidity: RelativeHumidityValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-34 relative mass concentration of vapour */
+    attribute def RelativeMassConcentrationOfVapourValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-34 relative mass concentration of vapour
+         * symbol(s): `φ`
+         * application domain: generic
+         * name: RelativeMassConcentrationOfVapour (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass concentration of water vapour and mass concentration at its saturation: `φ = v/v_"sat"` where `v` is mass concentration of water vapour (item 5-28) and `v_"sat"` is its mass concentration of water vapour at saturation of the same temperature
+         * remarks: For water vapour concentrations up to 1 kg/m^3, the relative humidity (item 5-33) is assumed to be equal to relative mass concentration of vapour. For details see Reference [8].
+         */
+    }
+    attribute relativeMassConcentrationOfVapour: RelativeMassConcentrationOfVapourValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-35 relative mass ratio of vapour */
+    attribute def RelativeMassRatioOfVapourValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-35 relative mass ratio of vapour
+         * symbol(s): `ψ`
+         * application domain: generic
+         * name: RelativeMassRatioOfVapour (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass ratio of water vapour to dry gas and mass ratio of water vapour to dry gas at saturation: `ψ = r/r_"sat"` where `r` is mass ratio of water vapour to dry gas (item 5-30) and `r_"sat"` is its mass ratio of water vapour to dry gas at saturation of the same temperature
+         * remarks: This quantity is also used as an approximation of relative humidity (item 5-33).
+         */
+    }
+    attribute relativeMassRatioOfVapour: RelativeMassRatioOfVapourValue :> scalarQuantities;
+
+    /* ISO-80000-5 item 5-36 dew-point temperature */
+    attribute dewPointTemperature: ThermodynamicTemperatureValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-36 dew-point temperature
+         * symbol(s): `T_d`
+         * application domain: generic
+         * name: DewPointTemperature (specializes ThermodynamicTemperature)
+         * quantity dimension: Θ^1
+         * measurement unit(s): K
+         * tensor order: 0
+         * definition: temperature at which water vapour in the air reaches saturation under isobaric conditions
+         * remarks: The corresponding Celsius temperature, denoted `t_d`, is still called dew-point temperature. The unit for the corresponding Celsius temperature is degree Celsius, symbol °C.
+         */
+    }
+
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "isq_thermodynamics.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+standard library package ISQThermodynamics {
+    doc
+    /*
+     * International System of Quantities and Units
+     * Generated on 2025-03-13T15:00:05Z from standard ISO-80000-5:2019 "Thermodynamics"
+     * see also https://www.iso.org/standard/64976.html
+     * 
+     * Note 1: In documentation comments, AsciiMath notation (see http://asciimath.org/) is used for mathematical concepts,
+     * with Greek letters in Unicode encoding. In running text, AsciiMath is placed between backticks.
+     * Note 2: For vector and tensor quantities currently the unit and quantity value type for their (scalar) magnitude is 
+     * defined, as well as their typical Cartesian 3d VectorMeasurementReference (i.e. coordinate system) 
+     * or TensorMeasurementReference.
+     */
+    private import ScalarValues::Real;
+    private import Quantities::*;
+    private import MeasurementReferences::*;
+    private import ISQBase::*;
+    /* Quantity definitions referenced from other ISQ packages */
+    /* ISO-80000-5 item 5-1 thermodynamic temperature, temperature */
+    /* See package ISQBase for the declarations of ThermodynamicTemperatureValue and ThermodynamicTemperatureUnit */
+    alias TemperatureUnit for ThermodynamicTemperatureUnit;
+    alias TemperatureValue for ThermodynamicTemperatureValue;
+    alias temperature for thermodynamicTemperature;
+    /* ISO-80000-5 item 5-2 Celsius temperature */
+    attribute def CelsiusTemperatureValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-2 Celsius temperature
+         * symbol(s): `t`, `θ`
+         * application domain: generic
+         * name: CelsiusTemperature
+         * quantity dimension: Θ^1
+         * measurement unit(s): °C
+         * tensor order: 0
+         * definition: temperature difference from the thermodynamic temperature of the ice point is called the Celsius temperature t, which is defined by the quantity equation: `t = T - T_0` where `T` is thermodynamic temperature (item 5-1) and `T_0 = 273,15 K`
+         * remarks: The unit degree Celsius is a special name for the kelvin for use in stating values of Celsius temperature. The unit degree Celsius is by definition equal in magnitude to the kelvin. A difference or interval of temperature may be expressed in kelvin or in degrees Celsius. The thermodynamic temperature `T_0` is 0,01 K below the thermodynamic temperature of the triple point of water. The symbol °C for the degree Celsius shall be preceded by a space (see ISO 80000-1). Prefixes are not allowed in combination with the unit °C.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : CelsiusTemperatureUnit[1];
+    }
+    attribute celsiusTemperature : CelsiusTemperatureValue[*] nonunique :> scalarQuantities;
+    attribute def CelsiusTemperatureUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = 1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = thermodynamicTemperaturePF;
+        }
+    }
+    /* ISO-80000-5 item 5-3.1 linear expansion coefficient */
+    attribute def LinearExpansionCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-3.1 linear expansion coefficient
+         * symbol(s): `α_l`
+         * application domain: generic
+         * name: LinearExpansionCoefficient
+         * quantity dimension: Θ^-1
+         * measurement unit(s): K^-1
+         * tensor order: 0
+         * definition: relative change of length with temperature: `α_l = 1/l * (dl)/(dT)` where l is length (ISO 80000-3) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : LinearExpansionCoefficientUnit[1];
+    }
+    attribute linearExpansionCoefficient : LinearExpansionCoefficientValue[*] nonunique :> scalarQuantities;
+    attribute def LinearExpansionCoefficientUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = thermodynamicTemperaturePF;
+        }
+    }
+    /* ISO-80000-5 item 5-3.2 cubic expansion coefficient */
+    attribute def CubicExpansionCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-3.2 cubic expansion coefficient
+         * symbol(s): `α_V`, `γ`
+         * application domain: generic
+         * name: CubicExpansionCoefficient
+         * quantity dimension: Θ^-1
+         * measurement unit(s): K^-1
+         * tensor order: 0
+         * definition: relative change of volume with temperature: `α_V = 1/V * (dV)/(dT)` where `V` is volume (ISO 80000-3) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: Also called volumetric expansion coefficient. The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : CubicExpansionCoefficientUnit[1];
+    }
+    attribute cubicExpansionCoefficient : CubicExpansionCoefficientValue[*] nonunique :> scalarQuantities;
+    attribute def CubicExpansionCoefficientUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = thermodynamicTemperaturePF;
+        }
+    }
+    /* ISO-80000-5 item 5-3.3 relative pressure coefficient */
+    attribute def RelativePressureCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-3.3 relative pressure coefficient
+         * symbol(s): `α_p`
+         * application domain: generic
+         * name: RelativePressureCoefficient
+         * quantity dimension: Θ^-1
+         * measurement unit(s): K^-1
+         * tensor order: 0
+         * definition: relative change of pressure with temperature at constant volume: `α_p = 1/p * ((partial p)/(partial T))_V` where `p` is pressure (ISO 80000-4), `T` is thermodynamic temperature (item 5-1), and `V` is volume (ISO 80000-3)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : RelativePressureCoefficientUnit[1];
+    }
+    attribute relativePressureCoefficient : RelativePressureCoefficientValue[*] nonunique :> scalarQuantities;
+    attribute def RelativePressureCoefficientUnit :> DerivedUnit {
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = thermodynamicTemperaturePF;
+        }
+    }
+    /* ISO-80000-5 item 5-4 pressure coefficient */
+    attribute def PressureCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-4 pressure coefficient
+         * symbol(s): `β`
+         * application domain: generic
+         * name: PressureCoefficient
+         * quantity dimension: L^-1*M^1*T^-2*Θ^-1
+         * measurement unit(s): Pa/K, kg*m^-1*s^-2*K^-1
+         * tensor order: 0
+         * definition: change of pressure with temperature at constant volume: `β = ((partial p)/(partial T))_V` where `p` is pressure (ISO 80000-4), `T` is thermodynamic temperature (item 5-1), and `V` is volume (ISO 80000-3)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : PressureCoefficientUnit[1];
+    }
+    attribute pressureCoefficient : PressureCoefficientValue[*] nonunique :> scalarQuantities;
+    attribute def PressureCoefficientUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = -1;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-5.1 isothermal compressibility */
+    attribute def IsothermalCompressibilityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-5.1 isothermal compressibility
+         * symbol(s): `ϰ_T`
+         * application domain: generic
+         * name: IsothermalCompressibility
+         * quantity dimension: L^1*M^-1*T^2
+         * measurement unit(s): Pa^-1, kg^-1*m*s^2
+         * tensor order: 0
+         * definition: negative relative change of volume with pressure at constant temperature: `ϰ_T = -1/V * ((partial V)/(partial p))_T` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `T` is thermodynamic temperature (item 5-1)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : IsothermalCompressibilityUnit[1];
+    }
+    attribute isothermalCompressibility : IsothermalCompressibilityValue[*] nonunique :> scalarQuantities;
+    attribute def IsothermalCompressibilityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 1;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = -1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = 2;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-5.2 isentropic compressibility */
+    attribute def IsentropicCompressibilityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-5.2 isentropic compressibility
+         * symbol(s): `ϰ_S`
+         * application domain: generic
+         * name: IsentropicCompressibility
+         * quantity dimension: L^1*M^-1*T^2
+         * measurement unit(s): Pa^-1, kg^-1*m*s^2
+         * tensor order: 0
+         * definition: negative relative change of volume with pressure at constant entropy: `ϰ_S = -1/V * ((partial V)/(partial p))_S` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `S` is entropy (item 5-18)
+         * remarks: The subscripts in the symbols may be omitted when there is no risk of confusion.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : IsentropicCompressibilityUnit[1];
+    }
+    attribute isentropicCompressibility : IsentropicCompressibilityValue[*] nonunique :> scalarQuantities;
+    attribute def IsentropicCompressibilityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 1;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = -1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = 2;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-6.1 heat, amount of heat */
+    attribute heat : EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-6.1 heat, amount of heat
+         * symbol(s): `Q`
+         * application domain: generic
+         * name: Heat (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: difference between the increase in the internal energy (item 5-20.2) of a system and the work (ISO 80000-4) done on the system, provided that the amounts of substances within the system are not changed
+         * remarks: The heat transferred in an isothermal phase transformation should be expressed as the change in the appropriate state functions, e.g. `T ΔS`, where `T` is thermodynamic temperature (item 5-1) and `S` is entropy (item 5-18), or `ΔH`, where `H` is enthalpy (item 5-20.3). NOTE A supply of heat can correspond to an increase in thermodynamic temperature or to other effects, such as phase change or chemical processes; see item 5-6.2.
+         */
+    }
+    alias amountOfHeat for heat;
+    /* ISO-80000-5 item 5-6.2 latent heat */
+    attribute latentHeat : EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-6.2 latent heat
+         * symbol(s): `Q`
+         * application domain: generic
+         * name: LatentHeat (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: energy released or absorbed by a system during a constant-temperature process
+         * remarks: Examples of latent heat are latent heat of fusion (melting) and latent heat of vaporization (boiling).
+         */
+    }
+    /* ISO-80000-5 item 5-7 heat flow rate */
+    attribute def HeatFlowRateValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-7 heat flow rate
+         * symbol(s): `dot(Q)`
+         * application domain: generic
+         * name: HeatFlowRate
+         * quantity dimension: L^2*M^1*T^-3
+         * measurement unit(s): W, J/s, kg*m^2*s^-3
+         * tensor order: 0
+         * definition: time rate at which heat (item 5-6.1) crosses a given surface
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : HeatFlowRateUnit[1];
+    }
+    attribute heatFlowRate : HeatFlowRateValue[*] nonunique :> scalarQuantities;
+    attribute def HeatFlowRateUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -3;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-8 density of heat flow rate */
+    attribute def DensityOfHeatFlowRateValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-8 density of heat flow rate
+         * symbol(s): `q`, `φ`
+         * application domain: generic
+         * name: DensityOfHeatFlowRate
+         * quantity dimension: M^1*T^-3
+         * measurement unit(s): W/m^2, kg*s^-3
+         * tensor order: 0
+         * definition: quotient of heat flow rate and area: `q = dot Q / A` where `dot Q` is heat flow rate (item 5-7) and A is area (ISO 80000-3) of a given surface
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : DensityOfHeatFlowRateUnit[1];
+    }
+    attribute densityOfHeatFlowRate : DensityOfHeatFlowRateValue[*] nonunique :> scalarQuantities;
+    attribute def DensityOfHeatFlowRateUnit :> DerivedUnit {
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -3;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (massPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-9 thermal conductivity */
+    attribute def ThermalConductivityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-9 thermal conductivity
+         * symbol(s): `λ_l`, `(ϰ)`
+         * application domain: generic
+         * name: ThermalConductivity
+         * quantity dimension: L^1*M^1*T^-3*Θ^-1
+         * measurement unit(s): W/(m*K), kg*m*s^-3*K^-1
+         * tensor order: 0
+         * definition: quotient of density of heat flow rate (item 5-8) and thermodynamic temperature gradient that has the same direction as the heat flow
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : ThermalConductivityUnit[1];
+    }
+    attribute thermalConductivity : ThermalConductivityValue[*] nonunique :> scalarQuantities;
+    attribute def ThermalConductivityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 1;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -3;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-10.1 coefficient of heat transfer */
+    attribute def CoefficientOfHeatTransferValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-10.1 coefficient of heat transfer
+         * symbol(s): `K`, `(k)`
+         * application domain: generic
+         * name: CoefficientOfHeatTransfer
+         * quantity dimension: M^1*T^-3*Θ^-1
+         * measurement unit(s): W/(m^2*K), kg*s^-3*K^-1
+         * tensor order: 0
+         * definition: quotient of density of heat flow rate (item 5-8) and thermodynamic temperature (item 5-1) difference
+         * remarks: In building technology, the coefficient of heat transfer is often called thermal transmittance, with the symbol U (no longer recommended). See remark to item 5-13.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : CoefficientOfHeatTransferUnit[1];
+    }
+    attribute coefficientOfHeatTransfer : CoefficientOfHeatTransferValue[*] nonunique :> scalarQuantities;
+    attribute def CoefficientOfHeatTransferUnit :> DerivedUnit {
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -3;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-10.2 surface coefficient of heat transfer */
+    attribute def SurfaceCoefficientOfHeatTransferValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-10.2 surface coefficient of heat transfer
+         * symbol(s): `h`, `(α)`
+         * application domain: generic
+         * name: SurfaceCoefficientOfHeatTransfer
+         * quantity dimension: M^1*T^-3*Θ^-1
+         * measurement unit(s): W/(m^2*K), kg*s^-3*K^-1
+         * tensor order: 0
+         * definition: quotient of density of heat flow rate and the difference of the temperature at the surface and a reference temperature: `h = q / (T_s - T_r)` where q is density of heat flow rate (item 5-8), `T_s` is the thermodynamic temperature (item 5-1) at the surface, and `T_r` is a reference thermodynamic temperature characterizing the adjacent surroundings
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SurfaceCoefficientOfHeatTransferUnit[1];
+    }
+    attribute surfaceCoefficientOfHeatTransfer : SurfaceCoefficientOfHeatTransferValue[*] nonunique :> scalarQuantities;
+    attribute def SurfaceCoefficientOfHeatTransferUnit :> DerivedUnit {
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -3;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-11 thermal insulance, coefficient of thermal insulance */
+    attribute def ThermalInsulanceValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-11 thermal insulance, coefficient of thermal insulance
+         * symbol(s): `M`
+         * application domain: generic
+         * name: ThermalInsulance
+         * quantity dimension: M^-1*T^3*Θ^1
+         * measurement unit(s): m^2*K/W, kg^-1*s^3*K
+         * tensor order: 0
+         * definition: inverse of coefficient of heat transfer `K`: `M = 1/K` where `K` is coefficient of heat transfer (item 5-10.1)
+         * remarks: In building technology, this quantity is often called thermal resistance, with the symbol R.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : ThermalInsulanceUnit[1];
+    }
+    attribute thermalInsulance : ThermalInsulanceValue[*] nonunique :> scalarQuantities;
+    attribute def ThermalInsulanceUnit :> DerivedUnit {
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = -1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = 3;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = 1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    alias CoefficientOfThermalInsulanceUnit for ThermalInsulanceUnit;
+    alias CoefficientOfThermalInsulanceValue for ThermalInsulanceValue;
+    alias coefficientOfThermalInsulance for thermalInsulance;
+    /* ISO-80000-5 item 5-12 thermal resistance */
+    attribute def ThermalResistanceValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-12 thermal resistance
+         * symbol(s): `R`
+         * application domain: generic
+         * name: ThermalResistance
+         * quantity dimension: L^-2*M^-1*T^3*Θ^1
+         * measurement unit(s): K/W, kg^-1*m^-2*s^3*K
+         * tensor order: 0
+         * definition: quotient of thermodynamic temperature (item 5-1) difference and heat flow rate (item 5-7)
+         * remarks: See remark to item 5-11.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : ThermalResistanceUnit[1];
+    }
+    attribute thermalResistance : ThermalResistanceValue[*] nonunique :> scalarQuantities;
+    attribute def ThermalResistanceUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = -2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = -1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = 3;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = 1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-13 thermal conductance */
+    attribute def ThermalConductanceValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-13 thermal conductance
+         * symbol(s): `G`, `(H)`
+         * application domain: generic
+         * name: ThermalConductance
+         * quantity dimension: L^2*M^1*T^-3*Θ^-1
+         * measurement unit(s): W/K, kg*m^2*s^-3*K^-1
+         * tensor order: 0
+         * definition: inverse of thermal resistance `R`: `G = 1/R` where `R` is thermal resistance (item 5-12)
+         * remarks: See remark to item 5-11. This quantity is also called heat transfer coefficient. See item 5-10.1.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : ThermalConductanceUnit[1];
+    }
+    attribute thermalConductance : ThermalConductanceValue[*] nonunique :> scalarQuantities;
+    attribute def ThermalConductanceUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -3;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-14 thermal diffusivity */
+    attribute def ThermalDiffusivityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-14 thermal diffusivity
+         * symbol(s): `a`
+         * application domain: generic
+         * name: ThermalDiffusivity
+         * quantity dimension: L^2*T^-1
+         * measurement unit(s): m^2*s^-1
+         * tensor order: 0
+         * definition: quotient of thermal conductivity and the product of mass density and specific heat capacity: `a = λ / (ρ C_p)` where `λ` is thermal conductivity (item 5-9), `ρ` is mass density (ISO 80000-4), and `c_p` is specific heat capacity at constant pressure (item 5-16.2)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : ThermalDiffusivityUnit[1];
+    }
+    attribute thermalDiffusivity : ThermalDiffusivityValue[*] nonunique :> scalarQuantities;
+    attribute def ThermalDiffusivityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-15 heat capacity */
+    attribute def HeatCapacityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-15 heat capacity
+         * symbol(s): `C`
+         * application domain: generic
+         * name: HeatCapacity
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: derivative of added heat with respect to thermodynamic temperature of a system: `C = (dQ)/(dT)` where `Q` is amount of heat (item 5-6.1) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: Heat capacity is not completely defined unless specified as seen in items 5-16.2, 5-16.3 and 5-16.4.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : HeatCapacityUnit[1];
+    }
+    attribute heatCapacity : HeatCapacityValue[*] nonunique :> scalarQuantities;
+    attribute def HeatCapacityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-16.1 specific heat capacity */
+    attribute def SpecificHeatCapacityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.1 specific heat capacity
+         * symbol(s): `c`
+         * application domain: generic
+         * name: SpecificHeatCapacity
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of heat capacity and mass: `c = C/m` where `C` is heat capacity (item 5-15) and `m` is mass (ISO 80000-4)
+         * remarks: For the corresponding quantities related to the amount of substance, see ISO 80000-9.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificHeatCapacityUnit[1];
+    }
+    attribute specificHeatCapacity : SpecificHeatCapacityValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificHeatCapacityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-16.2 specific heat capacity at constant pressure */
+    attribute def SpecificHeatCapacityAtConstantPressureValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.2 specific heat capacity at constant pressure
+         * symbol(s): `c_p`
+         * application domain: generic
+         * name: SpecificHeatCapacityAtConstantPressure
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: specific heat capacity (item 5-16.1) at constant pressure (ISO 80000-4)
+         * remarks: Also called specific isobaric heat capacity.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificHeatCapacityAtConstantPressureUnit[1];
+    }
+    attribute specificHeatCapacityAtConstantPressure : SpecificHeatCapacityAtConstantPressureValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificHeatCapacityAtConstantPressureUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-16.3 specific heat capacity at constant volume */
+    attribute def SpecificHeatCapacityAtConstantVolumeValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.3 specific heat capacity at constant volume
+         * symbol(s): `c_V`
+         * application domain: generic
+         * name: SpecificHeatCapacityAtConstantVolume
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: specific heat capacity (item 5-16.1) at constant volume (ISO 80000-3)
+         * remarks: Also called specific isochoric heat capacity.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificHeatCapacityAtConstantVolumeUnit[1];
+    }
+    attribute specificHeatCapacityAtConstantVolume : SpecificHeatCapacityAtConstantVolumeValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificHeatCapacityAtConstantVolumeUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-16.4 specific heat capacity at saturated vapour pressure */
+    attribute def SpecificHeatCapacityAtSaturatedVapourPressureValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-16.4 specific heat capacity at saturated vapour pressure
+         * symbol(s): `c_"sat"`
+         * application domain: generic
+         * name: SpecificHeatCapacityAtSaturatedVapourPressure
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: specific heat capacity (item 5-16.1) at saturated vapour pressure (ISO 80000-4)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificHeatCapacityAtSaturatedVapourPressureUnit[1];
+    }
+    attribute specificHeatCapacityAtSaturatedVapourPressure : SpecificHeatCapacityAtSaturatedVapourPressureValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificHeatCapacityAtSaturatedVapourPressureUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-17.1 ratio of specific heat capacities */
+    attribute def RatioOfSpecificHeatCapacitiesValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-17.1 ratio of specific heat capacities
+         * symbol(s): `γ`
+         * application domain: generic
+         * name: RatioOfSpecificHeatCapacities (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of specific heat capacity at constant pressure and specific heat capacity at constant volume: `γ = c_p/c_V` where `c_p` is specific heat capacity at constant pressure (item 5-16.2) and `c_V` is specific heat capacity at constant volume (item 5-16.3)
+         * remarks: This quantity can also be expressed by `γ = C_p/C_V` where `C_p` is heat capacity at constant pressure and `C_V` is heat capacity at constant volume.
+         */
+    }
+    attribute ratioOfSpecificHeatCapacities : RatioOfSpecificHeatCapacitiesValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-17.2 isentropic exponent, isentropic expansion factor */
+    attribute def IsentropicExponentValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-17.2 isentropic exponent, isentropic expansion factor
+         * symbol(s): `ϰ`
+         * application domain: generic
+         * name: IsentropicExponent (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: the negative of relative pressure change, divided by relative volume change, at constant entropy: `ϰ = -V/p * ((partial p)/(partial V))_S` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `S` is entropy (item 5-18)
+         * remarks: For an ideal gas, `ϰ` is equal to `γ` (item 5-17.1).
+         */
+    }
+    attribute isentropicExponent : IsentropicExponentValue :> scalarQuantities;
+    alias isentropicExpansionFactor for isentropicExponent;
+    /* ISO-80000-5 item 5-18 entropy */
+    attribute def EntropyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-18 entropy
+         * symbol(s): `S`
+         * application domain: generic
+         * name: Entropy
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: natural logarithm of number of equally probable microscopic configurations in a macroscopic system, multiplied by the Boltzmann constant: `S = k lnW` where `W` is number of configurations and `k` is the Boltzmann constant (ISO 80000-1)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : EntropyUnit[1];
+    }
+    attribute entropy : EntropyValue[*] nonunique :> scalarQuantities;
+    attribute def EntropyUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-19 specific entropy */
+    attribute def SpecificEntropyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-19 specific entropy
+         * symbol(s): `s`
+         * application domain: generic
+         * name: SpecificEntropy
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of entropy and mass: `s = S/m` where `S` is entropy (item 5-18) and `m` is mass (ISO 80000-4)
+         * remarks: For the corresponding quantity related to amount of substance, see ISO 80000-9.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificEntropyUnit[1];
+    }
+    attribute specificEntropy : SpecificEntropyValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificEntropyUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-20.1 energy */
+    attribute def EnergyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-20.1 energy
+         * symbol(s): `E`
+         * application domain: thermodynamics
+         * name: Energy
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: ability of a system to do work (ISO 80000-4)
+         * remarks: Energy exists in different forms that are mutually transformable into each other, either totally or partially. In contrast to internal energy (item 5-20.2), energy is not a state function.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : EnergyUnit[1];
+    }
+    attribute energy : EnergyValue[*] nonunique :> scalarQuantities;
+    attribute def EnergyUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-20.2 internal energy, thermodynamic energy */
+    attribute internalEnergy : EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.2 internal energy, thermodynamic energy
+         * symbol(s): `U`
+         * application domain: generic
+         * name: InternalEnergy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: energy of a system whose change is given by the amount of the heat (item 5-6.1) transferred to the system and the work (ISO 80000-4) done on the system, provided that the system is closed and no chemical reactions occur
+         * remarks: In thermodynamic text books, usually the formula `ΔU = Q + W` is used. Note that the zero of the energy is undefined.
+         */
+    }
+    alias thermodynamicEnergy for internalEnergy;
+    /* ISO-80000-5 item 5-20.3 enthalpy */
+    attribute enthalpy : EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.3 enthalpy
+         * symbol(s): `H`
+         * application domain: generic
+         * name: Enthalpy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: sum of internal energy of the system and the product of pressure and volume of the system: `H = U + p*V` where U is internal energy (item 5-20.2), `p` is pressure (ISO 80000-4), and `V` is volume (ISO 80000-3)
+         * remarks: None.
+         */
+    }
+    /* ISO-80000-5 item 5-20.4 Helmholtz energy, Helmholtz function */
+    attribute helmholtzEnergy : EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.4 Helmholtz energy, Helmholtz function
+         * symbol(s): `A`, `F`
+         * application domain: generic
+         * name: HelmholtzEnergy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: difference of internal energy of the system and the product of thermodynamic temperature and entropy of the system: `A = U - TS` where `U` is internal energy (item 5-20.2), `T` is thermodynamic temperature (item 5-1), and `S` is entropy (item 5-18)
+         * remarks: The name Helmholtz free energy is also used. However, this term is not recommended.
+         */
+    }
+    alias helmholtzFunction for helmholtzEnergy;
+    /* ISO-80000-5 item 5-20.5 Gibbs energy, Gibbs function */
+    attribute gibbsEnergy : EnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-20.5 Gibbs energy, Gibbs function
+         * symbol(s): `G`
+         * application domain: generic
+         * name: GibbsEnergy (specializes Energy)
+         * quantity dimension: L^2*M^1*T^-2
+         * measurement unit(s): J, kg*m^2*s^-2
+         * tensor order: 0
+         * definition: difference of the enthalpy and the product of thermodynamic temperature and entropy of the system: `G = H - T*S` where H is enthalpy (item 5-20.3), `T` is thermodynamic temperature (item 5-1), and `S` is entropy (item 5-18)
+         * remarks: The name Gibbs free energy is also used. However, this term is not recommended.
+         */
+    }
+    alias gibbsFunction for gibbsEnergy;
+    /* ISO-80000-5 item 5-21.1 specific energy */
+    attribute def SpecificEnergyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-21.1 specific energy
+         * symbol(s): `e`
+         * application domain: generic
+         * name: SpecificEnergy
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of energy and mass: `e = E/m` where `E` is energy (item 5-20.1) and `m` is mass (ISO 80000-4)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificEnergyUnit[1];
+    }
+    attribute specificEnergy : SpecificEnergyValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificEnergyUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-21.2 specific internal energy, specific thermodynamic energy */
+    attribute specificInternalEnergy : SpecificEnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-21.2 specific internal energy, specific thermodynamic energy
+         * symbol(s): `u`
+         * application domain: generic
+         * name: SpecificInternalEnergy (specializes SpecificEnergy)
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of internal energy and mass: `u = U/m` where `U` is internal energy (item 5-20.2) and `m` is mass (ISO 80000-4)
+         * remarks: None.
+         */
+    }
+    alias specificThermodynamicEnergy for specificInternalEnergy;
+    /* ISO-80000-5 item 5-21.3 specific enthalpy */
+    attribute def SpecificEnthalpyValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-21.3 specific enthalpy
+         * symbol(s): `h`
+         * application domain: generic
+         * name: SpecificEnthalpy
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of enthalpy and mass: `h = H/m` where `H` is enthalpy (item 5-20.3) and `m` is mass (ISO 80000-4)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificEnthalpyUnit[1];
+    }
+    attribute specificEnthalpy : SpecificEnthalpyValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificEnthalpyUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF);
+        }
+    }
+    /* ISO-80000-5 item 5-21.4 specific Helmholtz energy, specific Helmholtz function */
+    attribute specificHelmholtzEnergy : SpecificEnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-21.4 specific Helmholtz energy, specific Helmholtz function
+         * symbol(s): `a`, `f`
+         * application domain: generic
+         * name: SpecificHelmholtzEnergy (specializes SpecificEnergy)
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of Helmholtz energy and mass: `a = A/m` where A is Helmholtz energy (item 5-20.4) and m is mass (ISO 80000-4)
+         * remarks: The name specific Helmholtz free energy is also used. However, this term is not recommended.
+         */
+    }
+    alias specificHelmholtzFunction for specificHelmholtzEnergy;
+    /* ISO-80000-5 item 5-21.5 specific Gibbs energy, specific Gibbs function */
+    attribute specificGibbsEnergy : SpecificEnergyValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-21.5 specific Gibbs energy, specific Gibbs function
+         * symbol(s): `g`
+         * application domain: generic
+         * name: SpecificGibbsEnergy (specializes SpecificEnergy)
+         * quantity dimension: L^2*T^-2
+         * measurement unit(s): J/kg, m^2*s^-2
+         * tensor order: 0
+         * definition: quotient of Gibbs energy and mass: `g = G/m` where `G` is Gibbs energy (item 5-20.5) and `m` is mass (ISO 80000-4)
+         * remarks: The name specific Gibbs free energy is also used. However, this term is not recommended.
+         */
+    }
+    alias specificGibbsFunction for specificGibbsEnergy;
+    /* ISO-80000-5 item 5-22 Massieu function */
+    attribute def MassieuFunctionValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-22 Massieu function
+         * symbol(s): `J`
+         * application domain: generic
+         * name: MassieuFunction
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of the negative of Helmholtz energy and temperature: `J = -A/T` where `A` is Helmholtz energy (item 5-20.4) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : MassieuFunctionUnit[1];
+    }
+    attribute massieuFunction : MassieuFunctionValue[*] nonunique :> scalarQuantities;
+    attribute def MassieuFunctionUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-23 Planck function */
+    attribute def PlanckFunctionValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-23 Planck function
+         * symbol(s): `Y`
+         * application domain: generic
+         * name: PlanckFunction
+         * quantity dimension: L^2*M^1*T^-2*Θ^-1
+         * measurement unit(s): J/K, kg*m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of the negative of Gibbs energy and temperature: `Y = -G/T` where G is Gibbs energy (item 5-20.5) and `T` is thermodynamic temperature (item 5-1)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : PlanckFunctionUnit[1];
+    }
+    attribute planckFunction : PlanckFunctionValue[*] nonunique :> scalarQuantities;
+    attribute def PlanckFunctionUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-24 Joule-Thomson coefficient */
+    attribute def JouleThomsonCoefficientValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-24 Joule-Thomson coefficient
+         * symbol(s): `μ_"JT"`
+         * application domain: generic
+         * name: JouleThomsonCoefficient
+         * quantity dimension: L^1*M^-1*T^2*Θ^1
+         * measurement unit(s): K/Pa, kg^-1*m*s^2*K
+         * tensor order: 0
+         * definition: change of thermodynamic temperature with respect to pressure in a Joule-Thomson process at constant enthalpy: `μ_(JT) = ((partial T)/(partial p))_H` where `T` is thermodynamic temperature (item 5-1), `p` is pressure (ISO 80000-4) and H is enthalpy (item 5-20.3)
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : JouleThomsonCoefficientUnit[1];
+    }
+    attribute jouleThomsonCoefficient : JouleThomsonCoefficientValue[*] nonunique :> scalarQuantities;
+    attribute def JouleThomsonCoefficientUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 1;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = -1;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = 2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = 1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-25.1 thermal efficiency */
+    attribute def ThermalEfficiencyValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-25.1 thermal efficiency
+         * symbol(s): `η`
+         * application domain: thermodynamics
+         * name: ThermalEfficiency (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of work (ISO 80000-4) delivered by a heat engine and supplied heat: `η = W/Q` where `W` is work (ISO 80000-4) and `Q` is heat (item 5-6.1)
+         * remarks: None.
+         */
+    }
+    attribute thermalEfficiency : ThermalEfficiencyValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-25.2 maximum thermal efficiency */
+    attribute def MaximumThermalEfficiencyValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-25.2 maximum thermal efficiency
+         * symbol(s): `η_"max"`
+         * application domain: generic
+         * name: MaximumThermalEfficiency (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: efficiency determined by the quotient of the temperatures of the hot source and the cold sink: `η_max = 1 - T_c/T_h` where `T_c` is the thermodynamic temperature (item 5-1) of the cold sink and `T_h` is the thermodynamic temperature (item 5-1) of the hot source
+         * remarks: An ideal heat engine operating according to the Carnot process is delivering the maximum efficiency.
+         */
+    }
+    attribute maximumThermalEfficiency : MaximumThermalEfficiencyValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-26 specific gas constant */
+    attribute def SpecificGasConstantValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-26 specific gas constant
+         * symbol(s): `R_s`
+         * application domain: generic
+         * name: SpecificGasConstant
+         * quantity dimension: L^2*T^-2*Θ^-1
+         * measurement unit(s): J/(kg*K), m^2*s^-2*K^-1
+         * tensor order: 0
+         * definition: quotient of the Boltzmann constant `k` (ISO 80000-1) and the mass `m` (ISO 80000-4) of the gas particle
+         * remarks: None.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : SpecificGasConstantUnit[1];
+    }
+    attribute specificGasConstant : SpecificGasConstantValue[*] nonunique :> scalarQuantities;
+    attribute def SpecificGasConstantUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = 2;
+        }
+        private attribute durationPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.T;
+             :>> exponent = -2;
+        }
+        private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
+             :>> quantity = isq.'Θ';
+             :>> exponent = -1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, durationPF, thermodynamicTemperaturePF);
+        }
+    }
+    /* ISO-80000-5 item 5-27 mass concentration of water */
+    attribute def MassConcentrationOfWaterValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-27 mass concentration of water
+         * symbol(s): `w`
+         * application domain: generic
+         * name: MassConcentrationOfWater
+         * quantity dimension: L^-3*M^1
+         * measurement unit(s): kg*m^-3
+         * tensor order: 0
+         * definition: quotient of mass of water and a specified volume: `w = m/V` where `m` is mass (ISO 80000-4) of water, irrespective of the form of aggregation state, and `V` is volume (ISO 80000-3)
+         * remarks: Mass concentration of water at saturation is denoted `w_"sat"`.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : MassConcentrationOfWaterUnit[1];
+    }
+    attribute massConcentrationOfWater : MassConcentrationOfWaterValue[*] nonunique :> scalarQuantities;
+    attribute def MassConcentrationOfWaterUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = -3;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF);
+        }
+    }
+    /* ISO-80000-5 item 5-28 mass concentration of water vapour absolute humidity */
+    attribute def MassConcentrationOfWaterVapourAbsoluteHumidityValue :> ScalarQuantityValue {
+        doc
+        /*
+         * source: item 5-28 mass concentration of water vapour absolute humidity
+         * symbol(s): `v`
+         * application domain: generic
+         * name: MassConcentrationOfWaterVapourAbsoluteHumidity
+         * quantity dimension: L^-3*M^1
+         * measurement unit(s): kg*m^-3
+         * tensor order: 0
+         * definition: quotient of mass of water vapour and a specified volume: `v = m/V` where m is mass (ISO 80000-4) of water vapour and `V` is volume (ISO 80000-3)
+         * remarks: Mass concentration of water vapour at saturation is denoted `v_"sat"`.
+         */
+        attribute :>> num : Real;
+        attribute :>> mRef : MassConcentrationOfWaterVapourAbsoluteHumidityUnit[1];
+    }
+    attribute massConcentrationOfWaterVapourAbsoluteHumidity : MassConcentrationOfWaterVapourAbsoluteHumidityValue[*] nonunique :> scalarQuantities;
+    attribute def MassConcentrationOfWaterVapourAbsoluteHumidityUnit :> DerivedUnit {
+        private attribute lengthPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.L;
+             :>> exponent = -3;
+        }
+        private attribute massPF : QuantityPowerFactor[1] {
+             :>> quantity = isq.M;
+             :>> exponent = 1;
+        }
+        attribute :>> quantityDimension {
+             :>> quantityPowerFactors = (lengthPF, massPF);
+        }
+    }
+    /* ISO-80000-5 item 5-29 mass ratio of water to dry matter */
+    attribute def MassRatioOfWaterToDryMatterValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-29 mass ratio of water to dry matter
+         * symbol(s): `u`
+         * application domain: generic
+         * name: MassRatioOfWaterToDryMatter (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass of water and mass of dry matter: `u = m/m_d` where `m` is mass (ISO 80000-4) of water and `m_d` is mass of dry matter
+         * remarks: Mass ratio of water to dry matter at saturation is denoted `u_"sat"`.
+         */
+    }
+    attribute massRatioOfWaterToDryMatter : MassRatioOfWaterToDryMatterValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-30 mass ratio of water vapour to dry gas */
+    attribute def MassRatioOfWaterVapourToDryGasValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-30 mass ratio of water vapour to dry gas
+         * symbol(s): `r`, `(x)`
+         * application domain: generic
+         * name: MassRatioOfWaterVapourToDryGas (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass of water vapour and mass of dry gas: `r = m/m_d` where `m` is mass (ISO 80000-4) of water vapour and `m_d` is mass of dry gas
+         * remarks: Mass ratio of water vapour to dry gas at saturation is denoted `r_"sat"`. Mass ratio of water vapour to dry gas is also called mixing ratio.
+         */
+    }
+    attribute massRatioOfWaterVapourToDryGas : MassRatioOfWaterVapourToDryGasValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-31 mass fraction of water */
+    attribute def MassFractionOfWaterValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-31 mass fraction of water
+         * symbol(s): `w_(H_(2)O)`
+         * application domain: generic
+         * name: MassFractionOfWater (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quantity given by: `w_(H_(2)O) = u/(1+u)` where `u` is mass ratio of water to dry matter (item 5-29)
+         * remarks: None.
+         */
+    }
+    attribute massFractionOfWater : MassFractionOfWaterValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-32 mass fraction of dry matter */
+    attribute def MassFractionOfDryMatterValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-32 mass fraction of dry matter
+         * symbol(s): `w_d`
+         * application domain: generic
+         * name: MassFractionOfDryMatter (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quantity given by: `w_d = 1 - w_(H_(2)O)` where `w_(H_(2)O)` is mass fraction of water (item 5-31)
+         * remarks: None.
+         */
+    }
+    attribute massFractionOfDryMatter : MassFractionOfDryMatterValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-33 relative humidity */
+    attribute def RelativeHumidityValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-33 relative humidity
+         * symbol(s): `φ`
+         * application domain: generic
+         * name: RelativeHumidity (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of partial pressure of water vapour and partial pressure at its saturation: `φ = p/p_"sat"` where `p` is partial pressure (ISO 80000-4) of vapour and `p_"sat"` is its partial pressure at saturation at the same temperature
+         * remarks: Relative humidity is often referred to as RH and expressed in percent. See also remark in item 5-35.
+         */
+    }
+    attribute relativeHumidity : RelativeHumidityValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-34 relative mass concentration of vapour */
+    attribute def RelativeMassConcentrationOfVapourValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-34 relative mass concentration of vapour
+         * symbol(s): `φ`
+         * application domain: generic
+         * name: RelativeMassConcentrationOfVapour (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass concentration of water vapour and mass concentration at its saturation: `φ = v/v_"sat"` where `v` is mass concentration of water vapour (item 5-28) and `v_"sat"` is its mass concentration of water vapour at saturation of the same temperature
+         * remarks: For water vapour concentrations up to 1 kg/m^3, the relative humidity (item 5-33) is assumed to be equal to relative mass concentration of vapour. For details see Reference [8].
+         */
+    }
+    attribute relativeMassConcentrationOfVapour : RelativeMassConcentrationOfVapourValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-35 relative mass ratio of vapour */
+    attribute def RelativeMassRatioOfVapourValue :> DimensionOneValue {
+        doc
+        /*
+         * source: item 5-35 relative mass ratio of vapour
+         * symbol(s): `ψ`
+         * application domain: generic
+         * name: RelativeMassRatioOfVapour (specializes DimensionOneQuantity)
+         * quantity dimension: 1
+         * measurement unit(s): 1
+         * tensor order: 0
+         * definition: quotient of mass ratio of water vapour to dry gas and mass ratio of water vapour to dry gas at saturation: `ψ = r/r_"sat"` where `r` is mass ratio of water vapour to dry gas (item 5-30) and `r_"sat"` is its mass ratio of water vapour to dry gas at saturation of the same temperature
+         * remarks: This quantity is also used as an approximation of relative humidity (item 5-33).
+         */
+    }
+    attribute relativeMassRatioOfVapour : RelativeMassRatioOfVapourValue :> scalarQuantities;
+    /* ISO-80000-5 item 5-36 dew-point temperature */
+    attribute dewPointTemperature : ThermodynamicTemperatureValue :> scalarQuantities {
+        doc
+        /*
+         * source: item 5-36 dew-point temperature
+         * symbol(s): `T_d`
+         * application domain: generic
+         * name: DewPointTemperature (specializes ThermodynamicTemperature)
+         * quantity dimension: Θ^1
+         * measurement unit(s): K
+         * tensor order: 0
+         * definition: temperature at which water vapour in the air reaches saturation under isobaric conditions
+         * remarks: The corresponding Celsius temperature, denoted `t_d`, is still called dew-point temperature. The unit for the corresponding Celsius temperature is degree Celsius, symbol °C.
+         */
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 789) (line 15) (column 20) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 789) (line 15) (column 20) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 803) (line 15) (column 34) (len 4)))))
+    (reference r1 (scope relative) (span (offset 828) (line 16) (column 20) (len 10)) (segments (segment 0 (token "Quantities") (name "Quantities") (separator none) (span (offset 828) (line 16) (column 20) (len 10)))))
+    (reference r2 (scope relative) (span (offset 862) (line 17) (column 20) (len 21)) (segments (segment 0 (token "MeasurementReferences") (name "MeasurementReferences") (separator none) (span (offset 862) (line 17) (column 20) (len 21)))))
+    (reference r3 (scope relative) (span (offset 907) (line 18) (column 20) (len 7)) (segments (segment 0 (token "ISQBase") (name "ISQBase") (separator none) (span (offset 907) (line 18) (column 20) (len 7)))))
+    (reference r4 (scope relative) (span (offset 1206) (line 26) (column 31) (len 28)) (segments (segment 0 (token "ThermodynamicTemperatureUnit") (name "ThermodynamicTemperatureUnit") (separator none) (span (offset 1206) (line 26) (column 31) (len 28)))))
+    (reference r5 (scope relative) (span (offset 1267) (line 27) (column 32) (len 29)) (segments (segment 0 (token "ThermodynamicTemperatureValue") (name "ThermodynamicTemperatureValue") (separator none) (span (offset 1267) (line 27) (column 32) (len 29)))))
+    (reference r6 (scope relative) (span (offset 1324) (line 28) (column 27) (len 24)) (segments (segment 0 (token "thermodynamicTemperature") (name "thermodynamicTemperature") (separator none) (span (offset 1324) (line 28) (column 27) (len 24)))))
+    (reference r7 (scope relative) (span (offset 1447) (line 31) (column 46) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 1447) (line 31) (column 46) (len 19)))))
+    (reference r8 (scope relative) (span (offset 2597) (line 44) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 2597) (line 44) (column 28) (len 4)))))
+    (reference r9 (scope relative) (span (offset 2592) (line 44) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 2592) (line 44) (column 23) (len 3)))))
+    (reference r10 (scope relative) (span (offset 2631) (line 45) (column 29) (len 22)) (segments (segment 0 (token "CelsiusTemperatureUnit") (name "CelsiusTemperatureUnit") (separator none) (span (offset 2631) (line 45) (column 29) (len 22)))))
+    (reference r11 (scope relative) (span (offset 2625) (line 45) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 2625) (line 45) (column 23) (len 4)))))
+    (reference r12 (scope relative) (span (offset 2802) (line 50) (column 45) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 2802) (line 50) (column 45) (len 11)))))
+    (reference r13 (scope relative) (span (offset 2870) (line 51) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 2870) (line 51) (column 55) (len 19)))))
+    (reference r14 (scope relative) (span (offset 2899) (line 51) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 2899) (line 51) (column 84) (len 8)))))
+    (reference r15 (scope relative) (span (offset 2910) (line 51) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 2910) (line 51) (column 95) (len 3)))))
+    (reference r16 (scope relative) (span (offset 2914) (line 51) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 2914) (line 51) (column 99) (len 4)))))
+    (reference r17 (scope relative) (span (offset 2924) (line 51) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 2924) (line 51) (column 109) (len 8)))))
+    (reference r18 (scope relative) (span (offset 2962) (line 52) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 2962) (line 52) (column 23) (len 17)))))
+    (reference r19 (scope relative) (span (offset 2986) (line 52) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 2986) (line 52) (column 47) (len 20)))))
+    (reference r20 (scope relative) (span (offset 3009) (line 52) (column 70) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 3009) (line 52) (column 70) (len 26)))))
+    (reference r21 (scope relative) (span (offset 3161) (line 56) (column 54) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 3161) (line 56) (column 54) (len 19)))))
+    (reference r22 (scope relative) (span (offset 3790) (line 69) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 3790) (line 69) (column 28) (len 4)))))
+    (reference r23 (scope relative) (span (offset 3785) (line 69) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 3785) (line 69) (column 23) (len 3)))))
+    (reference r24 (scope relative) (span (offset 3824) (line 70) (column 29) (len 30)) (segments (segment 0 (token "LinearExpansionCoefficientUnit") (name "LinearExpansionCoefficientUnit") (separator none) (span (offset 3824) (line 70) (column 29) (len 30)))))
+    (reference r25 (scope relative) (span (offset 3818) (line 70) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 3818) (line 70) (column 23) (len 4)))))
+    (reference r26 (scope relative) (span (offset 4027) (line 75) (column 53) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 4027) (line 75) (column 53) (len 11)))))
+    (reference r27 (scope relative) (span (offset 4095) (line 76) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 4095) (line 76) (column 55) (len 19)))))
+    (reference r28 (scope relative) (span (offset 4124) (line 76) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 4124) (line 76) (column 84) (len 8)))))
+    (reference r29 (scope relative) (span (offset 4135) (line 76) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 4135) (line 76) (column 95) (len 3)))))
+    (reference r30 (scope relative) (span (offset 4139) (line 76) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 4139) (line 76) (column 99) (len 4)))))
+    (reference r31 (scope relative) (span (offset 4149) (line 76) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 4149) (line 76) (column 109) (len 8)))))
+    (reference r32 (scope relative) (span (offset 4188) (line 77) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 4188) (line 77) (column 23) (len 17)))))
+    (reference r33 (scope relative) (span (offset 4212) (line 77) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 4212) (line 77) (column 47) (len 20)))))
+    (reference r34 (scope relative) (span (offset 4235) (line 77) (column 70) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 4235) (line 77) (column 70) (len 26)))))
+    (reference r35 (scope relative) (span (offset 4385) (line 81) (column 53) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 4385) (line 81) (column 53) (len 19)))))
+    (reference r36 (scope relative) (span (offset 5066) (line 94) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 5066) (line 94) (column 28) (len 4)))))
+    (reference r37 (scope relative) (span (offset 5061) (line 94) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 5061) (line 94) (column 23) (len 3)))))
+    (reference r38 (scope relative) (span (offset 5100) (line 95) (column 29) (len 29)) (segments (segment 0 (token "CubicExpansionCoefficientUnit") (name "CubicExpansionCoefficientUnit") (separator none) (span (offset 5100) (line 95) (column 29) (len 29)))))
+    (reference r39 (scope relative) (span (offset 5094) (line 95) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 5094) (line 95) (column 23) (len 4)))))
+    (reference r40 (scope relative) (span (offset 5299) (line 100) (column 52) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 5299) (line 100) (column 52) (len 11)))))
+    (reference r41 (scope relative) (span (offset 5367) (line 101) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 5367) (line 101) (column 55) (len 19)))))
+    (reference r42 (scope relative) (span (offset 5396) (line 101) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 5396) (line 101) (column 84) (len 8)))))
+    (reference r43 (scope relative) (span (offset 5407) (line 101) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 5407) (line 101) (column 95) (len 3)))))
+    (reference r44 (scope relative) (span (offset 5411) (line 101) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 5411) (line 101) (column 99) (len 4)))))
+    (reference r45 (scope relative) (span (offset 5421) (line 101) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 5421) (line 101) (column 109) (len 8)))))
+    (reference r46 (scope relative) (span (offset 5460) (line 102) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 5460) (line 102) (column 23) (len 17)))))
+    (reference r47 (scope relative) (span (offset 5484) (line 102) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 5484) (line 102) (column 47) (len 20)))))
+    (reference r48 (scope relative) (span (offset 5507) (line 102) (column 70) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 5507) (line 102) (column 70) (len 26)))))
+    (reference r49 (scope relative) (span (offset 5661) (line 106) (column 55) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 5661) (line 106) (column 55) (len 19)))))
+    (reference r50 (scope relative) (span (offset 6365) (line 119) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 6365) (line 119) (column 28) (len 4)))))
+    (reference r51 (scope relative) (span (offset 6360) (line 119) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 6360) (line 119) (column 23) (len 3)))))
+    (reference r52 (scope relative) (span (offset 6399) (line 120) (column 29) (len 31)) (segments (segment 0 (token "RelativePressureCoefficientUnit") (name "RelativePressureCoefficientUnit") (separator none) (span (offset 6399) (line 120) (column 29) (len 31)))))
+    (reference r53 (scope relative) (span (offset 6393) (line 120) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 6393) (line 120) (column 23) (len 4)))))
+    (reference r54 (scope relative) (span (offset 6606) (line 125) (column 54) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 6606) (line 125) (column 54) (len 11)))))
+    (reference r55 (scope relative) (span (offset 6674) (line 126) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 6674) (line 126) (column 55) (len 19)))))
+    (reference r56 (scope relative) (span (offset 6703) (line 126) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 6703) (line 126) (column 84) (len 8)))))
+    (reference r57 (scope relative) (span (offset 6714) (line 126) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 6714) (line 126) (column 95) (len 3)))))
+    (reference r58 (scope relative) (span (offset 6718) (line 126) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 6718) (line 126) (column 99) (len 4)))))
+    (reference r59 (scope relative) (span (offset 6728) (line 126) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 6728) (line 126) (column 109) (len 8)))))
+    (reference r60 (scope relative) (span (offset 6767) (line 127) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 6767) (line 127) (column 23) (len 17)))))
+    (reference r61 (scope relative) (span (offset 6791) (line 127) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 6791) (line 127) (column 47) (len 20)))))
+    (reference r62 (scope relative) (span (offset 6814) (line 127) (column 70) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 6814) (line 127) (column 70) (len 26)))))
+    (reference r63 (scope relative) (span (offset 6949) (line 131) (column 47) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 6949) (line 131) (column 47) (len 19)))))
+    (reference r64 (scope relative) (span (offset 7573) (line 144) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 7573) (line 144) (column 28) (len 4)))))
+    (reference r65 (scope relative) (span (offset 7568) (line 144) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 7568) (line 144) (column 23) (len 3)))))
+    (reference r66 (scope relative) (span (offset 7607) (line 145) (column 29) (len 23)) (segments (segment 0 (token "PressureCoefficientUnit") (name "PressureCoefficientUnit") (separator none) (span (offset 7607) (line 145) (column 29) (len 23)))))
+    (reference r67 (scope relative) (span (offset 7601) (line 145) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 7601) (line 145) (column 23) (len 4)))))
+    (reference r68 (scope relative) (span (offset 7782) (line 150) (column 46) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 7782) (line 150) (column 46) (len 11)))))
+    (reference r69 (scope relative) (span (offset 7832) (line 151) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 7832) (line 151) (column 37) (len 19)))))
+    (reference r70 (scope relative) (span (offset 7861) (line 151) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 7861) (line 151) (column 66) (len 8)))))
+    (reference r71 (scope relative) (span (offset 7872) (line 151) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 7872) (line 151) (column 77) (len 3)))))
+    (reference r72 (scope relative) (span (offset 7876) (line 151) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 7876) (line 151) (column 81) (len 1)))))
+    (reference r73 (scope relative) (span (offset 7883) (line 151) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 7883) (line 151) (column 88) (len 8)))))
+    (reference r74 (scope relative) (span (offset 7934) (line 152) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 7934) (line 152) (column 35) (len 19)))))
+    (reference r75 (scope relative) (span (offset 7963) (line 152) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 7963) (line 152) (column 64) (len 8)))))
+    (reference r76 (scope relative) (span (offset 7974) (line 152) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 7974) (line 152) (column 75) (len 3)))))
+    (reference r77 (scope relative) (span (offset 7978) (line 152) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 7978) (line 152) (column 79) (len 1)))))
+    (reference r78 (scope relative) (span (offset 7985) (line 152) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 7985) (line 152) (column 86) (len 8)))))
+    (reference r79 (scope relative) (span (offset 8039) (line 153) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 8039) (line 153) (column 39) (len 19)))))
+    (reference r80 (scope relative) (span (offset 8068) (line 153) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 8068) (line 153) (column 68) (len 8)))))
+    (reference r81 (scope relative) (span (offset 8079) (line 153) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 8079) (line 153) (column 79) (len 3)))))
+    (reference r82 (scope relative) (span (offset 8083) (line 153) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 8083) (line 153) (column 83) (len 1)))))
+    (reference r83 (scope relative) (span (offset 8090) (line 153) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 8090) (line 153) (column 90) (len 8)))))
+    (reference r84 (scope relative) (span (offset 8161) (line 154) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 8161) (line 154) (column 55) (len 19)))))
+    (reference r85 (scope relative) (span (offset 8190) (line 154) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 8190) (line 154) (column 84) (len 8)))))
+    (reference r86 (scope relative) (span (offset 8201) (line 154) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 8201) (line 154) (column 95) (len 3)))))
+    (reference r87 (scope relative) (span (offset 8205) (line 154) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 8205) (line 154) (column 99) (len 4)))))
+    (reference r88 (scope relative) (span (offset 8215) (line 154) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 8215) (line 154) (column 109) (len 8)))))
+    (reference r89 (scope relative) (span (offset 8254) (line 155) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 8254) (line 155) (column 23) (len 17)))))
+    (reference r90 (scope relative) (span (offset 8278) (line 155) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 8278) (line 155) (column 47) (len 20)))))
+    (reference r91 (scope relative) (span (offset 8302) (line 155) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 8302) (line 155) (column 71) (len 8)))))
+    (reference r92 (scope relative) (span (offset 8312) (line 155) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 8312) (line 155) (column 81) (len 6)))))
+    (reference r93 (scope relative) (span (offset 8320) (line 155) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 8320) (line 155) (column 89) (len 10)))))
+    (reference r94 (scope relative) (span (offset 8332) (line 155) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 8332) (line 155) (column 101) (len 26)))))
+    (reference r95 (scope relative) (span (offset 8482) (line 159) (column 53) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 8482) (line 159) (column 53) (len 19)))))
+    (reference r96 (scope relative) (span (offset 9212) (line 172) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 9212) (line 172) (column 28) (len 4)))))
+    (reference r97 (scope relative) (span (offset 9207) (line 172) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 9207) (line 172) (column 23) (len 3)))))
+    (reference r98 (scope relative) (span (offset 9246) (line 173) (column 29) (len 29)) (segments (segment 0 (token "IsothermalCompressibilityUnit") (name "IsothermalCompressibilityUnit") (separator none) (span (offset 9246) (line 173) (column 29) (len 29)))))
+    (reference r99 (scope relative) (span (offset 9240) (line 173) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 9240) (line 173) (column 23) (len 4)))))
+    (reference r100 (scope relative) (span (offset 9445) (line 178) (column 52) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 9445) (line 178) (column 52) (len 11)))))
+    (reference r101 (scope relative) (span (offset 9495) (line 179) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 9495) (line 179) (column 37) (len 19)))))
+    (reference r102 (scope relative) (span (offset 9524) (line 179) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 9524) (line 179) (column 66) (len 8)))))
+    (reference r103 (scope relative) (span (offset 9535) (line 179) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 9535) (line 179) (column 77) (len 3)))))
+    (reference r104 (scope relative) (span (offset 9539) (line 179) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 9539) (line 179) (column 81) (len 1)))))
+    (reference r105 (scope relative) (span (offset 9546) (line 179) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 9546) (line 179) (column 88) (len 8)))))
+    (reference r106 (scope relative) (span (offset 9596) (line 180) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 9596) (line 180) (column 35) (len 19)))))
+    (reference r107 (scope relative) (span (offset 9625) (line 180) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 9625) (line 180) (column 64) (len 8)))))
+    (reference r108 (scope relative) (span (offset 9636) (line 180) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 9636) (line 180) (column 75) (len 3)))))
+    (reference r109 (scope relative) (span (offset 9640) (line 180) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 9640) (line 180) (column 79) (len 1)))))
+    (reference r110 (scope relative) (span (offset 9647) (line 180) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 9647) (line 180) (column 86) (len 8)))))
+    (reference r111 (scope relative) (span (offset 9702) (line 181) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 9702) (line 181) (column 39) (len 19)))))
+    (reference r112 (scope relative) (span (offset 9731) (line 181) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 9731) (line 181) (column 68) (len 8)))))
+    (reference r113 (scope relative) (span (offset 9742) (line 181) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 9742) (line 181) (column 79) (len 3)))))
+    (reference r114 (scope relative) (span (offset 9746) (line 181) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 9746) (line 181) (column 83) (len 1)))))
+    (reference r115 (scope relative) (span (offset 9753) (line 181) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 9753) (line 181) (column 90) (len 8)))))
+    (reference r116 (scope relative) (span (offset 9791) (line 182) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 9791) (line 182) (column 23) (len 17)))))
+    (reference r117 (scope relative) (span (offset 9815) (line 182) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 9815) (line 182) (column 47) (len 20)))))
+    (reference r118 (scope relative) (span (offset 9839) (line 182) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 9839) (line 182) (column 71) (len 8)))))
+    (reference r119 (scope relative) (span (offset 9849) (line 182) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 9849) (line 182) (column 81) (len 6)))))
+    (reference r120 (scope relative) (span (offset 9857) (line 182) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 9857) (line 182) (column 89) (len 10)))))
+    (reference r121 (scope relative) (span (offset 9991) (line 186) (column 53) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 9991) (line 186) (column 53) (len 19)))))
+    (reference r122 (scope relative) (span (offset 10700) (line 199) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 10700) (line 199) (column 28) (len 4)))))
+    (reference r123 (scope relative) (span (offset 10695) (line 199) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 10695) (line 199) (column 23) (len 3)))))
+    (reference r124 (scope relative) (span (offset 10734) (line 200) (column 29) (len 29)) (segments (segment 0 (token "IsentropicCompressibilityUnit") (name "IsentropicCompressibilityUnit") (separator none) (span (offset 10734) (line 200) (column 29) (len 29)))))
+    (reference r125 (scope relative) (span (offset 10728) (line 200) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 10728) (line 200) (column 23) (len 4)))))
+    (reference r126 (scope relative) (span (offset 10933) (line 205) (column 52) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 10933) (line 205) (column 52) (len 11)))))
+    (reference r127 (scope relative) (span (offset 10983) (line 206) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 10983) (line 206) (column 37) (len 19)))))
+    (reference r128 (scope relative) (span (offset 11012) (line 206) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 11012) (line 206) (column 66) (len 8)))))
+    (reference r129 (scope relative) (span (offset 11023) (line 206) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 11023) (line 206) (column 77) (len 3)))))
+    (reference r130 (scope relative) (span (offset 11027) (line 206) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 11027) (line 206) (column 81) (len 1)))))
+    (reference r131 (scope relative) (span (offset 11034) (line 206) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 11034) (line 206) (column 88) (len 8)))))
+    (reference r132 (scope relative) (span (offset 11084) (line 207) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 11084) (line 207) (column 35) (len 19)))))
+    (reference r133 (scope relative) (span (offset 11113) (line 207) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 11113) (line 207) (column 64) (len 8)))))
+    (reference r134 (scope relative) (span (offset 11124) (line 207) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 11124) (line 207) (column 75) (len 3)))))
+    (reference r135 (scope relative) (span (offset 11128) (line 207) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 11128) (line 207) (column 79) (len 1)))))
+    (reference r136 (scope relative) (span (offset 11135) (line 207) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 11135) (line 207) (column 86) (len 8)))))
+    (reference r137 (scope relative) (span (offset 11190) (line 208) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 11190) (line 208) (column 39) (len 19)))))
+    (reference r138 (scope relative) (span (offset 11219) (line 208) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 11219) (line 208) (column 68) (len 8)))))
+    (reference r139 (scope relative) (span (offset 11230) (line 208) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 11230) (line 208) (column 79) (len 3)))))
+    (reference r140 (scope relative) (span (offset 11234) (line 208) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 11234) (line 208) (column 83) (len 1)))))
+    (reference r141 (scope relative) (span (offset 11241) (line 208) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 11241) (line 208) (column 90) (len 8)))))
+    (reference r142 (scope relative) (span (offset 11279) (line 209) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 11279) (line 209) (column 23) (len 17)))))
+    (reference r143 (scope relative) (span (offset 11303) (line 209) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 11303) (line 209) (column 47) (len 20)))))
+    (reference r144 (scope relative) (span (offset 11327) (line 209) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 11327) (line 209) (column 71) (len 8)))))
+    (reference r145 (scope relative) (span (offset 11337) (line 209) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 11337) (line 209) (column 81) (len 6)))))
+    (reference r146 (scope relative) (span (offset 11345) (line 209) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 11345) (line 209) (column 89) (len 10)))))
+    (reference r147 (scope relative) (span (offset 12500) (line 228) (column 28) (len 4)) (segments (segment 0 (token "heat") (name "heat") (separator none) (span (offset 12500) (line 228) (column 28) (len 4)))))
+    (reference r148 (scope relative) (span (offset 13237) (line 247) (column 40) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 13237) (line 247) (column 40) (len 19)))))
+    (reference r149 (scope relative) (span (offset 13697) (line 260) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 13697) (line 260) (column 28) (len 4)))))
+    (reference r150 (scope relative) (span (offset 13692) (line 260) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 13692) (line 260) (column 23) (len 3)))))
+    (reference r151 (scope relative) (span (offset 13731) (line 261) (column 29) (len 16)) (segments (segment 0 (token "HeatFlowRateUnit") (name "HeatFlowRateUnit") (separator none) (span (offset 13731) (line 261) (column 29) (len 16)))))
+    (reference r152 (scope relative) (span (offset 13725) (line 261) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 13725) (line 261) (column 23) (len 4)))))
+    (reference r153 (scope relative) (span (offset 13878) (line 266) (column 39) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 13878) (line 266) (column 39) (len 11)))))
+    (reference r154 (scope relative) (span (offset 13928) (line 267) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 13928) (line 267) (column 37) (len 19)))))
+    (reference r155 (scope relative) (span (offset 13957) (line 267) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 13957) (line 267) (column 66) (len 8)))))
+    (reference r156 (scope relative) (span (offset 13968) (line 267) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 13968) (line 267) (column 77) (len 3)))))
+    (reference r157 (scope relative) (span (offset 13972) (line 267) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 13972) (line 267) (column 81) (len 1)))))
+    (reference r158 (scope relative) (span (offset 13979) (line 267) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 13979) (line 267) (column 88) (len 8)))))
+    (reference r159 (scope relative) (span (offset 14029) (line 268) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 14029) (line 268) (column 35) (len 19)))))
+    (reference r160 (scope relative) (span (offset 14058) (line 268) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 14058) (line 268) (column 64) (len 8)))))
+    (reference r161 (scope relative) (span (offset 14069) (line 268) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 14069) (line 268) (column 75) (len 3)))))
+    (reference r162 (scope relative) (span (offset 14073) (line 268) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 14073) (line 268) (column 79) (len 1)))))
+    (reference r163 (scope relative) (span (offset 14080) (line 268) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 14080) (line 268) (column 86) (len 8)))))
+    (reference r164 (scope relative) (span (offset 14134) (line 269) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 14134) (line 269) (column 39) (len 19)))))
+    (reference r165 (scope relative) (span (offset 14163) (line 269) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 14163) (line 269) (column 68) (len 8)))))
+    (reference r166 (scope relative) (span (offset 14174) (line 269) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 14174) (line 269) (column 79) (len 3)))))
+    (reference r167 (scope relative) (span (offset 14178) (line 269) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 14178) (line 269) (column 83) (len 1)))))
+    (reference r168 (scope relative) (span (offset 14185) (line 269) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 14185) (line 269) (column 90) (len 8)))))
+    (reference r169 (scope relative) (span (offset 14224) (line 270) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 14224) (line 270) (column 23) (len 17)))))
+    (reference r170 (scope relative) (span (offset 14248) (line 270) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 14248) (line 270) (column 47) (len 20)))))
+    (reference r171 (scope relative) (span (offset 14272) (line 270) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 14272) (line 270) (column 71) (len 8)))))
+    (reference r172 (scope relative) (span (offset 14282) (line 270) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 14282) (line 270) (column 81) (len 6)))))
+    (reference r173 (scope relative) (span (offset 14290) (line 270) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 14290) (line 270) (column 89) (len 10)))))
+    (reference r174 (scope relative) (span (offset 14417) (line 274) (column 49) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 14417) (line 274) (column 49) (len 19)))))
+    (reference r175 (scope relative) (span (offset 14971) (line 287) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 14971) (line 287) (column 28) (len 4)))))
+    (reference r176 (scope relative) (span (offset 14966) (line 287) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 14966) (line 287) (column 23) (len 3)))))
+    (reference r177 (scope relative) (span (offset 15005) (line 288) (column 29) (len 25)) (segments (segment 0 (token "DensityOfHeatFlowRateUnit") (name "DensityOfHeatFlowRateUnit") (separator none) (span (offset 15005) (line 288) (column 29) (len 25)))))
+    (reference r178 (scope relative) (span (offset 14999) (line 288) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 14999) (line 288) (column 23) (len 4)))))
+    (reference r179 (scope relative) (span (offset 15188) (line 293) (column 48) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 15188) (line 293) (column 48) (len 11)))))
+    (reference r180 (scope relative) (span (offset 15236) (line 294) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 15236) (line 294) (column 35) (len 19)))))
+    (reference r181 (scope relative) (span (offset 15265) (line 294) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 15265) (line 294) (column 64) (len 8)))))
+    (reference r182 (scope relative) (span (offset 15276) (line 294) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 15276) (line 294) (column 75) (len 3)))))
+    (reference r183 (scope relative) (span (offset 15280) (line 294) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 15280) (line 294) (column 79) (len 1)))))
+    (reference r184 (scope relative) (span (offset 15287) (line 294) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 15287) (line 294) (column 86) (len 8)))))
+    (reference r185 (scope relative) (span (offset 15341) (line 295) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 15341) (line 295) (column 39) (len 19)))))
+    (reference r186 (scope relative) (span (offset 15370) (line 295) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 15370) (line 295) (column 68) (len 8)))))
+    (reference r187 (scope relative) (span (offset 15381) (line 295) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 15381) (line 295) (column 79) (len 3)))))
+    (reference r188 (scope relative) (span (offset 15385) (line 295) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 15385) (line 295) (column 83) (len 1)))))
+    (reference r189 (scope relative) (span (offset 15392) (line 295) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 15392) (line 295) (column 90) (len 8)))))
+    (reference r190 (scope relative) (span (offset 15431) (line 296) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 15431) (line 296) (column 23) (len 17)))))
+    (reference r191 (scope relative) (span (offset 15455) (line 296) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 15455) (line 296) (column 47) (len 20)))))
+    (reference r192 (scope relative) (span (offset 15479) (line 296) (column 71) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 15479) (line 296) (column 71) (len 6)))))
+    (reference r193 (scope relative) (span (offset 15487) (line 296) (column 79) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 15487) (line 296) (column 79) (len 10)))))
+    (reference r194 (scope relative) (span (offset 15607) (line 300) (column 47) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 15607) (line 300) (column 47) (len 19)))))
+    (reference r195 (scope relative) (span (offset 16168) (line 313) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 16168) (line 313) (column 28) (len 4)))))
+    (reference r196 (scope relative) (span (offset 16163) (line 313) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 16163) (line 313) (column 23) (len 3)))))
+    (reference r197 (scope relative) (span (offset 16202) (line 314) (column 29) (len 23)) (segments (segment 0 (token "ThermalConductivityUnit") (name "ThermalConductivityUnit") (separator none) (span (offset 16202) (line 314) (column 29) (len 23)))))
+    (reference r198 (scope relative) (span (offset 16196) (line 314) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 16196) (line 314) (column 23) (len 4)))))
+    (reference r199 (scope relative) (span (offset 16377) (line 319) (column 46) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 16377) (line 319) (column 46) (len 11)))))
+    (reference r200 (scope relative) (span (offset 16427) (line 320) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 16427) (line 320) (column 37) (len 19)))))
+    (reference r201 (scope relative) (span (offset 16456) (line 320) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 16456) (line 320) (column 66) (len 8)))))
+    (reference r202 (scope relative) (span (offset 16467) (line 320) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 16467) (line 320) (column 77) (len 3)))))
+    (reference r203 (scope relative) (span (offset 16471) (line 320) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 16471) (line 320) (column 81) (len 1)))))
+    (reference r204 (scope relative) (span (offset 16478) (line 320) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 16478) (line 320) (column 88) (len 8)))))
+    (reference r205 (scope relative) (span (offset 16528) (line 321) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 16528) (line 321) (column 35) (len 19)))))
+    (reference r206 (scope relative) (span (offset 16557) (line 321) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 16557) (line 321) (column 64) (len 8)))))
+    (reference r207 (scope relative) (span (offset 16568) (line 321) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 16568) (line 321) (column 75) (len 3)))))
+    (reference r208 (scope relative) (span (offset 16572) (line 321) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 16572) (line 321) (column 79) (len 1)))))
+    (reference r209 (scope relative) (span (offset 16579) (line 321) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 16579) (line 321) (column 86) (len 8)))))
+    (reference r210 (scope relative) (span (offset 16633) (line 322) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 16633) (line 322) (column 39) (len 19)))))
+    (reference r211 (scope relative) (span (offset 16662) (line 322) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 16662) (line 322) (column 68) (len 8)))))
+    (reference r212 (scope relative) (span (offset 16673) (line 322) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 16673) (line 322) (column 79) (len 3)))))
+    (reference r213 (scope relative) (span (offset 16677) (line 322) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 16677) (line 322) (column 83) (len 1)))))
+    (reference r214 (scope relative) (span (offset 16684) (line 322) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 16684) (line 322) (column 90) (len 8)))))
+    (reference r215 (scope relative) (span (offset 16755) (line 323) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 16755) (line 323) (column 55) (len 19)))))
+    (reference r216 (scope relative) (span (offset 16784) (line 323) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 16784) (line 323) (column 84) (len 8)))))
+    (reference r217 (scope relative) (span (offset 16795) (line 323) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 16795) (line 323) (column 95) (len 3)))))
+    (reference r218 (scope relative) (span (offset 16799) (line 323) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 16799) (line 323) (column 99) (len 4)))))
+    (reference r219 (scope relative) (span (offset 16809) (line 323) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 16809) (line 323) (column 109) (len 8)))))
+    (reference r220 (scope relative) (span (offset 16848) (line 324) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 16848) (line 324) (column 23) (len 17)))))
+    (reference r221 (scope relative) (span (offset 16872) (line 324) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 16872) (line 324) (column 47) (len 20)))))
+    (reference r222 (scope relative) (span (offset 16896) (line 324) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 16896) (line 324) (column 71) (len 8)))))
+    (reference r223 (scope relative) (span (offset 16906) (line 324) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 16906) (line 324) (column 81) (len 6)))))
+    (reference r224 (scope relative) (span (offset 16914) (line 324) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 16914) (line 324) (column 89) (len 10)))))
+    (reference r225 (scope relative) (span (offset 16926) (line 324) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 16926) (line 324) (column 101) (len 26)))))
+    (reference r226 (scope relative) (span (offset 17079) (line 328) (column 53) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 17079) (line 328) (column 53) (len 19)))))
+    (reference r227 (scope relative) (span (offset 17775) (line 341) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 17775) (line 341) (column 28) (len 4)))))
+    (reference r228 (scope relative) (span (offset 17770) (line 341) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 17770) (line 341) (column 23) (len 3)))))
+    (reference r229 (scope relative) (span (offset 17809) (line 342) (column 29) (len 29)) (segments (segment 0 (token "CoefficientOfHeatTransferUnit") (name "CoefficientOfHeatTransferUnit") (separator none) (span (offset 17809) (line 342) (column 29) (len 29)))))
+    (reference r230 (scope relative) (span (offset 17803) (line 342) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 17803) (line 342) (column 23) (len 4)))))
+    (reference r231 (scope relative) (span (offset 18008) (line 347) (column 52) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 18008) (line 347) (column 52) (len 11)))))
+    (reference r232 (scope relative) (span (offset 18056) (line 348) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 18056) (line 348) (column 35) (len 19)))))
+    (reference r233 (scope relative) (span (offset 18085) (line 348) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 18085) (line 348) (column 64) (len 8)))))
+    (reference r234 (scope relative) (span (offset 18096) (line 348) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 18096) (line 348) (column 75) (len 3)))))
+    (reference r235 (scope relative) (span (offset 18100) (line 348) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 18100) (line 348) (column 79) (len 1)))))
+    (reference r236 (scope relative) (span (offset 18107) (line 348) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 18107) (line 348) (column 86) (len 8)))))
+    (reference r237 (scope relative) (span (offset 18161) (line 349) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 18161) (line 349) (column 39) (len 19)))))
+    (reference r238 (scope relative) (span (offset 18190) (line 349) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 18190) (line 349) (column 68) (len 8)))))
+    (reference r239 (scope relative) (span (offset 18201) (line 349) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 18201) (line 349) (column 79) (len 3)))))
+    (reference r240 (scope relative) (span (offset 18205) (line 349) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 18205) (line 349) (column 83) (len 1)))))
+    (reference r241 (scope relative) (span (offset 18212) (line 349) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 18212) (line 349) (column 90) (len 8)))))
+    (reference r242 (scope relative) (span (offset 18283) (line 350) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 18283) (line 350) (column 55) (len 19)))))
+    (reference r243 (scope relative) (span (offset 18312) (line 350) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 18312) (line 350) (column 84) (len 8)))))
+    (reference r244 (scope relative) (span (offset 18323) (line 350) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 18323) (line 350) (column 95) (len 3)))))
+    (reference r245 (scope relative) (span (offset 18327) (line 350) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 18327) (line 350) (column 99) (len 4)))))
+    (reference r246 (scope relative) (span (offset 18337) (line 350) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 18337) (line 350) (column 109) (len 8)))))
+    (reference r247 (scope relative) (span (offset 18376) (line 351) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 18376) (line 351) (column 23) (len 17)))))
+    (reference r248 (scope relative) (span (offset 18400) (line 351) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 18400) (line 351) (column 47) (len 20)))))
+    (reference r249 (scope relative) (span (offset 18424) (line 351) (column 71) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 18424) (line 351) (column 71) (len 6)))))
+    (reference r250 (scope relative) (span (offset 18432) (line 351) (column 79) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 18432) (line 351) (column 79) (len 10)))))
+    (reference r251 (scope relative) (span (offset 18444) (line 351) (column 91) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 18444) (line 351) (column 91) (len 26)))))
+    (reference r252 (scope relative) (span (offset 18612) (line 355) (column 60) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 18612) (line 355) (column 60) (len 19)))))
+    (reference r253 (scope relative) (span (offset 19414) (line 368) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 19414) (line 368) (column 28) (len 4)))))
+    (reference r254 (scope relative) (span (offset 19409) (line 368) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 19409) (line 368) (column 23) (len 3)))))
+    (reference r255 (scope relative) (span (offset 19448) (line 369) (column 29) (len 36)) (segments (segment 0 (token "SurfaceCoefficientOfHeatTransferUnit") (name "SurfaceCoefficientOfHeatTransferUnit") (separator none) (span (offset 19448) (line 369) (column 29) (len 36)))))
+    (reference r256 (scope relative) (span (offset 19442) (line 369) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 19442) (line 369) (column 23) (len 4)))))
+    (reference r257 (scope relative) (span (offset 19675) (line 374) (column 59) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 19675) (line 374) (column 59) (len 11)))))
+    (reference r258 (scope relative) (span (offset 19723) (line 375) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 19723) (line 375) (column 35) (len 19)))))
+    (reference r259 (scope relative) (span (offset 19752) (line 375) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 19752) (line 375) (column 64) (len 8)))))
+    (reference r260 (scope relative) (span (offset 19763) (line 375) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 19763) (line 375) (column 75) (len 3)))))
+    (reference r261 (scope relative) (span (offset 19767) (line 375) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 19767) (line 375) (column 79) (len 1)))))
+    (reference r262 (scope relative) (span (offset 19774) (line 375) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 19774) (line 375) (column 86) (len 8)))))
+    (reference r263 (scope relative) (span (offset 19828) (line 376) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 19828) (line 376) (column 39) (len 19)))))
+    (reference r264 (scope relative) (span (offset 19857) (line 376) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 19857) (line 376) (column 68) (len 8)))))
+    (reference r265 (scope relative) (span (offset 19868) (line 376) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 19868) (line 376) (column 79) (len 3)))))
+    (reference r266 (scope relative) (span (offset 19872) (line 376) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 19872) (line 376) (column 83) (len 1)))))
+    (reference r267 (scope relative) (span (offset 19879) (line 376) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 19879) (line 376) (column 90) (len 8)))))
+    (reference r268 (scope relative) (span (offset 19950) (line 377) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 19950) (line 377) (column 55) (len 19)))))
+    (reference r269 (scope relative) (span (offset 19979) (line 377) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 19979) (line 377) (column 84) (len 8)))))
+    (reference r270 (scope relative) (span (offset 19990) (line 377) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 19990) (line 377) (column 95) (len 3)))))
+    (reference r271 (scope relative) (span (offset 19994) (line 377) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 19994) (line 377) (column 99) (len 4)))))
+    (reference r272 (scope relative) (span (offset 20004) (line 377) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 20004) (line 377) (column 109) (len 8)))))
+    (reference r273 (scope relative) (span (offset 20043) (line 378) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 20043) (line 378) (column 23) (len 17)))))
+    (reference r274 (scope relative) (span (offset 20067) (line 378) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 20067) (line 378) (column 47) (len 20)))))
+    (reference r275 (scope relative) (span (offset 20091) (line 378) (column 71) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 20091) (line 378) (column 71) (len 6)))))
+    (reference r276 (scope relative) (span (offset 20099) (line 378) (column 79) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 20099) (line 378) (column 79) (len 10)))))
+    (reference r277 (scope relative) (span (offset 20111) (line 378) (column 91) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 20111) (line 378) (column 91) (len 26)))))
+    (reference r278 (scope relative) (span (offset 20276) (line 382) (column 44) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 20276) (line 382) (column 44) (len 19)))))
+    (reference r279 (scope relative) (span (offset 20912) (line 395) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 20912) (line 395) (column 28) (len 4)))))
+    (reference r280 (scope relative) (span (offset 20907) (line 395) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 20907) (line 395) (column 23) (len 3)))))
+    (reference r281 (scope relative) (span (offset 20946) (line 396) (column 29) (len 20)) (segments (segment 0 (token "ThermalInsulanceUnit") (name "ThermalInsulanceUnit") (separator none) (span (offset 20946) (line 396) (column 29) (len 20)))))
+    (reference r282 (scope relative) (span (offset 20940) (line 396) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 20940) (line 396) (column 23) (len 4)))))
+    (reference r283 (scope relative) (span (offset 21109) (line 401) (column 43) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 21109) (line 401) (column 43) (len 11)))))
+    (reference r284 (scope relative) (span (offset 21157) (line 402) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 21157) (line 402) (column 35) (len 19)))))
+    (reference r285 (scope relative) (span (offset 21186) (line 402) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 21186) (line 402) (column 64) (len 8)))))
+    (reference r286 (scope relative) (span (offset 21197) (line 402) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 21197) (line 402) (column 75) (len 3)))))
+    (reference r287 (scope relative) (span (offset 21201) (line 402) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 21201) (line 402) (column 79) (len 1)))))
+    (reference r288 (scope relative) (span (offset 21208) (line 402) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 21208) (line 402) (column 86) (len 8)))))
+    (reference r289 (scope relative) (span (offset 21263) (line 403) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 21263) (line 403) (column 39) (len 19)))))
+    (reference r290 (scope relative) (span (offset 21292) (line 403) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 21292) (line 403) (column 68) (len 8)))))
+    (reference r291 (scope relative) (span (offset 21303) (line 403) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 21303) (line 403) (column 79) (len 3)))))
+    (reference r292 (scope relative) (span (offset 21307) (line 403) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 21307) (line 403) (column 83) (len 1)))))
+    (reference r293 (scope relative) (span (offset 21314) (line 403) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 21314) (line 403) (column 90) (len 8)))))
+    (reference r294 (scope relative) (span (offset 21384) (line 404) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 21384) (line 404) (column 55) (len 19)))))
+    (reference r295 (scope relative) (span (offset 21413) (line 404) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 21413) (line 404) (column 84) (len 8)))))
+    (reference r296 (scope relative) (span (offset 21424) (line 404) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 21424) (line 404) (column 95) (len 3)))))
+    (reference r297 (scope relative) (span (offset 21428) (line 404) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 21428) (line 404) (column 99) (len 4)))))
+    (reference r298 (scope relative) (span (offset 21438) (line 404) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 21438) (line 404) (column 109) (len 8)))))
+    (reference r299 (scope relative) (span (offset 21476) (line 405) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 21476) (line 405) (column 23) (len 17)))))
+    (reference r300 (scope relative) (span (offset 21500) (line 405) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 21500) (line 405) (column 47) (len 20)))))
+    (reference r301 (scope relative) (span (offset 21524) (line 405) (column 71) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 21524) (line 405) (column 71) (len 6)))))
+    (reference r302 (scope relative) (span (offset 21532) (line 405) (column 79) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 21532) (line 405) (column 79) (len 10)))))
+    (reference r303 (scope relative) (span (offset 21544) (line 405) (column 91) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 21544) (line 405) (column 91) (len 26)))))
+    (reference r304 (scope relative) (span (offset 21630) (line 408) (column 49) (len 20)) (segments (segment 0 (token "ThermalInsulanceUnit") (name "ThermalInsulanceUnit") (separator none) (span (offset 21630) (line 408) (column 49) (len 20)))))
+    (reference r305 (scope relative) (span (offset 21701) (line 409) (column 50) (len 21)) (segments (segment 0 (token "ThermalInsulanceValue") (name "ThermalInsulanceValue") (separator none) (span (offset 21701) (line 409) (column 50) (len 21)))))
+    (reference r306 (scope relative) (span (offset 21768) (line 410) (column 45) (len 16)) (segments (segment 0 (token "thermalInsulance") (name "thermalInsulance") (separator none) (span (offset 21768) (line 410) (column 45) (len 16)))))
+    (reference r307 (scope relative) (span (offset 21882) (line 413) (column 45) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 21882) (line 413) (column 45) (len 19)))))
+    (reference r308 (scope relative) (span (offset 22403) (line 426) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 22403) (line 426) (column 28) (len 4)))))
+    (reference r309 (scope relative) (span (offset 22398) (line 426) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 22398) (line 426) (column 23) (len 3)))))
+    (reference r310 (scope relative) (span (offset 22437) (line 427) (column 29) (len 21)) (segments (segment 0 (token "ThermalResistanceUnit") (name "ThermalResistanceUnit") (separator none) (span (offset 22437) (line 427) (column 29) (len 21)))))
+    (reference r311 (scope relative) (span (offset 22431) (line 427) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 22431) (line 427) (column 23) (len 4)))))
+    (reference r312 (scope relative) (span (offset 22604) (line 432) (column 44) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 22604) (line 432) (column 44) (len 11)))))
+    (reference r313 (scope relative) (span (offset 22654) (line 433) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 22654) (line 433) (column 37) (len 19)))))
+    (reference r314 (scope relative) (span (offset 22683) (line 433) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 22683) (line 433) (column 66) (len 8)))))
+    (reference r315 (scope relative) (span (offset 22694) (line 433) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 22694) (line 433) (column 77) (len 3)))))
+    (reference r316 (scope relative) (span (offset 22698) (line 433) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 22698) (line 433) (column 81) (len 1)))))
+    (reference r317 (scope relative) (span (offset 22705) (line 433) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 22705) (line 433) (column 88) (len 8)))))
+    (reference r318 (scope relative) (span (offset 22756) (line 434) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 22756) (line 434) (column 35) (len 19)))))
+    (reference r319 (scope relative) (span (offset 22785) (line 434) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 22785) (line 434) (column 64) (len 8)))))
+    (reference r320 (scope relative) (span (offset 22796) (line 434) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 22796) (line 434) (column 75) (len 3)))))
+    (reference r321 (scope relative) (span (offset 22800) (line 434) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 22800) (line 434) (column 79) (len 1)))))
+    (reference r322 (scope relative) (span (offset 22807) (line 434) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 22807) (line 434) (column 86) (len 8)))))
+    (reference r323 (scope relative) (span (offset 22862) (line 435) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 22862) (line 435) (column 39) (len 19)))))
+    (reference r324 (scope relative) (span (offset 22891) (line 435) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 22891) (line 435) (column 68) (len 8)))))
+    (reference r325 (scope relative) (span (offset 22902) (line 435) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 22902) (line 435) (column 79) (len 3)))))
+    (reference r326 (scope relative) (span (offset 22906) (line 435) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 22906) (line 435) (column 83) (len 1)))))
+    (reference r327 (scope relative) (span (offset 22913) (line 435) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 22913) (line 435) (column 90) (len 8)))))
+    (reference r328 (scope relative) (span (offset 22983) (line 436) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 22983) (line 436) (column 55) (len 19)))))
+    (reference r329 (scope relative) (span (offset 23012) (line 436) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 23012) (line 436) (column 84) (len 8)))))
+    (reference r330 (scope relative) (span (offset 23023) (line 436) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 23023) (line 436) (column 95) (len 3)))))
+    (reference r331 (scope relative) (span (offset 23027) (line 436) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 23027) (line 436) (column 99) (len 4)))))
+    (reference r332 (scope relative) (span (offset 23037) (line 436) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 23037) (line 436) (column 109) (len 8)))))
+    (reference r333 (scope relative) (span (offset 23075) (line 437) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 23075) (line 437) (column 23) (len 17)))))
+    (reference r334 (scope relative) (span (offset 23099) (line 437) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 23099) (line 437) (column 47) (len 20)))))
+    (reference r335 (scope relative) (span (offset 23123) (line 437) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 23123) (line 437) (column 71) (len 8)))))
+    (reference r336 (scope relative) (span (offset 23133) (line 437) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 23133) (line 437) (column 81) (len 6)))))
+    (reference r337 (scope relative) (span (offset 23141) (line 437) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 23141) (line 437) (column 89) (len 10)))))
+    (reference r338 (scope relative) (span (offset 23153) (line 437) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 23153) (line 437) (column 101) (len 26)))))
+    (reference r339 (scope relative) (span (offset 23288) (line 441) (column 46) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 23288) (line 441) (column 46) (len 19)))))
+    (reference r340 (scope relative) (span (offset 23890) (line 454) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 23890) (line 454) (column 28) (len 4)))))
+    (reference r341 (scope relative) (span (offset 23885) (line 454) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 23885) (line 454) (column 23) (len 3)))))
+    (reference r342 (scope relative) (span (offset 23924) (line 455) (column 29) (len 22)) (segments (segment 0 (token "ThermalConductanceUnit") (name "ThermalConductanceUnit") (separator none) (span (offset 23924) (line 455) (column 29) (len 22)))))
+    (reference r343 (scope relative) (span (offset 23918) (line 455) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 23918) (line 455) (column 23) (len 4)))))
+    (reference r344 (scope relative) (span (offset 24095) (line 460) (column 45) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 24095) (line 460) (column 45) (len 11)))))
+    (reference r345 (scope relative) (span (offset 24145) (line 461) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 24145) (line 461) (column 37) (len 19)))))
+    (reference r346 (scope relative) (span (offset 24174) (line 461) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 24174) (line 461) (column 66) (len 8)))))
+    (reference r347 (scope relative) (span (offset 24185) (line 461) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 24185) (line 461) (column 77) (len 3)))))
+    (reference r348 (scope relative) (span (offset 24189) (line 461) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 24189) (line 461) (column 81) (len 1)))))
+    (reference r349 (scope relative) (span (offset 24196) (line 461) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 24196) (line 461) (column 88) (len 8)))))
+    (reference r350 (scope relative) (span (offset 24246) (line 462) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 24246) (line 462) (column 35) (len 19)))))
+    (reference r351 (scope relative) (span (offset 24275) (line 462) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 24275) (line 462) (column 64) (len 8)))))
+    (reference r352 (scope relative) (span (offset 24286) (line 462) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 24286) (line 462) (column 75) (len 3)))))
+    (reference r353 (scope relative) (span (offset 24290) (line 462) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 24290) (line 462) (column 79) (len 1)))))
+    (reference r354 (scope relative) (span (offset 24297) (line 462) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 24297) (line 462) (column 86) (len 8)))))
+    (reference r355 (scope relative) (span (offset 24351) (line 463) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 24351) (line 463) (column 39) (len 19)))))
+    (reference r356 (scope relative) (span (offset 24380) (line 463) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 24380) (line 463) (column 68) (len 8)))))
+    (reference r357 (scope relative) (span (offset 24391) (line 463) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 24391) (line 463) (column 79) (len 3)))))
+    (reference r358 (scope relative) (span (offset 24395) (line 463) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 24395) (line 463) (column 83) (len 1)))))
+    (reference r359 (scope relative) (span (offset 24402) (line 463) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 24402) (line 463) (column 90) (len 8)))))
+    (reference r360 (scope relative) (span (offset 24473) (line 464) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 24473) (line 464) (column 55) (len 19)))))
+    (reference r361 (scope relative) (span (offset 24502) (line 464) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 24502) (line 464) (column 84) (len 8)))))
+    (reference r362 (scope relative) (span (offset 24513) (line 464) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 24513) (line 464) (column 95) (len 3)))))
+    (reference r363 (scope relative) (span (offset 24517) (line 464) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 24517) (line 464) (column 99) (len 4)))))
+    (reference r364 (scope relative) (span (offset 24527) (line 464) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 24527) (line 464) (column 109) (len 8)))))
+    (reference r365 (scope relative) (span (offset 24566) (line 465) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 24566) (line 465) (column 23) (len 17)))))
+    (reference r366 (scope relative) (span (offset 24590) (line 465) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 24590) (line 465) (column 47) (len 20)))))
+    (reference r367 (scope relative) (span (offset 24614) (line 465) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 24614) (line 465) (column 71) (len 8)))))
+    (reference r368 (scope relative) (span (offset 24624) (line 465) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 24624) (line 465) (column 81) (len 6)))))
+    (reference r369 (scope relative) (span (offset 24632) (line 465) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 24632) (line 465) (column 89) (len 10)))))
+    (reference r370 (scope relative) (span (offset 24644) (line 465) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 24644) (line 465) (column 101) (len 26)))))
+    (reference r371 (scope relative) (span (offset 24779) (line 469) (column 46) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 24779) (line 469) (column 46) (len 19)))))
+    (reference r372 (scope relative) (span (offset 25437) (line 482) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 25437) (line 482) (column 28) (len 4)))))
+    (reference r373 (scope relative) (span (offset 25432) (line 482) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 25432) (line 482) (column 23) (len 3)))))
+    (reference r374 (scope relative) (span (offset 25471) (line 483) (column 29) (len 22)) (segments (segment 0 (token "ThermalDiffusivityUnit") (name "ThermalDiffusivityUnit") (separator none) (span (offset 25471) (line 483) (column 29) (len 22)))))
+    (reference r375 (scope relative) (span (offset 25465) (line 483) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 25465) (line 483) (column 23) (len 4)))))
+    (reference r376 (scope relative) (span (offset 25642) (line 488) (column 45) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 25642) (line 488) (column 45) (len 11)))))
+    (reference r377 (scope relative) (span (offset 25692) (line 489) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 25692) (line 489) (column 37) (len 19)))))
+    (reference r378 (scope relative) (span (offset 25721) (line 489) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 25721) (line 489) (column 66) (len 8)))))
+    (reference r379 (scope relative) (span (offset 25732) (line 489) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 25732) (line 489) (column 77) (len 3)))))
+    (reference r380 (scope relative) (span (offset 25736) (line 489) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 25736) (line 489) (column 81) (len 1)))))
+    (reference r381 (scope relative) (span (offset 25743) (line 489) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 25743) (line 489) (column 88) (len 8)))))
+    (reference r382 (scope relative) (span (offset 25797) (line 490) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 25797) (line 490) (column 39) (len 19)))))
+    (reference r383 (scope relative) (span (offset 25826) (line 490) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 25826) (line 490) (column 68) (len 8)))))
+    (reference r384 (scope relative) (span (offset 25837) (line 490) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 25837) (line 490) (column 79) (len 3)))))
+    (reference r385 (scope relative) (span (offset 25841) (line 490) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 25841) (line 490) (column 83) (len 1)))))
+    (reference r386 (scope relative) (span (offset 25848) (line 490) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 25848) (line 490) (column 90) (len 8)))))
+    (reference r387 (scope relative) (span (offset 25887) (line 491) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 25887) (line 491) (column 23) (len 17)))))
+    (reference r388 (scope relative) (span (offset 25911) (line 491) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 25911) (line 491) (column 47) (len 20)))))
+    (reference r389 (scope relative) (span (offset 25935) (line 491) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 25935) (line 491) (column 71) (len 8)))))
+    (reference r390 (scope relative) (span (offset 25945) (line 491) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 25945) (line 491) (column 81) (len 10)))))
+    (reference r391 (scope relative) (span (offset 26052) (line 495) (column 40) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 26052) (line 495) (column 40) (len 19)))))
+    (reference r392 (scope relative) (span (offset 26734) (line 508) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 26734) (line 508) (column 28) (len 4)))))
+    (reference r393 (scope relative) (span (offset 26729) (line 508) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 26729) (line 508) (column 23) (len 3)))))
+    (reference r394 (scope relative) (span (offset 26768) (line 509) (column 29) (len 16)) (segments (segment 0 (token "HeatCapacityUnit") (name "HeatCapacityUnit") (separator none) (span (offset 26768) (line 509) (column 29) (len 16)))))
+    (reference r395 (scope relative) (span (offset 26762) (line 509) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 26762) (line 509) (column 23) (len 4)))))
+    (reference r396 (scope relative) (span (offset 26915) (line 514) (column 39) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 26915) (line 514) (column 39) (len 11)))))
+    (reference r397 (scope relative) (span (offset 26965) (line 515) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 26965) (line 515) (column 37) (len 19)))))
+    (reference r398 (scope relative) (span (offset 26994) (line 515) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 26994) (line 515) (column 66) (len 8)))))
+    (reference r399 (scope relative) (span (offset 27005) (line 515) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 27005) (line 515) (column 77) (len 3)))))
+    (reference r400 (scope relative) (span (offset 27009) (line 515) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 27009) (line 515) (column 81) (len 1)))))
+    (reference r401 (scope relative) (span (offset 27016) (line 515) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 27016) (line 515) (column 88) (len 8)))))
+    (reference r402 (scope relative) (span (offset 27066) (line 516) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 27066) (line 516) (column 35) (len 19)))))
+    (reference r403 (scope relative) (span (offset 27095) (line 516) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 27095) (line 516) (column 64) (len 8)))))
+    (reference r404 (scope relative) (span (offset 27106) (line 516) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 27106) (line 516) (column 75) (len 3)))))
+    (reference r405 (scope relative) (span (offset 27110) (line 516) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 27110) (line 516) (column 79) (len 1)))))
+    (reference r406 (scope relative) (span (offset 27117) (line 516) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 27117) (line 516) (column 86) (len 8)))))
+    (reference r407 (scope relative) (span (offset 27171) (line 517) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 27171) (line 517) (column 39) (len 19)))))
+    (reference r408 (scope relative) (span (offset 27200) (line 517) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 27200) (line 517) (column 68) (len 8)))))
+    (reference r409 (scope relative) (span (offset 27211) (line 517) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 27211) (line 517) (column 79) (len 3)))))
+    (reference r410 (scope relative) (span (offset 27215) (line 517) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 27215) (line 517) (column 83) (len 1)))))
+    (reference r411 (scope relative) (span (offset 27222) (line 517) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 27222) (line 517) (column 90) (len 8)))))
+    (reference r412 (scope relative) (span (offset 27293) (line 518) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 27293) (line 518) (column 55) (len 19)))))
+    (reference r413 (scope relative) (span (offset 27322) (line 518) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 27322) (line 518) (column 84) (len 8)))))
+    (reference r414 (scope relative) (span (offset 27333) (line 518) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 27333) (line 518) (column 95) (len 3)))))
+    (reference r415 (scope relative) (span (offset 27337) (line 518) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 27337) (line 518) (column 99) (len 4)))))
+    (reference r416 (scope relative) (span (offset 27347) (line 518) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 27347) (line 518) (column 109) (len 8)))))
+    (reference r417 (scope relative) (span (offset 27386) (line 519) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 27386) (line 519) (column 23) (len 17)))))
+    (reference r418 (scope relative) (span (offset 27410) (line 519) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 27410) (line 519) (column 47) (len 20)))))
+    (reference r419 (scope relative) (span (offset 27434) (line 519) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 27434) (line 519) (column 71) (len 8)))))
+    (reference r420 (scope relative) (span (offset 27444) (line 519) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 27444) (line 519) (column 81) (len 6)))))
+    (reference r421 (scope relative) (span (offset 27452) (line 519) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 27452) (line 519) (column 89) (len 10)))))
+    (reference r422 (scope relative) (span (offset 27464) (line 519) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 27464) (line 519) (column 101) (len 26)))))
+    (reference r423 (scope relative) (span (offset 27606) (line 523) (column 48) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 27606) (line 523) (column 48) (len 19)))))
+    (reference r424 (scope relative) (span (offset 28220) (line 536) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 28220) (line 536) (column 28) (len 4)))))
+    (reference r425 (scope relative) (span (offset 28215) (line 536) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 28215) (line 536) (column 23) (len 3)))))
+    (reference r426 (scope relative) (span (offset 28254) (line 537) (column 29) (len 24)) (segments (segment 0 (token "SpecificHeatCapacityUnit") (name "SpecificHeatCapacityUnit") (separator none) (span (offset 28254) (line 537) (column 29) (len 24)))))
+    (reference r427 (scope relative) (span (offset 28248) (line 537) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 28248) (line 537) (column 23) (len 4)))))
+    (reference r428 (scope relative) (span (offset 28433) (line 542) (column 47) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 28433) (line 542) (column 47) (len 11)))))
+    (reference r429 (scope relative) (span (offset 28483) (line 543) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 28483) (line 543) (column 37) (len 19)))))
+    (reference r430 (scope relative) (span (offset 28512) (line 543) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 28512) (line 543) (column 66) (len 8)))))
+    (reference r431 (scope relative) (span (offset 28523) (line 543) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 28523) (line 543) (column 77) (len 3)))))
+    (reference r432 (scope relative) (span (offset 28527) (line 543) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 28527) (line 543) (column 81) (len 1)))))
+    (reference r433 (scope relative) (span (offset 28534) (line 543) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 28534) (line 543) (column 88) (len 8)))))
+    (reference r434 (scope relative) (span (offset 28588) (line 544) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 28588) (line 544) (column 39) (len 19)))))
+    (reference r435 (scope relative) (span (offset 28617) (line 544) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 28617) (line 544) (column 68) (len 8)))))
+    (reference r436 (scope relative) (span (offset 28628) (line 544) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 28628) (line 544) (column 79) (len 3)))))
+    (reference r437 (scope relative) (span (offset 28632) (line 544) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 28632) (line 544) (column 83) (len 1)))))
+    (reference r438 (scope relative) (span (offset 28639) (line 544) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 28639) (line 544) (column 90) (len 8)))))
+    (reference r439 (scope relative) (span (offset 28710) (line 545) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 28710) (line 545) (column 55) (len 19)))))
+    (reference r440 (scope relative) (span (offset 28739) (line 545) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 28739) (line 545) (column 84) (len 8)))))
+    (reference r441 (scope relative) (span (offset 28750) (line 545) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 28750) (line 545) (column 95) (len 3)))))
+    (reference r442 (scope relative) (span (offset 28754) (line 545) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 28754) (line 545) (column 99) (len 4)))))
+    (reference r443 (scope relative) (span (offset 28764) (line 545) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 28764) (line 545) (column 109) (len 8)))))
+    (reference r444 (scope relative) (span (offset 28803) (line 546) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 28803) (line 546) (column 23) (len 17)))))
+    (reference r445 (scope relative) (span (offset 28827) (line 546) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 28827) (line 546) (column 47) (len 20)))))
+    (reference r446 (scope relative) (span (offset 28851) (line 546) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 28851) (line 546) (column 71) (len 8)))))
+    (reference r447 (scope relative) (span (offset 28861) (line 546) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 28861) (line 546) (column 81) (len 10)))))
+    (reference r448 (scope relative) (span (offset 28873) (line 546) (column 93) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 28873) (line 546) (column 93) (len 26)))))
+    (reference r449 (scope relative) (span (offset 29054) (line 550) (column 66) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 29054) (line 550) (column 66) (len 19)))))
+    (reference r450 (scope relative) (span (offset 29625) (line 563) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 29625) (line 563) (column 28) (len 4)))))
+    (reference r451 (scope relative) (span (offset 29620) (line 563) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 29620) (line 563) (column 23) (len 3)))))
+    (reference r452 (scope relative) (span (offset 29659) (line 564) (column 29) (len 42)) (segments (segment 0 (token "SpecificHeatCapacityAtConstantPressureUnit") (name "SpecificHeatCapacityAtConstantPressureUnit") (separator none) (span (offset 29659) (line 564) (column 29) (len 42)))))
+    (reference r453 (scope relative) (span (offset 29653) (line 564) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 29653) (line 564) (column 23) (len 4)))))
+    (reference r454 (scope relative) (span (offset 29910) (line 569) (column 65) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 29910) (line 569) (column 65) (len 11)))))
+    (reference r455 (scope relative) (span (offset 29960) (line 570) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 29960) (line 570) (column 37) (len 19)))))
+    (reference r456 (scope relative) (span (offset 29989) (line 570) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 29989) (line 570) (column 66) (len 8)))))
+    (reference r457 (scope relative) (span (offset 30000) (line 570) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 30000) (line 570) (column 77) (len 3)))))
+    (reference r458 (scope relative) (span (offset 30004) (line 570) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 30004) (line 570) (column 81) (len 1)))))
+    (reference r459 (scope relative) (span (offset 30011) (line 570) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 30011) (line 570) (column 88) (len 8)))))
+    (reference r460 (scope relative) (span (offset 30065) (line 571) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 30065) (line 571) (column 39) (len 19)))))
+    (reference r461 (scope relative) (span (offset 30094) (line 571) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 30094) (line 571) (column 68) (len 8)))))
+    (reference r462 (scope relative) (span (offset 30105) (line 571) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 30105) (line 571) (column 79) (len 3)))))
+    (reference r463 (scope relative) (span (offset 30109) (line 571) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 30109) (line 571) (column 83) (len 1)))))
+    (reference r464 (scope relative) (span (offset 30116) (line 571) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 30116) (line 571) (column 90) (len 8)))))
+    (reference r465 (scope relative) (span (offset 30187) (line 572) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 30187) (line 572) (column 55) (len 19)))))
+    (reference r466 (scope relative) (span (offset 30216) (line 572) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 30216) (line 572) (column 84) (len 8)))))
+    (reference r467 (scope relative) (span (offset 30227) (line 572) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 30227) (line 572) (column 95) (len 3)))))
+    (reference r468 (scope relative) (span (offset 30231) (line 572) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 30231) (line 572) (column 99) (len 4)))))
+    (reference r469 (scope relative) (span (offset 30241) (line 572) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 30241) (line 572) (column 109) (len 8)))))
+    (reference r470 (scope relative) (span (offset 30280) (line 573) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 30280) (line 573) (column 23) (len 17)))))
+    (reference r471 (scope relative) (span (offset 30304) (line 573) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 30304) (line 573) (column 47) (len 20)))))
+    (reference r472 (scope relative) (span (offset 30328) (line 573) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 30328) (line 573) (column 71) (len 8)))))
+    (reference r473 (scope relative) (span (offset 30338) (line 573) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 30338) (line 573) (column 81) (len 10)))))
+    (reference r474 (scope relative) (span (offset 30350) (line 573) (column 93) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 30350) (line 573) (column 93) (len 26)))))
+    (reference r475 (scope relative) (span (offset 30527) (line 577) (column 64) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 30527) (line 577) (column 64) (len 19)))))
+    (reference r476 (scope relative) (span (offset 31093) (line 590) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 31093) (line 590) (column 28) (len 4)))))
+    (reference r477 (scope relative) (span (offset 31088) (line 590) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 31088) (line 590) (column 23) (len 3)))))
+    (reference r478 (scope relative) (span (offset 31127) (line 591) (column 29) (len 40)) (segments (segment 0 (token "SpecificHeatCapacityAtConstantVolumeUnit") (name "SpecificHeatCapacityAtConstantVolumeUnit") (separator none) (span (offset 31127) (line 591) (column 29) (len 40)))))
+    (reference r479 (scope relative) (span (offset 31121) (line 591) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 31121) (line 591) (column 23) (len 4)))))
+    (reference r480 (scope relative) (span (offset 31370) (line 596) (column 63) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 31370) (line 596) (column 63) (len 11)))))
+    (reference r481 (scope relative) (span (offset 31420) (line 597) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 31420) (line 597) (column 37) (len 19)))))
+    (reference r482 (scope relative) (span (offset 31449) (line 597) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 31449) (line 597) (column 66) (len 8)))))
+    (reference r483 (scope relative) (span (offset 31460) (line 597) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 31460) (line 597) (column 77) (len 3)))))
+    (reference r484 (scope relative) (span (offset 31464) (line 597) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 31464) (line 597) (column 81) (len 1)))))
+    (reference r485 (scope relative) (span (offset 31471) (line 597) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 31471) (line 597) (column 88) (len 8)))))
+    (reference r486 (scope relative) (span (offset 31525) (line 598) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 31525) (line 598) (column 39) (len 19)))))
+    (reference r487 (scope relative) (span (offset 31554) (line 598) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 31554) (line 598) (column 68) (len 8)))))
+    (reference r488 (scope relative) (span (offset 31565) (line 598) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 31565) (line 598) (column 79) (len 3)))))
+    (reference r489 (scope relative) (span (offset 31569) (line 598) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 31569) (line 598) (column 83) (len 1)))))
+    (reference r490 (scope relative) (span (offset 31576) (line 598) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 31576) (line 598) (column 90) (len 8)))))
+    (reference r491 (scope relative) (span (offset 31647) (line 599) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 31647) (line 599) (column 55) (len 19)))))
+    (reference r492 (scope relative) (span (offset 31676) (line 599) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 31676) (line 599) (column 84) (len 8)))))
+    (reference r493 (scope relative) (span (offset 31687) (line 599) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 31687) (line 599) (column 95) (len 3)))))
+    (reference r494 (scope relative) (span (offset 31691) (line 599) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 31691) (line 599) (column 99) (len 4)))))
+    (reference r495 (scope relative) (span (offset 31701) (line 599) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 31701) (line 599) (column 109) (len 8)))))
+    (reference r496 (scope relative) (span (offset 31740) (line 600) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 31740) (line 600) (column 23) (len 17)))))
+    (reference r497 (scope relative) (span (offset 31764) (line 600) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 31764) (line 600) (column 47) (len 20)))))
+    (reference r498 (scope relative) (span (offset 31788) (line 600) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 31788) (line 600) (column 71) (len 8)))))
+    (reference r499 (scope relative) (span (offset 31798) (line 600) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 31798) (line 600) (column 81) (len 10)))))
+    (reference r500 (scope relative) (span (offset 31810) (line 600) (column 93) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 31810) (line 600) (column 93) (len 26)))))
+    (reference r501 (scope relative) (span (offset 32006) (line 604) (column 73) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 32006) (line 604) (column 73) (len 19)))))
+    (reference r502 (scope relative) (span (offset 32565) (line 617) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 32565) (line 617) (column 28) (len 4)))))
+    (reference r503 (scope relative) (span (offset 32560) (line 617) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 32560) (line 617) (column 23) (len 3)))))
+    (reference r504 (scope relative) (span (offset 32599) (line 618) (column 29) (len 49)) (segments (segment 0 (token "SpecificHeatCapacityAtSaturatedVapourPressureUnit") (name "SpecificHeatCapacityAtSaturatedVapourPressureUnit") (separator none) (span (offset 32599) (line 618) (column 29) (len 49)))))
+    (reference r505 (scope relative) (span (offset 32593) (line 618) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 32593) (line 618) (column 23) (len 4)))))
+    (reference r506 (scope relative) (span (offset 32878) (line 623) (column 72) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 32878) (line 623) (column 72) (len 11)))))
+    (reference r507 (scope relative) (span (offset 32928) (line 624) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 32928) (line 624) (column 37) (len 19)))))
+    (reference r508 (scope relative) (span (offset 32957) (line 624) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 32957) (line 624) (column 66) (len 8)))))
+    (reference r509 (scope relative) (span (offset 32968) (line 624) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 32968) (line 624) (column 77) (len 3)))))
+    (reference r510 (scope relative) (span (offset 32972) (line 624) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 32972) (line 624) (column 81) (len 1)))))
+    (reference r511 (scope relative) (span (offset 32979) (line 624) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 32979) (line 624) (column 88) (len 8)))))
+    (reference r512 (scope relative) (span (offset 33033) (line 625) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 33033) (line 625) (column 39) (len 19)))))
+    (reference r513 (scope relative) (span (offset 33062) (line 625) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 33062) (line 625) (column 68) (len 8)))))
+    (reference r514 (scope relative) (span (offset 33073) (line 625) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 33073) (line 625) (column 79) (len 3)))))
+    (reference r515 (scope relative) (span (offset 33077) (line 625) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 33077) (line 625) (column 83) (len 1)))))
+    (reference r516 (scope relative) (span (offset 33084) (line 625) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 33084) (line 625) (column 90) (len 8)))))
+    (reference r517 (scope relative) (span (offset 33155) (line 626) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 33155) (line 626) (column 55) (len 19)))))
+    (reference r518 (scope relative) (span (offset 33184) (line 626) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 33184) (line 626) (column 84) (len 8)))))
+    (reference r519 (scope relative) (span (offset 33195) (line 626) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 33195) (line 626) (column 95) (len 3)))))
+    (reference r520 (scope relative) (span (offset 33199) (line 626) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 33199) (line 626) (column 99) (len 4)))))
+    (reference r521 (scope relative) (span (offset 33209) (line 626) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 33209) (line 626) (column 109) (len 8)))))
+    (reference r522 (scope relative) (span (offset 33248) (line 627) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 33248) (line 627) (column 23) (len 17)))))
+    (reference r523 (scope relative) (span (offset 33272) (line 627) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 33272) (line 627) (column 47) (len 20)))))
+    (reference r524 (scope relative) (span (offset 33296) (line 627) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 33296) (line 627) (column 71) (len 8)))))
+    (reference r525 (scope relative) (span (offset 33306) (line 627) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 33306) (line 627) (column 81) (len 10)))))
+    (reference r526 (scope relative) (span (offset 33318) (line 627) (column 93) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 33318) (line 627) (column 93) (len 26)))))
+    (reference r527 (scope relative) (span (offset 33480) (line 631) (column 57) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 33480) (line 631) (column 57) (len 17)))))
+    (reference r528 (scope relative) (span (offset 34532) (line 648) (column 46) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 34532) (line 648) (column 46) (len 17)))))
+    (reference r529 (scope relative) (span (offset 35359) (line 664) (column 41) (len 18)) (segments (segment 0 (token "isentropicExponent") (name "isentropicExponent") (separator none) (span (offset 35359) (line 664) (column 41) (len 18)))))
+    (reference r530 (scope relative) (span (offset 35454) (line 667) (column 35) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 35454) (line 667) (column 35) (len 19)))))
+    (reference r531 (scope relative) (span (offset 36081) (line 680) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 36081) (line 680) (column 28) (len 4)))))
+    (reference r532 (scope relative) (span (offset 36076) (line 680) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 36076) (line 680) (column 23) (len 3)))))
+    (reference r533 (scope relative) (span (offset 36115) (line 681) (column 29) (len 11)) (segments (segment 0 (token "EntropyUnit") (name "EntropyUnit") (separator none) (span (offset 36115) (line 681) (column 29) (len 11)))))
+    (reference r534 (scope relative) (span (offset 36109) (line 681) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 36109) (line 681) (column 23) (len 4)))))
+    (reference r535 (scope relative) (span (offset 36242) (line 686) (column 34) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 36242) (line 686) (column 34) (len 11)))))
+    (reference r536 (scope relative) (span (offset 36292) (line 687) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 36292) (line 687) (column 37) (len 19)))))
+    (reference r537 (scope relative) (span (offset 36321) (line 687) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 36321) (line 687) (column 66) (len 8)))))
+    (reference r538 (scope relative) (span (offset 36332) (line 687) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 36332) (line 687) (column 77) (len 3)))))
+    (reference r539 (scope relative) (span (offset 36336) (line 687) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 36336) (line 687) (column 81) (len 1)))))
+    (reference r540 (scope relative) (span (offset 36343) (line 687) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 36343) (line 687) (column 88) (len 8)))))
+    (reference r541 (scope relative) (span (offset 36393) (line 688) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 36393) (line 688) (column 35) (len 19)))))
+    (reference r542 (scope relative) (span (offset 36422) (line 688) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 36422) (line 688) (column 64) (len 8)))))
+    (reference r543 (scope relative) (span (offset 36433) (line 688) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 36433) (line 688) (column 75) (len 3)))))
+    (reference r544 (scope relative) (span (offset 36437) (line 688) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 36437) (line 688) (column 79) (len 1)))))
+    (reference r545 (scope relative) (span (offset 36444) (line 688) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 36444) (line 688) (column 86) (len 8)))))
+    (reference r546 (scope relative) (span (offset 36498) (line 689) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 36498) (line 689) (column 39) (len 19)))))
+    (reference r547 (scope relative) (span (offset 36527) (line 689) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 36527) (line 689) (column 68) (len 8)))))
+    (reference r548 (scope relative) (span (offset 36538) (line 689) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 36538) (line 689) (column 79) (len 3)))))
+    (reference r549 (scope relative) (span (offset 36542) (line 689) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 36542) (line 689) (column 83) (len 1)))))
+    (reference r550 (scope relative) (span (offset 36549) (line 689) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 36549) (line 689) (column 90) (len 8)))))
+    (reference r551 (scope relative) (span (offset 36620) (line 690) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 36620) (line 690) (column 55) (len 19)))))
+    (reference r552 (scope relative) (span (offset 36649) (line 690) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 36649) (line 690) (column 84) (len 8)))))
+    (reference r553 (scope relative) (span (offset 36660) (line 690) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 36660) (line 690) (column 95) (len 3)))))
+    (reference r554 (scope relative) (span (offset 36664) (line 690) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 36664) (line 690) (column 99) (len 4)))))
+    (reference r555 (scope relative) (span (offset 36674) (line 690) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 36674) (line 690) (column 109) (len 8)))))
+    (reference r556 (scope relative) (span (offset 36713) (line 691) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 36713) (line 691) (column 23) (len 17)))))
+    (reference r557 (scope relative) (span (offset 36737) (line 691) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 36737) (line 691) (column 47) (len 20)))))
+    (reference r558 (scope relative) (span (offset 36761) (line 691) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 36761) (line 691) (column 71) (len 8)))))
+    (reference r559 (scope relative) (span (offset 36771) (line 691) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 36771) (line 691) (column 81) (len 6)))))
+    (reference r560 (scope relative) (span (offset 36779) (line 691) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 36779) (line 691) (column 89) (len 10)))))
+    (reference r561 (scope relative) (span (offset 36791) (line 691) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 36791) (line 691) (column 101) (len 26)))))
+    (reference r562 (scope relative) (span (offset 36920) (line 695) (column 43) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 36920) (line 695) (column 43) (len 19)))))
+    (reference r563 (scope relative) (span (offset 37503) (line 708) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 37503) (line 708) (column 28) (len 4)))))
+    (reference r564 (scope relative) (span (offset 37498) (line 708) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 37498) (line 708) (column 23) (len 3)))))
+    (reference r565 (scope relative) (span (offset 37537) (line 709) (column 29) (len 19)) (segments (segment 0 (token "SpecificEntropyUnit") (name "SpecificEntropyUnit") (separator none) (span (offset 37537) (line 709) (column 29) (len 19)))))
+    (reference r566 (scope relative) (span (offset 37531) (line 709) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 37531) (line 709) (column 23) (len 4)))))
+    (reference r567 (scope relative) (span (offset 37696) (line 714) (column 42) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 37696) (line 714) (column 42) (len 11)))))
+    (reference r568 (scope relative) (span (offset 37746) (line 715) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 37746) (line 715) (column 37) (len 19)))))
+    (reference r569 (scope relative) (span (offset 37775) (line 715) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 37775) (line 715) (column 66) (len 8)))))
+    (reference r570 (scope relative) (span (offset 37786) (line 715) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 37786) (line 715) (column 77) (len 3)))))
+    (reference r571 (scope relative) (span (offset 37790) (line 715) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 37790) (line 715) (column 81) (len 1)))))
+    (reference r572 (scope relative) (span (offset 37797) (line 715) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 37797) (line 715) (column 88) (len 8)))))
+    (reference r573 (scope relative) (span (offset 37851) (line 716) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 37851) (line 716) (column 39) (len 19)))))
+    (reference r574 (scope relative) (span (offset 37880) (line 716) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 37880) (line 716) (column 68) (len 8)))))
+    (reference r575 (scope relative) (span (offset 37891) (line 716) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 37891) (line 716) (column 79) (len 3)))))
+    (reference r576 (scope relative) (span (offset 37895) (line 716) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 37895) (line 716) (column 83) (len 1)))))
+    (reference r577 (scope relative) (span (offset 37902) (line 716) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 37902) (line 716) (column 90) (len 8)))))
+    (reference r578 (scope relative) (span (offset 37973) (line 717) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 37973) (line 717) (column 55) (len 19)))))
+    (reference r579 (scope relative) (span (offset 38002) (line 717) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 38002) (line 717) (column 84) (len 8)))))
+    (reference r580 (scope relative) (span (offset 38013) (line 717) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 38013) (line 717) (column 95) (len 3)))))
+    (reference r581 (scope relative) (span (offset 38017) (line 717) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 38017) (line 717) (column 99) (len 4)))))
+    (reference r582 (scope relative) (span (offset 38027) (line 717) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 38027) (line 717) (column 109) (len 8)))))
+    (reference r583 (scope relative) (span (offset 38066) (line 718) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 38066) (line 718) (column 23) (len 17)))))
+    (reference r584 (scope relative) (span (offset 38090) (line 718) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 38090) (line 718) (column 47) (len 20)))))
+    (reference r585 (scope relative) (span (offset 38114) (line 718) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 38114) (line 718) (column 71) (len 8)))))
+    (reference r586 (scope relative) (span (offset 38124) (line 718) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 38124) (line 718) (column 81) (len 10)))))
+    (reference r587 (scope relative) (span (offset 38136) (line 718) (column 93) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 38136) (line 718) (column 93) (len 26)))))
+    (reference r588 (scope relative) (span (offset 38248) (line 722) (column 34) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 38248) (line 722) (column 34) (len 19)))))
+    (reference r589 (scope relative) (span (offset 38861) (line 735) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 38861) (line 735) (column 28) (len 4)))))
+    (reference r590 (scope relative) (span (offset 38856) (line 735) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 38856) (line 735) (column 23) (len 3)))))
+    (reference r591 (scope relative) (span (offset 38895) (line 736) (column 29) (len 10)) (segments (segment 0 (token "EnergyUnit") (name "EnergyUnit") (separator none) (span (offset 38895) (line 736) (column 29) (len 10)))))
+    (reference r592 (scope relative) (span (offset 38889) (line 736) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 38889) (line 736) (column 23) (len 4)))))
+    (reference r593 (scope relative) (span (offset 39018) (line 741) (column 33) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 39018) (line 741) (column 33) (len 11)))))
+    (reference r594 (scope relative) (span (offset 39068) (line 742) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 39068) (line 742) (column 37) (len 19)))))
+    (reference r595 (scope relative) (span (offset 39097) (line 742) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 39097) (line 742) (column 66) (len 8)))))
+    (reference r596 (scope relative) (span (offset 39108) (line 742) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 39108) (line 742) (column 77) (len 3)))))
+    (reference r597 (scope relative) (span (offset 39112) (line 742) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 39112) (line 742) (column 81) (len 1)))))
+    (reference r598 (scope relative) (span (offset 39119) (line 742) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 39119) (line 742) (column 88) (len 8)))))
+    (reference r599 (scope relative) (span (offset 39169) (line 743) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 39169) (line 743) (column 35) (len 19)))))
+    (reference r600 (scope relative) (span (offset 39198) (line 743) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 39198) (line 743) (column 64) (len 8)))))
+    (reference r601 (scope relative) (span (offset 39209) (line 743) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 39209) (line 743) (column 75) (len 3)))))
+    (reference r602 (scope relative) (span (offset 39213) (line 743) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 39213) (line 743) (column 79) (len 1)))))
+    (reference r603 (scope relative) (span (offset 39220) (line 743) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 39220) (line 743) (column 86) (len 8)))))
+    (reference r604 (scope relative) (span (offset 39274) (line 744) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 39274) (line 744) (column 39) (len 19)))))
+    (reference r605 (scope relative) (span (offset 39303) (line 744) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 39303) (line 744) (column 68) (len 8)))))
+    (reference r606 (scope relative) (span (offset 39314) (line 744) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 39314) (line 744) (column 79) (len 3)))))
+    (reference r607 (scope relative) (span (offset 39318) (line 744) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 39318) (line 744) (column 83) (len 1)))))
+    (reference r608 (scope relative) (span (offset 39325) (line 744) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 39325) (line 744) (column 90) (len 8)))))
+    (reference r609 (scope relative) (span (offset 39364) (line 745) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 39364) (line 745) (column 23) (len 17)))))
+    (reference r610 (scope relative) (span (offset 39388) (line 745) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 39388) (line 745) (column 47) (len 20)))))
+    (reference r611 (scope relative) (span (offset 39412) (line 745) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 39412) (line 745) (column 71) (len 8)))))
+    (reference r612 (scope relative) (span (offset 39422) (line 745) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 39422) (line 745) (column 81) (len 6)))))
+    (reference r613 (scope relative) (span (offset 39430) (line 745) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 39430) (line 745) (column 89) (len 10)))))
+    (reference r614 (scope relative) (span (offset 40351) (line 764) (column 35) (len 14)) (segments (segment 0 (token "internalEnergy") (name "internalEnergy") (separator none) (span (offset 40351) (line 764) (column 35) (len 14)))))
+    (reference r615 (scope relative) (span (offset 41936) (line 798) (column 33) (len 15)) (segments (segment 0 (token "helmholtzEnergy") (name "helmholtzEnergy") (separator none) (span (offset 41936) (line 798) (column 33) (len 15)))))
+    (reference r616 (scope relative) (span (offset 42788) (line 816) (column 29) (len 11)) (segments (segment 0 (token "gibbsEnergy") (name "gibbsEnergy") (separator none) (span (offset 42788) (line 816) (column 29) (len 11)))))
+    (reference r617 (scope relative) (span (offset 42893) (line 819) (column 42) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 42893) (line 819) (column 42) (len 19)))))
+    (reference r618 (scope relative) (span (offset 43387) (line 832) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 43387) (line 832) (column 28) (len 4)))))
+    (reference r619 (scope relative) (span (offset 43382) (line 832) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 43382) (line 832) (column 23) (len 3)))))
+    (reference r620 (scope relative) (span (offset 43421) (line 833) (column 29) (len 18)) (segments (segment 0 (token "SpecificEnergyUnit") (name "SpecificEnergyUnit") (separator none) (span (offset 43421) (line 833) (column 29) (len 18)))))
+    (reference r621 (scope relative) (span (offset 43415) (line 833) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 43415) (line 833) (column 23) (len 4)))))
+    (reference r622 (scope relative) (span (offset 43576) (line 838) (column 41) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 43576) (line 838) (column 41) (len 11)))))
+    (reference r623 (scope relative) (span (offset 43626) (line 839) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 43626) (line 839) (column 37) (len 19)))))
+    (reference r624 (scope relative) (span (offset 43655) (line 839) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 43655) (line 839) (column 66) (len 8)))))
+    (reference r625 (scope relative) (span (offset 43666) (line 839) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 43666) (line 839) (column 77) (len 3)))))
+    (reference r626 (scope relative) (span (offset 43670) (line 839) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 43670) (line 839) (column 81) (len 1)))))
+    (reference r627 (scope relative) (span (offset 43677) (line 839) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 43677) (line 839) (column 88) (len 8)))))
+    (reference r628 (scope relative) (span (offset 43731) (line 840) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 43731) (line 840) (column 39) (len 19)))))
+    (reference r629 (scope relative) (span (offset 43760) (line 840) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 43760) (line 840) (column 68) (len 8)))))
+    (reference r630 (scope relative) (span (offset 43771) (line 840) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 43771) (line 840) (column 79) (len 3)))))
+    (reference r631 (scope relative) (span (offset 43775) (line 840) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 43775) (line 840) (column 83) (len 1)))))
+    (reference r632 (scope relative) (span (offset 43782) (line 840) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 43782) (line 840) (column 90) (len 8)))))
+    (reference r633 (scope relative) (span (offset 43821) (line 841) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 43821) (line 841) (column 23) (len 17)))))
+    (reference r634 (scope relative) (span (offset 43845) (line 841) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 43845) (line 841) (column 47) (len 20)))))
+    (reference r635 (scope relative) (span (offset 43869) (line 841) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 43869) (line 841) (column 71) (len 8)))))
+    (reference r636 (scope relative) (span (offset 43879) (line 841) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 43879) (line 841) (column 81) (len 10)))))
+    (reference r637 (scope relative) (span (offset 44660) (line 860) (column 43) (len 22)) (segments (segment 0 (token "specificInternalEnergy") (name "specificInternalEnergy") (separator none) (span (offset 44660) (line 860) (column 43) (len 22)))))
+    (reference r638 (scope relative) (span (offset 44780) (line 863) (column 44) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 44780) (line 863) (column 44) (len 19)))))
+    (reference r639 (scope relative) (span (offset 45282) (line 876) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 45282) (line 876) (column 28) (len 4)))))
+    (reference r640 (scope relative) (span (offset 45277) (line 876) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 45277) (line 876) (column 23) (len 3)))))
+    (reference r641 (scope relative) (span (offset 45316) (line 877) (column 29) (len 20)) (segments (segment 0 (token "SpecificEnthalpyUnit") (name "SpecificEnthalpyUnit") (separator none) (span (offset 45316) (line 877) (column 29) (len 20)))))
+    (reference r642 (scope relative) (span (offset 45310) (line 877) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 45310) (line 877) (column 23) (len 4)))))
+    (reference r643 (scope relative) (span (offset 45479) (line 882) (column 43) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 45479) (line 882) (column 43) (len 11)))))
+    (reference r644 (scope relative) (span (offset 45529) (line 883) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 45529) (line 883) (column 37) (len 19)))))
+    (reference r645 (scope relative) (span (offset 45558) (line 883) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 45558) (line 883) (column 66) (len 8)))))
+    (reference r646 (scope relative) (span (offset 45569) (line 883) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 45569) (line 883) (column 77) (len 3)))))
+    (reference r647 (scope relative) (span (offset 45573) (line 883) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 45573) (line 883) (column 81) (len 1)))))
+    (reference r648 (scope relative) (span (offset 45580) (line 883) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 45580) (line 883) (column 88) (len 8)))))
+    (reference r649 (scope relative) (span (offset 45634) (line 884) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 45634) (line 884) (column 39) (len 19)))))
+    (reference r650 (scope relative) (span (offset 45663) (line 884) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 45663) (line 884) (column 68) (len 8)))))
+    (reference r651 (scope relative) (span (offset 45674) (line 884) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 45674) (line 884) (column 79) (len 3)))))
+    (reference r652 (scope relative) (span (offset 45678) (line 884) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 45678) (line 884) (column 83) (len 1)))))
+    (reference r653 (scope relative) (span (offset 45685) (line 884) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 45685) (line 884) (column 90) (len 8)))))
+    (reference r654 (scope relative) (span (offset 45724) (line 885) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 45724) (line 885) (column 23) (len 17)))))
+    (reference r655 (scope relative) (span (offset 45748) (line 885) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 45748) (line 885) (column 47) (len 20)))))
+    (reference r656 (scope relative) (span (offset 45772) (line 885) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 45772) (line 885) (column 71) (len 8)))))
+    (reference r657 (scope relative) (span (offset 45782) (line 885) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 45782) (line 885) (column 81) (len 10)))))
+    (reference r658 (scope relative) (span (offset 46651) (line 904) (column 41) (len 23)) (segments (segment 0 (token "specificHelmholtzEnergy") (name "specificHelmholtzEnergy") (separator none) (span (offset 46651) (line 904) (column 41) (len 23)))))
+    (reference r659 (scope relative) (span (offset 47483) (line 922) (column 37) (len 19)) (segments (segment 0 (token "specificGibbsEnergy") (name "specificGibbsEnergy") (separator none) (span (offset 47483) (line 922) (column 37) (len 19)))))
+    (reference r660 (scope relative) (span (offset 47596) (line 925) (column 43) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 47596) (line 925) (column 43) (len 19)))))
+    (reference r661 (scope relative) (span (offset 48169) (line 938) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 48169) (line 938) (column 28) (len 4)))))
+    (reference r662 (scope relative) (span (offset 48164) (line 938) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 48164) (line 938) (column 23) (len 3)))))
+    (reference r663 (scope relative) (span (offset 48203) (line 939) (column 29) (len 19)) (segments (segment 0 (token "MassieuFunctionUnit") (name "MassieuFunctionUnit") (separator none) (span (offset 48203) (line 939) (column 29) (len 19)))))
+    (reference r664 (scope relative) (span (offset 48197) (line 939) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 48197) (line 939) (column 23) (len 4)))))
+    (reference r665 (scope relative) (span (offset 48362) (line 944) (column 42) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 48362) (line 944) (column 42) (len 11)))))
+    (reference r666 (scope relative) (span (offset 48412) (line 945) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 48412) (line 945) (column 37) (len 19)))))
+    (reference r667 (scope relative) (span (offset 48441) (line 945) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 48441) (line 945) (column 66) (len 8)))))
+    (reference r668 (scope relative) (span (offset 48452) (line 945) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 48452) (line 945) (column 77) (len 3)))))
+    (reference r669 (scope relative) (span (offset 48456) (line 945) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 48456) (line 945) (column 81) (len 1)))))
+    (reference r670 (scope relative) (span (offset 48463) (line 945) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 48463) (line 945) (column 88) (len 8)))))
+    (reference r671 (scope relative) (span (offset 48513) (line 946) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 48513) (line 946) (column 35) (len 19)))))
+    (reference r672 (scope relative) (span (offset 48542) (line 946) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 48542) (line 946) (column 64) (len 8)))))
+    (reference r673 (scope relative) (span (offset 48553) (line 946) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 48553) (line 946) (column 75) (len 3)))))
+    (reference r674 (scope relative) (span (offset 48557) (line 946) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 48557) (line 946) (column 79) (len 1)))))
+    (reference r675 (scope relative) (span (offset 48564) (line 946) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 48564) (line 946) (column 86) (len 8)))))
+    (reference r676 (scope relative) (span (offset 48618) (line 947) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 48618) (line 947) (column 39) (len 19)))))
+    (reference r677 (scope relative) (span (offset 48647) (line 947) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 48647) (line 947) (column 68) (len 8)))))
+    (reference r678 (scope relative) (span (offset 48658) (line 947) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 48658) (line 947) (column 79) (len 3)))))
+    (reference r679 (scope relative) (span (offset 48662) (line 947) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 48662) (line 947) (column 83) (len 1)))))
+    (reference r680 (scope relative) (span (offset 48669) (line 947) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 48669) (line 947) (column 90) (len 8)))))
+    (reference r681 (scope relative) (span (offset 48740) (line 948) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 48740) (line 948) (column 55) (len 19)))))
+    (reference r682 (scope relative) (span (offset 48769) (line 948) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 48769) (line 948) (column 84) (len 8)))))
+    (reference r683 (scope relative) (span (offset 48780) (line 948) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 48780) (line 948) (column 95) (len 3)))))
+    (reference r684 (scope relative) (span (offset 48784) (line 948) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 48784) (line 948) (column 99) (len 4)))))
+    (reference r685 (scope relative) (span (offset 48794) (line 948) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 48794) (line 948) (column 109) (len 8)))))
+    (reference r686 (scope relative) (span (offset 48833) (line 949) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 48833) (line 949) (column 23) (len 17)))))
+    (reference r687 (scope relative) (span (offset 48857) (line 949) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 48857) (line 949) (column 47) (len 20)))))
+    (reference r688 (scope relative) (span (offset 48881) (line 949) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 48881) (line 949) (column 71) (len 8)))))
+    (reference r689 (scope relative) (span (offset 48891) (line 949) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 48891) (line 949) (column 81) (len 6)))))
+    (reference r690 (scope relative) (span (offset 48899) (line 949) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 48899) (line 949) (column 89) (len 10)))))
+    (reference r691 (scope relative) (span (offset 48911) (line 949) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 48911) (line 949) (column 101) (len 26)))))
+    (reference r692 (scope relative) (span (offset 49038) (line 953) (column 42) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 49038) (line 953) (column 42) (len 19)))))
+    (reference r693 (scope relative) (span (offset 49599) (line 966) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 49599) (line 966) (column 28) (len 4)))))
+    (reference r694 (scope relative) (span (offset 49594) (line 966) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 49594) (line 966) (column 23) (len 3)))))
+    (reference r695 (scope relative) (span (offset 49633) (line 967) (column 29) (len 18)) (segments (segment 0 (token "PlanckFunctionUnit") (name "PlanckFunctionUnit") (separator none) (span (offset 49633) (line 967) (column 29) (len 18)))))
+    (reference r696 (scope relative) (span (offset 49627) (line 967) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 49627) (line 967) (column 23) (len 4)))))
+    (reference r697 (scope relative) (span (offset 49788) (line 972) (column 41) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 49788) (line 972) (column 41) (len 11)))))
+    (reference r698 (scope relative) (span (offset 49838) (line 973) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 49838) (line 973) (column 37) (len 19)))))
+    (reference r699 (scope relative) (span (offset 49867) (line 973) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 49867) (line 973) (column 66) (len 8)))))
+    (reference r700 (scope relative) (span (offset 49878) (line 973) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 49878) (line 973) (column 77) (len 3)))))
+    (reference r701 (scope relative) (span (offset 49882) (line 973) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 49882) (line 973) (column 81) (len 1)))))
+    (reference r702 (scope relative) (span (offset 49889) (line 973) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 49889) (line 973) (column 88) (len 8)))))
+    (reference r703 (scope relative) (span (offset 49939) (line 974) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 49939) (line 974) (column 35) (len 19)))))
+    (reference r704 (scope relative) (span (offset 49968) (line 974) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 49968) (line 974) (column 64) (len 8)))))
+    (reference r705 (scope relative) (span (offset 49979) (line 974) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 49979) (line 974) (column 75) (len 3)))))
+    (reference r706 (scope relative) (span (offset 49983) (line 974) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 49983) (line 974) (column 79) (len 1)))))
+    (reference r707 (scope relative) (span (offset 49990) (line 974) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 49990) (line 974) (column 86) (len 8)))))
+    (reference r708 (scope relative) (span (offset 50044) (line 975) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 50044) (line 975) (column 39) (len 19)))))
+    (reference r709 (scope relative) (span (offset 50073) (line 975) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 50073) (line 975) (column 68) (len 8)))))
+    (reference r710 (scope relative) (span (offset 50084) (line 975) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 50084) (line 975) (column 79) (len 3)))))
+    (reference r711 (scope relative) (span (offset 50088) (line 975) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 50088) (line 975) (column 83) (len 1)))))
+    (reference r712 (scope relative) (span (offset 50095) (line 975) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 50095) (line 975) (column 90) (len 8)))))
+    (reference r713 (scope relative) (span (offset 50166) (line 976) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 50166) (line 976) (column 55) (len 19)))))
+    (reference r714 (scope relative) (span (offset 50195) (line 976) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 50195) (line 976) (column 84) (len 8)))))
+    (reference r715 (scope relative) (span (offset 50206) (line 976) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 50206) (line 976) (column 95) (len 3)))))
+    (reference r716 (scope relative) (span (offset 50210) (line 976) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 50210) (line 976) (column 99) (len 4)))))
+    (reference r717 (scope relative) (span (offset 50220) (line 976) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 50220) (line 976) (column 109) (len 8)))))
+    (reference r718 (scope relative) (span (offset 50259) (line 977) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 50259) (line 977) (column 23) (len 17)))))
+    (reference r719 (scope relative) (span (offset 50283) (line 977) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 50283) (line 977) (column 47) (len 20)))))
+    (reference r720 (scope relative) (span (offset 50307) (line 977) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 50307) (line 977) (column 71) (len 8)))))
+    (reference r721 (scope relative) (span (offset 50317) (line 977) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 50317) (line 977) (column 81) (len 6)))))
+    (reference r722 (scope relative) (span (offset 50325) (line 977) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 50325) (line 977) (column 89) (len 10)))))
+    (reference r723 (scope relative) (span (offset 50337) (line 977) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 50337) (line 977) (column 101) (len 26)))))
+    (reference r724 (scope relative) (span (offset 50483) (line 981) (column 51) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 50483) (line 981) (column 51) (len 19)))))
+    (reference r725 (scope relative) (span (offset 51174) (line 994) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 51174) (line 994) (column 28) (len 4)))))
+    (reference r726 (scope relative) (span (offset 51169) (line 994) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 51169) (line 994) (column 23) (len 3)))))
+    (reference r727 (scope relative) (span (offset 51208) (line 995) (column 29) (len 27)) (segments (segment 0 (token "JouleThomsonCoefficientUnit") (name "JouleThomsonCoefficientUnit") (separator none) (span (offset 51208) (line 995) (column 29) (len 27)))))
+    (reference r728 (scope relative) (span (offset 51202) (line 995) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 51202) (line 995) (column 23) (len 4)))))
+    (reference r729 (scope relative) (span (offset 51399) (line 1000) (column 50) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 51399) (line 1000) (column 50) (len 11)))))
+    (reference r730 (scope relative) (span (offset 51449) (line 1001) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 51449) (line 1001) (column 37) (len 19)))))
+    (reference r731 (scope relative) (span (offset 51478) (line 1001) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 51478) (line 1001) (column 66) (len 8)))))
+    (reference r732 (scope relative) (span (offset 51489) (line 1001) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 51489) (line 1001) (column 77) (len 3)))))
+    (reference r733 (scope relative) (span (offset 51493) (line 1001) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 51493) (line 1001) (column 81) (len 1)))))
+    (reference r734 (scope relative) (span (offset 51500) (line 1001) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 51500) (line 1001) (column 88) (len 8)))))
+    (reference r735 (scope relative) (span (offset 51550) (line 1002) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 51550) (line 1002) (column 35) (len 19)))))
+    (reference r736 (scope relative) (span (offset 51579) (line 1002) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 51579) (line 1002) (column 64) (len 8)))))
+    (reference r737 (scope relative) (span (offset 51590) (line 1002) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 51590) (line 1002) (column 75) (len 3)))))
+    (reference r738 (scope relative) (span (offset 51594) (line 1002) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 51594) (line 1002) (column 79) (len 1)))))
+    (reference r739 (scope relative) (span (offset 51601) (line 1002) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 51601) (line 1002) (column 86) (len 8)))))
+    (reference r740 (scope relative) (span (offset 51656) (line 1003) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 51656) (line 1003) (column 39) (len 19)))))
+    (reference r741 (scope relative) (span (offset 51685) (line 1003) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 51685) (line 1003) (column 68) (len 8)))))
+    (reference r742 (scope relative) (span (offset 51696) (line 1003) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 51696) (line 1003) (column 79) (len 3)))))
+    (reference r743 (scope relative) (span (offset 51700) (line 1003) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 51700) (line 1003) (column 83) (len 1)))))
+    (reference r744 (scope relative) (span (offset 51707) (line 1003) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 51707) (line 1003) (column 90) (len 8)))))
+    (reference r745 (scope relative) (span (offset 51777) (line 1004) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 51777) (line 1004) (column 55) (len 19)))))
+    (reference r746 (scope relative) (span (offset 51806) (line 1004) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 51806) (line 1004) (column 84) (len 8)))))
+    (reference r747 (scope relative) (span (offset 51817) (line 1004) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 51817) (line 1004) (column 95) (len 3)))))
+    (reference r748 (scope relative) (span (offset 51821) (line 1004) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 51821) (line 1004) (column 99) (len 4)))))
+    (reference r749 (scope relative) (span (offset 51831) (line 1004) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 51831) (line 1004) (column 109) (len 8)))))
+    (reference r750 (scope relative) (span (offset 51869) (line 1005) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 51869) (line 1005) (column 23) (len 17)))))
+    (reference r751 (scope relative) (span (offset 51893) (line 1005) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 51893) (line 1005) (column 47) (len 20)))))
+    (reference r752 (scope relative) (span (offset 51917) (line 1005) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 51917) (line 1005) (column 71) (len 8)))))
+    (reference r753 (scope relative) (span (offset 51927) (line 1005) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 51927) (line 1005) (column 81) (len 6)))))
+    (reference r754 (scope relative) (span (offset 51935) (line 1005) (column 89) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 51935) (line 1005) (column 89) (len 10)))))
+    (reference r755 (scope relative) (span (offset 51947) (line 1005) (column 101) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 51947) (line 1005) (column 101) (len 26)))))
+    (reference r756 (scope relative) (span (offset 52082) (line 1009) (column 45) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 52082) (line 1009) (column 45) (len 17)))))
+    (reference r757 (scope relative) (span (offset 52818) (line 1026) (column 52) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 52818) (line 1026) (column 52) (len 17)))))
+    (reference r758 (scope relative) (span (offset 53779) (line 1043) (column 47) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 53779) (line 1043) (column 47) (len 19)))))
+    (reference r759 (scope relative) (span (offset 54300) (line 1056) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 54300) (line 1056) (column 28) (len 4)))))
+    (reference r760 (scope relative) (span (offset 54295) (line 1056) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 54295) (line 1056) (column 23) (len 3)))))
+    (reference r761 (scope relative) (span (offset 54334) (line 1057) (column 29) (len 23)) (segments (segment 0 (token "SpecificGasConstantUnit") (name "SpecificGasConstantUnit") (separator none) (span (offset 54334) (line 1057) (column 29) (len 23)))))
+    (reference r762 (scope relative) (span (offset 54328) (line 1057) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 54328) (line 1057) (column 23) (len 4)))))
+    (reference r763 (scope relative) (span (offset 54509) (line 1062) (column 46) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 54509) (line 1062) (column 46) (len 11)))))
+    (reference r764 (scope relative) (span (offset 54559) (line 1063) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 54559) (line 1063) (column 37) (len 19)))))
+    (reference r765 (scope relative) (span (offset 54588) (line 1063) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 54588) (line 1063) (column 66) (len 8)))))
+    (reference r766 (scope relative) (span (offset 54599) (line 1063) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 54599) (line 1063) (column 77) (len 3)))))
+    (reference r767 (scope relative) (span (offset 54603) (line 1063) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 54603) (line 1063) (column 81) (len 1)))))
+    (reference r768 (scope relative) (span (offset 54610) (line 1063) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 54610) (line 1063) (column 88) (len 8)))))
+    (reference r769 (scope relative) (span (offset 54664) (line 1064) (column 39) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 54664) (line 1064) (column 39) (len 19)))))
+    (reference r770 (scope relative) (span (offset 54693) (line 1064) (column 68) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 54693) (line 1064) (column 68) (len 8)))))
+    (reference r771 (scope relative) (span (offset 54704) (line 1064) (column 79) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 54704) (line 1064) (column 79) (len 3)))))
+    (reference r772 (scope relative) (span (offset 54708) (line 1064) (column 83) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 54708) (line 1064) (column 83) (len 1)))))
+    (reference r773 (scope relative) (span (offset 54715) (line 1064) (column 90) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 54715) (line 1064) (column 90) (len 8)))))
+    (reference r774 (scope relative) (span (offset 54786) (line 1065) (column 55) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 54786) (line 1065) (column 55) (len 19)))))
+    (reference r775 (scope relative) (span (offset 54815) (line 1065) (column 84) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 54815) (line 1065) (column 84) (len 8)))))
+    (reference r776 (scope relative) (span (offset 54826) (line 1065) (column 95) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 54826) (line 1065) (column 95) (len 3)))))
+    (reference r777 (scope relative) (span (offset 54830) (line 1065) (column 99) (len 4)) (segments (segment 0 (token "'Θ'") (name "Θ") (separator none) (span (offset 54830) (line 1065) (column 99) (len 4)))))
+    (reference r778 (scope relative) (span (offset 54840) (line 1065) (column 109) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 54840) (line 1065) (column 109) (len 8)))))
+    (reference r779 (scope relative) (span (offset 54879) (line 1066) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 54879) (line 1066) (column 23) (len 17)))))
+    (reference r780 (scope relative) (span (offset 54903) (line 1066) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 54903) (line 1066) (column 47) (len 20)))))
+    (reference r781 (scope relative) (span (offset 54927) (line 1066) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 54927) (line 1066) (column 71) (len 8)))))
+    (reference r782 (scope relative) (span (offset 54937) (line 1066) (column 81) (len 10)) (segments (segment 0 (token "durationPF") (name "durationPF") (separator none) (span (offset 54937) (line 1066) (column 81) (len 10)))))
+    (reference r783 (scope relative) (span (offset 54949) (line 1066) (column 93) (len 26)) (segments (segment 0 (token "thermodynamicTemperaturePF") (name "thermodynamicTemperaturePF") (separator none) (span (offset 54949) (line 1066) (column 93) (len 26)))))
+    (reference r784 (scope relative) (span (offset 55098) (line 1070) (column 52) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 55098) (line 1070) (column 52) (len 19)))))
+    (reference r785 (scope relative) (span (offset 55741) (line 1083) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 55741) (line 1083) (column 28) (len 4)))))
+    (reference r786 (scope relative) (span (offset 55736) (line 1083) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 55736) (line 1083) (column 23) (len 3)))))
+    (reference r787 (scope relative) (span (offset 55775) (line 1084) (column 29) (len 28)) (segments (segment 0 (token "MassConcentrationOfWaterUnit") (name "MassConcentrationOfWaterUnit") (separator none) (span (offset 55775) (line 1084) (column 29) (len 28)))))
+    (reference r788 (scope relative) (span (offset 55769) (line 1084) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 55769) (line 1084) (column 23) (len 4)))))
+    (reference r789 (scope relative) (span (offset 55970) (line 1089) (column 51) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 55970) (line 1089) (column 51) (len 11)))))
+    (reference r790 (scope relative) (span (offset 56020) (line 1090) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 56020) (line 1090) (column 37) (len 19)))))
+    (reference r791 (scope relative) (span (offset 56049) (line 1090) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 56049) (line 1090) (column 66) (len 8)))))
+    (reference r792 (scope relative) (span (offset 56060) (line 1090) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 56060) (line 1090) (column 77) (len 3)))))
+    (reference r793 (scope relative) (span (offset 56064) (line 1090) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 56064) (line 1090) (column 81) (len 1)))))
+    (reference r794 (scope relative) (span (offset 56071) (line 1090) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 56071) (line 1090) (column 88) (len 8)))))
+    (reference r795 (scope relative) (span (offset 56122) (line 1091) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 56122) (line 1091) (column 35) (len 19)))))
+    (reference r796 (scope relative) (span (offset 56151) (line 1091) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 56151) (line 1091) (column 64) (len 8)))))
+    (reference r797 (scope relative) (span (offset 56162) (line 1091) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 56162) (line 1091) (column 75) (len 3)))))
+    (reference r798 (scope relative) (span (offset 56166) (line 1091) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 56166) (line 1091) (column 79) (len 1)))))
+    (reference r799 (scope relative) (span (offset 56173) (line 1091) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 56173) (line 1091) (column 86) (len 8)))))
+    (reference r800 (scope relative) (span (offset 56211) (line 1092) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 56211) (line 1092) (column 23) (len 17)))))
+    (reference r801 (scope relative) (span (offset 56235) (line 1092) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 56235) (line 1092) (column 47) (len 20)))))
+    (reference r802 (scope relative) (span (offset 56259) (line 1092) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 56259) (line 1092) (column 71) (len 8)))))
+    (reference r803 (scope relative) (span (offset 56269) (line 1092) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 56269) (line 1092) (column 81) (len 6)))))
+    (reference r804 (scope relative) (span (offset 56445) (line 1096) (column 74) (len 19)) (segments (segment 0 (token "ScalarQuantityValue") (name "ScalarQuantityValue") (separator none) (span (offset 56445) (line 1096) (column 74) (len 19)))))
+    (reference r805 (scope relative) (span (offset 57106) (line 1109) (column 28) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 57106) (line 1109) (column 28) (len 4)))))
+    (reference r806 (scope relative) (span (offset 57101) (line 1109) (column 23) (len 3)) (segments (segment 0 (token "num") (name "num") (separator none) (span (offset 57101) (line 1109) (column 23) (len 3)))))
+    (reference r807 (scope relative) (span (offset 57140) (line 1110) (column 29) (len 50)) (segments (segment 0 (token "MassConcentrationOfWaterVapourAbsoluteHumidityUnit") (name "MassConcentrationOfWaterVapourAbsoluteHumidityUnit") (separator none) (span (offset 57140) (line 1110) (column 29) (len 50)))))
+    (reference r808 (scope relative) (span (offset 57134) (line 1110) (column 23) (len 4)) (segments (segment 0 (token "mRef") (name "mRef") (separator none) (span (offset 57134) (line 1110) (column 23) (len 4)))))
+    (reference r809 (scope relative) (span (offset 57423) (line 1115) (column 73) (len 11)) (segments (segment 0 (token "DerivedUnit") (name "DerivedUnit") (separator none) (span (offset 57423) (line 1115) (column 73) (len 11)))))
+    (reference r810 (scope relative) (span (offset 57473) (line 1116) (column 37) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 57473) (line 1116) (column 37) (len 19)))))
+    (reference r811 (scope relative) (span (offset 57502) (line 1116) (column 66) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 57502) (line 1116) (column 66) (len 8)))))
+    (reference r812 (scope relative) (span (offset 57513) (line 1116) (column 77) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 57513) (line 1116) (column 77) (len 3)))))
+    (reference r813 (scope relative) (span (offset 57517) (line 1116) (column 81) (len 1)) (segments (segment 0 (token "L") (name "L") (separator none) (span (offset 57517) (line 1116) (column 81) (len 1)))))
+    (reference r814 (scope relative) (span (offset 57524) (line 1116) (column 88) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 57524) (line 1116) (column 88) (len 8)))))
+    (reference r815 (scope relative) (span (offset 57575) (line 1117) (column 35) (len 19)) (segments (segment 0 (token "QuantityPowerFactor") (name "QuantityPowerFactor") (separator none) (span (offset 57575) (line 1117) (column 35) (len 19)))))
+    (reference r816 (scope relative) (span (offset 57604) (line 1117) (column 64) (len 8)) (segments (segment 0 (token "quantity") (name "quantity") (separator none) (span (offset 57604) (line 1117) (column 64) (len 8)))))
+    (reference r817 (scope relative) (span (offset 57615) (line 1117) (column 75) (len 3)) (segments (segment 0 (token "isq") (name "isq") (separator none) (span (offset 57615) (line 1117) (column 75) (len 3)))))
+    (reference r818 (scope relative) (span (offset 57619) (line 1117) (column 79) (len 1)) (segments (segment 0 (token "M") (name "M") (separator none) (span (offset 57619) (line 1117) (column 79) (len 1)))))
+    (reference r819 (scope relative) (span (offset 57626) (line 1117) (column 86) (len 8)) (segments (segment 0 (token "exponent") (name "exponent") (separator none) (span (offset 57626) (line 1117) (column 86) (len 8)))))
+    (reference r820 (scope relative) (span (offset 57664) (line 1118) (column 23) (len 17)) (segments (segment 0 (token "quantityDimension") (name "quantityDimension") (separator none) (span (offset 57664) (line 1118) (column 23) (len 17)))))
+    (reference r821 (scope relative) (span (offset 57688) (line 1118) (column 47) (len 20)) (segments (segment 0 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator none) (span (offset 57688) (line 1118) (column 47) (len 20)))))
+    (reference r822 (scope relative) (span (offset 57712) (line 1118) (column 71) (len 8)) (segments (segment 0 (token "lengthPF") (name "lengthPF") (separator none) (span (offset 57712) (line 1118) (column 71) (len 8)))))
+    (reference r823 (scope relative) (span (offset 57722) (line 1118) (column 81) (len 6)) (segments (segment 0 (token "massPF") (name "massPF") (separator none) (span (offset 57722) (line 1118) (column 81) (len 6)))))
+    (reference r824 (scope relative) (span (offset 57860) (line 1122) (column 55) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 57860) (line 1122) (column 55) (len 17)))))
+    (reference r825 (scope relative) (span (offset 58696) (line 1139) (column 58) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 58696) (line 1139) (column 58) (len 17)))))
+    (reference r826 (scope relative) (span (offset 59605) (line 1156) (column 47) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 59605) (line 1156) (column 47) (len 17)))))
+    (reference r827 (scope relative) (span (offset 60300) (line 1173) (column 51) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 60300) (line 1173) (column 51) (len 17)))))
+    (reference r828 (scope relative) (span (offset 60986) (line 1190) (column 44) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 60986) (line 1190) (column 44) (len 17)))))
+    (reference r829 (scope relative) (span (offset 61905) (line 1207) (column 61) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 61905) (line 1207) (column 61) (len 17)))))
+    (reference r830 (scope relative) (span (offset 62984) (line 1224) (column 53) (len 17)) (segments (segment 0 (token "DimensionOneValue") (name "DimensionOneValue") (separator none) (span (offset 62984) (line 1224) (column 53) (len 17)))))
+  )
+  (root (library-package (name "ISQThermodynamics") (standard true) (body brace (doc (name none) (locale none) (body (span (offset 59) (line 3) (column 7) (len 707)) (normalized "International System of Quantities and Units\nGenerated on 2025-03-13T15:00:05Z from standard ISO-80000-5:2019 \"Thermodynamics\"\nsee also https://www.iso.org/standard/64976.html\n\nNote 1: In documentation comments, AsciiMath notation (see http://asciimath.org/) is used for mathematical concepts,\nwith Greek letters in Unicode encoding. In running text, AsciiMath is placed between backticks.\nNote 2: For vector and tensor quantities currently the unit and quantity value type for their (scalar) magnitude is \ndefined, as well as their typical Cartesian 3d VectorMeasurementReference (i.e. coordinate system) \nor TensorMeasurementReference.\n"))) (import (target (span (span (offset 789) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 828) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 838) (line 16) (column 30) (len 3))) (separator (span (offset 838) (line 16) (column 30) (len 2))) (marker (span (offset 840) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 862) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 883) (line 17) (column 41) (len 3))) (separator (span (offset 883) (line 17) (column 41) (len 2))) (marker (span (offset 885) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 907) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 914) (line 18) (column 27) (len 3))) (separator (span (offset 914) (line 18) (column 27) (len 2))) (marker (span (offset 916) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 926) (line 20) (column 7) (len 57)) (normalized "Quantity definitions referenced from other ISQ packages "))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 994) (line 23) (column 7) (len 61)) (normalized "ISO-80000-5 item 5-1 thermodynamic temperature, temperature "))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 1064) (line 24) (column 7) (len 108)) (normalized "See package ISQBase for the declarations of ThermodynamicTemperatureValue and ThermodynamicTemperatureUnit "))) (alias (name "TemperatureUnit") (target (ref r4)) (body semicolon)) (alias (name "TemperatureValue") (target (ref r5)) (body semicolon)) (alias (name "temperature") (target (ref r6)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 1357) (line 30) (column 7) (len 42)) (normalized "ISO-80000-5 item 5-2 Celsius temperature "))) (attribute-def (declaration-name "CelsiusTemperatureValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r7)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 1491) (line 33) (column 11) (len 1076)) (normalized "source: item 5-2 Celsius temperature\nsymbol(s): `t`, `θ`\napplication domain: generic\nname: CelsiusTemperature\nquantity dimension: Θ^1\nmeasurement unit(s): °C\ntensor order: 0\ndefinition: temperature difference from the thermodynamic temperature of the ice point is called the Celsius temperature t, which is defined by the quantity equation: `t = T - T_0` where `T` is thermodynamic temperature (item 5-1) and `T_0 = 273,15 K`\nremarks: The unit degree Celsius is a special name for the kelvin for use in stating values of Celsius temperature. The unit degree Celsius is by definition equal in magnitude to the kelvin. A difference or interval of temperature may be expressed in kelvin or in degrees Celsius. The thermodynamic temperature `T_0` is 0,01 K below the thermodynamic temperature of the triple point of water. The symbol °C for the degree Celsius shall be preceded by a space (see ISO 80000-1). Prefixes are not allowed in combination with the unit °C.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r8)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r9)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r10)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r11)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "CelsiusTemperatureUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r12)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r13)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r14)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 2910) (line 51) (column 95) (len 8)) (member-access (base (expression (span (offset 2910) (line 51) (column 95) (len 3)) (ref r15))) (separator dot) (member (ref r16))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r17)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 2935) (line 51) (column 120) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r18)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r19)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 3009) (line 52) (column 70) (len 26)) (ref r20))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 3052) (line 55) (column 7) (len 53)) (normalized "ISO-80000-5 item 5-3.1 linear expansion coefficient "))) (attribute-def (declaration-name "LinearExpansionCoefficientValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r21)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 3205) (line 58) (column 11) (len 555)) (normalized "source: item 5-3.1 linear expansion coefficient\nsymbol(s): `α_l`\napplication domain: generic\nname: LinearExpansionCoefficient\nquantity dimension: Θ^-1\nmeasurement unit(s): K^-1\ntensor order: 0\ndefinition: relative change of length with temperature: `α_l = 1/l * (dl)/(dT)` where l is length (ISO 80000-3) and `T` is thermodynamic temperature (item 5-1)\nremarks: The subscripts in the symbols may be omitted when there is no risk of confusion.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r22)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r23)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r24)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r25)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "LinearExpansionCoefficientUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r26)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r27)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r28)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 4135) (line 76) (column 95) (len 8)) (member-access (base (expression (span (offset 4135) (line 76) (column 95) (len 3)) (ref r29))) (separator dot) (member (ref r30))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r31)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 4160) (line 76) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 4161) (line 76) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r32)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r33)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 4235) (line 77) (column 70) (len 26)) (ref r34))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 4278) (line 80) (column 7) (len 52)) (normalized "ISO-80000-5 item 5-3.2 cubic expansion coefficient "))) (attribute-def (declaration-name "CubicExpansionCoefficientValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r35)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 4429) (line 83) (column 11) (len 607)) (normalized "source: item 5-3.2 cubic expansion coefficient\nsymbol(s): `α_V`, `γ`\napplication domain: generic\nname: CubicExpansionCoefficient\nquantity dimension: Θ^-1\nmeasurement unit(s): K^-1\ntensor order: 0\ndefinition: relative change of volume with temperature: `α_V = 1/V * (dV)/(dT)` where `V` is volume (ISO 80000-3) and `T` is thermodynamic temperature (item 5-1)\nremarks: Also called volumetric expansion coefficient. The subscripts in the symbols may be omitted when there is no risk of confusion.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r36)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r37)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r38)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r39)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "CubicExpansionCoefficientUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r40)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r41)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r42)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 5407) (line 101) (column 95) (len 8)) (member-access (base (expression (span (offset 5407) (line 101) (column 95) (len 3)) (ref r43))) (separator dot) (member (ref r44))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r45)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 5432) (line 101) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 5433) (line 101) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r46)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r47)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 5507) (line 102) (column 70) (len 26)) (ref r48))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 5550) (line 105) (column 7) (len 54)) (normalized "ISO-80000-5 item 5-3.3 relative pressure coefficient "))) (attribute-def (declaration-name "RelativePressureCoefficientValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r49)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 5705) (line 108) (column 11) (len 630)) (normalized "source: item 5-3.3 relative pressure coefficient\nsymbol(s): `α_p`\napplication domain: generic\nname: RelativePressureCoefficient\nquantity dimension: Θ^-1\nmeasurement unit(s): K^-1\ntensor order: 0\ndefinition: relative change of pressure with temperature at constant volume: `α_p = 1/p * ((partial p)/(partial T))_V` where `p` is pressure (ISO 80000-4), `T` is thermodynamic temperature (item 5-1), and `V` is volume (ISO 80000-3)\nremarks: The subscripts in the symbols may be omitted when there is no risk of confusion.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r50)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r51)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r52)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r53)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "RelativePressureCoefficientUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r54)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r55)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r56)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 6714) (line 126) (column 95) (len 8)) (member-access (base (expression (span (offset 6714) (line 126) (column 95) (len 3)) (ref r57))) (separator dot) (member (ref r58))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r59)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 6739) (line 126) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 6740) (line 126) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r60)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r61)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 6814) (line 127) (column 70) (len 26)) (ref r62))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 6857) (line 130) (column 7) (len 43)) (normalized "ISO-80000-5 item 5-4 pressure coefficient "))) (attribute-def (declaration-name "PressureCoefficientValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r63)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 6993) (line 133) (column 11) (len 550)) (normalized "source: item 5-4 pressure coefficient\nsymbol(s): `β`\napplication domain: generic\nname: PressureCoefficient\nquantity dimension: L^-1*M^1*T^-2*Θ^-1\nmeasurement unit(s): Pa/K, kg*m^-1*s^-2*K^-1\ntensor order: 0\ndefinition: change of pressure with temperature at constant volume: `β = ((partial p)/(partial T))_V` where `p` is pressure (ISO 80000-4), `T` is thermodynamic temperature (item 5-1), and `V` is volume (ISO 80000-3)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r64)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r65)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r66)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r67)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "PressureCoefficientUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r68)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r69)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r70)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 7872) (line 151) (column 77) (len 5)) (member-access (base (expression (span (offset 7872) (line 151) (column 77) (len 3)) (ref r71))) (separator dot) (member (ref r72))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r73)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 7894) (line 151) (column 99) (len 2)) (unary (operator "-") (operand (expression (span (offset 7895) (line 151) (column 100) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r74)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r75)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 7974) (line 152) (column 75) (len 5)) (member-access (base (expression (span (offset 7974) (line 152) (column 75) (len 3)) (ref r76))) (separator dot) (member (ref r77))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r78)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 7996) (line 152) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r79)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r80)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 8079) (line 153) (column 79) (len 5)) (member-access (base (expression (span (offset 8079) (line 153) (column 79) (len 3)) (ref r81))) (separator dot) (member (ref r82))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r83)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 8101) (line 153) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 8102) (line 153) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r84)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r85)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 8201) (line 154) (column 95) (len 8)) (member-access (base (expression (span (offset 8201) (line 154) (column 95) (len 3)) (ref r86))) (separator dot) (member (ref r87))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r88)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 8226) (line 154) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 8227) (line 154) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r89)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r90)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 8301) (line 155) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 8302) (line 155) (column 71) (len 8)) (ref r91))) (element comma (expression (span (offset 8312) (line 155) (column 81) (len 6)) (ref r92))) (element comma (expression (span (offset 8320) (line 155) (column 89) (len 10)) (ref r93))) (element comma (expression (span (offset 8332) (line 155) (column 101) (len 26)) (ref r94))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 8376) (line 158) (column 7) (len 51)) (normalized "ISO-80000-5 item 5-5.1 isothermal compressibility "))) (attribute-def (declaration-name "IsothermalCompressibilityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r95)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 8526) (line 161) (column 11) (len 656)) (normalized "source: item 5-5.1 isothermal compressibility\nsymbol(s): `ϰ_T`\napplication domain: generic\nname: IsothermalCompressibility\nquantity dimension: L^1*M^-1*T^2\nmeasurement unit(s): Pa^-1, kg^-1*m*s^2\ntensor order: 0\ndefinition: negative relative change of volume with pressure at constant temperature: `ϰ_T = -1/V * ((partial V)/(partial p))_T` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `T` is thermodynamic temperature (item 5-1)\nremarks: The subscripts in the symbols may be omitted when there is no risk of confusion.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r96)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r97)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r98)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r99)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "IsothermalCompressibilityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r100)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r101)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r102)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9535) (line 179) (column 77) (len 5)) (member-access (base (expression (span (offset 9535) (line 179) (column 77) (len 3)) (ref r103))) (separator dot) (member (ref r104))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r105)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9557) (line 179) (column 99) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r106)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r107)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9636) (line 180) (column 75) (len 5)) (member-access (base (expression (span (offset 9636) (line 180) (column 75) (len 3)) (ref r108))) (separator dot) (member (ref r109))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r110)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9658) (line 180) (column 97) (len 2)) (unary (operator "-") (operand (expression (span (offset 9659) (line 180) (column 98) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r111)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r112)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9742) (line 181) (column 79) (len 5)) (member-access (base (expression (span (offset 9742) (line 181) (column 79) (len 3)) (ref r113))) (separator dot) (member (ref r114))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r115)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9764) (line 181) (column 101) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r116)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r117)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 9838) (line 182) (column 70) (len 30)) (sequence (sequence-list (element first (expression (span (offset 9839) (line 182) (column 71) (len 8)) (ref r118))) (element comma (expression (span (offset 9849) (line 182) (column 81) (len 6)) (ref r119))) (element comma (expression (span (offset 9857) (line 182) (column 89) (len 10)) (ref r120))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 9885) (line 185) (column 7) (len 51)) (normalized "ISO-80000-5 item 5-5.2 isentropic compressibility "))) (attribute-def (declaration-name "IsentropicCompressibilityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r121)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 10035) (line 188) (column 11) (len 635)) (normalized "source: item 5-5.2 isentropic compressibility\nsymbol(s): `ϰ_S`\napplication domain: generic\nname: IsentropicCompressibility\nquantity dimension: L^1*M^-1*T^2\nmeasurement unit(s): Pa^-1, kg^-1*m*s^2\ntensor order: 0\ndefinition: negative relative change of volume with pressure at constant entropy: `ϰ_S = -1/V * ((partial V)/(partial p))_S` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `S` is entropy (item 5-18)\nremarks: The subscripts in the symbols may be omitted when there is no risk of confusion.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r122)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r123)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r124)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r125)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "IsentropicCompressibilityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r126)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r127)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r128)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11023) (line 206) (column 77) (len 5)) (member-access (base (expression (span (offset 11023) (line 206) (column 77) (len 3)) (ref r129))) (separator dot) (member (ref r130))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r131)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11045) (line 206) (column 99) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r132)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r133)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11124) (line 207) (column 75) (len 5)) (member-access (base (expression (span (offset 11124) (line 207) (column 75) (len 3)) (ref r134))) (separator dot) (member (ref r135))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r136)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11146) (line 207) (column 97) (len 2)) (unary (operator "-") (operand (expression (span (offset 11147) (line 207) (column 98) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r137)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r138)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11230) (line 208) (column 79) (len 5)) (member-access (base (expression (span (offset 11230) (line 208) (column 79) (len 3)) (ref r139))) (separator dot) (member (ref r140))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r141)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11252) (line 208) (column 101) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r142)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r143)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 11326) (line 209) (column 70) (len 30)) (sequence (sequence-list (element first (expression (span (offset 11327) (line 209) (column 71) (len 8)) (ref r144))) (element comma (expression (span (offset 11337) (line 209) (column 81) (len 6)) (ref r145))) (element comma (expression (span (offset 11345) (line 209) (column 89) (len 10)) (ref r146))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 11373) (line 212) (column 7) (len 45)) (normalized "ISO-80000-5 item 5-6.1 heat, amount of heat "))) (attribute-usage) (alias (name "amountOfHeat") (target (ref r147)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 12513) (line 230) (column 7) (len 36)) (normalized "ISO-80000-5 item 5-6.2 latent heat "))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 13158) (line 246) (column 7) (len 37)) (normalized "ISO-80000-5 item 5-7 heat flow rate "))) (attribute-def (declaration-name "HeatFlowRateValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r148)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 13281) (line 249) (column 11) (len 386)) (normalized "source: item 5-7 heat flow rate\nsymbol(s): `dot(Q)`\napplication domain: generic\nname: HeatFlowRate\nquantity dimension: L^2*M^1*T^-3\nmeasurement unit(s): W, J/s, kg*m^2*s^-3\ntensor order: 0\ndefinition: time rate at which heat (item 5-6.1) crosses a given surface\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r149)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r150)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r151)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r152)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "HeatFlowRateUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r153)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r154)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r155)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 13968) (line 267) (column 77) (len 5)) (member-access (base (expression (span (offset 13968) (line 267) (column 77) (len 3)) (ref r156))) (separator dot) (member (ref r157))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r158)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 13990) (line 267) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r159)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r160)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 14069) (line 268) (column 75) (len 5)) (member-access (base (expression (span (offset 14069) (line 268) (column 75) (len 3)) (ref r161))) (separator dot) (member (ref r162))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r163)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 14091) (line 268) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r164)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r165)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 14174) (line 269) (column 79) (len 5)) (member-access (base (expression (span (offset 14174) (line 269) (column 79) (len 3)) (ref r166))) (separator dot) (member (ref r167))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r168)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 14196) (line 269) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 14197) (line 269) (column 102) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r169)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r170)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 14271) (line 270) (column 70) (len 30)) (sequence (sequence-list (element first (expression (span (offset 14272) (line 270) (column 71) (len 8)) (ref r171))) (element comma (expression (span (offset 14282) (line 270) (column 81) (len 6)) (ref r172))) (element comma (expression (span (offset 14290) (line 270) (column 89) (len 10)) (ref r173))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 14318) (line 273) (column 7) (len 48)) (normalized "ISO-80000-5 item 5-8 density of heat flow rate "))) (attribute-def (declaration-name "DensityOfHeatFlowRateValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r174)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 14461) (line 276) (column 11) (len 480)) (normalized "source: item 5-8 density of heat flow rate\nsymbol(s): `q`, `φ`\napplication domain: generic\nname: DensityOfHeatFlowRate\nquantity dimension: M^1*T^-3\nmeasurement unit(s): W/m^2, kg*s^-3\ntensor order: 0\ndefinition: quotient of heat flow rate and area: `q = dot Q / A` where `dot Q` is heat flow rate (item 5-7) and A is area (ISO 80000-3) of a given surface\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r175)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r176)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r177)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r178)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "DensityOfHeatFlowRateUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r179)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r180)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r181)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 15276) (line 294) (column 75) (len 5)) (member-access (base (expression (span (offset 15276) (line 294) (column 75) (len 3)) (ref r182))) (separator dot) (member (ref r183))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r184)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 15298) (line 294) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r185)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r186)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 15381) (line 295) (column 79) (len 5)) (member-access (base (expression (span (offset 15381) (line 295) (column 79) (len 3)) (ref r187))) (separator dot) (member (ref r188))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r189)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 15403) (line 295) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 15404) (line 295) (column 102) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r190)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r191)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 15478) (line 296) (column 70) (len 20)) (sequence (sequence-list (element first (expression (span (offset 15479) (line 296) (column 71) (len 6)) (ref r192))) (element comma (expression (span (offset 15487) (line 296) (column 79) (len 10)) (ref r193))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 15515) (line 299) (column 7) (len 43)) (normalized "ISO-80000-5 item 5-9 thermal conductivity "))) (attribute-def (declaration-name "ThermalConductivityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r194)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 15651) (line 302) (column 11) (len 487)) (normalized "source: item 5-9 thermal conductivity\nsymbol(s): `λ_l`, `(ϰ)`\napplication domain: generic\nname: ThermalConductivity\nquantity dimension: L^1*M^1*T^-3*Θ^-1\nmeasurement unit(s): W/(m*K), kg*m*s^-3*K^-1\ntensor order: 0\ndefinition: quotient of density of heat flow rate (item 5-8) and thermodynamic temperature gradient that has the same direction as the heat flow\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r195)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r196)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r197)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r198)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "ThermalConductivityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r199)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r200)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r201)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16467) (line 320) (column 77) (len 5)) (member-access (base (expression (span (offset 16467) (line 320) (column 77) (len 3)) (ref r202))) (separator dot) (member (ref r203))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r204)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16489) (line 320) (column 99) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r205)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r206)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16568) (line 321) (column 75) (len 5)) (member-access (base (expression (span (offset 16568) (line 321) (column 75) (len 3)) (ref r207))) (separator dot) (member (ref r208))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r209)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16590) (line 321) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r210)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r211)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16673) (line 322) (column 79) (len 5)) (member-access (base (expression (span (offset 16673) (line 322) (column 79) (len 3)) (ref r212))) (separator dot) (member (ref r213))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r214)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16695) (line 322) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 16696) (line 322) (column 102) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r215)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r216)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16795) (line 323) (column 95) (len 8)) (member-access (base (expression (span (offset 16795) (line 323) (column 95) (len 3)) (ref r217))) (separator dot) (member (ref r218))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r219)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16820) (line 323) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 16821) (line 323) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r220)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r221)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 16895) (line 324) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 16896) (line 324) (column 71) (len 8)) (ref r222))) (element comma (expression (span (offset 16906) (line 324) (column 81) (len 6)) (ref r223))) (element comma (expression (span (offset 16914) (line 324) (column 89) (len 10)) (ref r224))) (element comma (expression (span (offset 16926) (line 324) (column 101) (len 26)) (ref r225))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 16970) (line 327) (column 7) (len 54)) (normalized "ISO-80000-5 item 5-10.1 coefficient of heat transfer "))) (attribute-def (declaration-name "CoefficientOfHeatTransferValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r226)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 17123) (line 330) (column 11) (len 622)) (normalized "source: item 5-10.1 coefficient of heat transfer\nsymbol(s): `K`, `(k)`\napplication domain: generic\nname: CoefficientOfHeatTransfer\nquantity dimension: M^1*T^-3*Θ^-1\nmeasurement unit(s): W/(m^2*K), kg*s^-3*K^-1\ntensor order: 0\ndefinition: quotient of density of heat flow rate (item 5-8) and thermodynamic temperature (item 5-1) difference\nremarks: In building technology, the coefficient of heat transfer is often called thermal transmittance, with the symbol U (no longer recommended). See remark to item 5-13.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r227)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r228)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r229)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r230)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "CoefficientOfHeatTransferUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r231)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r232)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r233)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18096) (line 348) (column 75) (len 5)) (member-access (base (expression (span (offset 18096) (line 348) (column 75) (len 3)) (ref r234))) (separator dot) (member (ref r235))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r236)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18118) (line 348) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r237)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r238)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18201) (line 349) (column 79) (len 5)) (member-access (base (expression (span (offset 18201) (line 349) (column 79) (len 3)) (ref r239))) (separator dot) (member (ref r240))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r241)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18223) (line 349) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 18224) (line 349) (column 102) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r242)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r243)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18323) (line 350) (column 95) (len 8)) (member-access (base (expression (span (offset 18323) (line 350) (column 95) (len 3)) (ref r244))) (separator dot) (member (ref r245))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r246)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18348) (line 350) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 18349) (line 350) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r247)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r248)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 18423) (line 351) (column 70) (len 48)) (sequence (sequence-list (element first (expression (span (offset 18424) (line 351) (column 71) (len 6)) (ref r249))) (element comma (expression (span (offset 18432) (line 351) (column 79) (len 10)) (ref r250))) (element comma (expression (span (offset 18444) (line 351) (column 91) (len 26)) (ref r251))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 18488) (line 354) (column 7) (len 62)) (normalized "ISO-80000-5 item 5-10.2 surface coefficient of heat transfer "))) (attribute-def (declaration-name "SurfaceCoefficientOfHeatTransferValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r252)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 18656) (line 357) (column 11) (len 728)) (normalized "source: item 5-10.2 surface coefficient of heat transfer\nsymbol(s): `h`, `(α)`\napplication domain: generic\nname: SurfaceCoefficientOfHeatTransfer\nquantity dimension: M^1*T^-3*Θ^-1\nmeasurement unit(s): W/(m^2*K), kg*s^-3*K^-1\ntensor order: 0\ndefinition: quotient of density of heat flow rate and the difference of the temperature at the surface and a reference temperature: `h = q / (T_s - T_r)` where q is density of heat flow rate (item 5-8), `T_s` is the thermodynamic temperature (item 5-1) at the surface, and `T_r` is a reference thermodynamic temperature characterizing the adjacent surroundings\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r253)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r254)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r255)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r256)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SurfaceCoefficientOfHeatTransferUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r257)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r258)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r259)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 19763) (line 375) (column 75) (len 5)) (member-access (base (expression (span (offset 19763) (line 375) (column 75) (len 3)) (ref r260))) (separator dot) (member (ref r261))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r262)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 19785) (line 375) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r263)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r264)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 19868) (line 376) (column 79) (len 5)) (member-access (base (expression (span (offset 19868) (line 376) (column 79) (len 3)) (ref r265))) (separator dot) (member (ref r266))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r267)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 19890) (line 376) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 19891) (line 376) (column 102) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r268)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r269)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 19990) (line 377) (column 95) (len 8)) (member-access (base (expression (span (offset 19990) (line 377) (column 95) (len 3)) (ref r270))) (separator dot) (member (ref r271))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r272)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 20015) (line 377) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 20016) (line 377) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r273)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r274)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 20090) (line 378) (column 70) (len 48)) (sequence (sequence-list (element first (expression (span (offset 20091) (line 378) (column 71) (len 6)) (ref r275))) (element comma (expression (span (offset 20099) (line 378) (column 79) (len 10)) (ref r276))) (element comma (expression (span (offset 20111) (line 378) (column 91) (len 26)) (ref r277))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 20155) (line 381) (column 7) (len 75)) (normalized "ISO-80000-5 item 5-11 thermal insulance, coefficient of thermal insulance "))) (attribute-def (declaration-name "ThermalInsulanceValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r278)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 20320) (line 384) (column 11) (len 562)) (normalized "source: item 5-11 thermal insulance, coefficient of thermal insulance\nsymbol(s): `M`\napplication domain: generic\nname: ThermalInsulance\nquantity dimension: M^-1*T^3*Θ^1\nmeasurement unit(s): m^2*K/W, kg^-1*s^3*K\ntensor order: 0\ndefinition: inverse of coefficient of heat transfer `K`: `M = 1/K` where `K` is coefficient of heat transfer (item 5-10.1)\nremarks: In building technology, this quantity is often called thermal resistance, with the symbol R.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r279)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r280)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r281)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r282)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "ThermalInsulanceUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r283)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r284)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r285)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21197) (line 402) (column 75) (len 5)) (member-access (base (expression (span (offset 21197) (line 402) (column 75) (len 3)) (ref r286))) (separator dot) (member (ref r287))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r288)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21219) (line 402) (column 97) (len 2)) (unary (operator "-") (operand (expression (span (offset 21220) (line 402) (column 98) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r289)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r290)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21303) (line 403) (column 79) (len 5)) (member-access (base (expression (span (offset 21303) (line 403) (column 79) (len 3)) (ref r291))) (separator dot) (member (ref r292))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r293)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21325) (line 403) (column 101) (len 1)) (integer 3))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r294)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r295)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21424) (line 404) (column 95) (len 8)) (member-access (base (expression (span (offset 21424) (line 404) (column 95) (len 3)) (ref r296))) (separator dot) (member (ref r297))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r298)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21449) (line 404) (column 120) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r299)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r300)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 21523) (line 405) (column 70) (len 48)) (sequence (sequence-list (element first (expression (span (offset 21524) (line 405) (column 71) (len 6)) (ref r301))) (element comma (expression (span (offset 21532) (line 405) (column 79) (len 10)) (ref r302))) (element comma (expression (span (offset 21544) (line 405) (column 91) (len 26)) (ref r303))))))))) (body semicolon)))))) (alias (name "CoefficientOfThermalInsulanceUnit") (target (ref r304)) (body semicolon)) (alias (name "CoefficientOfThermalInsulanceValue") (target (ref r305)) (body semicolon)) (alias (name "coefficientOfThermalInsulance") (target (ref r306)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 21793) (line 412) (column 7) (len 42)) (normalized "ISO-80000-5 item 5-12 thermal resistance "))) (attribute-def (declaration-name "ThermalResistanceValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r307)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 21926) (line 415) (column 11) (len 447)) (normalized "source: item 5-12 thermal resistance\nsymbol(s): `R`\napplication domain: generic\nname: ThermalResistance\nquantity dimension: L^-2*M^-1*T^3*Θ^1\nmeasurement unit(s): K/W, kg^-1*m^-2*s^3*K\ntensor order: 0\ndefinition: quotient of thermodynamic temperature (item 5-1) difference and heat flow rate (item 5-7)\nremarks: See remark to item 5-11.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r308)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r309)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r310)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r311)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "ThermalResistanceUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r312)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r313)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r314)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 22694) (line 433) (column 77) (len 5)) (member-access (base (expression (span (offset 22694) (line 433) (column 77) (len 3)) (ref r315))) (separator dot) (member (ref r316))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r317)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 22716) (line 433) (column 99) (len 2)) (unary (operator "-") (operand (expression (span (offset 22717) (line 433) (column 100) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r318)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r319)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 22796) (line 434) (column 75) (len 5)) (member-access (base (expression (span (offset 22796) (line 434) (column 75) (len 3)) (ref r320))) (separator dot) (member (ref r321))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r322)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 22818) (line 434) (column 97) (len 2)) (unary (operator "-") (operand (expression (span (offset 22819) (line 434) (column 98) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r323)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r324)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 22902) (line 435) (column 79) (len 5)) (member-access (base (expression (span (offset 22902) (line 435) (column 79) (len 3)) (ref r325))) (separator dot) (member (ref r326))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r327)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 22924) (line 435) (column 101) (len 1)) (integer 3))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r328)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r329)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 23023) (line 436) (column 95) (len 8)) (member-access (base (expression (span (offset 23023) (line 436) (column 95) (len 3)) (ref r330))) (separator dot) (member (ref r331))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r332)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 23048) (line 436) (column 120) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r333)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r334)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 23122) (line 437) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 23123) (line 437) (column 71) (len 8)) (ref r335))) (element comma (expression (span (offset 23133) (line 437) (column 81) (len 6)) (ref r336))) (element comma (expression (span (offset 23141) (line 437) (column 89) (len 10)) (ref r337))) (element comma (expression (span (offset 23153) (line 437) (column 101) (len 26)) (ref r338))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 23197) (line 440) (column 7) (len 43)) (normalized "ISO-80000-5 item 5-13 thermal conductance "))) (attribute-def (declaration-name "ThermalConductanceValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r339)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 23332) (line 443) (column 11) (len 528)) (normalized "source: item 5-13 thermal conductance\nsymbol(s): `G`, `(H)`\napplication domain: generic\nname: ThermalConductance\nquantity dimension: L^2*M^1*T^-3*Θ^-1\nmeasurement unit(s): W/K, kg*m^2*s^-3*K^-1\ntensor order: 0\ndefinition: inverse of thermal resistance `R`: `G = 1/R` where `R` is thermal resistance (item 5-12)\nremarks: See remark to item 5-11. This quantity is also called heat transfer coefficient. See item 5-10.1.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r340)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r341)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r342)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r343)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "ThermalConductanceUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r344)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r345)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r346)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24185) (line 461) (column 77) (len 5)) (member-access (base (expression (span (offset 24185) (line 461) (column 77) (len 3)) (ref r347))) (separator dot) (member (ref r348))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r349)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24207) (line 461) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r350)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r351)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24286) (line 462) (column 75) (len 5)) (member-access (base (expression (span (offset 24286) (line 462) (column 75) (len 3)) (ref r352))) (separator dot) (member (ref r353))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r354)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24308) (line 462) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r355)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r356)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24391) (line 463) (column 79) (len 5)) (member-access (base (expression (span (offset 24391) (line 463) (column 79) (len 3)) (ref r357))) (separator dot) (member (ref r358))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r359)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24413) (line 463) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 24414) (line 463) (column 102) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r360)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r361)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24513) (line 464) (column 95) (len 8)) (member-access (base (expression (span (offset 24513) (line 464) (column 95) (len 3)) (ref r362))) (separator dot) (member (ref r363))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r364)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24538) (line 464) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 24539) (line 464) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r365)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r366)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 24613) (line 465) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 24614) (line 465) (column 71) (len 8)) (ref r367))) (element comma (expression (span (offset 24624) (line 465) (column 81) (len 6)) (ref r368))) (element comma (expression (span (offset 24632) (line 465) (column 89) (len 10)) (ref r369))) (element comma (expression (span (offset 24644) (line 465) (column 101) (len 26)) (ref r370))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 24688) (line 468) (column 7) (len 43)) (normalized "ISO-80000-5 item 5-14 thermal diffusivity "))) (attribute-def (declaration-name "ThermalDiffusivityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r371)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 24823) (line 471) (column 11) (len 584)) (normalized "source: item 5-14 thermal diffusivity\nsymbol(s): `a`\napplication domain: generic\nname: ThermalDiffusivity\nquantity dimension: L^2*T^-1\nmeasurement unit(s): m^2*s^-1\ntensor order: 0\ndefinition: quotient of thermal conductivity and the product of mass density and specific heat capacity: `a = λ / (ρ C_p)` where `λ` is thermal conductivity (item 5-9), `ρ` is mass density (ISO 80000-4), and `c_p` is specific heat capacity at constant pressure (item 5-16.2)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r372)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r373)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r374)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r375)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "ThermalDiffusivityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r376)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r377)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r378)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 25732) (line 489) (column 77) (len 5)) (member-access (base (expression (span (offset 25732) (line 489) (column 77) (len 3)) (ref r379))) (separator dot) (member (ref r380))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r381)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 25754) (line 489) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r382)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r383)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 25837) (line 490) (column 79) (len 5)) (member-access (base (expression (span (offset 25837) (line 490) (column 79) (len 3)) (ref r384))) (separator dot) (member (ref r385))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r386)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 25859) (line 490) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 25860) (line 490) (column 102) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r387)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r388)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 25934) (line 491) (column 70) (len 22)) (sequence (sequence-list (element first (expression (span (offset 25935) (line 491) (column 71) (len 8)) (ref r389))) (element comma (expression (span (offset 25945) (line 491) (column 81) (len 10)) (ref r390))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 25973) (line 494) (column 7) (len 37)) (normalized "ISO-80000-5 item 5-15 heat capacity "))) (attribute-def (declaration-name "HeatCapacityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r391)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 26096) (line 497) (column 11) (len 608)) (normalized "source: item 5-15 heat capacity\nsymbol(s): `C`\napplication domain: generic\nname: HeatCapacity\nquantity dimension: L^2*M^1*T^-2*Θ^-1\nmeasurement unit(s): J/K, kg*m^2*s^-2*K^-1\ntensor order: 0\ndefinition: derivative of added heat with respect to thermodynamic temperature of a system: `C = (dQ)/(dT)` where `Q` is amount of heat (item 5-6.1) and `T` is thermodynamic temperature (item 5-1)\nremarks: Heat capacity is not completely defined unless specified as seen in items 5-16.2, 5-16.3 and 5-16.4.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r392)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r393)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r394)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r395)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "HeatCapacityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r396)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r397)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r398)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27005) (line 515) (column 77) (len 5)) (member-access (base (expression (span (offset 27005) (line 515) (column 77) (len 3)) (ref r399))) (separator dot) (member (ref r400))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r401)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27027) (line 515) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r402)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r403)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27106) (line 516) (column 75) (len 5)) (member-access (base (expression (span (offset 27106) (line 516) (column 75) (len 3)) (ref r404))) (separator dot) (member (ref r405))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r406)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27128) (line 516) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r407)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r408)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27211) (line 517) (column 79) (len 5)) (member-access (base (expression (span (offset 27211) (line 517) (column 79) (len 3)) (ref r409))) (separator dot) (member (ref r410))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r411)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27233) (line 517) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 27234) (line 517) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r412)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r413)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27333) (line 518) (column 95) (len 8)) (member-access (base (expression (span (offset 27333) (line 518) (column 95) (len 3)) (ref r414))) (separator dot) (member (ref r415))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r416)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27358) (line 518) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 27359) (line 518) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r417)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r418)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 27433) (line 519) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 27434) (line 519) (column 71) (len 8)) (ref r419))) (element comma (expression (span (offset 27444) (line 519) (column 81) (len 6)) (ref r420))) (element comma (expression (span (offset 27452) (line 519) (column 89) (len 10)) (ref r421))) (element comma (expression (span (offset 27464) (line 519) (column 101) (len 26)) (ref r422))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 27508) (line 522) (column 7) (len 48)) (normalized "ISO-80000-5 item 5-16.1 specific heat capacity "))) (attribute-def (declaration-name "SpecificHeatCapacityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r423)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 27650) (line 525) (column 11) (len 540)) (normalized "source: item 5-16.1 specific heat capacity\nsymbol(s): `c`\napplication domain: generic\nname: SpecificHeatCapacity\nquantity dimension: L^2*T^-2*Θ^-1\nmeasurement unit(s): J/(kg*K), m^2*s^-2*K^-1\ntensor order: 0\ndefinition: quotient of heat capacity and mass: `c = C/m` where `C` is heat capacity (item 5-15) and `m` is mass (ISO 80000-4)\nremarks: For the corresponding quantities related to the amount of substance, see ISO 80000-9.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r424)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r425)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r426)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r427)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificHeatCapacityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r428)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r429)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r430)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28523) (line 543) (column 77) (len 5)) (member-access (base (expression (span (offset 28523) (line 543) (column 77) (len 3)) (ref r431))) (separator dot) (member (ref r432))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r433)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28545) (line 543) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r434)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r435)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28628) (line 544) (column 79) (len 5)) (member-access (base (expression (span (offset 28628) (line 544) (column 79) (len 3)) (ref r436))) (separator dot) (member (ref r437))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r438)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28650) (line 544) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 28651) (line 544) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r439)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r440)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28750) (line 545) (column 95) (len 8)) (member-access (base (expression (span (offset 28750) (line 545) (column 95) (len 3)) (ref r441))) (separator dot) (member (ref r442))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r443)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28775) (line 545) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 28776) (line 545) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r444)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r445)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 28850) (line 546) (column 70) (len 50)) (sequence (sequence-list (element first (expression (span (offset 28851) (line 546) (column 71) (len 8)) (ref r446))) (element comma (expression (span (offset 28861) (line 546) (column 81) (len 10)) (ref r447))) (element comma (expression (span (offset 28873) (line 546) (column 93) (len 26)) (ref r448))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 28917) (line 549) (column 7) (len 69)) (normalized "ISO-80000-5 item 5-16.2 specific heat capacity at constant pressure "))) (attribute-def (declaration-name "SpecificHeatCapacityAtConstantPressureValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r449)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 29098) (line 552) (column 11) (len 497)) (normalized "source: item 5-16.2 specific heat capacity at constant pressure\nsymbol(s): `c_p`\napplication domain: generic\nname: SpecificHeatCapacityAtConstantPressure\nquantity dimension: L^2*T^-2*Θ^-1\nmeasurement unit(s): J/(kg*K), m^2*s^-2*K^-1\ntensor order: 0\ndefinition: specific heat capacity (item 5-16.1) at constant pressure (ISO 80000-4)\nremarks: Also called specific isobaric heat capacity.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r450)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r451)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r452)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r453)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificHeatCapacityAtConstantPressureUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r454)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r455)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r456)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30000) (line 570) (column 77) (len 5)) (member-access (base (expression (span (offset 30000) (line 570) (column 77) (len 3)) (ref r457))) (separator dot) (member (ref r458))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r459)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30022) (line 570) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r460)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r461)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30105) (line 571) (column 79) (len 5)) (member-access (base (expression (span (offset 30105) (line 571) (column 79) (len 3)) (ref r462))) (separator dot) (member (ref r463))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r464)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30127) (line 571) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 30128) (line 571) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r465)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r466)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30227) (line 572) (column 95) (len 8)) (member-access (base (expression (span (offset 30227) (line 572) (column 95) (len 3)) (ref r467))) (separator dot) (member (ref r468))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r469)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30252) (line 572) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 30253) (line 572) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r470)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r471)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 30327) (line 573) (column 70) (len 50)) (sequence (sequence-list (element first (expression (span (offset 30328) (line 573) (column 71) (len 8)) (ref r472))) (element comma (expression (span (offset 30338) (line 573) (column 81) (len 10)) (ref r473))) (element comma (expression (span (offset 30350) (line 573) (column 93) (len 26)) (ref r474))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 30394) (line 576) (column 7) (len 67)) (normalized "ISO-80000-5 item 5-16.3 specific heat capacity at constant volume "))) (attribute-def (declaration-name "SpecificHeatCapacityAtConstantVolumeValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r475)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 30571) (line 579) (column 11) (len 492)) (normalized "source: item 5-16.3 specific heat capacity at constant volume\nsymbol(s): `c_V`\napplication domain: generic\nname: SpecificHeatCapacityAtConstantVolume\nquantity dimension: L^2*T^-2*Θ^-1\nmeasurement unit(s): J/(kg*K), m^2*s^-2*K^-1\ntensor order: 0\ndefinition: specific heat capacity (item 5-16.1) at constant volume (ISO 80000-3)\nremarks: Also called specific isochoric heat capacity.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r476)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r477)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r478)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r479)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificHeatCapacityAtConstantVolumeUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r480)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r481)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r482)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31460) (line 597) (column 77) (len 5)) (member-access (base (expression (span (offset 31460) (line 597) (column 77) (len 3)) (ref r483))) (separator dot) (member (ref r484))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r485)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31482) (line 597) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r486)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r487)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31565) (line 598) (column 79) (len 5)) (member-access (base (expression (span (offset 31565) (line 598) (column 79) (len 3)) (ref r488))) (separator dot) (member (ref r489))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r490)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31587) (line 598) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 31588) (line 598) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r491)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r492)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31687) (line 599) (column 95) (len 8)) (member-access (base (expression (span (offset 31687) (line 599) (column 95) (len 3)) (ref r493))) (separator dot) (member (ref r494))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r495)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31712) (line 599) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 31713) (line 599) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r496)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r497)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 31787) (line 600) (column 70) (len 50)) (sequence (sequence-list (element first (expression (span (offset 31788) (line 600) (column 71) (len 8)) (ref r498))) (element comma (expression (span (offset 31798) (line 600) (column 81) (len 10)) (ref r499))) (element comma (expression (span (offset 31810) (line 600) (column 93) (len 26)) (ref r500))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 31854) (line 603) (column 7) (len 77)) (normalized "ISO-80000-5 item 5-16.4 specific heat capacity at saturated vapour pressure "))) (attribute-def (declaration-name "SpecificHeatCapacityAtSaturatedVapourPressureValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r501)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 32050) (line 606) (column 11) (len 485)) (normalized "source: item 5-16.4 specific heat capacity at saturated vapour pressure\nsymbol(s): `c_\"sat\"`\napplication domain: generic\nname: SpecificHeatCapacityAtSaturatedVapourPressure\nquantity dimension: L^2*T^-2*Θ^-1\nmeasurement unit(s): J/(kg*K), m^2*s^-2*K^-1\ntensor order: 0\ndefinition: specific heat capacity (item 5-16.1) at saturated vapour pressure (ISO 80000-4)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r502)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r503)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r504)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r505)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificHeatCapacityAtSaturatedVapourPressureUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r506)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r507)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r508)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 32968) (line 624) (column 77) (len 5)) (member-access (base (expression (span (offset 32968) (line 624) (column 77) (len 3)) (ref r509))) (separator dot) (member (ref r510))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r511)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 32990) (line 624) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r512)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r513)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 33073) (line 625) (column 79) (len 5)) (member-access (base (expression (span (offset 33073) (line 625) (column 79) (len 3)) (ref r514))) (separator dot) (member (ref r515))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r516)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 33095) (line 625) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 33096) (line 625) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r517)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r518)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 33195) (line 626) (column 95) (len 8)) (member-access (base (expression (span (offset 33195) (line 626) (column 95) (len 3)) (ref r519))) (separator dot) (member (ref r520))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r521)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 33220) (line 626) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 33221) (line 626) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r522)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r523)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 33295) (line 627) (column 70) (len 50)) (sequence (sequence-list (element first (expression (span (offset 33296) (line 627) (column 71) (len 8)) (ref r524))) (element comma (expression (span (offset 33306) (line 627) (column 81) (len 10)) (ref r525))) (element comma (expression (span (offset 33318) (line 627) (column 93) (len 26)) (ref r526))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 33362) (line 630) (column 7) (len 59)) (normalized "ISO-80000-5 item 5-17.1 ratio of specific heat capacities "))) (attribute-def (declaration-name "RatioOfSpecificHeatCapacitiesValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r527)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 33522) (line 633) (column 11) (len 771)) (normalized "source: item 5-17.1 ratio of specific heat capacities\nsymbol(s): `γ`\napplication domain: generic\nname: RatioOfSpecificHeatCapacities (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of specific heat capacity at constant pressure and specific heat capacity at constant volume: `γ = c_p/c_V` where `c_p` is specific heat capacity at constant pressure (item 5-16.2) and `c_V` is specific heat capacity at constant volume (item 5-16.3)\nremarks: This quantity can also be expressed by `γ = C_p/C_V` where `C_p` is heat capacity at constant pressure and `C_V` is heat capacity at constant volume.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 34410) (line 647) (column 7) (len 74)) (normalized "ISO-80000-5 item 5-17.2 isentropic exponent, isentropic expansion factor "))) (attribute-def (declaration-name "IsentropicExponentValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r528)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 34574) (line 650) (column 11) (len 656)) (normalized "source: item 5-17.2 isentropic exponent, isentropic expansion factor\nsymbol(s): `ϰ`\napplication domain: generic\nname: IsentropicExponent (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: the negative of relative pressure change, divided by relative volume change, at constant entropy: `ϰ = -V/p * ((partial p)/(partial V))_S` where `V` is volume (ISO 80000-3), `p` is pressure (ISO 80000-4), and `S` is entropy (item 5-18)\nremarks: For an ideal gas, `ϰ` is equal to `γ` (item 5-17.1).\n"))))) (attribute-usage) (alias (name "isentropicExpansionFactor") (target (ref r529)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 35386) (line 666) (column 7) (len 31)) (normalized "ISO-80000-5 item 5-18 entropy "))) (attribute-def (declaration-name "EntropyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r530)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 35498) (line 669) (column 11) (len 553)) (normalized "source: item 5-18 entropy\nsymbol(s): `S`\napplication domain: generic\nname: Entropy\nquantity dimension: L^2*M^1*T^-2*Θ^-1\nmeasurement unit(s): J/K, kg*m^2*s^-2*K^-1\ntensor order: 0\ndefinition: natural logarithm of number of equally probable microscopic configurations in a macroscopic system, multiplied by the Boltzmann constant: `S = k lnW` where `W` is number of configurations and `k` is the Boltzmann constant (ISO 80000-1)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r531)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r532)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r533)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r534)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "EntropyUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r535)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r536)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r537)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36332) (line 687) (column 77) (len 5)) (member-access (base (expression (span (offset 36332) (line 687) (column 77) (len 3)) (ref r538))) (separator dot) (member (ref r539))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r540)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36354) (line 687) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r541)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r542)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36433) (line 688) (column 75) (len 5)) (member-access (base (expression (span (offset 36433) (line 688) (column 75) (len 3)) (ref r543))) (separator dot) (member (ref r544))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r545)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36455) (line 688) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r546)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r547)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36538) (line 689) (column 79) (len 5)) (member-access (base (expression (span (offset 36538) (line 689) (column 79) (len 3)) (ref r548))) (separator dot) (member (ref r549))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r550)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36560) (line 689) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 36561) (line 689) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r551)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r552)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36660) (line 690) (column 95) (len 8)) (member-access (base (expression (span (offset 36660) (line 690) (column 95) (len 3)) (ref r553))) (separator dot) (member (ref r554))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r555)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36685) (line 690) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 36686) (line 690) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r556)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r557)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 36760) (line 691) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 36761) (line 691) (column 71) (len 8)) (ref r558))) (element comma (expression (span (offset 36771) (line 691) (column 81) (len 6)) (ref r559))) (element comma (expression (span (offset 36779) (line 691) (column 89) (len 10)) (ref r560))) (element comma (expression (span (offset 36791) (line 691) (column 101) (len 26)) (ref r561))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 36835) (line 694) (column 7) (len 40)) (normalized "ISO-80000-5 item 5-19 specific entropy "))) (attribute-def (declaration-name "SpecificEntropyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r562)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 36964) (line 697) (column 11) (len 509)) (normalized "source: item 5-19 specific entropy\nsymbol(s): `s`\napplication domain: generic\nname: SpecificEntropy\nquantity dimension: L^2*T^-2*Θ^-1\nmeasurement unit(s): J/(kg*K), m^2*s^-2*K^-1\ntensor order: 0\ndefinition: quotient of entropy and mass: `s = S/m` where `S` is entropy (item 5-18) and `m` is mass (ISO 80000-4)\nremarks: For the corresponding quantity related to amount of substance, see ISO 80000-9.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r563)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r564)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r565)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r566)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificEntropyUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r567)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r568)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r569)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 37786) (line 715) (column 77) (len 5)) (member-access (base (expression (span (offset 37786) (line 715) (column 77) (len 3)) (ref r570))) (separator dot) (member (ref r571))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r572)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 37808) (line 715) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r573)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r574)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 37891) (line 716) (column 79) (len 5)) (member-access (base (expression (span (offset 37891) (line 716) (column 79) (len 3)) (ref r575))) (separator dot) (member (ref r576))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r577)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 37913) (line 716) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 37914) (line 716) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r578)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r579)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 38013) (line 717) (column 95) (len 8)) (member-access (base (expression (span (offset 38013) (line 717) (column 95) (len 3)) (ref r580))) (separator dot) (member (ref r581))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r582)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 38038) (line 717) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 38039) (line 717) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r583)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r584)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 38113) (line 718) (column 70) (len 50)) (sequence (sequence-list (element first (expression (span (offset 38114) (line 718) (column 71) (len 8)) (ref r585))) (element comma (expression (span (offset 38124) (line 718) (column 81) (len 10)) (ref r586))) (element comma (expression (span (offset 38136) (line 718) (column 93) (len 26)) (ref r587))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 38180) (line 721) (column 7) (len 32)) (normalized "ISO-80000-5 item 5-20.1 energy "))) (attribute-def (declaration-name "EnergyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r588)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 38292) (line 724) (column 11) (len 539)) (normalized "source: item 5-20.1 energy\nsymbol(s): `E`\napplication domain: thermodynamics\nname: Energy\nquantity dimension: L^2*M^1*T^-2\nmeasurement unit(s): J, kg*m^2*s^-2\ntensor order: 0\ndefinition: ability of a system to do work (ISO 80000-4)\nremarks: Energy exists in different forms that are mutually transformable into each other, either totally or partially. In contrast to internal energy (item 5-20.2), energy is not a state function.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r589)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r590)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r591)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r592)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "EnergyUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r593)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r594)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r595)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39108) (line 742) (column 77) (len 5)) (member-access (base (expression (span (offset 39108) (line 742) (column 77) (len 3)) (ref r596))) (separator dot) (member (ref r597))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r598)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39130) (line 742) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r599)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r600)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39209) (line 743) (column 75) (len 5)) (member-access (base (expression (span (offset 39209) (line 743) (column 75) (len 3)) (ref r601))) (separator dot) (member (ref r602))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r603)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39231) (line 743) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r604)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r605)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39314) (line 744) (column 79) (len 5)) (member-access (base (expression (span (offset 39314) (line 744) (column 79) (len 3)) (ref r606))) (separator dot) (member (ref r607))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r608)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39336) (line 744) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 39337) (line 744) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r609)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r610)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 39411) (line 745) (column 70) (len 30)) (sequence (sequence-list (element first (expression (span (offset 39412) (line 745) (column 71) (len 8)) (ref r611))) (element comma (expression (span (offset 39422) (line 745) (column 81) (len 6)) (ref r612))) (element comma (expression (span (offset 39430) (line 745) (column 89) (len 10)) (ref r613))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 39458) (line 748) (column 7) (len 63)) (normalized "ISO-80000-5 item 5-20.2 internal energy, thermodynamic energy "))) (attribute-usage) (alias (name "thermodynamicEnergy") (target (ref r614)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 40374) (line 766) (column 7) (len 34)) (normalized "ISO-80000-5 item 5-20.3 enthalpy "))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 41046) (line 782) (column 7) (len 62)) (normalized "ISO-80000-5 item 5-20.4 Helmholtz energy, Helmholtz function "))) (attribute-usage) (alias (name "helmholtzFunction") (target (ref r615)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 41960) (line 800) (column 7) (len 54)) (normalized "ISO-80000-5 item 5-20.5 Gibbs energy, Gibbs function "))) (attribute-usage) (alias (name "gibbsFunction") (target (ref r616)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 42808) (line 818) (column 7) (len 41)) (normalized "ISO-80000-5 item 5-21.1 specific energy "))) (attribute-def (declaration-name "SpecificEnergyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r617)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 42937) (line 821) (column 11) (len 420)) (normalized "source: item 5-21.1 specific energy\nsymbol(s): `e`\napplication domain: generic\nname: SpecificEnergy\nquantity dimension: L^2*T^-2\nmeasurement unit(s): J/kg, m^2*s^-2\ntensor order: 0\ndefinition: quotient of energy and mass: `e = E/m` where `E` is energy (item 5-20.1) and `m` is mass (ISO 80000-4)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r618)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r619)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r620)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r621)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificEnergyUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r622)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r623)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r624)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 43666) (line 839) (column 77) (len 5)) (member-access (base (expression (span (offset 43666) (line 839) (column 77) (len 3)) (ref r625))) (separator dot) (member (ref r626))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r627)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 43688) (line 839) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r628)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r629)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 43771) (line 840) (column 79) (len 5)) (member-access (base (expression (span (offset 43771) (line 840) (column 79) (len 3)) (ref r630))) (separator dot) (member (ref r631))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r632)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 43793) (line 840) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 43794) (line 840) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r633)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r634)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 43868) (line 841) (column 70) (len 22)) (sequence (sequence-list (element first (expression (span (offset 43869) (line 841) (column 71) (len 8)) (ref r635))) (element comma (expression (span (offset 43879) (line 841) (column 81) (len 10)) (ref r636))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 43907) (line 844) (column 7) (len 81)) (normalized "ISO-80000-5 item 5-21.2 specific internal energy, specific thermodynamic energy "))) (attribute-usage) (alias (name "specificThermodynamicEnergy") (target (ref r637)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 44691) (line 862) (column 7) (len 43)) (normalized "ISO-80000-5 item 5-21.3 specific enthalpy "))) (attribute-def (declaration-name "SpecificEnthalpyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r638)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 44824) (line 865) (column 11) (len 428)) (normalized "source: item 5-21.3 specific enthalpy\nsymbol(s): `h`\napplication domain: generic\nname: SpecificEnthalpy\nquantity dimension: L^2*T^-2\nmeasurement unit(s): J/kg, m^2*s^-2\ntensor order: 0\ndefinition: quotient of enthalpy and mass: `h = H/m` where `H` is enthalpy (item 5-20.3) and `m` is mass (ISO 80000-4)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r639)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r640)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r641)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r642)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificEnthalpyUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r643)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r644)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r645)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 45569) (line 883) (column 77) (len 5)) (member-access (base (expression (span (offset 45569) (line 883) (column 77) (len 3)) (ref r646))) (separator dot) (member (ref r647))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r648)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 45591) (line 883) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r649)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r650)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 45674) (line 884) (column 79) (len 5)) (member-access (base (expression (span (offset 45674) (line 884) (column 79) (len 3)) (ref r651))) (separator dot) (member (ref r652))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r653)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 45696) (line 884) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 45697) (line 884) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r654)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r655)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 45771) (line 885) (column 70) (len 22)) (sequence (sequence-list (element first (expression (span (offset 45772) (line 885) (column 71) (len 8)) (ref r656))) (element comma (expression (span (offset 45782) (line 885) (column 81) (len 10)) (ref r657))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 45810) (line 888) (column 7) (len 80)) (normalized "ISO-80000-5 item 5-21.4 specific Helmholtz energy, specific Helmholtz function "))) (attribute-usage) (alias (name "specificHelmholtzFunction") (target (ref r658)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 46683) (line 906) (column 7) (len 72)) (normalized "ISO-80000-5 item 5-21.5 specific Gibbs energy, specific Gibbs function "))) (attribute-usage) (alias (name "specificGibbsFunction") (target (ref r659)) (body semicolon)) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 47511) (line 924) (column 7) (len 40)) (normalized "ISO-80000-5 item 5-22 Massieu function "))) (attribute-def (declaration-name "MassieuFunctionValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r660)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 47640) (line 927) (column 11) (len 499)) (normalized "source: item 5-22 Massieu function\nsymbol(s): `J`\napplication domain: generic\nname: MassieuFunction\nquantity dimension: L^2*M^1*T^-2*Θ^-1\nmeasurement unit(s): J/K, kg*m^2*s^-2*K^-1\ntensor order: 0\ndefinition: quotient of the negative of Helmholtz energy and temperature: `J = -A/T` where `A` is Helmholtz energy (item 5-20.4) and `T` is thermodynamic temperature (item 5-1)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r661)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r662)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r663)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r664)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "MassieuFunctionUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r665)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r666)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r667)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48452) (line 945) (column 77) (len 5)) (member-access (base (expression (span (offset 48452) (line 945) (column 77) (len 3)) (ref r668))) (separator dot) (member (ref r669))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r670)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48474) (line 945) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r671)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r672)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48553) (line 946) (column 75) (len 5)) (member-access (base (expression (span (offset 48553) (line 946) (column 75) (len 3)) (ref r673))) (separator dot) (member (ref r674))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r675)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48575) (line 946) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r676)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r677)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48658) (line 947) (column 79) (len 5)) (member-access (base (expression (span (offset 48658) (line 947) (column 79) (len 3)) (ref r678))) (separator dot) (member (ref r679))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r680)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48680) (line 947) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 48681) (line 947) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r681)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r682)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48780) (line 948) (column 95) (len 8)) (member-access (base (expression (span (offset 48780) (line 948) (column 95) (len 3)) (ref r683))) (separator dot) (member (ref r684))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r685)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48805) (line 948) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 48806) (line 948) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r686)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r687)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 48880) (line 949) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 48881) (line 949) (column 71) (len 8)) (ref r688))) (element comma (expression (span (offset 48891) (line 949) (column 81) (len 6)) (ref r689))) (element comma (expression (span (offset 48899) (line 949) (column 89) (len 10)) (ref r690))) (element comma (expression (span (offset 48911) (line 949) (column 101) (len 26)) (ref r691))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 48955) (line 952) (column 7) (len 39)) (normalized "ISO-80000-5 item 5-23 Planck function "))) (attribute-def (declaration-name "PlanckFunctionValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r692)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 49082) (line 955) (column 11) (len 487)) (normalized "source: item 5-23 Planck function\nsymbol(s): `Y`\napplication domain: generic\nname: PlanckFunction\nquantity dimension: L^2*M^1*T^-2*Θ^-1\nmeasurement unit(s): J/K, kg*m^2*s^-2*K^-1\ntensor order: 0\ndefinition: quotient of the negative of Gibbs energy and temperature: `Y = -G/T` where G is Gibbs energy (item 5-20.5) and `T` is thermodynamic temperature (item 5-1)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r693)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r694)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r695)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r696)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "PlanckFunctionUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r697)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r698)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r699)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 49878) (line 973) (column 77) (len 5)) (member-access (base (expression (span (offset 49878) (line 973) (column 77) (len 3)) (ref r700))) (separator dot) (member (ref r701))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r702)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 49900) (line 973) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r703)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r704)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 49979) (line 974) (column 75) (len 5)) (member-access (base (expression (span (offset 49979) (line 974) (column 75) (len 3)) (ref r705))) (separator dot) (member (ref r706))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r707)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 50001) (line 974) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r708)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r709)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 50084) (line 975) (column 79) (len 5)) (member-access (base (expression (span (offset 50084) (line 975) (column 79) (len 3)) (ref r710))) (separator dot) (member (ref r711))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r712)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 50106) (line 975) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 50107) (line 975) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r713)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r714)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 50206) (line 976) (column 95) (len 8)) (member-access (base (expression (span (offset 50206) (line 976) (column 95) (len 3)) (ref r715))) (separator dot) (member (ref r716))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r717)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 50231) (line 976) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 50232) (line 976) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r718)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r719)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 50306) (line 977) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 50307) (line 977) (column 71) (len 8)) (ref r720))) (element comma (expression (span (offset 50317) (line 977) (column 81) (len 6)) (ref r721))) (element comma (expression (span (offset 50325) (line 977) (column 89) (len 10)) (ref r722))) (element comma (expression (span (offset 50337) (line 977) (column 101) (len 26)) (ref r723))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 50381) (line 980) (column 7) (len 49)) (normalized "ISO-80000-5 item 5-24 Joule-Thomson coefficient "))) (attribute-def (declaration-name "JouleThomsonCoefficientValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r724)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 50527) (line 983) (column 11) (len 617)) (normalized "source: item 5-24 Joule-Thomson coefficient\nsymbol(s): `μ_\"JT\"`\napplication domain: generic\nname: JouleThomsonCoefficient\nquantity dimension: L^1*M^-1*T^2*Θ^1\nmeasurement unit(s): K/Pa, kg^-1*m*s^2*K\ntensor order: 0\ndefinition: change of thermodynamic temperature with respect to pressure in a Joule-Thomson process at constant enthalpy: `μ_(JT) = ((partial T)/(partial p))_H` where `T` is thermodynamic temperature (item 5-1), `p` is pressure (ISO 80000-4) and H is enthalpy (item 5-20.3)\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r725)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r726)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r727)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r728)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "JouleThomsonCoefficientUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r729)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r730)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r731)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51489) (line 1001) (column 77) (len 5)) (member-access (base (expression (span (offset 51489) (line 1001) (column 77) (len 3)) (ref r732))) (separator dot) (member (ref r733))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r734)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51511) (line 1001) (column 99) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r735)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r736)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51590) (line 1002) (column 75) (len 5)) (member-access (base (expression (span (offset 51590) (line 1002) (column 75) (len 3)) (ref r737))) (separator dot) (member (ref r738))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r739)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51612) (line 1002) (column 97) (len 2)) (unary (operator "-") (operand (expression (span (offset 51613) (line 1002) (column 98) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r740)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r741)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51696) (line 1003) (column 79) (len 5)) (member-access (base (expression (span (offset 51696) (line 1003) (column 79) (len 3)) (ref r742))) (separator dot) (member (ref r743))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r744)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51718) (line 1003) (column 101) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r745)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r746)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51817) (line 1004) (column 95) (len 8)) (member-access (base (expression (span (offset 51817) (line 1004) (column 95) (len 3)) (ref r747))) (separator dot) (member (ref r748))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r749)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51842) (line 1004) (column 120) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r750)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r751)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 51916) (line 1005) (column 70) (len 58)) (sequence (sequence-list (element first (expression (span (offset 51917) (line 1005) (column 71) (len 8)) (ref r752))) (element comma (expression (span (offset 51927) (line 1005) (column 81) (len 6)) (ref r753))) (element comma (expression (span (offset 51935) (line 1005) (column 89) (len 10)) (ref r754))) (element comma (expression (span (offset 51947) (line 1005) (column 101) (len 26)) (ref r755))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 51991) (line 1008) (column 7) (len 44)) (normalized "ISO-80000-5 item 5-25.1 thermal efficiency "))) (attribute-def (declaration-name "ThermalEfficiencyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r756)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 52124) (line 1011) (column 11) (len 495)) (normalized "source: item 5-25.1 thermal efficiency\nsymbol(s): `η`\napplication domain: thermodynamics\nname: ThermalEfficiency (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of work (ISO 80000-4) delivered by a heat engine and supplied heat: `η = W/Q` where `W` is work (ISO 80000-4) and `Q` is heat (item 5-6.1)\nremarks: None.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 52712) (line 1025) (column 7) (len 52)) (normalized "ISO-80000-5 item 5-25.2 maximum thermal efficiency "))) (attribute-def (declaration-name "MaximumThermalEfficiencyValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r757)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 52860) (line 1028) (column 11) (len 718)) (normalized "source: item 5-25.2 maximum thermal efficiency\nsymbol(s): `η_\"max\"`\napplication domain: generic\nname: MaximumThermalEfficiency (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: efficiency determined by the quotient of the temperatures of the hot source and the cold sink: `η_max = 1 - T_c/T_h` where `T_c` is the thermodynamic temperature (item 5-1) of the cold sink and `T_h` is the thermodynamic temperature (item 5-1) of the hot source\nremarks: An ideal heat engine operating according to the Carnot process is delivering the maximum efficiency.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 53685) (line 1042) (column 7) (len 45)) (normalized "ISO-80000-5 item 5-26 specific gas constant "))) (attribute-def (declaration-name "SpecificGasConstantValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r758)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 53823) (line 1045) (column 11) (len 447)) (normalized "source: item 5-26 specific gas constant\nsymbol(s): `R_s`\napplication domain: generic\nname: SpecificGasConstant\nquantity dimension: L^2*T^-2*Θ^-1\nmeasurement unit(s): J/(kg*K), m^2*s^-2*K^-1\ntensor order: 0\ndefinition: quotient of the Boltzmann constant `k` (ISO 80000-1) and the mass `m` (ISO 80000-4) of the gas particle\nremarks: None.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r759)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r760)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r761)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r762)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "SpecificGasConstantUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r763)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r764)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r765)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54599) (line 1063) (column 77) (len 5)) (member-access (base (expression (span (offset 54599) (line 1063) (column 77) (len 3)) (ref r766))) (separator dot) (member (ref r767))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r768)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54621) (line 1063) (column 99) (len 1)) (integer 2))))) (body semicolon)))) (attribute-usage (declaration-name "durationPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r769)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r770)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54704) (line 1064) (column 79) (len 5)) (member-access (base (expression (span (offset 54704) (line 1064) (column 79) (len 3)) (ref r771))) (separator dot) (member (ref r772))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r773)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54726) (line 1064) (column 101) (len 2)) (unary (operator "-") (operand (expression (span (offset 54727) (line 1064) (column 102) (len 1)) (integer 2)))))))) (body semicolon)))) (attribute-usage (declaration-name "thermodynamicTemperaturePF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r774)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r775)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54826) (line 1065) (column 95) (len 8)) (member-access (base (expression (span (offset 54826) (line 1065) (column 95) (len 3)) (ref r776))) (separator dot) (member (ref r777))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r778)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54851) (line 1065) (column 120) (len 2)) (unary (operator "-") (operand (expression (span (offset 54852) (line 1065) (column 121) (len 1)) (integer 1)))))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r779)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r780)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 54926) (line 1066) (column 70) (len 50)) (sequence (sequence-list (element first (expression (span (offset 54927) (line 1066) (column 71) (len 8)) (ref r781))) (element comma (expression (span (offset 54937) (line 1066) (column 81) (len 10)) (ref r782))) (element comma (expression (span (offset 54949) (line 1066) (column 93) (len 26)) (ref r783))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 54993) (line 1069) (column 7) (len 51)) (normalized "ISO-80000-5 item 5-27 mass concentration of water "))) (attribute-def (declaration-name "MassConcentrationOfWaterValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r784)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 55142) (line 1072) (column 11) (len 569)) (normalized "source: item 5-27 mass concentration of water\nsymbol(s): `w`\napplication domain: generic\nname: MassConcentrationOfWater\nquantity dimension: L^-3*M^1\nmeasurement unit(s): kg*m^-3\ntensor order: 0\ndefinition: quotient of mass of water and a specified volume: `w = m/V` where `m` is mass (ISO 80000-4) of water, irrespective of the form of aggregation state, and `V` is volume (ISO 80000-3)\nremarks: Mass concentration of water at saturation is denoted `w_\"sat\"`.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r785)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r786)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r787)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r788)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "MassConcentrationOfWaterUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r789)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r790)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r791)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 56060) (line 1090) (column 77) (len 5)) (member-access (base (expression (span (offset 56060) (line 1090) (column 77) (len 3)) (ref r792))) (separator dot) (member (ref r793))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r794)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 56082) (line 1090) (column 99) (len 2)) (unary (operator "-") (operand (expression (span (offset 56083) (line 1090) (column 100) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r795)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r796)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 56162) (line 1091) (column 75) (len 5)) (member-access (base (expression (span (offset 56162) (line 1091) (column 75) (len 3)) (ref r797))) (separator dot) (member (ref r798))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r799)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 56184) (line 1091) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r800)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r801)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 56258) (line 1092) (column 70) (len 18)) (sequence (sequence-list (element first (expression (span (offset 56259) (line 1092) (column 71) (len 8)) (ref r802))) (element comma (expression (span (offset 56269) (line 1092) (column 81) (len 6)) (ref r803))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 56293) (line 1095) (column 7) (len 76)) (normalized "ISO-80000-5 item 5-28 mass concentration of water vapour absolute humidity "))) (attribute-def (declaration-name "MassConcentrationOfWaterVapourAbsoluteHumidityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r804)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 56489) (line 1098) (column 11) (len 587)) (normalized "source: item 5-28 mass concentration of water vapour absolute humidity\nsymbol(s): `v`\napplication domain: generic\nname: MassConcentrationOfWaterVapourAbsoluteHumidity\nquantity dimension: L^-3*M^1\nmeasurement unit(s): kg*m^-3\ntensor order: 0\ndefinition: quotient of mass of water vapour and a specified volume: `v = m/V` where m is mass (ISO 80000-4) of water vapour and `V` is volume (ISO 80000-3)\nremarks: Mass concentration of water vapour at saturation is denoted `v_\"sat\"`.\n"))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r805)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r806)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r807)))) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r808)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-usage) (attribute-def (declaration-name "MassConcentrationOfWaterVapourAbsoluteHumidityUnit") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r809)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (attribute-usage (declaration-name "lengthPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r810)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r811)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 57513) (line 1116) (column 77) (len 5)) (member-access (base (expression (span (offset 57513) (line 1116) (column 77) (len 3)) (ref r812))) (separator dot) (member (ref r813))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r814)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 57535) (line 1116) (column 99) (len 2)) (unary (operator "-") (operand (expression (span (offset 57536) (line 1116) (column 100) (len 1)) (integer 3)))))))) (body semicolon)))) (attribute-usage (declaration-name "massPF") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r815)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r816)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 57615) (line 1117) (column 75) (len 5)) (member-access (base (expression (span (offset 57615) (line 1117) (column 75) (len 3)) (ref r817))) (separator dot) (member (ref r818))))))) (body semicolon)) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r819)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 57637) (line 1117) (column 97) (len 1)) (integer 1))))) (body semicolon)))) (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r820)))) (references none) (crosses none) (intersects none) (value none) (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r821)))) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 57711) (line 1118) (column 70) (len 18)) (sequence (sequence-list (element first (expression (span (offset 57712) (line 1118) (column 71) (len 8)) (ref r822))) (element comma (expression (span (offset 57722) (line 1118) (column 81) (len 6)) (ref r823))))))))) (body semicolon)))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 57746) (line 1121) (column 7) (len 57)) (normalized "ISO-80000-5 item 5-29 mass ratio of water to dry matter "))) (attribute-def (declaration-name "MassRatioOfWaterToDryMatterValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r824)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 57902) (line 1124) (column 11) (len 560)) (normalized "source: item 5-29 mass ratio of water to dry matter\nsymbol(s): `u`\napplication domain: generic\nname: MassRatioOfWaterToDryMatter (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of mass of water and mass of dry matter: `u = m/m_d` where `m` is mass (ISO 80000-4) of water and `m_d` is mass of dry matter\nremarks: Mass ratio of water to dry matter at saturation is denoted `u_\"sat\"`.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 58575) (line 1138) (column 7) (len 61)) (normalized "ISO-80000-5 item 5-30 mass ratio of water vapour to dry gas "))) (attribute-def (declaration-name "MassRatioOfWaterVapourToDryGasValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r825)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 58738) (line 1141) (column 11) (len 653)) (normalized "source: item 5-30 mass ratio of water vapour to dry gas\nsymbol(s): `r`, `(x)`\napplication domain: generic\nname: MassRatioOfWaterVapourToDryGas (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of mass of water vapour and mass of dry gas: `r = m/m_d` where `m` is mass (ISO 80000-4) of water vapour and `m_d` is mass of dry gas\nremarks: Mass ratio of water vapour to dry gas at saturation is denoted `r_\"sat\"`. Mass ratio of water vapour to dry gas is also called mixing ratio.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 59510) (line 1155) (column 7) (len 46)) (normalized "ISO-80000-5 item 5-31 mass fraction of water "))) (attribute-def (declaration-name "MassFractionOfWaterValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r826)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 59647) (line 1158) (column 11) (len 452)) (normalized "source: item 5-31 mass fraction of water\nsymbol(s): `w_(H_(2)O)`\napplication domain: generic\nname: MassFractionOfWater (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quantity given by: `w_(H_(2)O) = u/(1+u)` where `u` is mass ratio of water to dry matter (item 5-29)\nremarks: None.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 60196) (line 1172) (column 7) (len 51)) (normalized "ISO-80000-5 item 5-32 mass fraction of dry matter "))) (attribute-def (declaration-name "MassFractionOfDryMatterValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r827)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 60342) (line 1175) (column 11) (len 452)) (normalized "source: item 5-32 mass fraction of dry matter\nsymbol(s): `w_d`\napplication domain: generic\nname: MassFractionOfDryMatter (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quantity given by: `w_d = 1 - w_(H_(2)O)` where `w_(H_(2)O)` is mass fraction of water (item 5-31)\nremarks: None.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 60899) (line 1189) (column 7) (len 41)) (normalized "ISO-80000-5 item 5-33 relative humidity "))) (attribute-def (declaration-name "RelativeHumidityValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r828)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 61028) (line 1192) (column 11) (len 662)) (normalized "source: item 5-33 relative humidity\nsymbol(s): `φ`\napplication domain: generic\nname: RelativeHumidity (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of partial pressure of water vapour and partial pressure at its saturation: `φ = p/p_\"sat\"` where `p` is partial pressure (ISO 80000-4) of vapour and `p_\"sat\"` is its partial pressure at saturation at the same temperature\nremarks: Relative humidity is often referred to as RH and expressed in percent. See also remark in item 5-35.\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 61781) (line 1206) (column 7) (len 61)) (normalized "ISO-80000-5 item 5-34 relative mass concentration of vapour "))) (attribute-def (declaration-name "RelativeMassConcentrationOfVapourValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r829)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 61947) (line 1209) (column 11) (len 804)) (normalized "source: item 5-34 relative mass concentration of vapour\nsymbol(s): `φ`\napplication domain: generic\nname: RelativeMassConcentrationOfVapour (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of mass concentration of water vapour and mass concentration at its saturation: `φ = v/v_\"sat\"` where `v` is mass concentration of water vapour (item 5-28) and `v_\"sat\"` is its mass concentration of water vapour at saturation of the same temperature\nremarks: For water vapour concentrations up to 1 kg/m^3, the relative humidity (item 5-33) is assumed to be equal to relative mass concentration of vapour. For details see Reference [8].\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 62876) (line 1223) (column 7) (len 53)) (normalized "ISO-80000-5 item 5-35 relative mass ratio of vapour "))) (attribute-def (declaration-name "RelativeMassRatioOfVapourValue") (short-name none) (modifiers) (typing (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r830)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body brace (doc (name none) (locale none) (body (span (offset 63026) (line 1226) (column 11) (len 715)) (normalized "source: item 5-35 relative mass ratio of vapour\nsymbol(s): `ψ`\napplication domain: generic\nname: RelativeMassRatioOfVapour (specializes DimensionOneQuantity)\nquantity dimension: 1\nmeasurement unit(s): 1\ntensor order: 0\ndefinition: quotient of mass ratio of water vapour to dry gas and mass ratio of water vapour to dry gas at saturation: `ψ = r/r_\"sat\"` where `r` is mass ratio of water vapour to dry gas (item 5-30) and `r_\"sat\"` is its mass ratio of water vapour to dry gas at saturation of the same temperature\nremarks: This quantity is also used as an approximation of relative humidity (item 5-33).\n"))))) (attribute-usage) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 63850) (line 1240) (column 7) (len 45)) (normalized "ISO-80000-5 item 5-36 dew-point temperature "))) (attribute-usage))))
+)
+~~~

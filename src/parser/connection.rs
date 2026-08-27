@@ -2,7 +2,6 @@
 
 use crate::ast::{ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -13,8 +12,7 @@ use crate::parser::occurrence_body::{
     assert_constraint_member, occurrence_usage, succession_usage,
 };
 use crate::parser::part::part_usage;
-use crate::parser::port::{port_def_required, port_usage};
-use crate::parser::requirement::doc_comment;
+use crate::parser::port::{port_def, port_usage};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -25,26 +23,64 @@ use nom::Parser;
 fn connection_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConnectionDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = ConnectionDefBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = ConnectionDefBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = ConnectionDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = port_usage(start) {
+            let elem = ConnectionDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
-        // GH-33: connections allow the `#name` derived-end-name form (tested real usage, see
+        // GH-33: connections allow the fixed `#original`/`#derive` end-role form (tested real usage; see
         // `connector::end_decl`'s doc comment); interfaces don't.
         map(|i| end_decl(i, true), ConnectionDefBodyElement::EndDecl),
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
         map(connect_stmt, ConnectionDefBodyElement::ConnectStmt),
-        map(doc_comment, ConnectionDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ConnectionDefBodyElement::Annotating,
+        ),
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                ConnectionDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                ConnectionDefBodyElement::MetadataKeywordUsage,
+            ),
+        )),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
         // Same def-before-usage discipline as `InterfaceDefBodyElement`/other body enums.
-        map(
-            |i| attribute_def(i, true),
-            ConnectionDefBodyElement::AttributeDef,
-        ),
+        map(attribute_def, ConnectionDefBodyElement::AttributeDef),
         map(attribute_usage, ConnectionDefBodyElement::AttributeUsage),
         map(item_def_required, ConnectionDefBodyElement::ItemDef),
         map(item_usage, ConnectionDefBodyElement::ItemUsage),
-        map(port_def_required, ConnectionDefBodyElement::PortDef),
-        map(port_usage, ConnectionDefBodyElement::PortUsage),
+        map(port_def, ConnectionDefBodyElement::PortDef),
+        map(port_usage, |p| {
+            ConnectionDefBodyElement::PortUsage(Box::new(p))
+        }),
         // GH-51: real Systems/Domain Library connection defs use these member kinds too --
         // see `ConnectionDefBodyElement`'s doc comment for the exact real-usage citations.
         map(
@@ -86,18 +122,25 @@ fn connection_def_body_recovery(
 pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ConnectionDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ConnectionDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         CONNECTION_DEF_BODY_STARTERS,
         "connection definition body",
         "recovered_connection_def_body_element",
         connection_def_body_element,
         connection_def_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, ConnectionDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Connection definition: `connection def` Identification body.
@@ -147,7 +190,8 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
-            .with_hash_annotation()
+            .with_derivation_role()
+            .individual_allowed()
             .with_captured_visibility()
             .reject_header_keyword(b"connect")
             // GH-20: a `def`-less, non-`abstract` `connection name : Type { ... }` with no
@@ -164,13 +208,14 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
 /// definition body) where a bare `connection` usage form (`connection_usage_member`) is already
 /// dispatched separately -- requiring `def` here prevents a `def`-less connection usage from
 /// being misclassified as a definition, the same bug class as PAR-001 in `attribute_def`. Does
-/// not support the hash-annotation def-less form ([`connection_def`] does); nothing in the
+/// does not support the `#derivation` def-less form ([`connection_def`] does); nothing in the
 /// nested-part-body grammar currently needs that combination.
 pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility()
             .reject_header_keyword(b"connect"),
     )
@@ -189,7 +234,9 @@ fn parse_connection_def(
             start,
             input,
             ConnectionDef {
-                annotation: prefix.annotation,
+                definition_prefix: prefix.basic_prefix,
+                is_individual: prefix.is_individual,
+                derivation_role: prefix.derivation_role,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -205,10 +252,9 @@ fn parse_connection_def(
 #[cfg(test)]
 mod par_002_widening_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -270,10 +316,9 @@ mod par_002_widening_tests {
 #[cfg(test)]
 mod par_006b_audit_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// PAR-006b audit: `connection_def` must keep accepting this exact real-Systems-Library shape
@@ -304,10 +349,9 @@ mod par_006b_audit_tests {
 mod membership_tests {
     use super::*;
     use crate::parser::part::connection_usage_member;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on ConnectionDef/ConnectionUsageMember ---
@@ -344,12 +388,17 @@ mod membership_tests {
     /// Annex `3c-Function-based Behavior-structure mod.sysml`) fell through to opaque recovery.
     #[test]
     fn connection_usage_member_accepts_multiplicity() {
+        let src = input("connection trailerHitch : TrailerHitch[0..1];");
         let (rest, node) =
-            connection_usage_member(input("connection trailerHitch : TrailerHitch[0..1];"))
-                .expect("connection usage member with multiplicity");
+            connection_usage_member(src).expect("connection usage member with multiplicity");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("trailerHitch"));
-        assert_eq!(node.value.type_name.as_deref(), Some("TrailerHitch"));
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"trailerHitch"[..])
+        );
+        assert!(node.value.type_reference.is_some());
         let multiplicity = node.value.multiplicity.expect("multiplicity present");
         assert!(multiplicity.value.lower.is_some());
         assert!(multiplicity.value.upper.is_some());

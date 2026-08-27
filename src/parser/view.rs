@@ -1,25 +1,25 @@
 //! View, viewpoint, and rendering parsing (SysML v2 Clause 8.2.2.26).
 
 use crate::ast::{
-    ExposeMember, FilterMember, Membership, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
-    RenderingDefBodyElement, RenderingUsage, RenderingUsageBody, RenderingUsageBodyElement,
-    SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
+    ExposeMember, FilterMember, ImportTarget, Membership, Node, ParseErrorNode, RenderingDef,
+    RenderingDefBody, RenderingDefBodyElement, RenderingUsage, RenderingUsageBody,
+    RenderingUsageBodyElement, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
     ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
-use crate::parser::connector::connect_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_name, starts_with_any_keyword, visibility_prefix, ws1,
-    ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    name, reference_path, visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS,
+    VIEW_DEF_BODY_STARTERS,
 };
-use crate::parser::requirement::{doc_comment, requirement_def_body};
+use crate::parser::requirement::requirement_def_body;
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node_from_span, node_from_to};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt, success};
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
@@ -27,18 +27,60 @@ const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = crate::parser::requirement::satisfy(input) {
+            let elem = ViewDefBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
-        map(doc_comment, ViewDefBodyElement::Doc),
         map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            ViewDefBodyElement::MetadataAnnotation,
+            crate::parser::body::annotating_member,
+            ViewDefBodyElement::Annotating,
+        ),
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                ViewDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                ViewDefBodyElement::MetadataKeywordUsage,
+            ),
+        )),
+        map(
+            crate::parser::connector::ref_decl,
+            ViewDefBodyElement::RefDecl,
+        ),
+        map(
+            crate::parser::alias::alias_def,
+            ViewDefBodyElement::AliasDef,
         ),
         map(view_filter_member, ViewDefBodyElement::Filter),
+        map(rendering_usage, ViewDefBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
+        map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
+        map(crate::parser::requirement::satisfy, |n| {
+            ViewDefBodyElement::Satisfy(Box::new(n))
+        }),
         map(
-            |i| capture_opaque_member(i, VIEW_DEF_OPAQUE_STARTERS),
-            ViewDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    VIEW_DEF_OPAQUE_STARTERS,
+                    "view definition body",
+                )
+            },
+            ViewDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -61,10 +103,22 @@ fn rendering_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingUsageBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
-        map(doc_comment, RenderingUsageBodyElement::Doc),
-        map(view_usage, RenderingUsageBodyElement::ViewUsage),
+        map(
+            crate::parser::body::annotating_member,
+            RenderingUsageBodyElement::Annotating,
+        ),
+        map(view_usage, |n| {
+            RenderingUsageBodyElement::ViewUsage(Box::new(n))
+        }),
+        // Nested `rendering` usage, e.g. the anonymous `rendering :>> subrenderings[0..*] =
+        // columnView.viewRendering;` inside `asElementTable` (Systems Library `Views.sysml`).
+        map(rendering_usage, |n| {
+            RenderingUsageBodyElement::Rendering(Box::new(n))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -91,10 +145,16 @@ fn rendering_usage_body_recovery(
 fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, RenderingUsageBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            RenderingUsageBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members(
         input,
         VIEW_DEF_BODY_STARTERS,
         "rendering usage body",
@@ -102,10 +162,12 @@ fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBo
         rendering_usage_body_element,
         rendering_usage_body_recovery,
     )?;
-    Ok((input, RenderingUsageBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
-fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
+pub(crate) fn view_rendering_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
@@ -126,7 +188,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
             input,
             ViewRenderingUsage {
                 name: name_str,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -135,30 +197,30 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
 }
 
 fn view_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewDefBodyElement> {
-    if starts_with_any_keyword(start.fragment(), VIEW_DEF_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            VIEW_DEF_BODY_STARTERS,
-            "view definition body",
-            "recovered_view_def_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ViewDefBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ViewDefBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_DEF_BODY_STARTERS,
+        "view definition body",
+        "recovered_view_def_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ViewDefBodyElement::Error(node))
 }
 
 fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ViewDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ViewDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members(
         input,
         VIEW_DEF_BODY_STARTERS,
         "view definition body",
@@ -166,7 +228,7 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
         view_def_body_element,
         view_def_body_recovery,
     )?;
-    Ok((input, ViewDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
@@ -175,6 +237,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
         input,
         DefinitionPrefixOptions::new(b"view")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = view_def_body(input)?;
@@ -184,7 +247,9 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             start,
             input,
             ViewDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
+                definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -199,6 +264,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
         input,
         DefinitionPrefixOptions::new(b"viewpoint")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = requirement_def_body(input)?;
@@ -208,6 +274,8 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
             start,
             input,
             ViewpointDef {
+                is_individual: prefix.is_individual,
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -223,14 +291,29 @@ fn rendering_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
-        map(doc_comment, RenderingDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            RenderingDefBodyElement::Annotating,
+        ),
+        map(
+            crate::parser::connector::ref_decl,
+            RenderingDefBodyElement::RefDecl,
+        ),
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
         map(
-            |i| capture_opaque_member(i, RENDERING_DEF_OPAQUE_STARTERS),
-            RenderingDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    RENDERING_DEF_OPAQUE_STARTERS,
+                    "rendering definition body",
+                )
+            },
+            RenderingDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -255,10 +338,16 @@ fn rendering_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<Renderi
 fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, RenderingDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            RenderingDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members(
         input,
         VIEW_DEF_BODY_STARTERS,
         "rendering definition body",
@@ -266,7 +355,7 @@ fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> 
         rendering_def_body_element,
         rendering_def_body_recovery,
     )?;
-    Ok((input, RenderingDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingDef>> {
@@ -275,6 +364,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
         input,
         DefinitionPrefixOptions::new(b"rendering")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = rendering_def_body(input)?;
@@ -284,7 +374,9 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             start,
             input,
             RenderingDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
+                definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -295,114 +387,65 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
 
 fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
-        map(doc_comment, ViewBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ViewBodyElement::Annotating,
+        ),
+        map(crate::parser::connector::ref_decl, ViewBodyElement::RefDecl),
+        map(crate::parser::alias::alias_def, ViewBodyElement::AliasDef),
         map(view_filter_member, ViewBodyElement::Filter),
+        map(rendering_usage, ViewBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
         map(expose_member, ViewBodyElement::Expose),
-        map(satisfy_view_member, ViewBodyElement::Satisfy),
+        // `ViewBodyItem -> DefinitionBodyItem -> ... -> SatisfyRequirementUsage`: one satisfy
+        // production, dispatched here through the same parser every other body scope uses.
+        map(crate::parser::requirement::satisfy, |n| {
+            ViewBodyElement::Satisfy(Box::new(n))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Append zero or more `.` + qualified-name feature-chain segments (SysML §7.6.6).
-fn parse_expose_feature_chain_suffix(
-    mut input: Input<'_>,
-    mut target: String,
-) -> IResult<Input<'_>, String> {
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        if next.fragment().first() != Some(&b'.') {
-            return Ok((next, target));
-        }
-        let (next, _) = tag(&b"."[..]).parse(next)?;
-        let (next, _) = ws_and_comments(next)?;
-        let (next, segment) = qualified_name.parse(next)?;
-        target.push('.');
-        target.push_str(&segment);
-        input = next;
-    }
-}
-
 /// expose (MembershipImport | NamespaceImport) RelationshipBody
 /// MembershipImport = QualifiedName (::**)?
 /// NamespaceImport = QualifiedName :: * (::**)?
-fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
+pub(crate) fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
+    crate::parser::span::reference_transaction(input, expose_member_inner)
+}
+
+fn expose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, first) = qualified_name.parse(input)?;
-    let (input, (target, is_import_all, is_recursive)) = alt((
-        // ::*::** (try before ::* since * would consume first char of **)
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"*"[..])),
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"**"[..])),
-            ),
-            |_| (format!("{}::*::**", first), true, true),
-        ),
-        // ::** (try before ::*)
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"**"[..])),
-            ),
-            |_| (format!("{}::**", first), false, true),
-        ),
-        // ::*
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"*"[..])),
-            ),
-            |_| (format!("{}::*", first), true, false),
-        ),
-        // plain
-        map(success(()), |_| (first.clone(), false, false)),
-    ))
-    .parse(input)?;
-    let (input, target) = parse_expose_feature_chain_suffix(input, target)?;
-    // Optional filter [ expr ] - skip content to reach body
-    let (input, _) = nom::combinator::opt(nom::sequence::delimited(
-        preceded(ws_and_comments, tag(&b"["[..])),
-        nom::bytes::complete::take_until(&b"]"[..]),
-        preceded(ws_and_comments, tag(&b"]"[..])),
-    ))
-    .parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let target_start = input;
+    let (after_reference, reference) = reference_path(input)?;
+    let (input, shape) = import_shape(after_reference)?;
+    // The target ends at its last authored token, not wherever shape parsing stopped -- looking
+    // for an absent `::*` consumes the trivia before a braced body. `import_` documents the same
+    // hazard; `expose` shared the bug and only stopped hiding it once the body became a real
+    // `Body` whose deserialization checks the target span it sits beside.
+    let mut target_span = span_from_to(target_start, input);
+    target_span.len =
+        crate::parser::import::import_target_end(&shape, after_reference.location_offset())
+            .saturating_sub(target_span.offset);
+    let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             ExposeMember {
-                target,
-                is_import_all,
-                is_recursive,
-                body,
-            },
-        ),
-    ))
-}
-
-/// satisfy QualifiedName RelationshipBody (simplified form in view body)
-fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewMember>> {
-    let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, viewpoint_ref) = qualified_name.parse(input)?;
-    let (input, body) = connect_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            SatisfyViewMember {
-                viewpoint_ref,
+                target: ImportTarget {
+                    span: target_span,
+                    all_span: None,
+                    reference,
+                    shape,
+                },
                 body,
             },
         ),
@@ -410,30 +453,30 @@ fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewM
 }
 
 fn view_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewBodyElement> {
-    if starts_with_any_keyword(start.fragment(), VIEW_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            VIEW_BODY_STARTERS,
-            "view body",
-            "recovered_view_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ViewBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ViewBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_BODY_STARTERS,
+        "view body",
+        "recovered_view_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ViewBodyElement::Error(node))
 }
 
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ViewBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ViewBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members_with_skip(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         VIEW_BODY_STARTERS,
         "view body",
@@ -442,7 +485,7 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
         view_body_recovery,
         crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, ViewBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
@@ -452,6 +495,8 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
     // Anonymous redefinition form (BNF `ViewUsage`'s `UsageDeclaration?` legally omits the name
     // in favor of a leading `:>>` target, same shape `PartUsage`'s `part_usage_redefines_only`
     // already handles) -- e.g. `view :>> columnView[1] { render asTextualNotation; }`, confirmed
@@ -473,10 +518,13 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             start,
             input,
             ViewUsage {
-                name: name_str,
-                type_name: header.type_name,
+                short_name,
+                name: Some(name_str),
+                type_name: header.type_reference,
+                subsets: header.subsets,
                 redefines: header.redefines,
-                multiplicity: None,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers.clone(),
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -494,6 +542,7 @@ fn view_usage_redefines_only<'a>(
 ) -> IResult<Input<'a>, Node<ViewUsage>> {
     let (input, (_, redefines_target)) = prefix_redefinition_target(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -501,10 +550,13 @@ fn view_usage_redefines_only<'a>(
             start,
             input,
             ViewUsage {
-                name: String::new(),
+                short_name: None,
+                name: None,
                 type_name: None,
+                subsets: None,
                 redefines: Some(redefines_target),
                 multiplicity: multiplicity_opt,
+                multiplicity_modifiers: modifiers,
                 body,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
@@ -529,7 +581,9 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
             input,
             ViewpointUsage {
                 name: name_str,
-                type_name: header.type_name.unwrap_or_default(),
+                type_name: header.type_reference,
+                subsets: header.subsets,
+                redefines: header.redefines,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -541,11 +595,63 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_abstract) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, header) = parse_feature_usage_header(input)?;
+    // The declaration name is optional: the anonymous redefinition form `rendering :>>
+    // subrenderings[0..*] = columnView.viewRendering;` (Systems Library `Views.sysml`) goes
+    // straight to its specialization clause.
+    let (after_gap, _) = ws_and_comments(input)?;
+    let (input, name_str) = if after_gap.fragment().starts_with(b":")
+        || after_gap.fragment().starts_with(b"[")
+        || after_gap.fragment().starts_with(b"{")
+        || after_gap.fragment().starts_with(b";")
+    {
+        (after_gap, None)
+    } else {
+        let (input, _) = ws1(input)?;
+        let (input, n) = name(input)?;
+        (input, Some(n))
+    };
+    // Header clauses, each retained: leading `:>>` redefinition (the anonymous form), typing,
+    // multiplicity (before or after the typing), and a `:>` subsets clause -- `asTreeDiagram :
+    // GraphicalRendering[1] :> renderings { ... }` (Systems Library `Views.sysml`).
+    let (input, leading_redefines) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::redefinition,
+    ))
+    .parse(input)?;
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let type_name = type_result.and_then(|(_, _, targets, _)| targets.first().copied());
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, redefines) = if leading_redefines.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::redefinition,
+        ))
+        .parse(input)?
+    } else {
+        (input, leading_redefines)
+    };
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
+    // Optional value clause: `= columnView.viewRendering` (Systems Library `Views.sysml`).
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = rendering_usage_body(input)?;
     Ok((
         input,
@@ -553,8 +659,14 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
             start,
             input,
             RenderingUsage {
+                is_abstract: is_abstract.is_some(),
                 name: name_str,
-                type_name: header.type_name,
+                type_name,
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                multiplicity_modifiers: modifiers,
+                subsets,
+                redefines,
+                value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -565,9 +677,32 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
 #[cfg(test)]
 mod expose_diagnostic_tests {
     use crate::ast::{
-        ExposeMember, PackageBody, PackageBodyElement, RootElement, ViewBody, ViewBodyElement,
+        ExposeMember, ImportShape, PackageBody, PackageBodyElement, ParsedDocument, RootElement,
+        ViewBody, ViewBodyElement,
     };
     use crate::parse_with_diagnostics;
+
+    fn expose_of(document: &ParsedDocument) -> &ExposeMember {
+        let root = &document.root;
+        let pkg = match &root.elements[0].value {
+            RootElement::Package(p) => p,
+            other => panic!("expected package, got {other:?}"),
+        };
+        let view_usage = match &pkg.value.body {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
+                PackageBodyElement::ViewUsage(v) => v,
+                other => panic!("expected view usage, got {other:?}"),
+            },
+            other => panic!("expected brace body, got {other:?}"),
+        };
+        match &view_usage.value.body {
+            ViewBody::Brace { elements, .. } => match &elements[0].value {
+                ViewBodyElement::Expose(e) => &e.value,
+                other => panic!("expected expose member, got {other:?}"),
+            },
+            other => panic!("expected view body, got {other:?}"),
+        }
+    }
 
     #[test]
     fn expose_feature_chain_is_parsed_without_separator_diagnostic() {
@@ -578,97 +713,157 @@ mod expose_diagnostic_tests {
             "expected feature-chain expose to parse, got {:?}",
             result.errors
         );
-        let root = result.root;
-        let pkg = match &root.elements[0].value {
-            RootElement::Package(p) => p,
-            other => panic!("expected package, got {other:?}"),
-        };
-        let view_usage = match &pkg.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
-                PackageBodyElement::ViewUsage(v) => v,
-                other => panic!("expected view usage, got {other:?}"),
-            },
-            other => panic!("expected brace body, got {other:?}"),
-        };
-        let expose = match &view_usage.value.body {
-            ViewBody::Brace { elements } => match &elements[0].value {
-                ViewBodyElement::Expose(e) => e,
-                other => panic!("expected expose member, got {other:?}"),
-            },
-            other => panic!("expected view body, got {other:?}"),
-        };
+        let expose = expose_of(&result.document);
+        let reference = result
+            .document
+            .qualified_reference(expose.target.reference)
+            .expect("expose reference");
         assert_eq!(
-            expose.value.target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
+            reference.authored_text(),
+            "SurveillanceDrone.SurveillanceQuadrotorDrone",
             "feature-chain segments should be preserved in expose target"
         );
-        assert!(!expose.value.is_import_all, "no wildcard suffix present");
-        assert!(!expose.value.is_recursive, "no `::**` suffix present");
-    }
-
-    fn expose_of(input: &str) -> ExposeMember {
-        let result = parse_with_diagnostics(input);
-        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
-        let root = result.root;
-        let pkg = match &root.elements[0].value {
-            RootElement::Package(p) => p,
-            other => panic!("expected package, got {other:?}"),
-        };
-        let view_usage = match &pkg.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
-                PackageBodyElement::ViewUsage(v) => v,
-                other => panic!("expected view usage, got {other:?}"),
-            },
-            other => panic!("expected brace body, got {other:?}"),
-        };
-        match &view_usage.value.body {
-            ViewBody::Brace { elements } => match &elements[0].value {
-                ViewBodyElement::Expose(e) => e.value.clone(),
-                other => panic!("expected expose member, got {other:?}"),
-            },
-            other => panic!("expected view body, got {other:?}"),
-        }
+        assert!(matches!(
+            expose.target.shape,
+            ImportShape::Membership {
+                recursive_suffix: None
+            }
+        ));
     }
 
     #[test]
     fn expose_plain_target_is_a_membership_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle; } }");
-        assert_eq!(expose.target, "vehicle");
-        assert!(!expose.is_import_all);
-        assert!(!expose.is_recursive);
+        let result =
+            parse_with_diagnostics("package Views { view v : GeneralView { expose vehicle; } }");
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert!(matches!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Membership {
+                recursive_suffix: None
+            }
+        ));
     }
 
     #[test]
     fn expose_wildcard_target_is_a_namespace_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::*; } }");
-        assert_eq!(expose.target, "vehicle::*");
-        assert!(expose.is_import_all);
-        assert!(!expose.is_recursive);
+        let result =
+            parse_with_diagnostics("package Views { view v : GeneralView { expose vehicle::*; } }");
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert!(matches!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Namespace {
+                recursive_suffix: None,
+                combined_recursive_suffix_span: None,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn expose_recursive_membership_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::**; } }");
-        assert_eq!(expose.target, "vehicle::**");
-        assert!(!expose.is_import_all);
-        assert!(expose.is_recursive);
+        let result = parse_with_diagnostics(
+            "package Views { view v : GeneralView { expose vehicle::**; } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert!(matches!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Membership {
+                recursive_suffix: Some(_)
+            }
+        ));
     }
 
     #[test]
     fn expose_recursive_namespace_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::*::**; } }");
-        assert_eq!(expose.target, "vehicle::*::**");
-        assert!(expose.is_import_all);
-        assert!(expose.is_recursive);
+        let result = parse_with_diagnostics(
+            "package Views { view v : GeneralView { expose vehicle::*::**; } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert!(matches!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Namespace {
+                recursive_suffix: Some(_),
+                combined_recursive_suffix_span: Some(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn expose_filter_retains_typed_expressions_and_brace_body() {
+        let result = parse_with_diagnostics(
+            "package Views { view v : GeneralView { expose vehicle[x][y] {} } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        let expose = expose_of(&result.document);
+        match &expose.target.shape {
+            ImportShape::Filter {
+                recursive_suffix,
+                members,
+            } => {
+                assert!(recursive_suffix.is_none());
+                assert_eq!(members.len(), 2);
+            }
+            other => panic!("expected filter shape, got {other:?}"),
+        }
+        assert!(expose.body.braced_elements().is_some());
+    }
+
+    #[test]
+    fn view_type_and_satisfy_target_are_source_backed_references() {
+        let result = parse_with_diagnostics(
+            "package Views { view v : $::Views::General { satisfy Viewpoints::VP; } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        let package = match &result.document.root.elements[0].value {
+            RootElement::Package(package) => &package.value,
+            other => panic!("expected package, got {other:?}"),
+        };
+        let view = match &package.body {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
+                PackageBodyElement::ViewUsage(view) => &view.value,
+                other => panic!("expected view usage, got {other:?}"),
+            },
+            other => panic!("expected package body, got {other:?}"),
+        };
+        let view_type = result
+            .document
+            .qualified_reference(view.type_name.expect("view type"))
+            .expect("source-backed view type");
+        assert_eq!(view_type.authored_text(), "$::Views::General");
+        assert!(view_type.metadata.is_absolute);
+        let satisfy = match &view.body {
+            ViewBody::Brace { elements, .. } => match &elements[0].value {
+                ViewBodyElement::Satisfy(satisfy) => &satisfy.value,
+                other => panic!("expected satisfy member, got {other:?}"),
+            },
+            other => panic!("expected view body, got {other:?}"),
+        };
+        let reference = match &satisfy.requirement {
+            crate::ast::SatisfiedRequirement::Reference { reference } => *reference,
+            other => panic!("expected the reference alternative, got {other:?}"),
+        };
+        let target = result
+            .document
+            .qualified_reference(reference)
+            .expect("source-backed viewpoint target");
+        assert_eq!(target.authored_text(), "Viewpoints::VP");
+        assert_eq!(target.segments.len(), 2);
+        assert_eq!(
+            target.segments[1].separator_before,
+            Some(crate::ast::ReferenceSeparator::ColonColon)
+        );
     }
 }
 
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::parser::span::ParseContext;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        let context = Box::leak(Box::new(ParseContext::new()));
+        context.input(text.as_bytes())
     }
 
     // --- parser work item 4b (final sweep): Membership on the view family (7 structs) ---
@@ -787,10 +982,11 @@ mod membership_tests {
 #[cfg(test)]
 mod column_view_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::parser::span::ParseContext;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        let context = Box::leak(Box::new(ParseContext::new()));
+        context.input(text.as_bytes())
     }
 
     // Real usage confirmed in sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml
@@ -808,7 +1004,7 @@ mod column_view_tests {
         ))
         .expect("view usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "");
+        assert!(node.value.name.is_none());
         assert!(node.value.redefines.is_some());
         assert!(node.value.multiplicity.is_some());
     }
@@ -820,17 +1016,18 @@ mod column_view_tests {
         ))
         .expect("rendering usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let RenderingUsageBody::Brace { elements } = &node.value.body else {
+        let RenderingUsageBody::Brace { elements, .. } = &node.value.body else {
             panic!("expected brace body, got {:?}", node.value.body);
         };
         assert_eq!(elements.len(), 1);
         let RenderingUsageBodyElement::ViewUsage(column_view) = &elements[0].value else {
             panic!("expected a nested view usage, got {:?}", elements[0].value);
         };
-        assert_eq!(column_view.value.name, "");
+        assert!(column_view.value.name.is_none());
         assert!(column_view.value.redefines.is_some());
         let ViewBody::Brace {
             elements: nested_elements,
+            ..
         } = &column_view.value.body
         else {
             panic!("expected brace body on nested columnView");
@@ -850,7 +1047,7 @@ mod column_view_tests {
         ))
         .expect("view rendering usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let RenderingUsageBody::Brace { elements } = &node.value.body else {
+        let RenderingUsageBody::Brace { elements, .. } = &node.value.body else {
             panic!("expected brace body, got {:?}", node.value.body);
         };
         assert_eq!(elements.len(), 1);

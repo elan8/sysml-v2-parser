@@ -1,0 +1,125 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "SysML Training 40 (Filtering): Filtering Example-1"))
+~~~
+# SOURCE
+~~~sysml
+package 'Filtering Example-1' {
+	private import ScalarValues::Boolean;
+	
+	metadata def Safety {
+		attribute isMandatory : Boolean;
+	}
+	
+	part vehicle {
+		part interior {
+			part alarm;
+			part seatBelt[2] {@Safety{isMandatory = true;}}
+			part frontSeat[2];
+			part driverAirBag {@Safety{isMandatory = false;}}
+		}
+		part bodyAssy {
+			part body;
+			part bumper {@Safety{isMandatory = true;}}
+			part keylessEntry;
+		}
+		part wheelAssy {
+			part wheel[2];
+			part antilockBrakes[2] {@Safety{isMandatory = false;}}
+		}
+	}
+	
+	package 'Safety Features' {
+		/* Parts that contribute to safety. */		
+		public import vehicle::**;
+		filter @Safety;
+	}
+	
+	package 'Mandatory Safety Features' {
+		/* Parts that contribute to safety AND are mandatory. */
+		public import vehicle::**;
+		filter @Safety and Safety::isMandatory;
+	}
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "40_filtering_example_1.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package 'Filtering Example-1' {
+    private import ScalarValues::Boolean;
+    metadata def Safety {
+        attribute isMandatory : Boolean;
+    }
+    part vehicle {
+        part interior {
+            part alarm;
+            part seatBelt[2] {
+                @Safety {
+                    isMandatory = true;
+                }
+            }
+            part frontSeat[2];
+            part driverAirBag {
+                @Safety {
+                    isMandatory = false;
+                }
+            }
+        }
+        part bodyAssy {
+            part body;
+            part bumper {
+                @Safety {
+                    isMandatory = true;
+                }
+            }
+            part keylessEntry;
+        }
+        part wheelAssy {
+            part wheel[2];
+            part antilockBrakes[2] {
+                @Safety {
+                    isMandatory = false;
+                }
+            }
+        }
+    }
+    package 'Safety Features' {
+        /* Parts that contribute to safety. */
+        public import vehicle::**;
+        filter @Safety;
+    }
+    package 'Mandatory Safety Features' {
+        /* Parts that contribute to safety AND are mandatory. */
+        public import vehicle::**;
+        filter @Safety && Safety::isMandatory;
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 48) (line 2) (column 17) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 48) (line 2) (column 17) (len 12))) (segment 1 (token "Boolean") (name "Boolean") (separator colon-colon) (span (offset 62) (line 2) (column 31) (len 7)))))
+    (reference r1 (scope relative) (span (offset 122) (line 5) (column 27) (len 7)) (segments (segment 0 (token "Boolean") (name "Boolean") (separator none) (span (offset 122) (line 5) (column 27) (len 7)))))
+    (reference r2 (scope relative) (span (offset 207) (line 11) (column 23) (len 6)) (segments (segment 0 (token "Safety") (name "Safety") (separator none) (span (offset 207) (line 11) (column 23) (len 6)))))
+    (reference r3 (scope relative) (span (offset 214) (line 11) (column 30) (len 11)) (segments (segment 0 (token "isMandatory") (name "isMandatory") (separator none) (span (offset 214) (line 11) (column 30) (len 11)))))
+    (reference r4 (scope relative) (span (offset 281) (line 13) (column 24) (len 6)) (segments (segment 0 (token "Safety") (name "Safety") (separator none) (span (offset 281) (line 13) (column 24) (len 6)))))
+    (reference r5 (scope relative) (span (offset 288) (line 13) (column 31) (len 11)) (segments (segment 0 (token "isMandatory") (name "isMandatory") (separator none) (span (offset 288) (line 13) (column 31) (len 11)))))
+    (reference r6 (scope relative) (span (offset 364) (line 17) (column 18) (len 6)) (segments (segment 0 (token "Safety") (name "Safety") (separator none) (span (offset 364) (line 17) (column 18) (len 6)))))
+    (reference r7 (scope relative) (span (offset 371) (line 17) (column 25) (len 11)) (segments (segment 0 (token "isMandatory") (name "isMandatory") (separator none) (span (offset 371) (line 17) (column 25) (len 11)))))
+    (reference r8 (scope relative) (span (offset 484) (line 22) (column 29) (len 6)) (segments (segment 0 (token "Safety") (name "Safety") (separator none) (span (offset 484) (line 22) (column 29) (len 6)))))
+    (reference r9 (scope relative) (span (offset 491) (line 22) (column 36) (len 11)) (segments (segment 0 (token "isMandatory") (name "isMandatory") (separator none) (span (offset 491) (line 22) (column 36) (len 11)))))
+    (reference r10 (scope relative) (span (offset 611) (line 28) (column 17) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 611) (line 28) (column 17) (len 7)))))
+    (reference r11 (scope relative) (span (offset 761) (line 34) (column 17) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 761) (line 34) (column 17) (len 7)))))
+  )
+  (root (package (name "Filtering Example-1") (body brace (import (target (span (span (offset 48) (line 2) (column 17) (len 21))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (metadata-def (name "Safety") (abstract false) (specializes none) (body brace (attribute-usage (declaration-name "isMandatory") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicle") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "interior") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "alarm") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "seatBelt") (short-name none) (typing none) (multiplicity (lower (expression (span (offset 202) (line 11) (column 18) (len 1)) (integer 2))) (upper (expression (span (offset 202) (line 11) (column 18) (len 1)) (integer 2)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (metadata-annotation (prefixes) (introducer at) (declared-name none) (type (ref r2)) (about) (body brace (metadata-body-usage (reference false) (redefinition-operator implicit) (target (ref r3)) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 228) (line 11) (column 44) (len 4)) (boolean true))))) (body semicolon)))))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "frontSeat") (short-name none) (typing none) (multiplicity (lower (expression (span (offset 254) (line 12) (column 19) (len 1)) (integer 2))) (upper (expression (span (offset 254) (line 12) (column 19) (len 1)) (integer 2)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "driverAirBag") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (metadata-annotation (prefixes) (introducer at) (declared-name none) (type (ref r4)) (about) (body brace (metadata-body-usage (reference false) (redefinition-operator implicit) (target (ref r5)) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 302) (line 13) (column 45) (len 5)) (boolean false))))) (body semicolon)))))))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "bodyAssy") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "body") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "bumper") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (metadata-annotation (prefixes) (introducer at) (declared-name none) (type (ref r6)) (about) (body brace (metadata-body-usage (reference false) (redefinition-operator implicit) (target (ref r7)) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 385) (line 17) (column 39) (len 4)) (boolean true))))) (body semicolon)))))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "keylessEntry") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "wheelAssy") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "wheel") (short-name none) (typing none) (multiplicity (lower (expression (span (offset 452) (line 21) (column 15) (len 1)) (integer 2))) (upper (expression (span (offset 452) (line 21) (column 15) (len 1)) (integer 2)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "antilockBrakes") (short-name none) (typing none) (multiplicity (lower (expression (span (offset 479) (line 22) (column 24) (len 1)) (integer 2))) (upper (expression (span (offset 479) (line 22) (column 24) (len 1)) (integer 2)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (metadata-annotation (prefixes) (introducer at) (declared-name none) (type (ref r8)) (about) (body brace (metadata-body-usage (reference false) (redefinition-operator implicit) (target (ref r9)) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 505) (line 22) (column 50) (len 5)) (boolean false))))) (body semicolon)))))))))) (package (name "Safety Features") (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 556) (line 27) (column 5) (len 34)) (normalized "Parts that contribute to safety. "))) (import (target (span (span (offset 611) (line 28) (column 17) (len 11))) (all none) (ref r10) (shape (membership (recursive-suffix (span (span (offset 618) (line 28) (column 24) (len 4))) (separator (span (offset 618) (line 28) (column 24) (len 2))) (marker (span (offset 620) (line 28) (column 26) (len 2)))))))) (filter))) (package (name "Mandatory Safety Features") (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 690) (line 33) (column 5) (len 52)) (normalized "Parts that contribute to safety AND are mandatory. "))) (import (target (span (span (offset 761) (line 34) (column 17) (len 11))) (all none) (ref r11) (shape (membership (recursive-suffix (span (span (offset 768) (line 34) (column 24) (len 4))) (separator (span (offset 768) (line 34) (column 24) (len 2))) (marker (span (offset 770) (line 34) (column 26) (len 2)))))))) (filter))))))
+)
+~~~

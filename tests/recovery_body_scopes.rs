@@ -9,11 +9,11 @@ use sysml_v2_parser::parse_with_diagnostics;
 fn requirement_recovery_keeps_later_members() {
     let input = "package P {\nrequirement def R {\nsubject laptop: ;\nrequire constraint { }\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let req = elements
@@ -23,7 +23,7 @@ fn requirement_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("requirement def should be present");
-    let RequirementDefBody::Brace { elements } = &req.body else {
+    let RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("expected requirement body");
     };
     assert!(
@@ -44,11 +44,11 @@ fn requirement_recovery_keeps_later_members() {
 fn use_case_recovery_keeps_later_members() {
     let input = "package P {\nuse case def U {\nactor user: ;\nobjective { }\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let use_case = elements
@@ -58,7 +58,7 @@ fn use_case_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("use case def should be present");
-    let UseCaseDefBody::Brace { elements } = &use_case.body else {
+    let UseCaseDefBody::Brace { elements, .. } = &use_case.body else {
         panic!("expected use case body");
     };
     assert!(
@@ -80,11 +80,11 @@ fn state_recovery_keeps_later_members() {
     // Named usage with typing started but type missing (anonymous `state: Mode;` is legal).
     let input = "package P {\nstate def Machine {\nstate ready: ;\ntransition t then Ready;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let state_def = elements
@@ -94,7 +94,7 @@ fn state_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("state def should be present");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected state body");
     };
     assert!(
@@ -130,11 +130,11 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
         Some("state body member such as `entry`, `transition`, `then`, `state`, or `ref`")
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let state_def = elements
@@ -144,7 +144,7 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
             _ => None,
         })
         .expect("state def should be present");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected state body");
     };
     assert!(elements
@@ -159,11 +159,11 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
 fn part_def_recovery_keeps_later_members() {
     let input = "package P {\npart def Vehicle {\nattribute mass: ;\nport p : Port;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part = elements
@@ -173,7 +173,7 @@ fn part_def_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("part def should be present");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part def body");
     };
     assert!(

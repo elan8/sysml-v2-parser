@@ -1,0 +1,95 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "SysML Training 38 (Allocation): Allocation Usage Example"))
+~~~
+# SOURCE
+~~~sysml
+package 'Allocation Usage Example' {
+	package LogicalModel {
+		action def ProvidePower;
+		action def GenerateTorque;
+		
+		part def TorqueGenerator;
+		
+		action providePower : ProvidePower {
+			action generateTorque : GenerateTorque;
+		}
+		
+		part torqueGenerator : TorqueGenerator {
+			perform providePower.generateTorque;
+		}
+	}
+	
+	package PhysicalModel {
+		private import LogicalModel::*;
+	
+		part def PowerTrain;
+		part def Engine;
+		
+		part powerTrain : PowerTrain {
+			part engine : Engine {
+				perform providePower.generateTorque;
+			}
+		}
+		
+		allocate torqueGenerator to powerTrain {
+			allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque;
+		}
+	}
+	
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "38_allocation_usage_example.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package 'Allocation Usage Example' {
+    package LogicalModel {
+        action def ProvidePower;
+        action def GenerateTorque;
+        part def TorqueGenerator;
+        action providePower : ProvidePower {
+            action generateTorque : GenerateTorque;
+        }
+        part torqueGenerator : TorqueGenerator {
+            perform providePower.generateTorque;
+        }
+    }
+    package PhysicalModel {
+        private import LogicalModel::*;
+        part def PowerTrain;
+        part def Engine;
+        part powerTrain : PowerTrain {
+            part engine : Engine {
+                perform providePower.generateTorque;
+            }
+        }
+        allocate torqueGenerator to powerTrain {
+            allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque;
+        }
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 175) (line 8) (column 25) (len 12)) (segments (segment 0 (token "ProvidePower") (name "ProvidePower") (separator none) (span (offset 175) (line 8) (column 25) (len 12)))))
+    (reference r1 (scope relative) (span (offset 217) (line 9) (column 28) (len 14)) (segments (segment 0 (token "GenerateTorque") (name "GenerateTorque") (separator none) (span (offset 217) (line 9) (column 28) (len 14)))))
+    (reference r2 (scope relative) (span (offset 265) (line 12) (column 26) (len 15)) (segments (segment 0 (token "TorqueGenerator") (name "TorqueGenerator") (separator none) (span (offset 265) (line 12) (column 26) (len 15)))))
+    (reference r3 (scope relative) (span (offset 294) (line 13) (column 12) (len 27)) (segments (segment 0 (token "providePower") (name "providePower") (separator none) (span (offset 294) (line 13) (column 12) (len 12))) (segment 1 (token "generateTorque") (name "generateTorque") (separator dot) (span (offset 307) (line 13) (column 25) (len 14)))))
+    (reference r4 (scope relative) (span (offset 374) (line 18) (column 18) (len 12)) (segments (segment 0 (token "LogicalModel") (name "LogicalModel") (separator none) (span (offset 374) (line 18) (column 18) (len 12)))))
+    (reference r5 (scope relative) (span (offset 458) (line 23) (column 21) (len 10)) (segments (segment 0 (token "PowerTrain") (name "PowerTrain") (separator none) (span (offset 458) (line 23) (column 21) (len 10)))))
+    (reference r6 (scope relative) (span (offset 488) (line 24) (column 18) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 488) (line 24) (column 18) (len 6)))))
+    (reference r7 (scope relative) (span (offset 509) (line 25) (column 13) (len 27)) (segments (segment 0 (token "providePower") (name "providePower") (separator none) (span (offset 509) (line 25) (column 13) (len 12))) (segment 1 (token "generateTorque") (name "generateTorque") (separator dot) (span (offset 522) (line 25) (column 26) (len 14)))))
+  )
+  (root (package (name "Allocation Usage Example") (body brace (package (name "LogicalModel") (body brace (action-def (name "ProvidePower") (modifiers) (specializes none) (body semicolon)) (action-def (name "GenerateTorque") (modifiers) (specializes none) (body semicolon)) (part-def (name "TorqueGenerator") (modifiers) (body semicolon)) (action-usage (keyword action) (name "providePower") (short-name none) (prefix (abstract false) (variation false) (reference false) (individual false)) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body brace (action-usage (keyword action) (name "generateTorque") (short-name none) (prefix (abstract false) (variation false) (reference false) (individual false)) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body semicolon)))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "torqueGenerator") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (perform (target (reference (action (ref r3)) (redefines none))) (value none) (body semicolon)))))) (package (name "PhysicalModel") (body brace (import (target (span (span (offset 374) (line 18) (column 18) (len 15))) (all none) (ref r4) (shape (namespace (wildcard-suffix (span (span (offset 386) (line 18) (column 30) (len 3))) (separator (span (offset 386) (line 18) (column 30) (len 2))) (marker (span (offset 388) (line 18) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "PowerTrain") (modifiers) (body semicolon)) (part-def (name "Engine") (modifiers) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "powerTrain") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "engine") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (perform (target (reference (action (ref r7)) (redefines none))) (value none) (body semicolon)))))) (allocation-usage))))))
+)
+~~~

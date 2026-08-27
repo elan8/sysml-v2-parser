@@ -1,5 +1,6 @@
 //! Diagnostic classification, nom error mapping, and error post-processing.
 
+use super::delimiters::DelimiterScan;
 use super::lex;
 use super::Input;
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
@@ -22,6 +23,10 @@ pub(crate) fn fragment_to_found_snippet(fragment: &[u8]) -> (String, usize) {
     (s.trim_end().to_string(), len)
 }
 /// Map nom error kind to a human-readable message for language server diagnostics.
+// `ErrorKind` is a foreign, dependency-owned enum. The generic arm intentionally keeps new nom
+// parser error kinds classified as a stable generic diagnostic instead of coupling this API to
+// every nom release; parser-specific kinds above remain explicit.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
     match code {
@@ -45,6 +50,9 @@ fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
 }
 
 /// Map nom error kind to a specific code for LSP/quick fixes.
+// See `nom_error_kind_to_message`: dependency-owned additions deliberately retain the stable
+// `parse_error` fallback, while parser-specific classifications are enumerated above.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn nom_error_kind_to_code(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
     match code {
@@ -68,7 +76,7 @@ pub(crate) fn nom_err_to_parse_error(
 ) -> ParseError {
     let offset = e.input.location_offset();
     let line = e.input.location_line();
-    let column = e.input.get_column();
+    let column = crate::parser::span::column_of(&e.input);
     let fragment = e.input.fragment();
     let (found_snippet, found_len) = fragment_to_found_snippet(fragment);
     let message = nom_error_kind_to_message(&e.code).to_string();
@@ -337,7 +345,7 @@ pub(crate) fn invalid_expose_separator_diagnostic(
     ))
 }
 
-fn invalid_requirement_short_name_syntax_diagnostic(
+pub(crate) fn invalid_requirement_short_name_syntax_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     let fragment = trim_ascii_start(fragment);
@@ -490,6 +498,140 @@ fn definition_header_has_invalid_specialization_colon(header: &[u8]) -> bool {
     false
 }
 
+/// `end` combined with a slot that no production lets it carry *in that position*.
+///
+/// ```text
+/// FeaturePrefix        = ( EndFeaturePrefix … | BasicFeaturePrefix ) …          -- KerML BNF 584
+/// EndFeaturePrefix     = ( isConstant ?= 'const' )? isEnd ?= 'end'              -- 573
+/// BasicFeaturePrefix   = FeatureDirection? 'derived'? 'abstract'?
+///                        ( 'composite' | 'portion' )? ( 'var' | 'const' )?      -- 577
+/// UnextendedUsagePrefix = EndUsagePrefix | BasicUsagePrefix                     -- SysML 298
+/// DefaultReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration …      -- SysML 630
+/// ```
+///
+/// Two of these are exclusive choices, and one is not, so the position of the modifier decides:
+///
+/// - **Before `end`** -- `in end feature f;`, `derived end x;` -- has no derivation anywhere.
+///   Every production that spells both puts `end` first.
+/// - **After `end`, before a declaration keyword** -- `end derived feature f;`, `end in part p;` --
+///   is the exclusive choice: `FeaturePrefix` and `UnextendedUsagePrefix` each pick one alternative.
+/// - **After `end`, before a plain name** -- `end derived x : T;` -- is **legal**. SysML's
+///   keyword-less `DefaultReferenceUsage` spells `'end'? RefPrefix`, the one production that
+///   combines them, so this must not be reported. It is the spelling that makes
+///   `validateFeatureEndNoDirection` and `validateFeatureEndNotDerivedAbstractCompositeOrPortion`
+///   reachable from textual notation at all, which is why the Pilot's own textual validator
+///   (`KerMLValidator.xtend:669-677`) checks them.
+///
+/// Verified against the reference implementation, not only the published BNF:
+/// `org.omg.kerml.xtext/.../KerML.xtext:510-526` and `org.omg.sysml.xtext/.../SysML.xtext:568-574,
+/// 630-633`.
+///
+/// Recognized here so a genuine violation is *reported as what it is*, naming the offending
+/// keyword, instead of reaching a scope's generic recovery as "`composite` is not a SysML
+/// keyword" -- which is both wrong and unusable to a consumer that wants the authored modifier.
+pub(crate) fn invalid_end_feature_prefix_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    /// Every `BasicFeaturePrefix` slot keyword except `const`, which both alternatives admit.
+    const BASIC_ONLY: &[&[u8]] = &[
+        b"in",
+        b"out",
+        b"inout",
+        b"derived",
+        b"abstract",
+        b"composite",
+        b"portion",
+        b"var",
+    ];
+
+    let mut rest = trim_ascii_start(fragment);
+    let mut before_end: Option<&[u8]> = None;
+    let mut after_end: Option<&[u8]> = None;
+    let mut saw_end = false;
+    // Walk the leading keyword run only: the first word that is neither a prefix slot nor `end`
+    // ends the prefix, and that word decides whether a modifier after `end` is legal.
+    let terminator = loop {
+        let word_len = rest
+            .iter()
+            .position(|b| !(b.is_ascii_alphanumeric() || *b == b'_'))
+            .unwrap_or(rest.len());
+        if word_len == 0 {
+            break None;
+        }
+        let (word, tail) = rest.split_at(word_len);
+        if word == b"end" {
+            saw_end = true;
+        } else if BASIC_ONLY.contains(&word) {
+            let slot = if saw_end {
+                &mut after_end
+            } else {
+                &mut before_end
+            };
+            *slot = slot.or(Some(word));
+        } else if word != b"const" {
+            break Some(word);
+        }
+        rest = trim_ascii_start(tail);
+    };
+
+    if !saw_end {
+        return None;
+    }
+    // A modifier after `end` is only wrong when a declaration keyword follows the run: that is the
+    // exclusive `FeaturePrefix`/`UnextendedUsagePrefix` choice. Followed by a plain name it is
+    // `DefaultReferenceUsage`, which spells `'end'? RefPrefix` and is legal.
+    //
+    // `is_reserved_keyword` alone is not the test: its table is the SysML reserved-word list and
+    // carries none of KerML's feature-kind keywords, so `end derived feature f;` would read as a
+    // usage named `feature`.
+    let introduces_a_keyworded_declaration = |word: &[u8]| {
+        const KERML_FEATURE_KEYWORDS: &[&[u8]] =
+            &[b"feature", b"step", b"expr", b"bool", b"inv", b"invariant"];
+        KERML_FEATURE_KEYWORDS.contains(&word) || lex::is_reserved_keyword(word)
+    };
+    let after_end =
+        after_end.filter(|_| terminator.is_some_and(introduces_a_keyworded_declaration));
+    let wrote_modifier_first = before_end.is_some();
+    let offender = before_end.or(after_end)?;
+    let offender = String::from_utf8_lossy(offender).into_owned();
+    let slot = if matches!(offender.as_str(), "in" | "out" | "inout") {
+        "direction"
+    } else {
+        "restriction modifier"
+    };
+    // Two different rules are broken depending on where the modifier sits, and naming the wrong
+    // one sends the author to the wrong part of the grammar.
+    let (message, expected, suggestion) = if wrote_modifier_first {
+        (
+            format!(
+                "the {slot} `{offender}` cannot precede `end`: every production that spells both \
+                 writes `end` first"
+            ),
+            "`end` before any prefix keyword".to_string(),
+            format!("Write `end {offender} ...`, or remove `end`."),
+        )
+    } else {
+        let keyword = String::from_utf8_lossy(terminator.unwrap_or_default()).into_owned();
+        (
+            format!(
+                "`end {keyword}` cannot carry the {slot} `{offender}`: `end` and the prefix \
+                 keywords are exclusive alternatives of one choice (SysML BNF 298, KerML BNF 584)"
+            ),
+            format!("`end {keyword}` with no prefix keyword"),
+            format!(
+                "Drop `{keyword}` -- the keyword-less `end {offender} <name> : <Type>;` is legal \
+                 -- or remove `{offender}`."
+            ),
+        )
+    };
+    Some((
+        crate::parser::diagnostic_catalog::END_FEATURE_INVALID_PREFIX,
+        message,
+        expected,
+        suggestion,
+    ))
+}
+
 pub(crate) fn invalid_typing_operator_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
@@ -548,7 +690,7 @@ pub(crate) fn missing_expression_after_operator_diagnostic(
         ),
     ];
 
-    // GH-29: bound the scan to the current statement (mirrors `invalid_unit_reference_diagnostic`/
+    // GH-29: bound the scan to the current statement (mirrors `invalid_bracket_expression_diagnostic`/
     // `bare_comma_sequence_diagnostic`, GH-18/#28) -- otherwise a `.contains()` match on unrelated
     // text or a comment further down the file (e.g. a doc comment mentioning `= ;`) can override
     // the true diagnostic for a genuinely malformed statement here.
@@ -605,7 +747,7 @@ pub(crate) fn missing_expression_after_operator_diagnostic(
 /// Bounds `fragment` to the current statement/member: scanning stops before entering a `//` or
 /// `/* */` comment, at the first depth-0 `;`, or at a depth-0 closing `}`/`)`/`]` that isn't
 /// matched by an opener within the window (i.e. the enclosing scope's own delimiter). Local
-/// pattern-matching diagnostics (like [`invalid_unit_reference_diagnostic`] and
+/// pattern-matching diagnostics (like [`invalid_bracket_expression_diagnostic`] and
 /// [`bare_comma_sequence_diagnostic`]) must scan within this window rather than the unbounded rest
 /// of the file -- otherwise bracket- or comma-like text in unrelated code, or in a doc comment far
 /// below the real error site, can override the true diagnostic (GH-18).
@@ -636,7 +778,7 @@ fn local_statement_window(fragment: &[u8]) -> &[u8] {
     &fragment[..end]
 }
 
-pub(crate) fn invalid_unit_reference_diagnostic(
+pub(crate) fn invalid_bracket_expression_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     let fragment = trim_ascii_start(fragment);
@@ -648,10 +790,10 @@ pub(crate) fn invalid_unit_reference_diagnostic(
 
     if text.contains("[]") || text.contains("[ ]") {
         return Some((
-            "invalid_unit_reference",
-            "expected unit name inside '[ ]'".to_string(),
-            "unit name inside '[ ]'".to_string(),
-            "Use a concrete unit such as `1750 [kg]`.".to_string(),
+            "invalid_bracket_expression",
+            "expected an expression inside '[ ]'".to_string(),
+            "expression inside '[ ]'".to_string(),
+            "Use a bracket operand such as `1750[kg]`.".to_string(),
         ));
     }
 
@@ -662,10 +804,10 @@ pub(crate) fn invalid_unit_reference_diagnostic(
         || text.contains("[,")
     {
         return Some((
-            "invalid_unit_reference",
-            "invalid unit expression inside '[ ]'".to_string(),
-            "unit name inside '[ ]'".to_string(),
-            "Use a unit symbol or qualified unit name (example: `[kg]` or `[SI::kg]`).".to_string(),
+            "invalid_bracket_expression",
+            "invalid bracket expression inside '[ ]'".to_string(),
+            "expression inside '[ ]'".to_string(),
+            "Use a complete expression inside brackets (example: `[kg]` or `[N * m]`).".to_string(),
         ));
     }
 
@@ -805,7 +947,7 @@ pub(crate) fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseErr
         .with_location(
             input.location_offset(),
             input.location_line(),
-            input.get_column(),
+            crate::parser::span::column_of(&input),
         )
         .with_length(1)
         .with_code("unexpected_closing_brace")
@@ -816,17 +958,16 @@ pub(crate) fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseErr
         .with_category(DiagnosticCategory::ParseError)
 }
 
-pub(crate) fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Option<ParseError> {
-    if !input.fragment().is_empty() {
+/// Report an unterminated body when the parser stopped at end of input with a body still open.
+pub(crate) fn missing_closing_brace_error(
+    bytes: &[u8],
+    input: Input<'_>,
+    delimiters: &DelimiterScan,
+) -> Option<ParseError> {
+    if !input.fragment().is_empty() || !delimiters.has_unclosed_brace() {
         return None;
     }
-    let consumed = &bytes[..input.location_offset().min(bytes.len())];
-    let opens = consumed.iter().filter(|&&b| b == b'{').count();
-    let closes = consumed.iter().filter(|&&b| b == b'}').count();
-    if opens <= closes {
-        return None;
-    }
-    Some(missing_closing_brace_error_at_eof(consumed))
+    Some(missing_closing_brace_error_at_eof(bytes))
 }
 
 pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
@@ -840,42 +981,17 @@ pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
         .with_category(DiagnosticCategory::ParseError)
 }
 
-pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
-    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
+/// Report the trailing `}` of a document that closes more bodies than it opens.
+pub(crate) fn extra_closing_brace_at_eof(
+    bytes: &[u8],
+    delimiters: &DelimiterScan,
+) -> Option<ParseError> {
+    let (opens, closes) = delimiters.balance();
     if closes <= opens {
         return None;
     }
-    let mut last_brace: Option<(usize, u32, usize)> = None;
-    let mut line = 1u32;
-    let mut column = 1usize;
-    let mut pos = 0usize;
-    while pos < bytes.len() {
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"/*") {
-            if let Some(rel) = lex::find_subslice(&bytes[pos..], b"*/") {
-                pos += rel + 2;
-                continue;
-            }
-            break;
-        }
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"//") {
-            while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
-                pos += 1;
-            }
-            continue;
-        }
-        let b = bytes[pos];
-        if b == b'}' {
-            last_brace = Some((pos, line, column));
-        }
-        if b == b'\n' {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
-        }
-        pos += 1;
-    }
-    let (offset, line, column) = last_brace?;
+    let offset = delimiters.last_close()?;
+    let (line, column) = eof_line_column(&bytes[..offset]);
     Some(
         ParseError::new("unexpected closing '}' at end of file")
             .with_location(offset, line, column)
@@ -898,11 +1014,6 @@ pub(crate) fn category_from_code(code: &str) -> DiagnosticCategory {
     }
 }
 
-pub(crate) fn has_unclosed_brace(bytes: &[u8]) -> bool {
-    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
-    opens > closes
-}
-
 fn eof_line_column(bytes: &[u8]) -> (u32, usize) {
     let mut line = 1u32;
     let mut column = 1usize;
@@ -923,19 +1034,21 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("invalid_qualified_name_separator")
         | Some("invalid_typing_operator")
         | Some("missing_expression_after_operator")
-        | Some("invalid_unit_reference")
+        | Some("invalid_bracket_expression")
         | Some("missing_body_or_semicolon")
         | Some("invalid_requirement_short_name_syntax")
         | Some("missing_semicolon")
         | Some("unexpected_closing_brace")
         | Some("missing_closing_brace")
         | Some("unsupported_annotation_syntax")
+        | Some("malformed_annotation_head")
         | Some("invalid_bare_identifier_in_action_body")
         | Some("invalid_bare_identifier_in_state_body")
         | Some("recovery_cascade_suppressed")
         | Some("unexpected_keyword_in_scope")
         | Some("unrecognized_declaration_in_scope")
-        | Some("bare_comma_in_feature_value") => 5,
+        | Some("bare_comma_in_feature_value")
+        | Some("end_feature_invalid_prefix") => 5,
         Some(code) if code.starts_with("recovered_") => 2,
         Some("expected_end_of_input") | Some("expected_keyword") => 1,
         _ => 3,
@@ -945,6 +1058,15 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
 /// Drop `unexpected_closing_brace` on a line that already has a parse error for an
 /// invalid statement block (e.g. `badstmt {} }` â€” the second `}` closes the package).
 pub(crate) fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
+    // Recovery nodes can cover the entire unterminated declaration while the document-level
+    // balance check reports the same condition at EOF. Keep the local EOF diagnostic: it gives the
+    // editor the actionable insertion point and avoids publishing the recovery node's broad span as
+    // a second error for the same missing token.
+    let final_missing_closing_brace = errors
+        .iter()
+        .filter(|error| error.code.as_deref() == Some("missing_closing_brace"))
+        .filter_map(|error| error.offset)
+        .max();
     let lines_with_block_error: std::collections::HashSet<u32> = errors
         .iter()
         .filter(|e| e.code.as_deref() != Some("unexpected_closing_brace"))
@@ -963,6 +1085,9 @@ pub(crate) fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -
     errors
         .into_iter()
         .filter(|e| {
+            if e.code.as_deref() == Some("missing_closing_brace") {
+                return e.offset == final_missing_closing_brace;
+            }
             if e.code.as_deref() != Some("unexpected_closing_brace") {
                 return true;
             }
@@ -1116,7 +1241,7 @@ pub(crate) fn root_body_recovery_error(input: Input<'_>, scope: &str) -> ParseEr
     .with_location(
         input.location_offset(),
         input.location_line(),
-        input.get_column(),
+        crate::parser::span::column_of(&input),
     )
     .with_length(len.max(1))
     .with_code("recovered_root_body")

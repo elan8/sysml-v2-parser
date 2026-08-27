@@ -4,24 +4,23 @@ use super::usage::{
     perform_usage, variant_usage,
 };
 use crate::parser::action::first_stmt;
+use crate::parser::lex::skip_statement_or_block;
+use crate::parser::package::{library_package_, package_};
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| PartDefBody::Semicolon),
-        part_def_body_brace,
-    ))
-    .parse(input)
+    alt((crate::parser::body::semicolon_body, part_def_body_brace)).parse(input)
 }
 
 fn try_part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
-    match part_def_body_element(input) {
+    match crate::parser::span::reference_transaction(input, part_def_body_element) {
         Err(e)
             if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS)
                 && starts_with_keyword(input.fragment(), b"part") =>
         {
-            if let Ok((next, usage)) = part_usage(input) {
+            if let Ok((next, usage)) = crate::parser::span::reference_transaction(input, part_usage)
+            {
                 if next.location_offset() > input.location_offset() {
                     return Ok((
                         next,
@@ -73,7 +72,7 @@ fn part_def_succession_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::
 }
 
 fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (input, elements) = parse_structured_brace_members_with_skip(
+    let (input, members) = parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
         "part definition body",
@@ -82,24 +81,7 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
         part_def_body_recovery,
         BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, PartDefBody::Brace { elements }))
-}
-
-/// Dotted feature path for exhibit/perform-style names: `name ( '.' name )*`.
-fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, first) = name(input)?;
-    let (input, rest) = many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    Ok((
-        input,
-        std::iter::once(first)
-            .chain(rest)
-            .collect::<Vec<_>>()
-            .join("."),
-    ))
+    Ok((input, members.into_body()))
 }
 
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
@@ -111,6 +93,18 @@ fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
 /// both in lockstep; `constant` and portion kind remain unsupported on both, see
 /// `state_usage`'s doc comment for why.
 pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"exhibit") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, exhibit_state_inner)
+}
+
+fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
@@ -125,15 +119,21 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     // §6 G18: the `state` keyword is optional -- `exhibit 'vehicle states' :>> VehicleA::'vehicle
     // states';` (OMG spec Annex `5-State-based Behavior-2.sysml`) exhibits an already-declared
     // state usage by redefinition, without redeclaring its kind.
-    let (input, _) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
-    let (input, name_str) = feature_name_path(input)?;
+    let (input, state_keyword) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
+    let (input, name, state_reference) = if state_keyword.is_some() {
+        let (input, name) = name(input)?;
+        (input, Some(name), None)
+    } else {
+        let (input, reference) = crate::parser::lex::reference_path(input)?;
+        (input, None, Some(reference))
+    };
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing) = specialization_clauses(input)?;
-    let (_type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+    let (_type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let subsets = trailing
         .subsets
         .clone()
@@ -143,11 +143,7 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     // §8.2.2.18.2: `ExhibitStateUsage` shares `StateUsageBody` with plain `state` usages, so the
     // same `parallel`/`initial` modifier is legal here too (OMG spec Annex `exhibit state
     // vehicleStates parallel { ... }` in `5-State-based Behavior-2.sysml`) -- GH-17.
-    let (input, _) = opt(alt((
-        preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
-        preceded(preceded(ws_and_comments, tag(&b"initial"[..])), ws1),
-    )))
-    .parse(input)?;
+    let (input, body_modifier) = crate::parser::state::state_body_modifier(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = crate::parser::state::state_def_body(input)?;
     // `:>>` may also come *after* the body -- this predates the before-body support above (via
@@ -155,7 +151,7 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     let before_post_body_redefines = input;
     let (input, post_body_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let post_body_redefines = post_body_redefines.map(|target| {
@@ -175,17 +171,14 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
             start,
             input,
             ExhibitState {
+                body_modifier,
                 direction,
                 is_derived: is_derived.is_some(),
                 is_abstract: is_abstract.is_some(),
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
-                name: name_str,
-                type_name: if type_name.is_empty() {
-                    None
-                } else {
-                    Some(type_name)
-                },
+                name,
+                state_reference,
                 typing,
                 multiplicity,
                 subsets,
@@ -198,21 +191,70 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
 }
 
 fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // `metadata` is ambiguous with KerML MetadataFeature. This SysML scope owns MetadataUsage,
+    // so its more specific production gets first refusal before AnnotatingElement.
+    if crate::parser::lex::starts_with_keyword(start.fragment(), b"metadata") {
+        if let Ok((next, usage)) = metadata_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, PartDefBodyElement::MetadataUsage(usage)),
+            ));
+        }
+    }
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = PartDefBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = satisfy(start) {
+            let elem = PartDefBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = PartDefBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = PartDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
+            let elem = PartDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = analysis_case_usage(start) {
+            let elem = PartDefBodyElement::AnalysisCaseUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         alt((
-            map(doc_comment, PartDefBodyElement::Doc),
-            map(comment_annotation, PartDefBodyElement::Comment),
+            // `PartDefinition` has a `DefinitionBody`, so `DefinitionBodyItem` reaches
+            // `DefinitionMember -> DefinitionElement`, which owns both `Package` and
+            // `LibraryPackage` (SysML BNF 180-207, 234-248; the pinned Pilot SysML grammar
+            // agrees). Reuse the package module's typed parsers rather than reinterpreting a
+            // nested namespace as opaque source.
+            map(package_, PartDefBodyElement::Package),
+            map(library_package_, PartDefBodyElement::LibraryPackage),
+            map(
+                crate::parser::body::annotating_member,
+                PartDefBodyElement::Annotating,
+            ),
             map(
                 crate::parser::metadata_annotation::metadata_keyword_usage,
                 PartDefBodyElement::MetadataKeywordUsage,
             ),
             map(
-                crate::parser::metadata_annotation::metadata_annotation,
-                PartDefBodyElement::MetadataAnnotation,
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                PartDefBodyElement::MetadataKeywordUsage,
             ),
-            map(annotation, PartDefBodyElement::Annotation),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
             // Each `_def` parser must be tried before its `_usage` sibling: neither `calc_usage`
             // nor `constraint_usage` guards against a bare `def` keyword (same bug class as
@@ -224,6 +266,9 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 map(calc_usage, PartDefBodyElement::CalcUsage),
                 map(constraint_def, PartDefBodyElement::ConstraintDef),
                 map(constraint_usage, PartDefBodyElement::ConstraintUsage),
+                map(crate::parser::requirement::require_constraint, |member| {
+                    PartDefBodyElement::RequireConstraint(Box::new(member))
+                }),
                 // §6 G16: a part body is a namespace, so it owns imports too.
                 map(crate::parser::import::import_, PartDefBodyElement::Import),
             )),
@@ -241,37 +286,29 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // the latter has no guard against a bare `def` keyword being consumed as a flow
             // usage's name, which misparses `flow def DataFlow;` as `FlowUsage { name: "def" }`.
             map(flow_def, PartDefBodyElement::FlowDef),
-            map(
-                crate::parser::flow::flow_usage_member,
-                PartDefBodyElement::FlowUsage,
-            ),
+            map(crate::parser::flow::flow_usage_member, |usage| {
+                PartDefBodyElement::FlowUsage(Box::new(usage))
+            }),
             map(part_def, PartDefBodyElement::PartDef),
+            // Nested KerML classifier declarations (`struct`/`classifier`/`datatype`/...,
+            // spec42 Gap 38), keyword-gated so no other member shape is affected.
+            map(crate::parser::package::kerml_classifier_structured, |n| {
+                PartDefBodyElement::KermlClassifier(Box::new(n))
+            }),
             map(variant_usage, PartDefBodyElement::VariantUsage),
             map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
-            map(individual_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(snapshot_usage, |n| {
+            map(occurrence_usage, |n| {
                 PartDefBodyElement::OccurrenceUsage(Box::new(n))
             }),
         )),
         alt((
-            map(timeslice_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(then_timeslice_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(occurrence_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
             map(interface_usage, PartDefBodyElement::InterfaceUsage),
             map(interface_def_required, PartDefBodyElement::InterfaceDef),
-            // `port_def_required` must be tried before `port_usage`: `port_usage` has no guard
+            // `port_def` must be tried before `port_usage`: `port_usage` has no guard
             // against a bare `def` keyword (same bug class caught for `flow_usage_member` above),
             // so `port def Foo {}` would otherwise misparse as `PortUsage { name: "def" }`.
-            map(port_def_required, PartDefBodyElement::PortDef),
-            map(port_usage, PartDefBodyElement::PortUsage),
+            map(port_def, PartDefBodyElement::PortDef),
+            map(port_usage, |p| PartDefBodyElement::PortUsage(Box::new(p))),
             // GH-14: `action_def` must be tried before `action_usage` -- the latter has no guard
             // against a bare `def` keyword being consumed as the usage's name for most kinds (same
             // bug class as `flow_usage_member`/`port_usage`/`calc_usage` above), but here it
@@ -286,14 +323,18 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             }),
             map(state_usage, PartDefBodyElement::StateUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
+            // Anonymous `ref :>> target;` owns a relationship target rather than a declaration
+            // name, so the shared full ref-declaration parser must get a chance after the named
+            // reference-usage parser declines it.
+            map(crate::parser::connector::ref_decl, PartDefBodyElement::Ref),
             // GH-42 Gap 1: bare `bind a = b;` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2) was
             // never dispatched here, even though `bind_` was already wired into part *usage*
             // bodies (`part_usage_body_element` below) -- mirrors that arm's placement.
             map(bind_, PartDefBodyElement::Bind),
-            map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
+            map(attribute_def, PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
-                attribute_usage_shorthand,
+                default_reference_usage,
                 PartDefBodyElement::DefaultReferenceUsage,
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
@@ -321,18 +362,16 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // and Snapshot Examples/TimeVaryingAttribute.sysml:14). Already supported in action
             // bodies via `action_def_body_element`'s equivalent `directed_item_usage` arm; part
             // def bodies had no such path. Tried before the plain `item_usage` arm since that one
-            // has no direction-prefix handling of its own.
-            map(
-                crate::parser::item::directed_item_usage,
-                PartDefBodyElement::ItemUsage,
-            ),
             map(item_usage, PartDefBodyElement::ItemUsage),
             map(
                 crate::parser::occurrence_body::assert_constraint_member,
                 PartDefBodyElement::AssertConstraint,
             ),
-            map(satisfy, PartDefBodyElement::Satisfy),
-            map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
+            map(satisfy, |n| PartDefBodyElement::Satisfy(Box::new(n))),
+            map(
+                unsupported_part_member,
+                PartDefBodyElement::UnsupportedMember,
+            ),
         )),
         alt((
             // PAR-002: remaining nested `def`/usage pairs, previously only reachable at package
@@ -350,6 +389,14 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(viewpoint_usage, PartDefBodyElement::ViewpointUsage),
             map(rendering_def, PartDefBodyElement::RenderingDef),
             map(rendering_usage, PartDefBodyElement::RenderingUsage),
+            map(
+                crate::parser::view::view_rendering_usage,
+                PartDefBodyElement::ViewRendering,
+            ),
+            map(
+                crate::parser::requirement::verify_requirement,
+                PartDefBodyElement::VerifyRequirement,
+            ),
             map(analysis_case_def, PartDefBodyElement::AnalysisCaseDef),
             map(analysis_case_usage, PartDefBodyElement::AnalysisCaseUsage),
             map(
@@ -381,10 +428,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         ),
         // GH-87: keyword-less `name;` / `name = expr;` feature binding (§6 G26), previously only
         // reachable inside action bodies even though `part def V { m; }` is real usage (Simple
-        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `attribute_usage_shorthand`
+        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `default_reference_usage`
         // above (which requires `: Type`), so every keyword-led/typed member keeps priority.
         map(
-            crate::parser::attribute::bare_or_valued_feature_binding,
+            crate::parser::attribute::default_reference_usage,
             PartDefBodyElement::DefaultReferenceUsage,
         ),
     ))
@@ -395,9 +442,24 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
 pub(crate) fn connection_usage_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"connection") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, connection_usage_member_inner)
+}
+
+fn connection_usage_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, name) = if input.fragment().starts_with(b":")
@@ -409,20 +471,25 @@ pub(crate) fn connection_usage_member(
         let (input, parsed_name) = name(input)?;
         (input, Some(parsed_name))
     };
-    let (input, type_name) = {
+    let (input, leading_multiplicity) =
+        opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, type_reference) = {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":")
             && !peek.fragment().starts_with(b":>")
             && !peek.fragment().starts_with(b":>>")
         {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, parsed_type) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, parsed_type) =
+                preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(parsed_type))
         } else {
             (input, None)
         }
     };
-    let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, trailing_multiplicity) =
+        opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
     // PAR-007 widening: an inline `connect from to to (, extra)*` clause between the type and the
     // body, e.g. `connection link : Link connect sensorA.cmd to sensorB.cmd;`. Optional -- a
     // plain `connection link : Link;` declaration with no explicit binding must keep parsing.
@@ -441,7 +508,7 @@ pub(crate) fn connection_usage_member(
     let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let subsets = trailing_subsets.map(|target| {
@@ -451,7 +518,7 @@ pub(crate) fn connection_usage_member(
     let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let redefines = trailing_redefines.map(|target| {
@@ -472,7 +539,7 @@ pub(crate) fn connection_usage_member(
             input,
             ConnectionUsageMember {
                 name,
-                type_name,
+                type_reference,
                 multiplicity,
                 connect_from,
                 connect_to,
@@ -481,101 +548,60 @@ pub(crate) fn connection_usage_member(
                 subsets,
                 redefines,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
+                by_reference: is_reference.is_some(),
             },
         ),
     ))
 }
 
-/// Permissive parser for library-style part members not yet modeled with dedicated AST nodes.
-/// Kinded `ref action` / `ref state` / bare `action` / `state` are handled by dedicated parsers
-/// above; this catch-all remains for residual forms such as unmodeled `ref connection` headers.
-fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
+/// Recognize a spec-valid connection-like member whose semantic production is not implemented in
+/// this scope. The complete source span is retained, but no header text is scanned or guessed into
+/// declaration/reference fields.
+fn unsupported_part_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::UnsupportedGrammarNode>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    if !starts_with_any_keyword(input.fragment(), &[b"ref", b"connection"]) {
+    if !starts_with_any_keyword(input.fragment(), &[b"connection"]) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    // Do not opaque-capture kinded refs that have dedicated parsers.
-    if starts_with_keyword(input.fragment(), b"ref") {
-        let after_ref = {
-            let (peek, _) = ws_and_comments(input)?;
-            let (peek, _) = tag(&b"ref"[..]).parse(peek)?;
-            let (peek, _) = ws1(peek)?;
-            peek
-        };
-        if starts_with_any_keyword(
-            after_ref.fragment(),
-            &[b"action", b"state", b"port", b"part"],
-        ) {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
+    // `ref connection ...` is now handled structurally by `connection_usage_member`
+    // (`by_reference`), which is tried before this fallback in the same `alt`. Only a bare
+    // `connection ...` that `connection_usage_member` itself failed to parse reaches here.
+    let (production, member_start) = (
+        crate::ast::UnsupportedProduction::ConnectionUsageInPartDefinition,
+        input,
+    );
+    let (mut input, _) = skip_statement_or_block(member_start)?;
+    let (after_ws, _) = ws_and_comments(input)?;
+    if after_ws.fragment().starts_with(b":>") || after_ws.fragment().starts_with(b":>>") {
+        let (after_relationship, _) = skip_statement_or_block(after_ws)?;
+        input = after_relationship;
     }
-    let keyword = if starts_with_keyword(input.fragment(), b"ref") {
-        "ref"
-    } else {
-        "connection"
-    }
-    .to_string();
-    let (input, header_text) =
-        crate::parser::lex::take_until_terminator(input, MEMBER_HEADER_UNTIL_BODY)?;
-    let name_str = header_text
-        .split(|c: char| {
-            c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')'
-        })
-        .filter(|s| !s.is_empty())
-        .find(|token| {
-            !matches!(
-                *token,
-                "ref"
-                    | "action"
-                    | "state"
-                    | "port"
-                    | "connection"
-                    | "part"
-                    | "def"
-                    | "private"
-                    | "protected"
-                    | "public"
-                    | "abstract"
-            )
-        })
-        .unwrap_or("member")
-        .to_string();
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = crate::parser::attribute::attribute_body(input)?;
-    let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
+    let diagnostic = crate::ast::ParseErrorNode {
+        message: "spec-valid connection-like member is not implemented in part definitions"
+            .to_owned(),
+        code: "unsupported_grammar_form".to_owned(),
+        expected: Some("structured connection/reference usage".to_owned()),
+        found: None,
+        suggestion: Some(
+            "Keep this syntax; parser support is incomplete rather than the model being malformed."
+                .to_owned(),
+        ),
+        category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
     };
     Ok((
         input,
         node_from_to(
             start,
             input,
-            OpaqueMemberDecl {
-                keyword,
-                name: name_str,
-                text: header_text.trim().to_string(),
-                body,
+            crate::ast::UnsupportedGrammarNode {
+                production,
+                diagnostic,
             },
         ),
     ))
@@ -584,10 +610,9 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
 #[cfg(test)]
 mod par_002_nested_def_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -599,6 +624,21 @@ mod par_002_nested_def_tests {
             matches!(node.value, PartDefBodyElement::StateDef(_)),
             "expected StateDef, got {:?}",
             node.value
+        );
+    }
+
+    #[test]
+    fn exhibit_shorthand_keeps_its_dotted_state_reference_in_the_arena() {
+        let source = input("exhibit vehicleStates.on;");
+        let (rest, node) = exhibit_state(source).expect("exhibit reference");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.name.is_none());
+        assert_eq!(
+            node.value
+                .state_reference
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("vehicleStates.on")
         );
     }
 
@@ -874,14 +914,21 @@ mod par_002_nested_def_tests {
     fn part_def_body_parses_abstract_ref_action_as_action_usage() {
         let src =
             "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
-        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        let source = input(src);
+        let (rest, node) = part_def_body_element(source).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::ActionUsage(action) => {
                 assert!(action.value.is_abstract);
                 assert!(action.value.is_reference);
-                assert_eq!(action.value.name, "performedActions");
-                assert_eq!(action.value.type_name, "Action");
+                assert_eq!(
+                    action
+                        .value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"performedActions"[..])
+                );
+                assert!(action.value.type_name.is_some());
                 assert!(action.value.subsets.is_some());
             }
             other => panic!("expected ActionUsage, got {other:?}"),
@@ -894,14 +941,17 @@ mod par_002_nested_def_tests {
     /// `15_05-Unification of Expression and Constraint Definition.sysml`.
     #[test]
     fn part_def_body_accepts_untyped_constraint_usage_with_expression_body() {
-        let (rest, node) = part_def_body_element(input(
-            "constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}",
-        ))
-        .expect("constraint usage");
+        let source = input("constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}");
+        let (rest, node) = part_def_body_element(source).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::ConstraintUsage(c) => {
-                assert_eq!(c.value.name, "hasLegalProfileDepth");
+                assert_eq!(
+                    c.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"hasLegalProfileDepth"[..])
+                );
                 assert_eq!(c.value.type_name, None);
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
@@ -910,15 +960,20 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_typed_constraint_usage_with_in_binding_body() {
-        let (rest, node) = part_def_body_element(input(
+        let source = input(
             "constraint discBrakeConstraint : DiscBrakeConstraint { in wheelAssy = Vehicle_2::wheelAssy; }",
-        ))
-        .expect("constraint usage");
+        );
+        let (rest, node) = part_def_body_element(source).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::ConstraintUsage(c) => {
-                assert_eq!(c.value.name, "discBrakeConstraint");
-                assert_eq!(c.value.type_name.as_deref(), Some("DiscBrakeConstraint"));
+                assert_eq!(
+                    c.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"discBrakeConstraint"[..])
+                );
+                assert!(c.value.type_name.is_some());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
         }
@@ -936,14 +991,20 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_parses_ref_state_as_state_usage() {
-        let src = "ref state monitor: StateKind;";
-        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        let source = input("ref state monitor: StateKind;");
+        let (rest, node) = part_def_body_element(source).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::StateUsage(state) => {
                 assert!(state.value.is_reference);
-                assert_eq!(state.value.name, "monitor");
-                assert_eq!(state.value.type_name.as_deref(), Some("StateKind"));
+                assert_eq!(
+                    state
+                        .value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"monitor"[..])
+                );
+                assert!(state.value.type_name.is_some());
             }
             other => panic!("expected StateUsage, got {other:?}"),
         }
@@ -953,14 +1014,31 @@ mod par_002_nested_def_tests {
     /// parse (same path as plain `part … :> …`), not the narrow `part_ref_usage` / `RefDecl`.
     #[test]
     fn part_def_body_parses_ref_part_with_subsetting_as_part_usage() {
-        let src = "ref part origin : Remote :> remotes;";
-        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        let source = input("ref part origin : Remote :> remotes;");
+        let (rest, node) = part_def_body_element(source).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::PartUsage(part) => {
-                assert!(part.value.is_reference);
-                assert_eq!(part.value.name, "origin");
-                assert_eq!(part.value.type_name, "Remote");
+                assert!(part
+                    .value
+                    .prefix
+                    .basic()
+                    .expect("basic head")
+                    .reference_span
+                    .is_some());
+                assert_eq!(
+                    part.value
+                        .name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"origin"[..])
+                );
+                assert_eq!(
+                    part.value
+                        .typing
+                        .as_ref()
+                        .map(|typing| typing.value.target.len()),
+                    Some(1)
+                );
                 assert!(part.value.subsets.is_some());
             }
             other => panic!("expected PartUsage, got {other:?}"),
@@ -1042,12 +1120,17 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_named_succession_first_then_stmt() {
-        let (rest, node) = part_def_body_element(input("succession s first a then b;"))
-            .expect("succession first ... then ...");
+        let source = input("succession s first a then b;");
+        let (rest, node) = part_def_body_element(source).expect("succession first ... then ...");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::FirstStmt(stmt) => {
-                assert_eq!(stmt.value.succession_name.as_deref(), Some("s"));
+                assert_eq!(
+                    stmt.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"s"[..])
+                );
                 assert!(stmt.value.succession_type.is_none());
             }
             other => panic!("expected FirstStmt, got {other:?}"),
@@ -1056,13 +1139,19 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_named_typed_succession_first_then_stmt() {
-        let (rest, node) = part_def_body_element(input("succession s1 : AB first a then b;"))
-            .expect("succession : Type first ... then ...");
+        let source = input("succession s1 : AB first a then b;");
+        let (rest, node) =
+            part_def_body_element(source).expect("succession : Type first ... then ...");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::FirstStmt(stmt) => {
-                assert_eq!(stmt.value.succession_name.as_deref(), Some("s1"));
-                assert_eq!(stmt.value.succession_type.as_deref(), Some("AB"));
+                assert_eq!(
+                    stmt.value
+                        .succession_name
+                        .map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"s1"[..])
+                );
+                assert!(stmt.value.succession_type.is_some());
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
@@ -1089,14 +1178,13 @@ mod par_002_nested_def_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::Bind(bind) => {
-                assert!(matches!(
-                    &bind.value.left.value,
-                    crate::ast::Expression::FeatureRef(name) if name == "a"
-                ));
-                assert!(matches!(
-                    &bind.value.right.value,
-                    crate::ast::Expression::FeatureRef(name) if name == "b"
-                ));
+                let crate::ast::Expression::FeatureRef(left) = &bind.value.left.value else {
+                    panic!("expected left feature reference");
+                };
+                let crate::ast::Expression::FeatureRef(right) = &bind.value.right.value else {
+                    panic!("expected right feature reference");
+                };
+                assert_ne!(left, right);
             }
             other => panic!("expected Bind, got {other:?}"),
         }

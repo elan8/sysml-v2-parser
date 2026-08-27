@@ -18,26 +18,50 @@ fn test_parse_kitchen_timer() {
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
-    let strict = parse(&input).expect("strict parse should succeed");
-    assert_eq!(strict.elements.len(), 1);
+    // `end port` interface members are `PortUsage`s with an `EndUsagePrefix` head (reference
+    // `SysML.xtext:836-843`; the normative `Interfaces.sysml:72` authors the same spelling), so
+    // the strict view accepts the whole fixture.
+    parse(&input).expect("the fixture's `end port` interface members are reference-grammar SysML");
 
+    // Two root members: the file's leading `/* ... */` header block, which is the `Comment`
+    // production's keyword-less spelling and therefore a member rather than trivia, and the
+    // package itself.
     let result = parse_with_diagnostics(&input);
     assert_eq!(
-        result.root.elements.len(),
-        1,
-        "fixture should produce one root package"
+        result.document.root.elements.len(),
+        2,
+        "fixture should produce its header comment and one root package"
     );
-    match &result.root.elements[0].value {
+    match &result.document.root.elements[0].value {
+        RootElement::Member(member) => match &member.value {
+            sysml_v2_parser::ast::PackageBodyElement::Annotating(
+                sysml_v2_parser::ast::AnnotatingMember::Comment(comment),
+            ) => {
+                assert!(comment.value.keyword_span.is_none());
+                assert!(result
+                    .document
+                    .comment_body(comment.value.body)
+                    .is_some_and(|text| text.contains("Kitchen Timer")));
+            }
+            other => panic!("expected the header comment, got {other:?}"),
+        },
+        other => panic!("expected the header comment, got {other:?}"),
+    }
+    match &result.document.root.elements[1].value {
         RootElement::Package(pkg) => {
-            assert_eq!(pkg.identification.name.as_deref(), Some("KitchenTimer"));
+            assert_eq!(
+                pkg.identification
+                    .simple_name()
+                    .and_then(|n| result.document.declaration_name(n)),
+                Some("KitchenTimer")
+            );
         }
         other => panic!("expected root element to be package, got {:?}", other),
     }
 
-    assert_eq!(
-        result.errors.len(),
-        0,
-        "KitchenTimer should parse without diagnostics, got {:?}",
+    assert!(
+        result.errors.is_empty(),
+        "no member of the fixture should recover: {:?}",
         result.errors
     );
 }

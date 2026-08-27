@@ -27,7 +27,7 @@ The coverage gate treats `implemented` as the stronger claim. Productions marked
 
 - `package`, `library package`, `namespace`, `import`: `implemented`
 - `part definition`, `part usage`: `implemented`; definition and usage bodies already parse structured member nodes (attributes, nested parts/ports, doc, recovery errors)
-- `port definition`, `port usage`: `implemented`; `PortBody::Brace { elements }` with nested ports and in/out members
+- `port definition`, `port usage`: `implemented`; `PortDefinition` requires `def`, `PortUsage = OccurrenceUsagePrefix 'port' Usage` carries the shared typed prefix, and `PortBody::Brace { elements }` holds nested ports, in/out, `ref` and `variant` members
 - `part*`, `port*` wildcards: `partial` (member-depth gaps remain in broader families)
 - `attribute definition`, `attribute usage`: `implemented`; brace bodies use structured member parsing (`AttributeBody::Brace { elements }`) with doc/nested attribute recovery
 - `occurrence definition`: `implemented`; definition brace bodies use structured `DefinitionBody::Brace { elements }` with occurrence member parsing

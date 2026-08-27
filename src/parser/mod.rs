@@ -25,24 +25,28 @@ mod connector;
 mod constraint;
 mod definition_header;
 mod definition_prefix;
+mod delimiters;
 mod dependency;
 pub mod diagnostic_catalog;
 mod diagnostics;
 mod enumeration;
 mod expr;
-mod feature_chain;
+mod feature_prefix;
 mod feature_value;
 mod flow;
+mod grammar_scope;
 mod import;
 mod individual;
 mod interface;
 mod item;
-mod lex;
+pub(crate) mod lex;
 mod metadata;
 mod metadata_annotation;
+mod metadata_body;
 mod occurrence;
 mod occurrence_body;
-mod package;
+mod occurrence_prefix;
+pub(crate) mod package;
 mod parse;
 mod part;
 mod payload;
@@ -51,14 +55,17 @@ mod recovery;
 mod requirement;
 mod span;
 mod specialization;
+mod stack;
 mod state;
 mod usage;
 mod usecase;
 mod view;
 
 pub(crate) use feature_value::feature_value_part;
-pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
+pub(crate) use span::{advance, node_from_to, span_from_to, with_span, Input};
 
-pub use parse::{parse_root, parse_with_diagnostics, ParseResult};
+pub use parse::{
+    parse_root, parse_root_owned, parse_with_diagnostics, parse_with_diagnostics_owned, ParseResult,
+};
 
 pub(crate) use recovery::{build_recovery_error_node, build_recovery_error_node_from_span};

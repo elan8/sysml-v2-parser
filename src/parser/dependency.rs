@@ -1,7 +1,7 @@
 //! Dependency parsing (BNF Dependency, DependencyDeclaration).
 
-use crate::ast::{ConnectBody, Dependency, Identification, Node};
-use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
+use crate::ast::{Dependency, Identification, Node, QualifiedReferenceId};
+use crate::parser::lex::{name, qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -12,18 +12,18 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-fn name_list(input: Input<'_>) -> IResult<Input<'_>, Vec<String>> {
+fn reference_list(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
     separated_list1(
         preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     )
     .parse(input)
 }
 
-fn to_suppliers(input: Input<'_>) -> IResult<Input<'_>, Vec<String>> {
+fn to_suppliers(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    name_list(input)
+    reference_list(input)
 }
 
 /// dependency DependencyDeclaration RelationshipBody
@@ -41,15 +41,19 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
         // `from clients to suppliers` — must beat the bare client-list form so `from` is not
         // stored as a client name (#78 / validation `12a`).
         map(
-            (preceded(tag(&b"from"[..]), ws1), name_list, to_suppliers),
+            (
+                preceded(tag(&b"from"[..]), ws1),
+                reference_list,
+                to_suppliers,
+            ),
             |(_, clients, suppliers)| (None, clients, suppliers),
         ),
         map(
             (
-                preceded(ws_and_comments, qualified_name),
+                preceded(ws_and_comments, name),
                 preceded(ws_and_comments, tag(&b"from"[..])),
                 ws1,
-                name_list,
+                reference_list,
                 to_suppliers,
             ),
             |(name, _, _, clients, suppliers)| {
@@ -63,13 +67,13 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
                 )
             },
         ),
-        map((name_list, to_suppliers), |(clients, suppliers)| {
+        map((reference_list, to_suppliers), |(clients, suppliers)| {
             (None, clients, suppliers)
         }),
     ))
     .parse(input)?;
 
-    let (input, (body, body_elements)) = relationship_body_connect(input)?;
+    let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -80,68 +84,102 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
                 clients,
                 suppliers,
                 body,
-                body_elements,
             },
         ),
     ))
 }
 
-type RelationshipConnectBody = (
-    ConnectBody,
-    Option<Vec<Node<crate::ast::RelationshipBodyElement>>>,
-);
-
-/// `RelationshipBody`: `;` or `{` doc/comment/rep/metadata* `}`.
-fn relationship_body_connect(input: Input<'_>) -> IResult<Input<'_>, RelationshipConnectBody> {
-    let (input, elements) = crate::parser::body::relationship_body_annotations(input)?;
-    match &elements {
-        None => Ok((input, (ConnectBody::Semicolon, None))),
-        Some(_) => Ok((input, (ConnectBody::Brace, elements))),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::ast::{QualifiedReferenceArena, SourceStorage};
+    use crate::parser::span::ParseContext;
 
-    fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+    fn parsed(text: &str) -> (Dependency, SourceStorage, QualifiedReferenceArena) {
+        let source = SourceStorage::new(text.to_owned());
+        let context = ParseContext::new();
+        let (rest, node) =
+            dependency(context.input(source.as_str().as_bytes())).expect("dependency should parse");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        (node.value, source, context.finish())
+    }
+
+    fn authored<'a>(
+        source: &'a SourceStorage,
+        arena: &'a QualifiedReferenceArena,
+        id: QualifiedReferenceId,
+    ) -> &'a str {
+        arena
+            .get(source, id)
+            .expect("source-backed dependency reference")
+            .authored_text()
     }
 
     #[test]
     fn dependency_from_keyword_is_not_a_client() {
-        let (rest, node) = dependency(input("dependency from 'Service Layer' to 'Data Layer';"))
-            .expect("dependency from");
-        assert!(rest.fragment().is_empty());
-        assert!(node.value.identification.is_none());
-        assert_eq!(node.value.clients, vec!["Service Layer".to_string()]);
-        assert_eq!(node.value.suppliers, vec!["Data Layer".to_string()]);
+        let (dependency, source, arena) =
+            parsed("dependency from 'Service Layer' to 'Data Layer';");
+        assert!(dependency.identification.is_none());
+        assert_eq!(
+            authored(&source, &arena, dependency.clients[0]),
+            "'Service Layer'"
+        );
+        assert_eq!(
+            authored(&source, &arena, dependency.suppliers[0]),
+            "'Data Layer'"
+        );
+    }
+
+    /// Spec42 Gap 37: a braced `RelationshipBody` owns feature members alongside the annotation
+    /// subset (`dependency z to x, y { feature e; }`, kerml `dependencies` fixture).
+    #[test]
+    fn dependency_body_owns_feature_members() {
+        let (dependency, source, _arena) = parsed("dependency z to x, y { feature e; }");
+        let elements = dependency.body.braced_elements().expect("braced body");
+        assert_eq!(elements.len(), 1);
+        let crate::ast::RelationshipBodyElement::KermlFeature(feature) = &elements[0].value else {
+            panic!("expected KermlFeature member");
+        };
+        let name = feature.value.name.expect("named feature");
+        let span = name.span();
+        assert_eq!(&source.as_str()[span.offset..span.offset + span.len], "e");
     }
 
     #[test]
     fn dependency_named_from_clients() {
-        let (rest, node) = dependency(input(
-            "dependency Use from 'Application Layer' to 'Service Layer';",
-        ))
-        .expect("named dependency");
-        assert!(rest.fragment().is_empty());
+        let (dependency, source, arena) =
+            parsed("dependency Use from 'Application Layer' to 'Service Layer';");
         assert_eq!(
-            node.value
+            dependency
                 .identification
                 .as_ref()
-                .and_then(|i| i.name.as_deref()),
+                .and_then(|i| i.name)
+                .map(|n| {
+                    let span = n.span();
+                    &source.as_str()[span.offset..span.offset + span.len]
+                }),
             Some("Use")
         );
-        assert_eq!(node.value.clients, vec!["Application Layer".to_string()]);
-        assert_eq!(node.value.suppliers, vec!["Service Layer".to_string()]);
+        assert_eq!(
+            authored(&source, &arena, dependency.clients[0]),
+            "'Application Layer'"
+        );
+        assert_eq!(
+            authored(&source, &arena, dependency.suppliers[0]),
+            "'Service Layer'"
+        );
     }
 
     #[test]
     fn dependency_clients_without_from_keyword() {
-        let (rest, node) = dependency(input("dependency z to x, y;")).expect("dependency z");
-        assert!(rest.fragment().is_empty());
-        assert_eq!(node.value.clients, vec!["z".to_string()]);
-        assert_eq!(node.value.suppliers, vec!["x".to_string(), "y".to_string()]);
+        let (dependency, source, arena) = parsed("dependency z to x, y;");
+        assert_eq!(authored(&source, &arena, dependency.clients[0]), "z");
+        let suppliers: Vec<_> = dependency
+            .suppliers
+            .iter()
+            .copied()
+            .map(|id| authored(&source, &arena, id))
+            .collect();
+        assert_eq!(suppliers, ["x", "y"]);
     }
 }

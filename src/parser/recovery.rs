@@ -2,10 +2,11 @@
 
 use super::diagnostics::{
     bare_comma_sequence_diagnostic, category_from_code, invalid_bare_identifier_in_body_diagnostic,
+    invalid_bracket_expression_diagnostic, invalid_end_feature_prefix_diagnostic,
     invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
-    invalid_unit_reference_diagnostic, missing_expression_after_operator_diagnostic,
-    missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
-    trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
+    missing_expression_after_operator_diagnostic, missing_semicolon_or_body_diagnostic,
+    missing_type_diagnostic, trim_ascii_end, trim_ascii_start,
+    unexpected_keyword_in_scope_diagnostic,
 };
 use super::lex;
 use super::Input;
@@ -84,13 +85,20 @@ enum RecoveryClassification {
         expected: String,
         suggestion: String,
     },
-    InvalidUnitReference {
+    InvalidBracketExpression {
         code: String,
         message: String,
         expected: String,
         suggestion: String,
     },
     BareCommaSequence {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
+    /// `end` spelled with a slot only `BasicFeaturePrefix` owns (KerML BNF 573/577/584).
+    InvalidEndFeaturePrefix {
         code: String,
         message: String,
         expected: String,
@@ -115,8 +123,27 @@ enum RecoveryClassification {
         suggestion: String,
     },
     MissingSemicolon,
+    /// A `#` or `@` head this scope does not model, but that the pinned grammar admits.
     UnsupportedAnnotation,
+    /// A `#` or `@` sigil not followed by the `[QualifiedName]` its production requires.
+    ///
+    /// Distinct from [`RecoveryClassification::UnsupportedAnnotation`]: that one is valid syntax
+    /// the parser has not reached yet, this one is not a metadata reference at all, and the two
+    /// must stay separable in both the recovery node and its diagnostic.
+    MalformedAnnotationHead,
     Unexpected,
+}
+
+/// Whether a `#`/`@` sigil is followed by the `[QualifiedName]` its production requires.
+///
+/// `PrefixMetadataFeature` and `MetadataFeatureDeclaration` both end at an `OwnedFeatureTyping`,
+/// so a sigil followed by anything that cannot begin a name -- `#;`, `@ {`, `#::x` -- is
+/// malformed rather than merely unsupported here.
+fn annotation_head_is_well_formed(trimmed: &[u8]) -> bool {
+    let after_sigil = trim_ascii_start(&trimmed[1..]);
+    after_sigil
+        .first()
+        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_' || *b == b'\'' || *b == b'$')
 }
 
 fn classify_recovery(
@@ -147,6 +174,19 @@ fn classify_recovery(
         };
     }
 
+    // Ahead of the keyword-in-scope classifications: those would report the *scope* as the
+    // problem, when the authored prefix is what has no derivation.
+    if let Some((code, message, expected, suggestion)) =
+        invalid_end_feature_prefix_diagnostic(trimmed)
+    {
+        return RecoveryClassification::InvalidEndFeaturePrefix {
+            code: code.to_string(),
+            message,
+            expected,
+            suggestion,
+        };
+    }
+
     if let Some((code, message, expected, suggestion)) = invalid_typing_operator_diagnostic(trimmed)
     {
         return RecoveryClassification::InvalidTypingOperator {
@@ -168,9 +208,10 @@ fn classify_recovery(
         };
     }
 
-    if let Some((code, message, expected, suggestion)) = invalid_unit_reference_diagnostic(trimmed)
+    if let Some((code, message, expected, suggestion)) =
+        invalid_bracket_expression_diagnostic(trimmed)
     {
-        return RecoveryClassification::InvalidUnitReference {
+        return RecoveryClassification::InvalidBracketExpression {
             code: code.to_string(),
             message,
             expected,
@@ -238,8 +279,12 @@ fn classify_recovery(
         return RecoveryClassification::MissingSemicolon;
     }
 
-    if lex::starts_with_keyword(trimmed, b"#") || lex::starts_with_keyword(trimmed, b"@") {
-        return RecoveryClassification::UnsupportedAnnotation;
+    if trimmed.starts_with(b"#") || trimmed.starts_with(b"@") {
+        return if annotation_head_is_well_formed(trimmed) {
+            RecoveryClassification::UnsupportedAnnotation
+        } else {
+            RecoveryClassification::MalformedAnnotationHead
+        };
     }
 
     if let Some((code, message, expected, suggestion)) =
@@ -299,13 +344,19 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected,
             suggestion,
         }
-        | RecoveryClassification::InvalidUnitReference {
+        | RecoveryClassification::InvalidBracketExpression {
             code,
             message,
             expected,
             suggestion,
         }
         | RecoveryClassification::BareCommaSequence {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
+        | RecoveryClassification::InvalidEndFeaturePrefix {
             code,
             message,
             expected,
@@ -346,16 +397,27 @@ pub(crate) fn build_recovery_error_node_from_span(
         },
         RecoveryClassification::UnsupportedAnnotation => ParseErrorNode {
             message: format!(
-                "incomplete parser support for annotation syntax in {scope_label}"
+                "incomplete parser support for metadata syntax in {scope_label}"
             ),
             code: "unsupported_annotation_syntax".to_string(),
             expected: Some(format!("supported {scope_label} element or metadata form")),
             found: recovery_found_snippet_from_span(input, recovery_end),
             suggestion: Some(
-                "This `#`/`@` annotation form is legal SysML but not fully parsed yet; rewrite using a supported metadata form or simplify the annotated declaration."
+                "This `#`/`@` metadata form is legal SysML but not fully parsed yet; rewrite using a supported metadata form or simplify the annotated declaration."
                     .to_string(),
             ),
             category: Some(DiagnosticCategory::UnsupportedGrammarForm),
+        },
+        RecoveryClassification::MalformedAnnotationHead => ParseErrorNode {
+            message: format!("malformed metadata reference in {scope_label}"),
+            code: "malformed_annotation_head".to_string(),
+            expected: Some("qualified name after `#` or `@`".to_string()),
+            found: recovery_found_snippet_from_span(input, recovery_end),
+            suggestion: Some(
+                "`#` and `@` are followed by the qualified name of a metadata type, as in `#safety` or `@Safety`."
+                    .to_string(),
+            ),
+            category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::Unexpected => ParseErrorNode {
             message: format!("unexpected token in {scope_label}"),
@@ -366,6 +428,62 @@ pub(crate) fn build_recovery_error_node_from_span(
             category: Some(DiagnosticCategory::ParseError),
         },
     }
+}
+
+/// The member form of [`unsupported_body_member`]: recognizes one of the scope's spec-valid
+/// starter keywords, consumes the statement or block it introduces, and retains it as an
+/// unsupported node rather than as untyped text.
+pub(crate) fn unsupported_member<'a>(
+    input: crate::parser::Input<'a>,
+    starters: &[&[u8]],
+    scope_label: &str,
+) -> nom::IResult<crate::parser::Input<'a>, crate::ast::Node<crate::ast::UnsupportedGrammarNode>> {
+    use crate::parser::lex::{skip_statement_or_block, starts_with_any_keyword, ws_and_comments};
+    let (input, _) = ws_and_comments(input)?;
+    if !starts_with_any_keyword(input.fragment(), starters) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let start = input;
+    let (input, _) = skip_statement_or_block(input)?;
+    Ok((input, unsupported_body_member(start, input, scope_label)))
+}
+
+/// A spec-valid member that the containing scope does not model.
+///
+/// The member's text is retained by span, not copied, and it carries a diagnostic: keeping it
+/// silently -- as an opaque string with no report -- hid real gaps from every consumer.
+pub(crate) fn unsupported_body_member(
+    start: crate::parser::Input<'_>,
+    end: crate::parser::Input<'_>,
+    scope_label: &str,
+) -> crate::ast::Node<crate::ast::UnsupportedGrammarNode> {
+    let span = crate::parser::span::span_from_to(start, end);
+    let found = String::from_utf8_lossy(&start.fragment()[..span.len.min(start.fragment().len())])
+        .trim()
+        .to_string();
+    let diagnostic = ParseErrorNode {
+        message: format!(
+            "this {scope_label} member is spec-valid but not structurally implemented"
+        ),
+        code: "unsupported_grammar_form".to_owned(),
+        expected: None,
+        found: (!found.is_empty()).then_some(found),
+        suggestion: Some(
+            "The member is retained with its source span; its structure is not modelled yet."
+                .to_owned(),
+        ),
+        category: Some(DiagnosticCategory::UnsupportedGrammarForm),
+    };
+    crate::ast::Node::new(
+        span,
+        crate::ast::UnsupportedGrammarNode {
+            production: crate::ast::UnsupportedProduction::UnmodelledBodyMember,
+            diagnostic,
+        },
+    )
 }
 
 pub(crate) fn parse_error_from_recovery_node(
@@ -380,7 +498,9 @@ pub(crate) fn parse_error_from_recovery_node(
             node.category
                 .unwrap_or_else(|| category_from_code(node.code.as_str())),
         );
-    let severity = if node.code == "unsupported_annotation_syntax" {
+    let severity = if node.code == "unsupported_annotation_syntax"
+        || node.code == "unsupported_grammar_form"
+    {
         DiagnosticSeverity::Warning
     } else {
         DiagnosticSeverity::Error

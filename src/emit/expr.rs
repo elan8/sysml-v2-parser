@@ -1,59 +1,48 @@
 //! Expression emission.
 
-use super::writer::{format_feature_path, format_name, format_qualified_name, EmitWriter};
+use super::writer::EmitWriter;
 use super::EmitError;
 use crate::ast::{
-    Argument, BinaryOperator, CollectionOperator, Expression, FeatureValue, FeatureValueKind, Node,
-    TypeCheckKind, UnaryOperator,
+    Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody, Expression, FeatureValue,
+    FeatureValueKind, InOut, Node, SequenceExpressionList, TypeCheckKind, UnaryOperator,
 };
 
 pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Result<(), EmitError> {
     match expr {
         Expression::LiteralInteger(i) => w.push_str(&i.to_string()),
-        Expression::LiteralReal(s) => w.push_str(s),
-        Expression::LiteralString(s) => {
-            w.push_char('"');
-            w.push_str(s);
-            w.push_char('"');
+        Expression::LiteralReal(literal) => {
+            w.push_authored_span("expression real literal", literal.span())?
+        }
+        Expression::LiteralString(literal) => {
+            w.push_authored_span("expression string literal", literal.span())?
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
-        Expression::FeatureRef(name) => {
-            if name.contains("::") {
-                w.push_str(&format_qualified_name(name));
-            } else if name.contains('.') {
-                w.push_str(&format_feature_path(name));
-            } else {
-                w.push_str(&format_name(name));
-            }
+        Expression::FeatureRef(reference) => {
+            w.push_qualified_reference("expression feature", *reference)?
         }
-        Expression::MemberAccess(base, member) => {
+        Expression::MemberAccess {
+            base,
+            member,
+            separator,
+        } => {
             emit_expression(w, &base.value)?;
-            w.push_char('.');
-            w.push_str(&format_name(member));
+            w.push_str(match separator {
+                crate::ast::ReferenceSeparator::ColonColon => "::",
+                crate::ast::ReferenceSeparator::Dot => ".",
+            });
+            w.push_qualified_reference("expression member", *member)?;
         }
-        Expression::Index { base, index } => {
+        Expression::Index { base, operands, .. } => {
             emit_expression(w, &base.value)?;
             w.push_str("#(");
-            emit_expression(w, &index.value)?;
+            emit_sequence_expression_list(w, &operands.value)?;
             w.push_char(')');
         }
-        Expression::Bracket(inner) => {
+        Expression::Bracket { base, operands, .. } => {
+            emit_expression(w, &base.value)?;
             w.push_char('[');
-            emit_expression(w, &inner.value)?;
+            emit_sequence_expression_list(w, &operands.value)?;
             w.push_char(']');
-        }
-        Expression::LiteralWithUnit { value, unit } => {
-            emit_expression(w, &value.value)?;
-            w.push_char(' ');
-            // `unit` is often already `Expression::Bracket(...)`; avoid `[[kg]]`.
-            match &unit.value {
-                Expression::Bracket(_) => emit_expression(w, &unit.value)?,
-                other => {
-                    w.push_char('[');
-                    emit_expression(w, other)?;
-                    w.push_char(']');
-                }
-            }
         }
         Expression::BinaryOp { op, left, right } => {
             emit_expression(w, &left.value)?;
@@ -73,24 +62,19 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             emit_expression(w, &callee.value)?;
             emit_args(w, args)?;
         }
-        Expression::Tuple(items) => {
+        Expression::Sequence { operands, .. } => {
             w.push_char('(');
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    w.push_str(", ");
-                }
-                emit_expression(w, &item.value)?;
-            }
+            emit_sequence_expression_list(w, &operands.value)?;
             w.push_char(')');
         }
         Expression::Classification { metaclass } => {
             w.push_char('@');
-            w.push_str(metaclass);
+            w.push_qualified_reference("classification", *metaclass)?;
         }
         Expression::MetaCast { base, metaclass } => {
             emit_expression(w, &base.value)?;
             w.push_str(" meta ");
-            w.push_str(metaclass);
+            w.push_qualified_reference("meta cast", *metaclass)?;
         }
         Expression::TypeCheck {
             kind,
@@ -103,50 +87,60 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             }
             w.push_str(type_check_str(kind));
             w.push_char(' ');
-            w.push_str(&format_qualified_name(type_name));
+            w.push_qualified_reference("type check", *type_name)?;
         }
         Expression::Select { base, selector } => {
             emit_expression(w, &base.value)?;
             w.push_str(".?");
-            w.push_str(selector);
+            w.push_qualified_reference("select", *selector)?;
         }
         Expression::Collect { base, selector } => {
             emit_expression(w, &base.value)?;
             w.push_str(".**");
-            w.push_str(selector);
+            w.push_qualified_reference("collect", *selector)?;
         }
         Expression::Null => w.push_str("null"),
-        Expression::Parenthesized(inner) => {
-            w.push_char('(');
-            emit_expression(w, &inner.value)?;
-            w.push_char(')');
-        }
         Expression::Constructor { type_name, args } => {
             w.push_str("new ");
-            w.push_str(&format_qualified_name(type_name));
+            w.push_qualified_reference("constructor", *type_name)?;
             emit_args(w, args)?;
         }
-        Expression::FeatureChainRef(chain) => {
-            for (i, seg) in chain.segments.iter().enumerate() {
-                if i > 0 {
-                    w.push_char('.');
-                }
-                w.push_str(&format_name(seg));
-            }
+        Expression::FeatureChainRef(reference) => {
+            w.push_qualified_reference("feature chain", *reference)?
         }
         Expression::CollectionOp {
             op,
             base,
             args,
             brace_body,
+            dot_shorthand,
         } => {
             emit_expression(w, &base.value)?;
-            w.push_str("->");
-            w.push_str(collection_op_str(op));
-            if let Some(body) = brace_body {
-                w.push_str(body);
+            if *dot_shorthand {
+                // KerML dot sugar: `x.{...}` (collect) / `x.?{...}` (select). Only those two
+                // operators have a dot spelling; anything else could not have parsed with the
+                // flag set and falls back to the arrow form.
+                if matches!(op, CollectionOperator::Select) {
+                    w.push_str(".?");
+                } else if matches!(op, CollectionOperator::Collect) {
+                    w.push_str(".");
+                } else {
+                    w.push_str("->");
+                    push_collection_op(w, op)?;
+                }
+                if let Some(body) = brace_body {
+                    emit_body_expression_bare(w, &body.value)?;
+                } else {
+                    emit_args(w, args)?;
+                }
             } else {
-                emit_args(w, args)?;
+                w.push_str("->");
+                push_collection_op(w, op)?;
+                if let Some(body) = brace_body {
+                    emit_collection_operator_body(w, &body.value)?;
+                } else {
+                    emit_args(w, args)?;
+                }
             }
         }
         Expression::Conditional {
@@ -163,13 +157,118 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
         }
         Expression::Extent { target } => {
             w.push_str("all ");
-            w.push_str(&format_qualified_name(target));
+            w.push_qualified_reference("extent", *target)?;
+        }
+        Expression::BodyExpr(body) => {
+            // `emit_collection_operator_body` writes the leading space its `->op {...}` context
+            // needs; a standalone body expression sits directly after the operator/keyword's own
+            // spacing.
+            emit_body_expression_bare(w, &body.value)?;
         }
         Expression::MetadataAccess(base) => {
             emit_expression(w, &base.value)?;
             w.push_str(".metadata");
         }
     }
+    Ok(())
+}
+
+fn emit_sequence_expression_list(
+    w: &mut EmitWriter<'_>,
+    operands: &SequenceExpressionList,
+) -> Result<(), EmitError> {
+    for (index, element) in operands.elements.iter().enumerate() {
+        if index > 0 {
+            w.push_str(", ");
+        }
+        emit_expression(w, &element.expression.value)?;
+    }
+    if operands.trailing_comma_span.is_some() {
+        w.push_char(',');
+    }
+    Ok(())
+}
+
+fn emit_collection_operator_body(
+    w: &mut EmitWriter<'_>,
+    body: &CollectionOperatorBody,
+) -> Result<(), EmitError> {
+    w.push_char(' ');
+    emit_body_expression_bare(w, body)
+}
+
+/// Emit `{ parameters* result? }` with no leading space -- the caller supplies its own spacing.
+fn emit_body_expression_bare(
+    w: &mut EmitWriter<'_>,
+    body: &CollectionOperatorBody,
+) -> Result<(), EmitError> {
+    w.push_str("{");
+    if let Some(doc) = &body.doc {
+        w.push_char(' ');
+        super::root::emit_doc(w, &doc.value)?;
+    }
+    for parameter in &body.parameters {
+        w.push_char(' ');
+        if let Some(direction) = &parameter.value.direction {
+            w.push_str(match direction.value {
+                InOut::In => "in",
+                InOut::Out => "out",
+                InOut::InOut => "inout",
+            });
+            w.push_char(' ');
+        }
+        if parameter.value.reference_keyword_span.is_some() {
+            w.push_str("ref ");
+        }
+        let declaration = &parameter.value.declaration.value;
+        w.push_authored_name(
+            "collection body parameter/name",
+            &declaration.identification_span,
+        )?;
+        if let Some(typing) = &declaration.typing {
+            super::structure::emit_typing_clause(w, &typing.value)?;
+        }
+        if let Some(multiplicity) = &declaration.multiplicity {
+            super::structure::emit_multiplicity(w, &multiplicity.value)?;
+        }
+        super::structure::emit_multiplicity_modifiers(w, &declaration.multiplicity_modifiers);
+        if let Some((subsets, value)) = &declaration.subsets {
+            super::structure::emit_subsetting_clause(w, &subsets.value)?;
+            if let Some(value) = value {
+                w.push_str(" = ");
+                emit_expression(w, &value.value)?;
+            }
+        }
+        for relationship in [
+            declaration.redefines.as_ref(),
+            declaration.references.as_ref(),
+            declaration.crosses.as_ref(),
+            declaration.intersects.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            super::structure::emit_subsetting_clause(w, &relationship.value)?;
+        }
+        match &parameter.value.terminator {
+            crate::ast::CollectionOperatorParameterTerminator::Semicolon { .. } => {
+                w.push_char(';');
+            }
+            crate::ast::CollectionOperatorParameterTerminator::Body { doc, .. } => {
+                w.push_str(" {");
+                if let Some(doc) = doc {
+                    w.push_char(' ');
+                    super::root::emit_doc(w, &doc.value)?;
+                }
+                w.push_str(" }");
+            }
+        }
+    }
+    if let Some(result) = &body.result {
+        w.push_char(' ');
+        emit_expression(w, &result.value)?;
+    }
+    w.push_str(" }");
     Ok(())
 }
 
@@ -180,13 +279,15 @@ pub(crate) fn emit_feature_value(
     let v = &value.value;
     if v.is_default {
         w.push_str(" default");
-        match v.kind {
-            FeatureValueKind::Bind => {
-                // bare `default expr` or `default = expr` — prefer `=` for roundtrip of
-                // explicitly-bound defaults when expression follows.
-                w.push_str(" = ");
+        if v.has_operator {
+            match v.kind {
+                FeatureValueKind::Bind => w.push_str(" = "),
+                FeatureValueKind::Assign => w.push_str(" := "),
             }
-            FeatureValueKind::Assign => w.push_str(" := "),
+        } else {
+            // Bare `default expr` / `default {expr}`: no operator was authored, so none is
+            // emitted.
+            w.push_char(' ');
         }
     } else {
         match v.kind {
@@ -203,8 +304,8 @@ fn emit_args(w: &mut EmitWriter<'_>, args: &[Argument]) -> Result<(), EmitError>
         if i > 0 {
             w.push_str(", ");
         }
-        if let Some(name) = &arg.name {
-            w.push_str(name);
+        if let Some(parameter) = arg.parameter {
+            w.push_qualified_reference("argument parameter", parameter)?;
             w.push_str(" = ");
         }
         emit_expression(w, &arg.value.value)?;
@@ -221,8 +322,19 @@ fn unary_op_str(op: &UnaryOperator) -> &str {
     op.as_str()
 }
 
-fn collection_op_str(op: &CollectionOperator) -> &str {
-    op.as_str()
+/// Stream a collection operator: a classified name, or the authored spelling of an
+/// unclassified `->name` from its source span.
+fn push_collection_op(w: &mut EmitWriter<'_>, op: &CollectionOperator) -> Result<(), EmitError> {
+    match (op.classified_name(), op) {
+        (Some(name), _) => {
+            w.push_str(name);
+            Ok(())
+        }
+        (None, CollectionOperator::Other(spelling)) => {
+            w.push_authored_span("collection operator", spelling.span())
+        }
+        (None, _) => unreachable!("only `Other` has no classified name"),
+    }
 }
 
 fn type_check_str(kind: &TypeCheckKind) -> &'static str {

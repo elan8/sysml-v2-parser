@@ -7,9 +7,7 @@ use crate::parser::occurrence_body::occurrence_def_definition_body;
 use crate::parser::Input;
 use nom::IResult;
 
-pub(crate) use crate::parser::occurrence_body::{
-    individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
-};
+pub(crate) use crate::parser::occurrence_body::occurrence_usage;
 
 pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceDef>> {
     let start = input;
@@ -27,7 +25,7 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
             start,
             input,
             OccurrenceDef {
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
@@ -41,10 +39,9 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on OccurrenceDef ---

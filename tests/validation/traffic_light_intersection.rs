@@ -33,24 +33,29 @@ fn test_parse_traffic_light_intersection() {
         ),
     };
 
+    // The file's leading `/* ... */` header is the keyword-less `Comment` spelling, so it is a
+    // root member of its own ahead of the package.
     assert_eq!(
         root.elements.len(),
-        1,
-        "expected exactly one root element (package TrafficLightIntersection)"
+        2,
+        "expected the header comment and the package TrafficLightIntersection"
     );
-    let first = &root.elements[0];
+    let first = &root.elements[1];
     let package = match &first.value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected root to be a Package, got {:?}", other),
     };
     assert_eq!(
-        package.identification.name.as_deref(),
+        package
+            .identification
+            .simple_name()
+            .and_then(|n| root.declaration_name(n)),
         Some("TrafficLightIntersection"),
         "root package should be named TrafficLightIntersection"
     );
 
     let body = match &package.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package body to be brace form"),
     };
 
@@ -101,12 +106,13 @@ fn test_requirement_constraints_keep_doc_members() {
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
     let root = parse(&input).expect("fixture should parse");
-    let package = match &root.elements[0].value {
+    // Element 0 is the file's leading header comment; the package follows it.
+    let package = match &root.elements[1].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected root package, got {:?}", other),
     };
     let body = match &package.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package body to be brace form"),
     };
     let requirement = body
@@ -117,7 +123,7 @@ fn test_requirement_constraints_keep_doc_members() {
         })
         .expect("fixture should contain at least one requirement def");
     let requirement_body = match &requirement.body {
-        RequirementDefBody::Brace { elements } => elements,
+        RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected requirement body to be brace form"),
     };
     let require_constraint = requirement_body
@@ -128,14 +134,16 @@ fn test_requirement_constraints_keep_doc_members() {
         })
         .expect("fixture requirement should contain a require constraint");
     let constraint_elements = match &require_constraint.body {
-        sysml_v2_parser::ast::RequireConstraintBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected structured require constraint body"),
     };
 
     assert!(
         constraint_elements.iter().any(|e| matches!(
             e.value,
-            sysml_v2_parser::ast::ConstraintDefBodyElement::Doc(_)
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Annotating(
+                sysml_v2_parser::ast::AnnotatingMember::Doc(_)
+            )
         )),
         "fixture require constraint should preserve doc members"
     );

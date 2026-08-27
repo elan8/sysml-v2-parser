@@ -45,11 +45,11 @@ fn part_def_body_rejects_arbitrary_non_sysml_text() {
     assert_rejects_with_unexpected_token(&input, "part definition body");
 
     let result = parse_with_diagnostics(&input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part_def = elements
@@ -59,7 +59,7 @@ fn part_def_body_rejects_arbitrary_non_sysml_text() {
             _ => None,
         })
         .expect("part def should remain in the AST under editor parse");
-    let PartDefBody::Brace { elements } = &part_def.body else {
+    let PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected part def brace body");
     };
     assert!(
@@ -78,21 +78,28 @@ fn part_usage_body_rejects_arbitrary_non_sysml_text() {
     assert_rejects_with_unexpected_token(&input, "part usage body");
 
     let result = parse_with_diagnostics(&input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part_usage = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(p) if p.value.name == "wheel" => Some(&p.value),
+            PackageBodyElement::PartUsage(p)
+                if p.value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("wheel") =>
+            {
+                Some(&p.value)
+            }
             _ => None,
         })
         .expect("part usage should remain a real PartUsage, not ExtendedLibraryDecl");
-    let PartUsageBody::Brace { elements } = &part_usage.body else {
+    let PartUsageBody::Brace { elements, .. } = &part_usage.body else {
         panic!("expected part usage brace body");
     };
     assert!(

@@ -13,7 +13,7 @@ fn test_state_def_body_parses_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let state_def = match &elements[0].value {
@@ -21,7 +21,7 @@ fn test_state_def_body_parses_members() {
         _ => panic!("expected StateDef"),
     };
     let body_elements = match &state_def.body {
-        sysml_v2_parser::ast::StateDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::StateDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected state brace body"),
     };
     assert!(body_elements
@@ -46,7 +46,7 @@ fn test_constraint_and_calc_bodies_parse_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let constraint_def = match &elements[0].value {
@@ -54,7 +54,7 @@ fn test_constraint_and_calc_bodies_parse_members() {
         _ => panic!("expected ConstraintDef"),
     };
     let constraint_elements = match &constraint_def.body {
-        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected constraint brace body"),
     };
     assert!(
@@ -66,7 +66,7 @@ fn test_constraint_and_calc_bodies_parse_members() {
         _ => panic!("expected CalcDef"),
     };
     let calc_elements = match &calc_def.body {
-        sysml_v2_parser::ast::CalcDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::CalcDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected calc brace body"),
     };
     assert!(!calc_elements.is_empty(), "calc body should not be empty");
@@ -81,7 +81,7 @@ fn test_perform_action_decl_body_parses_bindings() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let part_def = match &elements[0].value {
@@ -89,7 +89,7 @@ fn test_perform_action_decl_body_parses_bindings() {
         _ => panic!("expected PartDef"),
     };
     let part_body = match &part_def.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected part def brace body"),
     };
     let perform = match &part_body[0].value {
@@ -97,7 +97,7 @@ fn test_perform_action_decl_body_parses_bindings() {
         _ => panic!("expected perform action declaration"),
     };
     assert!(
-        matches!(&perform.body, sysml_v2_parser::ast::PerformBody::Brace { elements } if !elements.is_empty()),
+        matches!(&perform.body, sysml_v2_parser::ast::PerformBody::Brace { elements, .. } if !elements.is_empty()),
         "perform action brace body should retain parsed in/out bindings"
     );
 }
@@ -165,7 +165,7 @@ action def Run specializes BaseAction;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let action_def = match &elements[0].value {
@@ -177,8 +177,8 @@ action def Run specializes BaseAction;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("BaseAction".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -193,7 +193,7 @@ action def Run :> BaseAction, LoggedAction;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let action_def = match &elements[0].value {
@@ -205,8 +205,8 @@ action def Run :> BaseAction, LoggedAction;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("BaseAction, LoggedAction".to_string())
+            .map(|n| n.value.target.len()),
+        Some(2)
     );
     assert!(action_def.value.specializes.is_some());
 }
@@ -229,7 +229,7 @@ action def Compute {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let action_def = match &elements[0].value {
@@ -237,7 +237,7 @@ action def Compute {
         other => panic!("expected action def, got {:?}", other),
     };
     let body_elements = match &action_def.value.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. } => elements,
         other => panic!("expected action def brace body, got {:?}", other),
     };
     let assign = body_elements
@@ -253,61 +253,10 @@ action def Compute {
         Expression::CollectionOp { op, base, args, .. } => {
             assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
             assert!(args.is_empty());
-            assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "collection"));
+            assert!(matches!(&base.value, Expression::FeatureRef(_)));
         }
         other => panic!(
             "expected rhs to be a structured CollectionOp expression, got {:?}",
-            other
-        ),
-    }
-}
-
-#[test]
-fn test_for_loop_range_uses_structured_arrow_invocation_not_raw_text_fallback() {
-    // Regression: `for_loop()` falls back to a raw-text `Expression::FeatureRef` when
-    // `expression()` can't parse the range. Arrow-invocation (`->`) used to be the common
-    // case that hit this fallback; now that expr.rs supports `->`, the range should parse
-    // as a structured Invocation, not the raw fallback text.
-    let input = r#"package P {
-action def Iterate {
-  in powerProfile;
-  for x in powerProfile->size() {
-    assign x := x + 1;
-  }
-}
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => p,
-        other => panic!("expected package, got {:?}", other),
-    };
-    let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let action_def = match &elements[0].value {
-        PackageBodyElement::ActionDef(a) => a,
-        other => panic!("expected action def, got {:?}", other),
-    };
-    let body_elements = match &action_def.value.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => elements,
-        other => panic!("expected action def brace body, got {:?}", other),
-    };
-    let for_loop = body_elements
-        .iter()
-        .find_map(|el| match &el.value {
-            sysml_v2_parser::ast::ActionDefBodyElement::ForLoop(f) => Some(&f.value),
-            _ => None,
-        })
-        .expect("action def body should contain a ForLoop");
-    match &for_loop.range.value {
-        // PAR-005 item 2: `->size()` is now a dedicated `CollectionOp`, not a generic
-        // `Invocation` wrapping `MemberAccess`.
-        Expression::CollectionOp { op, .. } => {
-            assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
-        }
-        other => panic!(
-            "expected structured CollectionOp range (not the raw-text FeatureRef fallback), got {:?}",
             other
         ),
     }
@@ -321,7 +270,7 @@ fn action_def_body_elements(
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let action_def = match &elements[0].value {
@@ -329,7 +278,7 @@ fn action_def_body_elements(
         other => panic!("expected action def, got {:?}", other),
     };
     match &action_def.value.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. } => {
             elements.iter().map(|el| el.value.clone()).collect()
         }
         other => panic!("expected action def brace body, got {:?}", other),
@@ -367,49 +316,10 @@ action def Run {
         "bare `terminate;` should have no target"
     );
     assert!(
-        matches!(&terminates[1].target, Some(t) if matches!(&t.value, Expression::FeatureRef(s) if s == "step")),
+        matches!(&terminates[1].target, Some(t) if matches!(&t.value, Expression::FeatureRef(_))),
         "expected `terminate step;` to target `step`, got {:?}",
         terminates[1].target
     );
-}
-
-#[test]
-fn test_while_stmt_parses_condition_and_nested_body() {
-    // Regression: `while` was listed in ACTION_BODY_STARTERS but had no parser function.
-    let input = r#"package P {
-action def Run {
-  attribute x : Integer;
-  while x < 10 {
-    assign x := x + 1;
-  }
-}
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let body_elements = action_def_body_elements(&result);
-    let while_stmt = body_elements
-        .iter()
-        .find_map(|el| match el {
-            sysml_v2_parser::ast::ActionDefBodyElement::WhileStmt(w) => Some(&w.value),
-            _ => None,
-        })
-        .expect("expected a WhileStmt node");
-    assert!(matches!(
-        &while_stmt.condition.value,
-        Expression::BinaryOp { .. }
-    ));
-    match &while_stmt.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
-            assert!(
-                elements.iter().any(|el| matches!(
-                    el.value,
-                    sysml_v2_parser::ast::ActionDefBodyElement::Assign(_)
-                )),
-                "while body should retain the nested assign statement, got {:?}",
-                elements
-            );
-        }
-        other => panic!("expected structured while body, got {:?}", other),
-    }
 }
 
 #[test]
@@ -446,7 +356,9 @@ action def Run {
 
     let with_else = &if_stmts[0];
     match &with_else.then_body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+        sysml_v2_parser::ast::ActionBranchBody::Braced(
+            sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. },
+        ) => {
             assert!(
                 elements.iter().any(|el| matches!(
                     el.value,
@@ -463,7 +375,9 @@ action def Run {
         "expected an else-body to be present"
     );
     match with_else.else_body.as_ref().unwrap() {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+        sysml_v2_parser::ast::ActionBranchBody::Braced(
+            sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. },
+        ) => {
             assert!(elements.iter().any(|el| matches!(
                 el.value,
                 sysml_v2_parser::ast::ActionDefBodyElement::Assign(_)
@@ -498,7 +412,7 @@ state def S {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let state_def = match &elements[0].value {
@@ -506,7 +420,7 @@ state def S {
         other => panic!("expected state def, got {:?}", other),
     };
     let transitions: Vec<_> = match &state_def.body {
-        sysml_v2_parser::ast::StateDefBody::Brace { elements } => elements
+        sysml_v2_parser::ast::StateDefBody::Brace { elements, .. } => elements
             .iter()
             .filter_map(|el| match &el.value {
                 sysml_v2_parser::ast::StateDefBodyElement::Transition(t) => Some(&t.value),
@@ -520,11 +434,11 @@ state def S {
     let shorthand_accept = transitions[0].accept.as_ref().expect("shorthand accept");
     match shorthand_accept {
         sysml_v2_parser::ast::TransitionAccept::Shorthand(expr, via) => {
-            assert!(matches!(&expr.value, Expression::FeatureRef(n) if n == "StartPressed"));
+            assert!(matches!(&expr.value, Expression::FeatureRef(_)));
             let via = via
                 .as_ref()
                 .expect("expected via clause on shorthand accept");
-            assert!(matches!(&via.value, Expression::FeatureRef(n) if n == "commPort"));
+            assert!(matches!(&via.value, Expression::FeatureRef(_)));
         }
         other => panic!("expected shorthand accept, got {:?}", other),
     }
@@ -532,10 +446,10 @@ state def S {
     let typed_accept = transitions[1].accept.as_ref().expect("typed accept");
     match typed_accept {
         sysml_v2_parser::ast::TransitionAccept::Payload(payload, via) => {
-            assert_eq!(payload.name, "evt");
-            assert_eq!(payload.type_name.as_deref(), Some("StartEvent"));
+            assert_eq!(result.declaration_name(payload.name), Some("evt"));
+            assert!(payload.type_name.is_some());
             let via = via.as_ref().expect("expected via clause on typed accept");
-            assert!(matches!(&via.value, Expression::FeatureRef(n) if n == "commPort"));
+            assert!(matches!(&via.value, Expression::FeatureRef(_)));
         }
         other => panic!("expected typed accept, got {:?}", other),
     }

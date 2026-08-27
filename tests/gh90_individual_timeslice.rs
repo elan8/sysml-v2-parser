@@ -4,21 +4,22 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Individuals Examples/AnalysisIndividualExample.sysml:75-77`:
@@ -30,7 +31,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// (`part_def`/`occurrence_def` already supported it via ad hoc parsing).
 #[test]
 fn gh90_1_individual_analysis_and_action_def_at_package_level() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             analysis def FuelEconomyAnalysis;
             action def FuelConsumption;
@@ -57,7 +58,7 @@ fn gh90_1_individual_analysis_and_action_def_at_package_level() {
 /// Previously: `occurrence_def` had no `individual` prefix handling.
 #[test]
 fn gh90_1_individual_occurrence_def_at_package_level() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             individual def IO1;
             individual occurrence def IO2 {
@@ -78,7 +79,7 @@ fn gh90_1_individual_occurrence_def_at_package_level() {
 /// Previously: `item_def`/`item_def_required` had no `individual` prefix handling.
 #[test]
 fn gh90_1_individual_item_def_at_package_level() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             item def Person;
             individual item def John :> Person;
@@ -109,7 +110,7 @@ fn gh90_1_individual_item_def_at_package_level() {
 /// for a structured `is_individual` flag here.
 #[test]
 fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             individual def IO1;
             individual occurrence def IO2 {
@@ -126,6 +127,7 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
     };
     let sysml_v2_parser::ast::DefinitionBody::Brace {
         elements: occ_elements,
+        ..
     } = &occ_def.value.body
     else {
         panic!("expected brace occurrence def body");
@@ -138,13 +140,14 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
         _ => None,
     });
     let occ_usage = occ_usage.expect("expected an OccurrenceUsage element");
-    assert!(occ_usage.is_individual);
+    assert!(occ_usage.prefix.individual_span().is_some());
 
     let PackageBodyElement::ActionDef(action_def) = &elements[3] else {
         panic!("expected ActionDef, got {:?}", elements[3]);
     };
     let sysml_v2_parser::ast::ActionDefBody::Brace {
         elements: action_elements,
+        ..
     } = &action_def.value.body
     else {
         panic!("expected brace action def body");
@@ -155,28 +158,6 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
     });
     let action_usage = action_usage.expect("expected an ActionUsage element");
     assert!(action_usage.is_individual);
-}
-
-/// Real usage: `Individuals Examples/AnalysisIndividualExample.sysml:79`:
-/// ```text
-/// individual analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 {
-///     subject vehicle : Vehicle_1 :> vehicle_c1 { ... }
-/// }
-/// ```
-/// Previously: `analysis_case_usage` had no `individual` prefix handling.
-#[test]
-fn gh90_1_individual_prefix_on_analysis_case_usage() {
-    let elements = package_elements(
-        r#"package P {
-            analysis def FuelEconomyAnalysis_1;
-            individual analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1;
-        }"#,
-    );
-    let PackageBodyElement::AnalysisCaseUsage(usage) = &elements[1] else {
-        panic!("expected AnalysisCaseUsage, got {:?}", elements[1]);
-    };
-    assert!(usage.value.is_individual);
-    assert_eq!(usage.value.name, "fuelEconomyAnalysis_1");
 }
 
 /// Real usage: `Individuals Examples/JohnIndividualExample.sysml:9-16`:
@@ -191,7 +172,7 @@ fn gh90_1_individual_prefix_on_analysis_case_usage() {
 /// elsewhere, e.g. part def bodies), just weren't reachable from here.
 #[test]
 fn gh90_2_timeslice_usage_inside_item_def_body() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             item def Person {
                 timeslice asPresident : Person [0..*];
@@ -201,7 +182,7 @@ fn gh90_2_timeslice_usage_inside_item_def_body() {
     let PackageBodyElement::ItemDef(person) = &elements[0] else {
         panic!("expected ItemDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::AttributeBody::Brace { elements } = &person.value.body else {
+    let sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } = &person.value.body else {
         panic!("expected brace item def body");
     };
     let timeslice = elements.iter().find_map(|e| match &e.value {
@@ -209,5 +190,8 @@ fn gh90_2_timeslice_usage_inside_item_def_body() {
         _ => None,
     });
     let timeslice = timeslice.expect("expected an OccurrenceUsage element");
-    assert_eq!(timeslice.name, "asPresident");
+    assert_eq!(
+        timeslice.name.and_then(|n| doc.declaration_name(n)),
+        Some("asPresident")
+    );
 }

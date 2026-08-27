@@ -2,18 +2,41 @@ use super::body::{connection_usage_member, exhibit_state};
 use super::prelude::*;
 use crate::parser::attribute::directed_attribute_usage;
 use crate::parser::feature_value_part as usage_value_part;
-use crate::parser::item::directed_item_usage;
+use crate::parser::item::item_usage;
 
-fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, bool> {
-    let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b"nonunique"[..]))).parse(input)?;
-    Ok((input, ordered.is_some()))
+fn usage_ordered_modifier(
+    prior: crate::ast::MultiplicityModifiers,
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::MultiplicityModifiers> {
+    crate::parser::usage::multiplicity_modifier_slots_after(prior, input)
+}
+
+/// Everything a `PartUsage` head recognizes before the declaration.
+///
+/// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623), and `Usage` opens with
+/// `Identification`, whose `( '<' ShortName '>' )?` half is read once at the head rather than in
+/// each of the three declaration tails. `MemberPrefix`'s visibility belongs to the
+/// `OccurrenceUsageMember`/`PackageMember` around the usage, not to the prefix, so it travels
+/// here as a [`Membership`] and is stored as one.
+///
+/// The tails take this by reference and clone it into the node they build. Before this seam each
+/// tail defaulted six prefix fields and each head assigned over them one by one, which is how
+/// `part_def_or_usage` came to accept a different set of slots than `part_usage`.
+use crate::ast::DeclarationName;
+
+pub(crate) struct PartUsageHead {
+    prefix: crate::ast::OccurrenceUsagePrefix,
+    /// `SourceSuccessionMember`'s `then`, which precedes the membership and therefore the prefix.
+    then_span: Option<crate::ast::Span>,
+    short_name: Option<DeclarationName>,
+    membership: Membership,
 }
 
 /// Part usage redefines-only: (`:>>` | `redefines`) qualified_name multiplicity? ordered? value? body.
-pub(crate) fn part_usage_redefines_only<'a>(
+fn part_usage_redefines_only<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, (_, redefines_qname)) = prefix_redefinition_target(input)?;
     // GH-92.2: an explicit `: Type` clause may follow the redefines target, e.g. `part redefines
@@ -21,75 +44,54 @@ pub(crate) fn part_usage_redefines_only<'a>(
     // Decomposition - Updated.sysml:43`) -- previously only the type-less bare (`part redefines
     // lb;`) and braced-body (`part redefines engine { ... }`) forms were accepted.
     let (input, type_result) = optional_typings(input)?;
-    let has_type = type_result.is_some();
-    let (type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+    let (type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, ordered) = usage_ordered_modifier(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
-    // When an explicit type follows the redefines target, the display name is derived from the
-    // target (matching the pre-existing behavior this shape previously reached via
-    // `part_usage_named`'s own `:>>`-prefixed fallback, e.g. `ref part :>> elements: SparePart;`
-    // in release validation `15_11-Variable Length Collection Types.sysml`). The type-less bare/
-    // braced-body forms (`part redefines lb;` / `part redefines engine { ... }`) keep the name
-    // empty -- `emit_part_usage`'s `redefines_only` special case (multiplicity placement) and
-    // `tests/parser/structure.rs::test_part_usage_redefines_only_keyword` both depend on that.
-    let name = if has_type {
-        redefines_qname
-            .value
-            .first_target()
-            .and_then(|t| t.local_name())
-            .unwrap_or_default()
-            .to_string()
-    } else {
-        String::new()
-    };
+    // This form has no declaration name; the target spelling lives only in `redefines`.
     Ok((
         input,
         node_from_to(
             start,
             input,
             PartUsage {
-                usage_prefix: None,
-                is_individual: false,
-                is_reference: false,
-                direction: None,
-                is_derived: false,
-                is_constant: false,
-                name,
-                short_name: None,
-                type_name,
+                prefix: head.prefix.clone(),
+                then_span: head.then_span,
+                name: None,
+                short_name: head.short_name,
                 typing,
                 multiplicity: multiplicity_opt,
-                ordered,
+                multiplicity_modifiers,
                 subsets: None,
                 redefines: Some(redefines_qname),
                 value,
                 body,
-                name_span: None,
                 type_ref_span,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+                membership: head.membership.clone(),
             },
         ),
     ))
 }
 
 /// Part usage with name (and optional type, redefines, etc.): (':>>')? name ':' type_name? ...
-pub(crate) fn part_usage_named<'a>(
+fn part_usage_named<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, name_str) = name(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, ordered_before_type) = usage_ordered_modifier(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, early_typing) = optional_typings(input)?;
     let (input, trailing_multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
-    let (input, ordered_after_type) = usage_ordered_modifier(input)?;
-    let ordered = ordered_before_type || ordered_after_type;
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     // Typing may follow redefinition: `in part anEngine :>> alternative : Engine;` (validation `10b`).
     let (input, type_result) = if early_typing.is_some() {
@@ -97,19 +99,13 @@ pub(crate) fn part_usage_named<'a>(
     } else {
         optional_typings(input)?
     };
-    let typing = type_result
-        .clone()
-        .map(|(s, is_conjugated, targets)| typing_node(s, is_conjugated, targets));
-    let (type_ref_span, type_name) = type_result
-        .map(|(s, is_conjugated, targets)| {
-            let t = targets_display_string(&targets);
-            (Some(s), if is_conjugated { format!("~{t}") } else { t })
-        })
-        .unwrap_or((None, String::new()));
+    let type_ref_span = type_result.as_ref().map(|(span, _, _, _)| *span);
+    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
+        typing_node(span, is_conjugated, targets, spelling)
+    });
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
-    let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
-    let ordered = ordered || ordered_after_clauses;
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
@@ -133,63 +129,61 @@ pub(crate) fn part_usage_named<'a>(
             start,
             input,
             PartUsage {
-                usage_prefix: None,
-                is_individual: false,
-                is_reference: false,
-                direction: None,
-                is_derived: false,
-                is_constant: false,
-                name: name_str,
-                short_name: None,
-                type_name,
+                prefix: head.prefix.clone(),
+                then_span: head.then_span,
+                name: Some(name_str),
+                short_name: head.short_name,
                 typing,
                 multiplicity: multiplicity_opt,
-                ordered,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 value,
                 body,
-                name_span: Some(name_span),
                 type_ref_span,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+                membership: head.membership.clone(),
             },
         ),
     ))
 }
 
-/// Part usage: (`ref`)? 'part' ( ':>>' qualified_name | (':>>')? name ':' type_name? ... ) multiplicity? ... body
+/// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623).
 ///
-/// Prefix keywords follow BNF `RefPrefix`/`OccurrenceUsagePrefix` order (§8.2.2.6.2, §8.2.2.9.2,
-/// reached via `PartUsage = OccurrenceUsagePrefix 'part' Usage` -> `OccurrenceUsagePrefix :
-/// BasicUsagePrefix ...` -> `BasicUsagePrefix : RefPrefix ...`): direction, `derived`,
-/// (`abstract`|`variation`), `constant`, `ref` (`BasicUsagePrefix.isReference`), then `individual`.
+/// One parser for every legal spelling and every scope of §3 in
+/// `planning/part-usage-prefix-matrix.md`. The prefix is the shared component
+/// [`occurrence_usage_prefix`](crate::parser::occurrence_prefix::occurrence_usage_prefix), not a
+/// hand-rolled subset: this function previously accepted `RefPrefix` plus `ref` plus
+/// `individual` and nothing else, so `snapshot part vehicle_1_t0 { ... }` (`training/28.
+/// Individuals/Individuals and Roles-1.sysml:14`) reached recovery and `#logical part
+/// vehicleLogical : Vehicle { ... }` (`Vehicle Example/SysML v2 Spec Annex A
+/// SimpleVehicleModel.sysml:487`) became two sibling members.
+///
+/// Wrapped in a reference transaction because the prefix's `UsageExtensionKeyword*` allocates an
+/// arena entry per `#tag` before the production is known to apply. A prefix followed by anything
+/// other than `part` fails the whole production, so the member reaches recovery as one node
+/// rather than being reinterpreted as an unprefixed usage.
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"part") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, part_usage_inner)
+}
+
+fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `DefinitionBodyItem`/`NonBehaviorBodyItem` = `( SourceSuccessionMember )? …UsageMember`, so
+    // `then` precedes the membership, and `OccurrenceUsageMember = MemberPrefix …`, so the
+    // visibility keyword precedes the usage's own prefix. All three in that order.
+    let (input, then_span) =
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"then")?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
-    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, usage_prefix) = opt(alt((
-        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-            DefinitionPrefix::Abstract
-        }),
-        map(preceded(tag(&b"variation"[..]), ws1), |_| {
-            DefinitionPrefix::Variation
-        }),
-    )))
-    .parse(input)?;
-    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    // `BasicUsagePrefix.isReference` — must come before `individual` / `'part'`.
-    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
     // Allow `part: Type` with no whitespace (anonymous UsageDeclaration).
     let (after_kw, _) = ws_and_comments(input)?;
@@ -214,78 +208,50 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     };
     // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
     // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
-    // citation. Parsed once here at the dispatch level (rather than inside each of the three
-    // branches below) and threaded through post-hoc, mirroring how `usage_prefix`/`is_individual`/
-    // etc. are already applied to whichever branch matches.
+    // citation. Parsed once here at the dispatch level rather than inside each of the three
+    // declaration tails below, which is why it travels in [`PartUsageHead`].
     let (input, short_name) = short_name_prefix(input)?;
     // Consume (not just peek) whitespace/comments after the short name's closing `>` -- see
     // `attribute::attribute_usage`'s identical fix for why this can't reuse `ws1`'s earlier
     // consumption (a short name leaves fresh un-consumed whitespace after it).
     let (input, _) = ws_and_comments(input)?;
+    let head = PartUsageHead {
+        prefix,
+        then_span,
+        short_name,
+        membership: Membership::feature(visibility, visibility_span),
+    };
     let peek = input;
     if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
         && !peek.fragment().starts_with(b":>>"))
         || starts_with_keyword(peek.fragment(), b"defined")
     {
-        let (input, mut usage) = anonymous_part_usage(start, input)?;
-        usage.value.usage_prefix = usage_prefix;
-        usage.value.is_individual = is_individual;
-        usage.value.is_reference = is_reference;
-        usage.value.direction = direction;
-        usage.value.is_derived = is_derived;
-        usage.value.is_constant = is_constant;
-        usage.value.short_name = short_name;
-        usage.value.membership = Membership::feature(visibility, visibility_span);
+        return anonymous_part_usage(start, input, &head);
+    }
+    if let Ok((input, usage)) = part_usage_redefines_only(start, input, &head) {
         return Ok((input, usage));
     }
-    if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
-        let mut usage = usage;
-        usage.value.usage_prefix = usage_prefix;
-        usage.value.is_individual = is_individual;
-        usage.value.is_reference = is_reference;
-        usage.value.direction = direction;
-        usage.value.is_derived = is_derived;
-        usage.value.is_constant = is_constant;
-        usage.value.short_name = short_name;
-        usage.value.membership = Membership::feature(visibility, visibility_span);
-        return Ok((input, usage));
-    }
-    let (input, mut usage) = part_usage_named(start, input)?;
-    usage.value.usage_prefix = usage_prefix;
-    usage.value.is_individual = is_individual;
-    usage.value.is_reference = is_reference;
-    usage.value.direction = direction;
-    usage.value.is_derived = is_derived;
-    usage.value.is_constant = is_constant;
-    usage.value.short_name = short_name;
-    usage.value.membership = Membership::feature(visibility, visibility_span);
-    Ok((input, usage))
+    part_usage_named(start, input, &head)
 }
 
 fn anonymous_part_usage<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
-    let (input, ordered_before_type) = usage_ordered_modifier(input)?;
-    let (input, (type_ref_span, is_conjugated, targets)) = typings(input)?;
-    let type_name = targets_display_string(&targets);
-    let type_name = if is_conjugated {
-        format!("~{type_name}")
-    } else {
-        type_name
-    };
-    let typing = Some(typing_node(type_ref_span.clone(), is_conjugated, targets));
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
+    let (input, (type_ref_span, is_conjugated, targets, spelling)) = typings(input)?;
+    let typing = Some(typing_node(type_ref_span, is_conjugated, targets, spelling));
     let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
-    let (input, ordered_after_type) = usage_ordered_modifier(input)?;
-    let ordered = ordered_before_type || ordered_after_type;
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, clauses) = specialization_clauses(input)?;
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
-    let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
-    let ordered = ordered || ordered_after_clauses;
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     Ok((
@@ -294,43 +260,33 @@ fn anonymous_part_usage<'a>(
             start,
             input,
             PartUsage {
-                usage_prefix: None,
-                is_individual: false,
-                is_reference: false,
-                direction: None,
-                is_derived: false,
-                is_constant: false,
-                name: String::new(),
-                short_name: None,
-                type_name,
+                prefix: head.prefix.clone(),
+                then_span: head.then_span,
+                name: None,
+                short_name: head.short_name,
                 typing,
                 multiplicity: multiplicity_opt,
-                ordered,
+                multiplicity_modifiers,
                 subsets: clauses.subsets,
                 redefines: clauses.redefines,
                 value,
                 body,
-                name_span: None,
                 type_ref_span: Some(type_ref_span),
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+                membership: head.membership.clone(),
             },
         ),
     ))
 }
 
 /// Part usage body: ';' or '{' PartUsageBodyElement* '}'
-fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
+pub(crate) fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     let frag = input.fragment();
     log::debug!(
         "part_usage_body: first 40 bytes: {:?}",
         frag.get(..40.min(frag.len())).unwrap_or(frag),
     );
-    let result = alt((
-        map(tag(&b";"[..]), |_| PartUsageBody::Semicolon),
-        part_usage_body_brace,
-    ))
-    .parse(input);
+    let result = alt((crate::parser::body::semicolon_body, part_usage_body_brace)).parse(input);
     if result.is_err() {
         log::debug!(
             "part_usage_body: failed at: {:?}",
@@ -359,7 +315,7 @@ fn part_usage_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartUsageB
 }
 
 fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
-    let (input, elements) = parse_structured_brace_members_with_skip(
+    let (input, members) = parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
         "part usage body",
@@ -368,13 +324,62 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
         part_usage_body_recovery,
         BraceMemberSkip::BodyElementRecover,
     )?;
-    log::debug!("part_usage_body: brace ok, {} elements", elements.len());
-    Ok((input, PartUsageBody::Brace { elements }))
+    log::debug!(
+        "part_usage_body: brace ok, {} elements",
+        members.elements.len()
+    );
+    Ok((input, members.into_body()))
+}
+
+/// The one `ref` usage body parser.
+///
+/// `ReferenceUsage` completes with a `UsageBody`, and `UsageBody = DefinitionBody`
+/// (SysML 8.2.2.6.2, 8.2.2.5.2), so a `ref` body holds the general usage-member set regardless of
+/// which declaration owns the `ref`. Connection, interface, part, action, and state owners all
+/// call this rather than parsing the same body through their own member grammar and recording
+/// which parser ran in the AST.
+pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            RefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
+    }
+    // Same member grammar as any other usage body, reported under this scope's own name so a
+    // diagnostic still tells the author which body they were writing.
+    let (input, members) = parse_structured_brace_members_with_skip(
+        input,
+        PART_BODY_STARTERS,
+        "ref usage body",
+        "recovered_ref_body_element",
+        part_usage_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                PART_BODY_STARTERS,
+                "ref usage body",
+                "recovered_ref_body_element",
+            );
+            node_from_to(
+                start,
+                end,
+                PartUsageBodyElement::Error(node_from_to(start, end, recovery)),
+            )
+        },
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, members.into_body()))
 }
 
 fn consume_part_usage_structured_brace(
     input: Input<'_>,
-) -> IResult<Input<'_>, Vec<Node<PartUsageBodyElement>>> {
+) -> IResult<Input<'_>, crate::parser::body::ParsedBraceMembers<PartUsageBodyElement>> {
     parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
@@ -386,23 +391,17 @@ fn consume_part_usage_structured_brace(
     )
 }
 
-/// Action path for perform: name ( '.' name )* -> joined with ".".
-fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, first) = name(input)?;
-    let mut rest_parser = many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ));
-    let (input, rest) = rest_parser.parse(input)?;
-    let action_name = std::iter::once(first)
-        .chain(rest)
-        .collect::<Vec<_>>()
-        .join(".");
-    Ok((input, action_name))
+/// Arena-backed action path for `perform`, preserving both qualification and dotted segments.
+fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, crate::ast::QualifiedReferenceId> {
+    crate::parser::lex::reference_path(input)
 }
 
-/// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
+/// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
+    crate::parser::span::reference_transaction(input, perform_in_out_binding_inner)
+}
+
+fn perform_in_out_binding_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
@@ -411,7 +410,7 @@ fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformIn
     ))
     .parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    let (input, target) = reference_path(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, value_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
@@ -422,7 +421,7 @@ fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformIn
             input,
             PerformInOutBinding {
                 direction,
-                name: name_str,
+                target,
                 value: value_expr,
             },
         ),
@@ -432,18 +431,21 @@ fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformIn
 /// Perform body element: doc comment, in/out binding, or `variant` member.
 fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
-        map(doc_comment, PerformBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            PerformBodyElement::Annotating,
+        ),
         map(perform_in_out_binding, PerformBodyElement::InOut),
         // §6 G6: parameter-direction usage members (`in part :>> name = value;`, `in item 'n' :
         // Type { }`, …) reuse the same directed/usage parsers as port-def bodies rather than
         // duplicating the grammar here. Placed before `variant`/`action` so simple `in name =`
         // bindings still win via `perform_in_out_binding` above.
         map(part_usage, |p| PerformBodyElement::PartUsage(Box::new(p))),
-        map(directed_item_usage, |i| {
-            PerformBodyElement::ItemUsage(Box::new(i))
-        }),
+        map(item_usage, |i| PerformBodyElement::ItemUsage(Box::new(i))),
         map(directed_attribute_usage, |a| {
             PerformBodyElement::AttributeUsage(Box::new(a))
         }),
@@ -459,16 +461,29 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
 /// Perform body: `{` PerformBodyElement* `}`.
 fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     let (input, _) = ws_and_comments(input)?;
-    let (input, elements) = nom::sequence::delimited(
-        tag(&b"{"[..]),
-        preceded(
-            ws_and_comments,
-            many0(preceded(ws_and_comments, perform_body_element)),
-        ),
-        preceded(ws_and_comments, tag(&b"}"[..])),
+    let open_start = input;
+    let (input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
+    // `PerformBodyElement` admits `AnnotatingElement`, whose shortest spelling is a bare regular
+    // comment. Skipping it here would make the inner dispatcher unreachable for that spelling.
+    let (input, elements) = preceded(
+        crate::parser::lex::ws_and_notes,
+        many0(preceded(
+            crate::parser::lex::ws_and_notes,
+            perform_body_element,
+        )),
     )
     .parse(input)?;
-    Ok((input, PerformBody::Brace { elements }))
+    let (close_start, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+    Ok((
+        input,
+        PerformBody::Brace {
+            open_span,
+            elements,
+            close_span: crate::parser::span::span_from_to(close_start, input),
+        },
+    ))
 }
 
 /// Optional `abstract` / `variation` prefix before `perform` (§6 G5). Mirrors `part_usage`'s
@@ -493,10 +508,7 @@ fn perform_value(input: Input<'_>) -> IResult<Input<'_>, Option<Node<crate::ast:
 fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     preceded(
         ws_and_comments,
-        alt((
-            map(tag(&b";"[..]), |_| PerformBody::Semicolon),
-            perform_body,
-        )),
+        alt((crate::parser::body::semicolon_body, perform_body)),
     )
     .parse(input)
 }
@@ -504,17 +516,32 @@ fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody
 /// Perform usage: (`abstract`|`variation`)? `perform` action_path (`:>>` target)? (`=` value)?
 /// (`;` or `{ }` body).
 pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"perform") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, perform_usage_inner)
+}
+
+fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, action_name) = perform_action_path(input)?;
+    let (input, action_reference) = perform_action_path(input)?;
     let (input, redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
+    let redefines = redefines.map(|(span, target)| {
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
+    });
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
@@ -524,11 +551,10 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
             input,
             Perform {
                 usage_prefix,
-                action_name,
-                type_name: None,
-                multiplicity: None,
-                redefines,
-                subsets: None,
+                target: PerformActionTarget::Reference {
+                    action: action_reference,
+                    redefines,
+                },
                 value,
                 body,
             },
@@ -536,50 +562,48 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
     ))
 }
 
-/// Perform action declaration: (`abstract`|`variation`)? `perform action` name? (`:>>` target)?
-/// (`:` type_name)? (`=` value)? (`;` or body).
+/// The `action UsageDeclaration?` alternative of `PerformActionUsageDeclaration`.
 ///
-/// §6 G20: the name is optional -- `perform action { ... }` and `perform action :>> doXorY = doX;`
-/// are both real OMG spec Annex usage (`3c-Function-based Behavior-structure mod-2.sysml`,
-/// `7a1-Variant Configuration - General Concept-a.sysml`) that previously fell through to opaque
-/// recovery because `name(input)` was mandatory here.
+/// The shared declaration parser deliberately produces a zero-width, anonymous
+/// [`UsageDeclaration`] when no identification is authored. That is the grammar's optional
+/// declaration, not a sentinel action name.
 pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+    // Mirror of the inner parser's first two tokens: `perform` (after its small prefix) then
+    // `action`. A `perform <path>` member is the sibling `perform_usage` form and refuses here
+    // without an arena transaction.
+    {
+        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = perform_usage_prefix(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"perform") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        let (cursor, _) =
+            nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(b"perform".len())
+                .parse(cursor)?;
+        let (cursor, _) = ws_and_comments(cursor)?;
+        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"action") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
+    crate::parser::span::reference_transaction(input, perform_action_decl_inner)
+}
+
+fn perform_action_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, action_name) = if is_anonymous_perform_action(input) {
-        (input, String::new())
-    } else {
-        name(input)?
-    };
-    // GH-89: multiplicity after the name, e.g. `takePicture[*] :> PictureTaking::takePicture;`
-    // (Camera Example/Camera.sysml:4).
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    // GH-89: `:>` subsets clause, tried only when `:>>` redefines didn't match -- the two are
-    // mutually exclusive specialization keywords at this position.
-    let (input, subsets) = if redefines.is_none() {
-        opt(preceded(
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, qualified_name),
-        ))
-        .parse(input)?
-    } else {
-        (input, None)
-    };
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, typing_colon),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, declaration) = crate::parser::usage::usage_declaration(input)?;
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
@@ -589,41 +613,12 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
             input,
             Perform {
                 usage_prefix,
-                action_name,
-                type_name,
-                multiplicity,
-                redefines,
-                subsets,
+                target: PerformActionTarget::Action(Box::new(declaration)),
                 value,
                 body,
             },
         ),
     ))
-}
-
-/// True when a `perform action` declaration has no name of its own -- the next token already
-/// begins the redefinition clause, the typing clause, the body, or the terminator.
-fn is_anonymous_perform_action(input: Input<'_>) -> bool {
-    let Ok((peek, _)) = ws_and_comments(input) else {
-        return false;
-    };
-    let frag = peek.fragment();
-    frag.starts_with(b"{")
-        || frag.starts_with(b";")
-        || frag.starts_with(b":>>")
-        || frag.starts_with(b"=")
-        || (frag.starts_with(b":") && !frag.starts_with(b":>"))
-}
-
-/// `:` that is not the start of `:>` / `:>>`.
-fn typing_colon(input: Input<'_>) -> IResult<Input<'_>, Input<'_>> {
-    if input.fragment().starts_with(b":>") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    tag(&b":"[..]).parse(input)
 }
 
 /// Allocate: `allocate` source `to` target body.
@@ -635,7 +630,7 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
     let (input, source) = path_expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -658,8 +653,8 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
 /// Systems Library `Domain Libraries/Geometry/ShapeItems.sysml` mirrors `succession [seBeforeNum]
 /// first ...` in `Flows.sysml`).
 type BindingPrefix = (
-    Option<String>,
-    Option<String>,
+    Option<DeclarationName>,
+    Option<crate::ast::QualifiedReferenceId>,
     Option<Node<crate::ast::Multiplicity>>,
 );
 
@@ -678,7 +673,7 @@ fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
     let (input, binding_type) =
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
@@ -706,14 +701,12 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, right) = preceded(ws_and_comments, path_expression).parse(input)?;
     let mut body_parser = alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            (Some(ConnectBody::Semicolon), Vec::new())
-        }),
-        map(consume_part_usage_structured_brace, |elements| {
-            (Some(ConnectBody::Brace), elements)
+        crate::parser::body::semicolon_body,
+        map(consume_part_usage_structured_brace, |members| {
+            members.into_body()
         }),
     ));
-    let (input, (body, body_elements)) = body_parser.parse(input)?;
+    let (input, body) = body_parser.parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -728,7 +721,6 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
                 right,
                 right_multiplicity,
                 body,
-                body_elements,
             },
         ),
     ))
@@ -736,6 +728,18 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
 
 /// Connect (part usage level): `connect` path `to` path body
 pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"connect") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, connect_inner)
+}
+
+fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -743,23 +747,35 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     // §6 G24: each endpoint may carry its own multiplicity -- `connect [0..1] a.p1 to [1] b.p2;`.
     let (input, from_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, from_expr) = path_expression(input)?;
+    let (input, from_name) = crate::parser::connector::connector_end_name(input)?;
+    let (input, from_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, to_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, to_name) = crate::parser::connector::connector_end_name(input)?;
     let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = ref_body(input)?;
+    let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    let subsets = trailing_subsets.map(|target| {
+        let span = crate::parser::span_from_to(before_subsets, input);
+        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
+    });
+    let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
+    let redefines = trailing_redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_redefines, input);
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
+    });
+    let input = if subsets.is_some() || redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
@@ -771,9 +787,11 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
             start,
             input,
             Connect {
-                from: connection_end_with_multiplicity(from_multiplicity, from_expr),
-                to: connection_end_with_multiplicity(to_multiplicity, to_expr),
+                from: connection_end_with_multiplicity(from_multiplicity, from_name, from_expr),
+                to: connection_end_with_multiplicity(to_multiplicity, to_name, to_expr),
                 body,
+                subsets,
+                redefines,
             },
         ),
     ))
@@ -783,12 +801,14 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 /// node, reusing the expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
 fn connection_end_with_multiplicity(
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<Expression>,
 ) -> Node<ConnectionEnd> {
-    let span = expr.span.clone();
+    let span = expr.span;
     Node::new(
-        span.clone(),
+        span,
         ConnectionEnd {
+            declared_name,
             expression: expr,
             multiplicity,
             span,
@@ -796,23 +816,80 @@ fn connection_end_with_multiplicity(
     )
 }
 
-/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end` member
-/// (GH-85), or `doc`.
+/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end`, the
+/// existing flow/message/succession-flow production, or `PerformActionUsage`.
 fn interface_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     alt((
         interface_usage_ref_redef,
+        // An `end`-led kind-keyworded usage is that family's node with an `end` head; give it
+        // first refusal ahead of the keyword-less `EndDecl`, as every other body does.
+        map(
+            |input| {
+                if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+                    crate::parser::port::port_usage(input)
+                } else {
+                    Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )))
+                }
+            },
+            |port| {
+                let span = port.span;
+                Node::new(span, InterfaceUsageBodyElement::PortUsage(Box::new(port)))
+            },
+        ),
         map(interface_usage_end_decl, |end| {
-            let span = end.span.clone();
+            let span = end.span;
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
         }),
-        map(doc_comment, |doc| {
-            let span = doc.span.clone();
-            Node::new(span, InterfaceUsageBodyElement::Doc(doc))
-        }),
+        interface_usage_other_body_element,
     ))
     .parse(input)
+}
+
+fn interface_usage_other_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    // `perform action ...` has the common `perform` prefix with the supported reference form,
+    // so the declaration alternative must own it before `perform <qualified-reference>`.
+    alt((
+        interface_usage_perform,
+        interface_usage_flow,
+        interface_usage_annotating,
+    ))
+    .parse(input)
+}
+
+fn interface_usage_perform(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    map(alt((perform_action_decl, perform_usage)), |perform| {
+        let span = perform.span;
+        Node::new(span, InterfaceUsageBodyElement::Perform(Box::new(perform)))
+    })
+    .parse(input)
+}
+
+fn interface_usage_flow(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    map(crate::parser::flow::flow_usage_member, |flow| {
+        let span = flow.span;
+        Node::new(span, InterfaceUsageBodyElement::FlowUsage(Box::new(flow)))
+    })
+    .parse(input)
+}
+
+fn interface_usage_annotating(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    let start = input;
+    let (input, member) = crate::parser::body::annotating_member(input)?;
+    Ok((
+        input,
+        crate::parser::node_from_to(start, input, InterfaceUsageBodyElement::Annotating(member)),
+    ))
 }
 
 // GH-85: interfaces don't allow the `#name` derived-end-name form (same as
@@ -828,17 +905,17 @@ fn interface_usage_ref_redef(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":>>"[..])).parse(input)?;
-    let (input, ref_name) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
-    let (input, body) = ref_body_parse(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             InterfaceUsageBodyElement::RefRedef {
-                name: ref_name,
+                target,
                 value,
                 body,
             },
@@ -846,66 +923,185 @@ fn interface_usage_ref_redef(
     ))
 }
 
-fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(consume_part_usage_structured_brace, |elements| {
-            RefBody::Brace {
-                elements: elements
-                    .into_iter()
-                    .map(|e| {
-                        let span = e.span.clone();
-                        Node::new(span, RefBodyElement::PartUsage(e))
-                    })
-                    .collect(),
-            }
-        }),
-    ))
-    .parse(input)
-}
-
 /// Connect body for interface usage (TypedConnect): `;` or `{` body_elements* `}`
-fn connect_body_with_elements(
+/// `InterfaceUsage = OccurrenceUsagePrefix 'interface' InterfaceUsageDeclaration InterfaceBody`.
+///
+/// Returns one shared [`crate::ast::Body`] carrying its own delimiter spans. The two callers used
+/// to receive a `ConnectBody` marker beside the element list, so the `;`/`{}` fact lived in two
+/// fields and neither `{` nor `}` had a span.
+fn interface_usage_body(
     input: Input<'_>,
-) -> IResult<Input<'_>, (ConnectBody, Vec<Node<InterfaceUsageBodyElement>>)> {
+) -> IResult<Input<'_>, crate::ast::Body<InterfaceUsageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
-    if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b";"[..]).parse(input) {
-        return Ok((input, (ConnectBody::Semicolon, vec![])));
+    if input.fragment().starts_with(b";") {
+        return crate::parser::body::semicolon_body(input);
     }
-
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = tag(&b"}"[..]).parse(input)?;
-            return Ok((input, (ConnectBody::Brace, elements)));
-        }
-        let (next, element) = interface_usage_body_element(input)?;
-        if next.location_offset() == input.location_offset() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Many0,
-            )));
-        }
-        elements.push(element);
-        input = next;
-    }
+    let (input, members) = parse_structured_brace_members_with_skip(
+        input,
+        INTERFACE_USAGE_BODY_STARTERS,
+        "interface usage body",
+        "recovered_interface_usage_body_element",
+        interface_usage_body_element,
+        interface_usage_body_recovery,
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, members.into_body()))
 }
 
-/// Connector end reference used in interface/connect syntax.
-/// Accepts an optional leading cross multiplicity (`[1]`, discarded -- `InterfaceUsage::from`/
-/// `to` don't model per-end multiplicity yet, same as the end name below; GH-16: real Systems
-/// Library / Annex fixtures write `connect [1] a to [1] b;`, which failed to parse at all before
-/// this), then either `path` or `endName ::> path`; the end name is currently ignored.
-fn connector_end_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+fn interface_usage_body_recovery(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<InterfaceUsageBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        INTERFACE_USAGE_BODY_STARTERS,
+        "interface usage body",
+        "recovered_interface_usage_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        InterfaceUsageBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
+/// The grammar-owned `InterfaceEnd`, not an arbitrary path expression.
+fn interface_end(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
+    crate::parser::span::reference_transaction(input, interface_end_inner)
+}
+
+fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt((name, preceded(ws_and_comments, tag(&b"::>"[..])))).parse(input)?;
-    preceded(ws_and_comments, path_expression).parse(input)
+    // A named end and a direct qualified reference share their first identifier.  Commit to the
+    // named shape only after its grammar-owned `::>` / `references` separator is visible;
+    // otherwise a failed optional branch would silently consume the label as a direct endpoint
+    // and leave the operator for the enclosing `InterfacePart`.
+    let (input, target) = if let Ok((after_name, end_name)) = name(input) {
+        let (after_trivia, _) = ws_and_comments(after_name)?;
+        let operator = if after_trivia.fragment().starts_with(b"::>") {
+            let (after_operator, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
+            Some((
+                after_operator,
+                InterfaceEndReferenceOperator::Symbol { span },
+            ))
+        } else if starts_with_keyword(after_trivia.fragment(), b"references") {
+            let (after_operator, (span, _)) =
+                with_span(tag(&b"references"[..])).parse(after_trivia)?;
+            Some((
+                after_operator,
+                InterfaceEndReferenceOperator::Keyword { span },
+            ))
+        } else {
+            None
+        };
+        if let Some((after_operator, operator)) = operator {
+            let (input, target) =
+                preceded(ws_and_comments, reference_path).parse(after_operator)?;
+            (
+                input,
+                InterfaceEndTarget::Named {
+                    name: end_name,
+                    operator,
+                    target,
+                },
+            )
+        } else {
+            let (input, target) = reference_path(input)?;
+            (input, InterfaceEndTarget::Direct(target))
+        }
+    } else {
+        let (input, target) = reference_path(input)?;
+        (input, InterfaceEndTarget::Direct(target))
+    };
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfaceEnd {
+                multiplicity,
+                target,
+            },
+        ),
+    ))
+}
+
+/// `InterfacePart = BinaryInterfacePart | NaryInterfacePart`.
+fn interface_part(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
+    crate::parser::span::reference_transaction(input, interface_part_inner)
+}
+
+fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"(") {
+        let open_start = input;
+        let (mut input, _) = tag(&b"("[..]).parse(input)?;
+        let open_span = crate::parser::span::span_from_to(open_start, input);
+        let (next, first) = interface_end(input)?;
+        input = next;
+        let mut ends = vec![InterfaceEndMember {
+            comma_span: None,
+            end: first,
+        }];
+        loop {
+            let (next, _) = ws_and_comments(input)?;
+            input = next;
+            if input.fragment().starts_with(b")") {
+                let close_start = input;
+                let (input, _) = tag(&b")"[..]).parse(input)?;
+                if ends.len() < 2 {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many1,
+                    )));
+                }
+                return Ok((
+                    input,
+                    node_from_to(
+                        start,
+                        input,
+                        InterfacePart::Nary {
+                            open_span,
+                            ends,
+                            close_span: crate::parser::span::span_from_to(close_start, input),
+                        },
+                    ),
+                ));
+            }
+            let comma_start = input;
+            let (input_after_comma, _) = tag(&b","[..]).parse(input)?;
+            let comma_span = crate::parser::span::span_from_to(comma_start, input_after_comma);
+            let (next, end) = interface_end(input_after_comma)?;
+            ends.push(InterfaceEndMember {
+                comma_span: Some(comma_span),
+                end,
+            });
+            input = next;
+        }
+    }
+    let (input, from) = interface_end(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let to_start = input;
+    let (input, _) = tag(&b"to"[..]).parse(input)?;
+    let to_span = crate::parser::span::span_from_to(to_start, input);
+    let (input, to) = interface_end(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfacePart::Binary {
+                from,
+                to_span,
+                to: Box::new(to),
+            },
+        ),
+    ))
 }
 
 /// Interface usage: `interface` ( name (multiplicity)? `:` Type )? `connect` path `to` path body,
@@ -930,7 +1126,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         name,
         opt(multiplicity_node),
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let (input, iface_name, interface_type) =
@@ -954,22 +1150,52 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             if let Some((iface_name, _, _)) = bare_named {
                 (input, Some(iface_name), None)
             } else {
-                let (input, interface_type) = opt(preceded(
-                    tag(&b":"[..]),
-                    preceded(ws_and_comments, qualified_name),
+                // A declared interface usage with a name but no typing and no `connect` clause:
+                // `interface i;`, `interface i { ... }`, `interface i :> J;`. `UsageDeclaration`
+                // makes the `: Type` optional, so the name above was reachable only through the
+                // typed or the `connect` spelling and this form fell through to the body parser
+                // with the name still unconsumed -- which then failed on it, sending the whole
+                // member to recovery.
+                //
+                // The lookahead is what keeps `interface a to b;` anonymous: `to` is not a
+                // declaration terminator, so `a` there stays the first connector end.
+                let (input, declared_name) = opt((
+                    name,
+                    opt(multiplicity_node),
+                    preceded(
+                        ws_and_comments,
+                        nom::combinator::peek(alt((
+                            tag(&b";"[..]),
+                            tag(&b"{"[..]),
+                            tag(&b":>>"[..]),
+                            tag(&b":>"[..]),
+                            tag(&b"subsets"[..]),
+                            tag(&b"redefines"[..]),
+                        ))),
+                    ),
                 ))
                 .parse(input)?;
-                (input, None, interface_type)
+                if let Some((iface_name, _, _)) = declared_name {
+                    (input, Some(iface_name), None)
+                } else {
+                    let (input, interface_type) = opt(preceded(
+                        tag(&b":"[..]),
+                        preceded(ws_and_comments, qualified_reference),
+                    ))
+                    .parse(input)?;
+                    (input, None, interface_type)
+                }
             }
         };
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let subsets = spec.subsets.map(|(target, _)| target);
+    let redefines = spec.redefines;
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
         let (input, _) = ws1(input)?;
-        let (input, from_expr) = connector_end_expression(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
-        let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+        let (input, part) = interface_part(input)?;
+        let (input, body) = interface_usage_body(input)?;
         return Ok((
             input,
             node_from_to(
@@ -978,10 +1204,10 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 InterfaceUsage::TypedConnect {
                     name: iface_name,
                     interface_type,
-                    from: from_expr,
-                    to: to_expr,
+                    subsets,
+                    redefines,
+                    part,
                     body,
-                    body_elements,
                 },
             ),
         ));
@@ -989,23 +1215,18 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     // BNF: the bare `InterfacePart` alternative (no `connect` keyword) is only legal when there
     // is no preceding `UsageDeclaration` at all -- i.e. no name and no type were captured above.
     if iface_name.is_none() && interface_type.is_none() {
-        if let Ok((after_to, (from_expr, to_expr))) = (|| {
-            let (input, from_expr) = connector_end_expression(input)?;
-            let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-            let (input, to_expr) =
-                preceded(ws_and_comments, connector_end_expression).parse(input)?;
-            Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
-        })() {
-            let (input, _) = opt(connect_body).parse(after_to)?;
+        if let Ok((after_part, part)) = interface_part(input) {
+            let (input, body) = interface_usage_body(after_part)?;
             return Ok((
                 input,
                 node_from_to(
                     start,
                     input,
                     InterfaceUsage::Connection {
-                        from: from_expr,
-                        to: to_expr,
-                        body_elements: vec![],
+                        subsets: subsets.clone(),
+                        redefines: redefines.clone(),
+                        part,
+                        body,
                     },
                 ),
             ));
@@ -1013,7 +1234,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     }
     // GH-16: no `connect` clause (and, if unnamed/untyped, no bare `from to to` form either) --
     // a plain declared interface usage. Ends, if any, are declared inside the body instead.
-    let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+    let (input, body) = interface_usage_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -1022,8 +1243,9 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             InterfaceUsage::Declaration {
                 name: iface_name,
                 interface_type,
+                subsets,
+                redefines,
                 body,
-                body_elements,
             },
         ),
     ))
@@ -1037,9 +1259,11 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
 pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    // GH-88.4: leading `in`/`out`/`inout` direction, e.g. `private in ref y: A, B;` (Simple
-    // Tests/ItemTest.sysml:15).
-    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    // `BasicUsagePrefix = RefPrefix ('ref')?` -- the direction (GH-88.4, e.g. `private in ref y:
+    // A, B;`, Simple Tests/ItemTest.sysml:15) and the modifiers after it are all slots of
+    // `RefPrefix`, parsed there in the order the production gives them.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
+    let direction = prefix.direction;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // Reject kinded refs so those forms parse as real PartUsage/ActionUsage/StateUsage/…
@@ -1065,54 +1289,82 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, _) = opt(preceded(
+    // An anonymous leading `:>> target` is a redefinition relationship, not punctuation before
+    // a declaration label. Leave that form to `connector::ref_decl`, which retains it in
+    // `RefDecl::redefines`; consuming it here would turn the target into `RefDecl::name`.
+    let (after_ref, _) = ws_and_comments(input)?;
+    if after_ref.fragment().starts_with(b":>>") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` (SysML BNF 335) reaches
+    // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` through
+    // `UsageDeclaration`, so `ref <rd> rd : T;` is legal. This parser went straight to the name
+    // and left the whole member to recovery; `connector::ref_decl`, which owns the same
+    // production in the definition-body scopes, already reads it.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, name_str) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, leading_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
+    // Trailing `:>>` redefinition after the typing, e.g. `ref self: Part :>> Item::self;`
+    // (Systems Library `Parts.sysml`). The typing may equally follow the redefinition -- the
+    // canonical emitted order and a legal `FeatureSpecializationPart` ordering -- so retry the
+    // typing after the redefinition when it wasn't already written before it.
+    let (input, redefines) = opt(preceded(
         ws_and_comments,
-        preceded(tag(&b":>>"[..]), ws_and_comments),
+        crate::parser::usage::redefinition,
     ))
     .parse(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let (type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+    let (input, type_ref_span, typing) = if typing.is_none() && redefines.is_some() {
+        let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+        let (type_ref_span, _, typing) =
+            crate::parser::usage::typing_reference_fields_from_result(type_result);
+        (input, type_ref_span, typing)
+    } else {
+        (input, type_ref_span, typing)
+    };
+    // `:>` subsets, independent of and in addition to `:>>` redefines (mirrors
+    // `connector::ref_decl`).
+    let (input, trailing_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, multiplicity_modifiers) =
+        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
     let (input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
     ))
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
-    let (input, body) = preceded(
-        ws_and_comments,
-        alt((
-            map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_part_usage_structured_brace, |elements| {
-                RefBody::Brace {
-                    elements: elements
-                        .into_iter()
-                        .map(|e| {
-                            let span = e.span.clone();
-                            Node::new(span, RefBodyElement::PartUsage(e))
-                        })
-                        .collect(),
-                }
-            }),
-        )),
-    )
-    .parse(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             RefDecl {
+                extension_keywords: Vec::new(),
+                short_name,
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
                 direction,
-                name: name_str,
-                type_name,
+                kind_keyword: None,
+                name: Some(name_str),
                 typing,
-                redefines: None,
-                subsets: None,
+                redefines,
+                subsets,
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                multiplicity_modifiers,
                 value,
                 body,
-                name_span: None,
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
@@ -1125,6 +1377,18 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
 /// `variant port ...`), or an untyped reference to a separately-declared usage
 /// (`variant name;`).
 pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"variant") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, variant_usage_inner)
+}
+
+fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let membership = Membership::variant(visibility, visibility_span);
@@ -1132,64 +1396,67 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     let (input, _) = ws1(input)?;
 
     if let Ok((next, usage)) = part_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
-                    typed: Some(VariantTypedUsage::Part(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Part(Box::new(usage))),
                     membership,
                 },
             ),
         ));
     }
     if let Ok((next, usage)) = attribute_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
-                    typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Attribute(Box::new(usage))),
                     membership,
                 },
             ),
         ));
     }
     if let Ok((next, usage)) = item_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
-                    typed: Some(VariantTypedUsage::Item(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Item(Box::new(usage))),
                     membership,
                 },
             ),
         ));
     }
     if let Ok((next, usage)) = port_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
-                    typed: Some(VariantTypedUsage::Port(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Port(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    // `variant requirement r1;` inside a `variation requirement r { ... }` body (spec42
+    // Gap 44), mirroring the five kind keywords above.
+    if let Ok((next, usage)) = requirement_usage(input) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Requirement(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1198,16 +1465,30 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     // §6 G5: `variant perform doX;` inside a `variation perform action ... { ... }` body.
     // `perform_action_decl` first, for the same bare-keyword reason as the dispatchers above.
     if let Ok((next, usage)) = alt((perform_action_decl, perform_usage)).parse(input) {
-        let name = usage.value.action_name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
-                    typed: Some(VariantTypedUsage::Perform(Box::new(usage))),
-                    body: None,
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Perform(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+
+    // `VariantUsageElement → BehaviorUsageElement → ActionUsage` (SysML textual BNF 374-390,
+    // 392-413; pinned Pilot `SysML.xtext` 679-719). `action_usage` is tried before the untyped
+    // reference branch so its declaration and optional action body stay typed.
+    if let Ok((next, usage)) = crate::parser::action::action_usage(input) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Action(Box::new(usage))),
                     membership,
                 },
             ),
@@ -1219,10 +1500,10 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     // usage. Real usage: `Simple Tests/VariabilityTest.sysml:16` (`variant q { attribute b : B
     // :>> a; }`, `q` referring to the sibling `part q : Q;`) and
     // `Variability Examples/VehicleVariabilityModel.sysml:78` (`variant '6cylEngine' { ... }`).
-    let (input, name) = name(input)?;
+    let (input, reference) = reference_path(input)?;
     let (input, body) = preceded(ws_and_comments, part_usage_body).parse(input)?;
     let body = match body {
-        PartUsageBody::Semicolon => None,
+        PartUsageBody::Semicolon { .. } => None,
         brace @ PartUsageBody::Brace { .. } => Some(brace),
     };
     Ok((
@@ -1231,9 +1512,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
             start,
             input,
             VariantUsage {
-                name,
-                typed: None,
-                body,
+                form: VariantUsageForm::Reference { reference, body },
                 membership,
             },
         ),
@@ -1241,8 +1520,50 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
 }
 
 fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsageBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // In SysML part bodies, `metadata name ...` is the dedicated MetadataUsage production.
+    // It shares its prefix with KerML MetadataFeature, so give the scope-specific production
+    // first refusal before the shared AnnotatingElement parser.
+    if crate::parser::lex::starts_with_keyword(start.fragment(), b"metadata") {
+        if let Ok((next, usage)) = metadata_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, PartUsageBodyElement::MetadataUsage(usage)),
+            ));
+        }
+    }
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = PartUsageBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = satisfy(start) {
+            let elem = PartUsageBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = item_usage(start) {
+            let elem = PartUsageBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = PartUsageBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
+            let elem = PartUsageBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = analysis_case_usage(start) {
+            let elem = PartUsageBodyElement::AnalysisCaseUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let frag = start.fragment();
     let first_30 = frag.get(..30.min(frag.len())).unwrap_or(frag);
     log::debug!(
@@ -1253,16 +1574,33 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
     let (input, elem) = alt((
         alt((
             alt((
-                map(doc_comment, PartUsageBodyElement::Doc),
+                map(
+                    crate::parser::body::annotating_member,
+                    PartUsageBodyElement::Annotating,
+                ),
+                // `in :>> target;` and friends. `in_out_decl` rejects the kinded forms
+                // (`in item`, `in part`, `in occurrence`, ...) itself, so the arms below still
+                // see them.
+                map(
+                    crate::parser::action::in_out_decl,
+                    PartUsageBodyElement::InOutDecl,
+                ),
+                map(
+                    |i| crate::parser::connector::end_decl(i, true),
+                    PartUsageBodyElement::EndDecl,
+                ),
+                map(
+                    crate::parser::metadata_annotation::extended_usage,
+                    |usage| PartUsageBodyElement::ExtendedUsage(Box::new(usage)),
+                ),
                 map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,
                     PartUsageBodyElement::MetadataKeywordUsage,
                 ),
                 map(
-                    metadata_annotation,
-                    PartUsageBodyElement::MetadataAnnotation,
+                    crate::parser::metadata_annotation::metadata_keyword_prefix,
+                    PartUsageBodyElement::MetadataKeywordUsage,
                 ),
-                map(annotation, PartUsageBodyElement::Annotation),
             )),
             map(
                 exhibit_state_as_state_usage,
@@ -1290,31 +1628,19 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 PartUsageBodyElement::AttributeUsage,
             ),
             map(
-                attribute_usage_shorthand,
+                default_reference_usage,
                 PartUsageBodyElement::DefaultReferenceUsage,
             ),
             alt((
                 map(enum_usage, PartUsageBodyElement::EnumerationUsage),
                 map(part_usage, |p| PartUsageBodyElement::PartUsage(Box::new(p))),
             )),
-            map(individual_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(snapshot_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(timeslice_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(then_timeslice_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
             map(occurrence_usage, |n| {
                 PartUsageBodyElement::OccurrenceUsage(Box::new(n))
             }),
         )),
         // PAR-002: nested `def` kinds -- usage bodies legally contain nested definitions per BNF
-        // `UsageBody = DefinitionBody`. `port_def_required`/`calc_def_required`/
+        // `UsageBody = DefinitionBody`. `port_def`/`calc_def_required`/
         // `connection_def_required` must be tried before `port_usage`/`connection_usage_member`
         // -- both usage-form parsers have no guard against a bare `def` keyword (same bug class
         // fixed for `PartDefBodyElement` in a prior increment), so `port def Foo;`/
@@ -1329,6 +1655,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             ),
             // `metadata_usage` before `metadata_def` so bare `metadata Name { … }` does not misfire
             // (metadata_def is def_required-guarded, but keep def/usage pairing explicit).
+            // Nested KerML classifier declarations (`struct Car1_ { ... }` inside a `part`
+            // usage body, KerML `time_varying_car_driver`; spec42 Gap 38), keyword-gated so no
+            // other member shape is affected.
+            map(crate::parser::package::kerml_classifier_structured, |n| {
+                PartUsageBodyElement::KermlClassifier(Box::new(n))
+            }),
             map(metadata_usage, PartUsageBodyElement::MetadataUsage),
             map(metadata_def, PartUsageBodyElement::MetadataDef),
             map(requirement_def, PartUsageBodyElement::RequirementDef),
@@ -1345,13 +1677,19 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(crate::parser::import::import_, PartUsageBodyElement::Import),
             map(connection_def_required, PartUsageBodyElement::ConnectionDef),
             map(connection_usage_member, PartUsageBodyElement::Connection),
-            map(port_def_required, PartUsageBodyElement::PortDef),
+            map(port_def, PartUsageBodyElement::PortDef),
         )),
         alt((
-            map(port_usage, PartUsageBodyElement::PortUsage),
+            map(port_usage, |p| PartUsageBodyElement::PortUsage(Box::new(p))),
             map(part_ref_usage, PartUsageBodyElement::Ref),
+            // Kinded `ref item :>> a, b, c;` (Domain Libraries `SpatialItems.sysml`), which
+            // `part_ref_usage` deliberately rejects; `connector::ref_decl` owns that shape.
+            map(
+                crate::parser::connector::ref_decl,
+                PartUsageBodyElement::Ref,
+            ),
             map(bind_, PartUsageBodyElement::Bind),
-            map(satisfy, PartUsageBodyElement::Satisfy),
+            map(satisfy, |n| PartUsageBodyElement::Satisfy(Box::new(n))),
             map(
                 crate::parser::occurrence_body::assert_constraint_member,
                 PartUsageBodyElement::AssertConstraint,
@@ -1361,10 +1699,9 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // `flow_def` must be tried before `flow_usage_member`: the latter has no guard
             // against a bare `def` keyword either (see comment above).
             map(flow_def, PartUsageBodyElement::FlowDef),
-            map(
-                crate::parser::flow::flow_usage_member,
-                PartUsageBodyElement::FlowUsage,
-            ),
+            map(crate::parser::flow::flow_usage_member, |usage| {
+                PartUsageBodyElement::FlowUsage(Box::new(usage))
+            }),
             // §6 G25: `item` members were reachable from part *definition* bodies only.
             // `item_def_required` first, for the same bare-`def` reason as `constraint_def`.
             map(item_def_required, PartUsageBodyElement::ItemDef),
@@ -1400,6 +1737,36 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 crate::parser::case::verification_case_usage,
                 PartUsageBodyElement::VerificationCaseUsage,
             ),
+            // The view family. `UsageBody = DefinitionBody`, so a part *usage* body admits the
+            // same six a part *definition* body already dispatched; this scope had none of them,
+            // so `rendering r { ... }` or `view v { ... }` inside `part p { ... }` reached
+            // recovery. `def` before `usage` throughout, for the bare-keyword reason the part
+            // definition dispatcher documents: `view_usage`, `viewpoint_usage` and
+            // `rendering_usage` each read a bare name straight after their keyword.
+            // Nested in a sub-alt to stay under nom's 21-branch limit, as the sibling groups are.
+            alt((
+                map(crate::parser::view::view_def, PartUsageBodyElement::ViewDef),
+                map(
+                    crate::parser::view::view_usage,
+                    PartUsageBodyElement::ViewUsage,
+                ),
+                map(
+                    crate::parser::view::viewpoint_def,
+                    PartUsageBodyElement::ViewpointDef,
+                ),
+                map(
+                    crate::parser::view::viewpoint_usage,
+                    PartUsageBodyElement::ViewpointUsage,
+                ),
+                map(
+                    crate::parser::view::rendering_def,
+                    PartUsageBodyElement::RenderingDef,
+                ),
+                map(
+                    crate::parser::view::rendering_usage,
+                    PartUsageBodyElement::RenderingUsage,
+                ),
+            )),
         )),
     ))
     .parse(input)?;
@@ -1417,13 +1784,20 @@ pub(crate) fn exhibit_state_as_state_usage(
         is_reference: exhibit.value.is_reference,
         is_individual: exhibit.value.is_individual,
         name: exhibit.value.name,
-        type_name: exhibit.value.type_name,
+        state_reference: exhibit.value.state_reference,
+        type_name: exhibit
+            .value
+            .typing
+            .as_ref()
+            .and_then(|typing| typing.value.target.first().copied()),
         typing: exhibit.value.typing,
         multiplicity: exhibit.value.multiplicity,
+        multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
         subsets: exhibit.value.subsets,
         // §6 G18: previously dropped, which silently lost the redefinition target of
         // `exhibit <name> :>> <target>;`.
         redefines: exhibit.value.redefines,
+        body_modifier: exhibit.value.body_modifier,
         body: exhibit.value.body,
         // GH-27: `ExhibitState` now carries its own `membership` (visibility prefix), so thread
         // it through instead of the previous ad hoc `visibility: None`.
@@ -1435,10 +1809,52 @@ pub(crate) fn exhibit_state_as_state_usage(
 #[cfg(test)]
 mod par_002_nested_def_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 38: KerML classifier-keyword declarations nested inside a part usage body
+    /// dispatch to the typed `KermlClassifierDecl` production (`struct Car1_ { ... }` inside
+    /// `part c { ... }`, KerML `time_varying_car_driver`).
+    #[test]
+    fn part_usage_body_dispatches_nested_kerml_classifiers() {
+        let source = input("struct Car1_ { feature wheels; }");
+        let (rest, node) = part_usage_body_element(source).expect("nested struct");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::KermlClassifier(decl) = node.value else {
+            panic!("expected KermlClassifier");
+        };
+        assert_eq!(
+            decl.value.keyword,
+            crate::ast::KermlClassifierKeyword::Struct
+        );
+        assert_eq!(
+            decl.value
+                .identification
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"Car1_"[..])
+        );
+    }
+
+    #[test]
+    fn connect_trailing_relationships_retain_arena_targets() {
+        let source = input("connect a to b; :> Network::links :>> Legacy::links;");
+        let (rest, node) = connect_(source).expect("connect with trailing relationships");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let subsets = node.value.subsets.expect("subsets relationship");
+        let redefines = node.value.redefines.expect("redefines relationship");
+        assert_eq!(subsets.value.target.len(), 1);
+        assert_eq!(redefines.value.target.len(), 1);
+        assert_eq!(
+            crate::parser::usage::reference_text(source, subsets.value.target[0]).as_deref(),
+            Some("Network::links")
+        );
+        assert_eq!(
+            crate::parser::usage::reference_text(source, redefines.value.target[0]).as_deref(),
+            Some("Legacy::links")
+        );
     }
 
     #[test]
@@ -1629,7 +2045,7 @@ mod par_002_nested_def_tests {
         let crate::parser::part::PartDefOrUsage::Def(def_node) = def_node else {
             panic!("expected a part def");
         };
-        let crate::ast::PartDefBody::Brace { elements } = &def_node.value.body else {
+        let crate::ast::PartDefBody::Brace { elements, .. } = &def_node.value.body else {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 1);
@@ -1648,10 +2064,9 @@ mod par_002_nested_def_tests {
 #[cfg(test)]
 mod perform_semicolon_and_redefine_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     fn perform(text: &str) -> Node<Perform> {
@@ -1663,70 +2078,11 @@ mod perform_semicolon_and_redefine_tests {
         perform
     }
 
-    #[test]
-    fn perform_plain_name_accepts_semicolon_body() {
-        let node = perform("perform vehicleMassTest;");
-        assert_eq!(node.value.action_name, "vehicleMassTest");
-        assert_eq!(node.value.redefines, None);
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
-    }
-
-    #[test]
-    fn perform_dotted_name_accepts_semicolon_body() {
-        let node = perform("perform providePower.generateTorque;");
-        assert_eq!(node.value.action_name, "providePower.generateTorque");
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
-    }
-
-    #[test]
-    fn perform_quoted_name_accepts_semicolon_body() {
-        let node = perform("perform 'provide power';");
-        assert_eq!(node.value.action_name, "provide power");
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
-    }
-
-    #[test]
-    fn perform_accepts_redefine_clause_with_semicolon_body() {
-        let node = perform("perform providePower.generateTorque :>> generateTorque;");
-        assert_eq!(node.value.action_name, "providePower.generateTorque");
-        assert_eq!(node.value.redefines.as_deref(), Some("generateTorque"));
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
-    }
-
-    #[test]
-    fn perform_accepts_redefine_clause_with_brace_body() {
-        let node = perform("perform 'provide power' :>> VehicleA::'provide power' { }");
-        assert_eq!(node.value.action_name, "provide power");
-        assert_eq!(
-            node.value.redefines.as_deref(),
-            Some("VehicleA::provide power")
-        );
-        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
-    }
-
-    #[test]
-    fn perform_plain_brace_body_still_works() {
-        let node = perform("perform vehicleMassTest { }");
-        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
-    }
-
-    #[test]
-    fn perform_action_declaration_form_is_unaffected() {
-        let (rest, node) = part_usage_body_element(input("perform action 'assemble vehicle' { }"))
-            .expect("perform action parses");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PartUsageBodyElement::Perform(perform) = node.value else {
-            panic!("expected Perform, got {:?}", node.value);
-        };
-        assert_eq!(perform.value.action_name, "assemble vehicle");
-        assert_eq!(perform.value.redefines, None);
-    }
-
     /// §6 G6: directed `part`/`item` usages inside a perform body.
     #[test]
     fn perform_body_accepts_directed_part_and_item_usages() {
         let node = perform("perform vehicleMassTest { in part :>> testVehicle = vehicleUnderTest; in item 'mass sample' : MassSample { } }");
-        let PerformBody::Brace { elements } = node.value.body else {
+        let PerformBody::Brace { elements, .. } = node.value.body else {
             panic!("expected brace body");
         };
         assert!(matches!(
@@ -1743,10 +2099,9 @@ mod perform_semicolon_and_redefine_tests {
 #[cfg(test)]
 mod variant_membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): VariantMembership on VariantUsage, confirmed
@@ -1796,20 +2151,35 @@ mod variant_membership_tests {
 #[cfg(test)]
 mod short_name_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
     fn part_usage_captures_short_name() {
-        let (rest, node) = part_usage(input("part <eng> engine : Engine;")).expect("part usage");
+        let source = input("part <eng> engine : Engine;");
+        let (rest, node) = part_usage(source).expect("part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("eng"));
-        assert_eq!(node.value.name, "engine");
-        assert_eq!(node.value.type_name, "Engine");
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"eng"[..])
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"engine"[..])
+        );
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
     }
 
     // Mirrors the anonymous-redefinition shape confirmed in `tests/apollo_regressions.rs`
@@ -1818,15 +2188,18 @@ mod short_name_tests {
     // leading-`:>>`-discard shape.
     #[test]
     fn part_usage_captures_short_name_with_redefines() {
-        let (rest, node) = part_usage(input("part <e> :>> engines[5];")).expect("part usage");
+        let source = input("part <e> :>> engines[5];");
+        let (rest, node) = part_usage(source).expect("part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.short_name.as_deref(), Some("e"));
         assert_eq!(
             node.value
-                .redefines
-                .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("engines".to_string())
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"e"[..])
+        );
+        assert_eq!(
+            node.value.redefines.as_ref().map(|n| n.value.target.len()),
+            Some(1)
         );
     }
 
@@ -1839,18 +2212,35 @@ mod short_name_tests {
     /// GH-10: `ref part` is `PartUsage` with `is_reference` and full specialization.
     #[test]
     fn part_usage_accepts_ref_prefix_with_typing_and_subsetting() {
-        let (rest, node) =
-            part_usage(input("ref part origin : Remote :> remotes;")).expect("ref part usage");
+        let source = input("ref part origin : Remote :> remotes;");
+        let (rest, node) = part_usage(source).expect("ref part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_reference);
-        assert_eq!(node.value.name, "origin");
-        assert_eq!(node.value.type_name, "Remote");
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"origin"[..])
+        );
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
         assert_eq!(
             node.value
                 .subsets
                 .as_ref()
-                .map(|(n, _)| targets_display_string(&n.value.target)),
-            Some("remotes".to_string())
+                .map(|(n, _)| n.value.target.len()),
+            Some(1)
         );
     }
 
@@ -1858,14 +2248,26 @@ mod short_name_tests {
     fn part_usage_accepts_ref_prefix_with_subsetting_only() {
         let (rest, node) = part_usage(input("ref part origin :> mesolab;")).expect("ref part");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_reference);
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
         assert!(node.value.subsets.is_some());
     }
 
     #[test]
     fn part_usage_without_ref_prefix_is_not_reference() {
         let (_, node) = part_usage(input("part origin : Remote :> remotes;")).expect("part");
-        assert!(!node.value.is_reference);
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_none());
         assert!(node.value.subsets.is_some());
     }
 
@@ -1876,19 +2278,31 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part :>> elements: SparePart;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_reference);
-        assert_eq!(node.value.name, "elements");
-        assert_eq!(node.value.type_name, "SparePart");
+        assert!(node
+            .value
+            .prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some());
+        assert!(node.value.name.is_none());
+        assert!(node.value.redefines.is_some());
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
     }
 }
 
 #[cfg(test)]
 mod gh16_interface_usage_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// GH-16: a typed interface usage with no inline `connect` clause at all previously failed
@@ -1896,8 +2310,8 @@ mod gh16_interface_usage_tests {
     /// optional, so this is legal -- ends would be declared inside the body instead, or omitted).
     #[test]
     fn interface_usage_accepts_typed_declaration_with_no_connect_clause() {
-        let (rest, node) =
-            interface_usage(input("interface hubToRim : SpokeInterface;")).expect("declaration");
+        let source = input("interface hubToRim : SpokeInterface;");
+        let (rest, node) = interface_usage(source).expect("declaration");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             InterfaceUsage::Declaration {
@@ -1905,8 +2319,11 @@ mod gh16_interface_usage_tests {
                 interface_type,
                 ..
             } => {
-                assert_eq!(name.as_deref(), Some("hubToRim"));
-                assert_eq!(interface_type.as_deref(), Some("SpokeInterface"));
+                assert_eq!(
+                    name.map(|n| crate::parser::lex::name_bytes(source, n)),
+                    Some(&b"hubToRim"[..])
+                );
+                assert!(interface_type.is_some());
             }
             other => panic!("expected Declaration, got {other:?}"),
         }
@@ -2005,10 +2422,9 @@ mod gh16_interface_usage_tests {
 #[cfg(test)]
 mod gh48_bind_prefix_and_multiplicity_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// GH-48 Gap 2a: bare `bind a = b;` (no `binding` prefix) must keep working exactly as
@@ -2027,9 +2443,15 @@ mod gh48_bind_prefix_and_multiplicity_tests {
     /// line 23.
     #[test]
     fn bind_accepts_named_binding_prefix() {
-        let (rest, node) = bind_(input("binding ab bind a = b;")).expect("binding ab bind a = b;");
+        let source = input("binding ab bind a = b;");
+        let (rest, node) = bind_(source).expect("binding ab bind a = b;");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.binding_name.as_deref(), Some("ab"));
+        assert_eq!(
+            node.value
+                .binding_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"ab"[..])
+        );
         assert!(node.value.binding_type.is_none());
     }
 
@@ -2037,11 +2459,16 @@ mod gh48_bind_prefix_and_multiplicity_tests {
     /// prefix. Real usage: `ConnectionTest.sysml` line 24.
     #[test]
     fn bind_accepts_named_typed_binding_prefix() {
-        let (rest, node) =
-            bind_(input("binding ab1 : AB bind a = b;")).expect("binding ab1 : AB bind a = b;");
+        let source = input("binding ab1 : AB bind a = b;");
+        let (rest, node) = bind_(source).expect("binding ab1 : AB bind a = b;");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.binding_name.as_deref(), Some("ab1"));
-        assert_eq!(node.value.binding_type.as_deref(), Some("AB"));
+        assert_eq!(
+            node.value
+                .binding_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"ab1"[..])
+        );
+        assert!(node.value.binding_type.is_some());
     }
 
     /// GH-48 Gap 2b: per-endpoint multiplicity on `bind`'s own two operands, plus an anonymous

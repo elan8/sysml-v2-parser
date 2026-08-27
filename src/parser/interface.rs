@@ -2,15 +2,14 @@
 
 use crate::ast::{InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, Membership, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
+use crate::parser::constraint::constraint_usage;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{ws_and_comments, INTERFACE_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
-use crate::parser::port::{port_def_required, port_usage};
-use crate::parser::requirement::doc_comment;
+use crate::parser::port::{port_def, port_usage};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -21,10 +20,37 @@ use nom::Parser;
 fn interface_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first -- the two `#` arms and
+    // `connector::ref_decl` below; see `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = port_usage(input) {
+            let elem = InterfaceDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
-        map(doc_comment, InterfaceDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            InterfaceDefBodyElement::Annotating,
+        ),
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                InterfaceDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                InterfaceDefBodyElement::MetadataKeywordUsage,
+            ),
+        )),
         // GH-33: interfaces don't allow the `#name` derived-end-name form connections do (no
         // matching real-usage evidence found for interfaces) -- see `connector::end_decl`'s doc
         // comment.
@@ -32,24 +58,29 @@ fn interface_def_body_element(
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
-        // `item_def_required`/`port_def_required` tried before their usage siblings, same
+        // `item_def_required`/`port_def` tried before their usage siblings, same
         // def-before-usage discipline as the other body enums wired in prior increments (their
         // usage parsers have no guard against a bare `def` token).
-        map(
-            |i| attribute_def(i, true),
-            InterfaceDefBodyElement::AttributeDef,
-        ),
+        map(attribute_def, InterfaceDefBodyElement::AttributeDef),
         map(attribute_usage, InterfaceDefBodyElement::AttributeUsage),
         map(item_def_required, InterfaceDefBodyElement::ItemDef),
         map(item_usage, InterfaceDefBodyElement::ItemUsage),
-        map(port_def_required, InterfaceDefBodyElement::PortDef),
-        map(port_usage, InterfaceDefBodyElement::PortUsage),
+        map(port_def, InterfaceDefBodyElement::PortDef),
+        map(port_usage, |p| {
+            InterfaceDefBodyElement::PortUsage(Box::new(p))
+        }),
         // GH-85: bare `flow <a> to <b>;` connecting two of this interface's own ends (OMG spec
         // Annex `Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml`).
-        map(
-            crate::parser::flow::flow_usage_member,
-            InterfaceDefBodyElement::FlowUsage,
-        ),
+        map(crate::parser::flow::flow_usage_member, |usage| {
+            InterfaceDefBodyElement::FlowUsage(Box::new(usage))
+        }),
+        // `InterfaceOccurrenceUsageElement` includes `BehaviorUsageElement`, whose
+        // `ConstraintUsage` alternative retains its own complete occurrence-prefix and
+        // calculation-body grammar (SysML BNF 727-750, 374-389, 1382-1395). This owner adds no
+        // interface-specific interpretation of that shared production.
+        map(constraint_usage, |usage| {
+            InterfaceDefBodyElement::ConstraintUsage(Box::new(usage))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -80,18 +111,25 @@ fn interface_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<Interfa
 fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, InterfaceDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            InterfaceDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         INTERFACE_DEF_BODY_STARTERS,
         "interface definition body",
         "recovered_interface_def_body_element",
         interface_def_body_element,
         interface_def_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, InterfaceDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Interface definition: `interface` `def` Identification body
@@ -125,6 +163,7 @@ fn parse_interface_def(
 ) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
     let mut options = DefinitionPrefixOptions::new(b"interface")
+        .individual_allowed()
         .with_captured_visibility()
         .reject_header_keyword(b"connect");
     if require_def {
@@ -138,6 +177,8 @@ fn parse_interface_def(
             start,
             input,
             InterfaceDef {
+                definition_prefix: prefix.basic_prefix,
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -150,10 +191,9 @@ fn parse_interface_def(
 #[cfg(test)]
 mod par_002_widening_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -198,11 +238,11 @@ mod par_002_widening_tests {
     }
 
     /// PAR-002 acceptance criterion: `port def` yields the same underlying parse (via the shared
-    /// `port_def_required` parser) whether reached through `InterfaceDefBodyElement::PortDef` or
+    /// `port_def` parser) whether reached through `InterfaceDefBodyElement::PortDef` or
     /// any other body enum wired to the same parser in prior increments (e.g.
     /// `PartDefBodyElement::PortDef`).
     #[test]
-    fn port_def_is_same_variant_kind_in_interface_def_body_as_port_def_required_parser() {
+    fn port_def_is_same_variant_kind_in_interface_def_body_as_port_def_parser() {
         let text = "port def MyPort;";
         let (_, iface_node) =
             interface_def_body_element(input(text)).expect("nested in interface def body");
@@ -210,21 +250,17 @@ mod par_002_widening_tests {
             iface_node.value,
             InterfaceDefBodyElement::PortDef(_)
         ));
-        let result = port_def_required(input(text));
-        assert!(
-            result.is_ok(),
-            "port_def_required should also accept {text:?}"
-        );
+        let result = port_def(input(text));
+        assert!(result.is_ok(), "port_def should also accept {text:?}");
     }
 }
 
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on InterfaceDef ---

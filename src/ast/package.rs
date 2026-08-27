@@ -1,55 +1,106 @@
 use super::behavior::{
-    ActionDef, ActionUsage, AllocationDef, AllocationUsage, FlowDef, FlowUsage, StateDef,
-    StateUsage,
+    ActionDef, ActionUsage, AllocationDef, AllocationUsage, FirstStmt, FlowDef, FlowUsage,
+    StateDef, StateUsage,
 };
+use super::body::Body;
+use super::common::DeclarationName;
 use super::common::FilterMember;
-use super::common::{
-    CommentAnnotation, DocComment, Identification, Import, ParseErrorNode, TextualRepresentation,
-};
+use super::common::{AnnotatingMember, Import, ParseErrorNode, UnsupportedGrammarNode};
 use super::kerml_fallback::{
-    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlFeatureDecl, KermlSemanticDecl,
+    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlBareDeclaration, KermlFeatureDecl,
+    KermlSemanticDecl,
 };
 use super::requirement::{
     ActorDecl, AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, ConcernUsage, Dependency,
-    EnumerationUsage, ItemUsage, RequirementDef, RequirementUsage, Satisfy, UseCaseDef,
-    UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
+    EnumerationUsage, IncludeUseCase, ItemUsage, RequirementDef, RequirementUsage,
+    SatisfyRequirementUsage, UseCaseDef, UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
     AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
-    ConnectionUsageMember, DefaultReferenceUsage, EnumDef, IndividualDef, InterfaceDef,
-    InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage, OccurrenceDef,
-    OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
+    ConnectionUsageMember, DefaultReferenceUsage, EnumDef, ExhibitState, IndividualDef,
+    InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage,
+    OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
-    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
-    ViewpointDef, ViewpointUsage,
+    CalcDef, ConstraintDef, ConstraintUsage, ExposeMember, RenderingDef, RenderingUsage, ViewDef,
+    ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::ast::core::Node;
+use crate::ast::QualifiedReferenceId;
+
+/// A qualified declaration name stored in the document's packed qualified-name arena.
+///
+/// This wrapper deliberately distinguishes a namespace declaration's identity from a semantic
+/// reference, even though both reuse the same source-backed storage primitive. Consumers resolve
+/// it through [`crate::ast::ParsedDocument::qualified_declaration_name`] rather than treating the
+/// underlying arena identity as a reference role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct QualifiedDeclarationName {
+    /// Crate-visible so the owning traversal in [`crate::ast::visit`] can reach the identity.
+    /// It stays private to callers outside the crate: a declaration label is not a reference,
+    /// and its storage must be resolved through the owning document.
+    pub(crate) reference: QualifiedReferenceId,
+}
+
+impl QualifiedDeclarationName {
+    pub(crate) const fn new(reference: QualifiedReferenceId) -> Self {
+        Self { reference }
+    }
+
+    pub(crate) const fn storage_id(self) -> QualifiedReferenceId {
+        self.reference
+    }
+}
+
+/// The authored main name of a package, library package, or namespace declaration.
+///
+/// Simple declaration labels are not references. Qualified declaration paths need packed segment,
+/// separator, scope, and span provenance, so they use a distinct declaration-role wrapper around
+/// the shared source-backed arena storage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum NamespaceName {
+    Simple(DeclarationName),
+    Qualified(QualifiedDeclarationName),
+}
+
+/// Identification used by namespace-owning declarations.
+///
+/// Unlike the general [`crate::ast::Identification`] grammar node, its main name may be a qualified path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct QualifiedIdentification {
+    pub short_name: Option<DeclarationName>,
+    pub name: Option<NamespaceName>,
+}
+
+impl QualifiedIdentification {
+    /// Return the declaration label only when the authored name is the simple-name alternative.
+    /// Qualified declarations remain arena-backed and must be resolved through their document.
+    pub fn simple_name(&self) -> Option<DeclarationName> {
+        match self.name.as_ref()? {
+            NamespaceName::Simple(name) => Some(*name),
+            NamespaceName::Qualified(_) => None,
+        }
+    }
+}
 
 /// A package declaration: `package` Identification PackageBody
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Package {
-    pub identification: Identification,
+    pub identification: QualifiedIdentification,
     pub body: PackageBody,
 }
 /// Package body: either `;` or `{` PackageBodyElement* `}`
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PackageBody {
-    /// Semicolon form: no body elements.
-    Semicolon,
-    /// Brace form: list of body elements (may be empty).
-    Brace {
-        elements: Vec<Node<PackageBodyElement>>,
-    },
-}
+pub type PackageBody = Body<PackageBodyElement>;
 /// Library package: `library` (optional `standard`) `package` Identification PackageBody (BNF LibraryPackage).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LibraryPackage {
     pub is_standard: bool,
-    pub identification: Identification,
+    pub identification: QualifiedIdentification,
     pub body: PackageBody,
 }
 /// Top-level element inside a namespace or package body.
@@ -57,9 +108,10 @@ pub struct LibraryPackage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PackageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
+    /// Spec-valid package member whose grammar production is not implemented in this scope.
+    Unsupported(Node<UnsupportedGrammarNode>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     Package(Node<Package>),
     LibraryPackage(Node<LibraryPackage>),
@@ -74,7 +126,7 @@ pub enum PackageBodyElement {
     ActionUsage(Node<ActionUsage>),
     RequirementDef(Node<RequirementDef>),
     RequirementUsage(Node<RequirementUsage>),
-    Satisfy(Node<Satisfy>),
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     UseCaseDef(Node<UseCaseDef>),
     Actor(Node<ActorDecl>),
     StateDef(Node<StateDef>),
@@ -84,12 +136,21 @@ pub enum PackageBodyElement {
     ConstraintDef(Node<ConstraintDef>),
     ConstraintUsage(Node<ConstraintUsage>),
     CalcDef(Node<CalcDef>),
+    /// `CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
+    /// (SysML BNF 1354), a `BehaviorUsageElement` and therefore a legal `PackageMember`.
+    /// Dispatched after [`Self::CalcDef`], which stays `def`-optional for the bare namespace-level
+    /// definitions the Systems Library authors; this variant catches the usage shapes that
+    /// definition grammar cannot accept, such as the multiplicity in `calc estimate [1];`.
+    CalcUsage(Node<crate::ast::CalcUsage>),
     ViewDef(Node<ViewDef>),
     ViewpointDef(Node<ViewpointDef>),
     RenderingDef(Node<RenderingDef>),
     ViewUsage(Node<ViewUsage>),
     ViewpointUsage(Node<ViewpointUsage>),
     RenderingUsage(Node<RenderingUsage>),
+    /// An `expose` membership retained in a non-view namespace so the semantic owning-namespace
+    /// validation rule can report its invalid owner without losing the typed target.
+    Expose(Node<ExposeMember>),
     ConnectionDef(Node<ConnectionDef>),
     MetadataDef(Node<MetadataDef>),
     MetadataUsage(Node<MetadataUsage>),
@@ -100,7 +161,7 @@ pub enum PackageBodyElement {
     AllocationDef(Node<AllocationDef>),
     AllocationUsage(Node<AllocationUsage>),
     FlowDef(Node<FlowDef>),
-    FlowUsage(Node<FlowUsage>),
+    FlowUsage(Box<Node<FlowUsage>>),
     ConcernUsage(Node<ConcernUsage>),
     CaseDef(Node<CaseDef>),
     CaseUsage(Node<CaseUsage>),
@@ -112,7 +173,26 @@ pub enum PackageBodyElement {
     FeatureDecl(Node<FeatureDecl>),
     ClassifierDecl(Node<ClassifierDecl>),
     KermlSemanticDecl(Node<KermlSemanticDecl>),
+    /// Structured KerML classifier declaration with a body (`function` families so far); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
+    /// Package-level KerML invariant (`inv piPrecision { ... }`, Kernel Function Library
+    /// `TrigFunctions.kerml`); see [`crate::ast::KermlInvariantMember`].
+    KermlInvariant(Box<Node<crate::ast::KermlInvariantMember>>),
+    /// Package-level KerML connector member (`connector a2 from x.s to y.t;`); see
+    /// [`crate::ast::KermlConnectorMember`].
+    KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),
+    /// KerML explicit relationship declaration (`specialization S subclassifier A specializes
+    /// B;`, `typing t typed x by T;`, ...); see [`crate::ast::KermlRelationshipDecl`].
+    KermlRelationship(Box<Node<crate::ast::KermlRelationshipDecl>>),
+    /// Package-level KerML feature member with the full feature-member surface (`feature i:
+    /// Complex[1] = rect(0.0, 1.0);`, Kernel Function Library `ComplexFunctions.kerml`); see
+    /// [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
+    /// Structurally recognized bare KerML declaration: keyword, optional name, optional
+    /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].
+    KermlBareDeclaration(Node<KermlBareDeclaration>),
     ExtendedLibraryDecl(Node<ExtendedLibraryDecl>),
     /// Standalone attribute usage at package level (PAR-002: `PackageMember` in the BNF allows
     /// `DefinitionElement | UsageElement`, so a bare attribute usage is legal package content,
@@ -121,7 +201,7 @@ pub enum PackageBodyElement {
     /// Standalone item usage at package level. See `AttributeUsage`.
     ItemUsage(Node<ItemUsage>),
     /// Standalone port usage at package level. See `AttributeUsage`.
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// Standalone connection usage at package level. See `AttributeUsage`.
     ConnectionUsage(Node<ConnectionUsageMember>),
     /// Standalone interface usage at package level (PAR-007: previously there was no
@@ -153,4 +233,28 @@ pub enum PackageBodyElement {
     /// ConstraintTest.sysml:89). Previously dispatched in six other body contexts (action, part
     /// def/usage, connection def, occurrence, attribute) but not at package scope.
     AssertConstraint(Node<AssertConstraintMember>),
+    /// Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
+    /// process;`). See `AttributeUsage` for the general PAR-002 rationale.
+    PerformUsage(Node<Perform>),
+    /// Package-level `BindingConnectorAsUsage`, e.g. `binding instant[instantNum] of startShot =
+    /// endShot;`. See `crate::ast::BindingConnectorUsage`'s doc comment for the full grammar.
+    BindingConnectorUsage(Node<crate::ast::BindingConnectorUsage>),
+    /// Package-level `SuccessionAsUsage` (BNF §8.2.2.13.3), e.g. `succession s1 : AB first a then
+    /// b;`, `first a then b;`. Reuses [`FirstStmt`], the identical shape already parsed inside
+    /// action bodies (GH-38): optional `succession` name/type/multiplicity prefix, `first`
+    /// endpoint, optional `then` endpoint, body.
+    Succession(Node<FirstStmt>),
+    /// Package-level `ExhibitStateUsage` (BNF §8.2.2.18.2), e.g. `exhibit vehicleStates.on;`,
+    /// `exhibit state s1 : StateDef { ... }`. Reuses [`ExhibitState`], the same node already
+    /// parsed inside part definition bodies (GH-27/GH-18).
+    ExhibitState(Node<ExhibitState>),
+    /// Package-level `IncludeUseCaseUsage` (BNF §8.2.2.25) reference form, e.g. `include
+    /// checkTires[1..*];`. Reuses [`IncludeUseCase`], the same node already parsed inside part
+    /// usage/use-case-def bodies.
+    IncludeUseCase(Node<IncludeUseCase>),
+    /// `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`, e.g. `#situation def
+    /// Failure;`. See [`crate::ast::ExtendedDefinition`].
+    ExtendedDefinition(Node<crate::ast::ExtendedDefinition>),
+    /// `ExtendedUsage` with a declaration (SysML BNF 341); see [`crate::ast::ExtendedUsage`].
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
 }

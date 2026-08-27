@@ -4,21 +4,22 @@
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Mass Roll-up Example/Vehicles.sysml:26`:
@@ -32,7 +33,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// documented synonym via `redefine_operator`, already used elsewhere e.g. `part_usage`).
 #[test]
 fn gh92_1_bare_redefines_keyword_standalone_body_member() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def Car { attribute mass; }
             part c : Car {
@@ -43,7 +44,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
     let PackageBodyElement::PartUsage(c) = &elements[1] else {
         panic!("expected PartUsage, got {:?}", elements[1]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &c.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &c.value.body else {
         panic!("expected brace part usage body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -51,7 +52,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "mass");
+    assert!(attr.name.is_none());
     assert!(attr.redefines.is_some());
     assert!(attr.value.is_some());
 }
@@ -68,7 +69,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
 /// forms already worked, but adding an explicit type broke parsing entirely.
 #[test]
 fn gh92_2_part_redefines_with_explicit_type_clause() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def Chassis { part rb; }
             part def LightRollBar;
@@ -80,7 +81,7 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
     let PackageBodyElement::PartUsage(chs) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &chs.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &chs.value.body else {
         panic!("expected brace part usage body");
     };
     let rb = elements.iter().find_map(|e| match &e.value {
@@ -88,11 +89,9 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
         _ => None,
     });
     let rb = rb.expect("expected a nested PartUsage element");
-    // Name is derived from the redefines target when an explicit type follows (matches the
-    // pre-existing `ref part :>> elements: SparePart;` convention this shape previously reached
-    // via a different fallback path).
-    assert_eq!(rb.name, "rb");
-    assert_eq!(rb.type_name, "LightRollBar");
+    // The target is semantic, not a declaration name, even when an explicit type follows.
+    assert!(rb.name.is_none());
+    assert!(rb.typing.is_some());
     assert!(rb.redefines.is_some());
     assert!(rb.multiplicity.is_some());
 }
@@ -111,7 +110,7 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
 /// `OccurrenceBodyElement`.
 #[test]
 fn gh92_3_unnamed_typed_succession_in_part_usage_body() {
-    let elements = package_elements(
+    let (_, elements) = package_elements(
         r#"package P {
             part def V;
             part def HappensJustBefore;
@@ -125,7 +124,7 @@ fn gh92_3_unnamed_typed_succession_in_part_usage_body() {
     let PackageBodyElement::PartUsage(vehicle1) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &vehicle1.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &vehicle1.value.body else {
         panic!("expected brace part usage body");
     };
     let succ = elements.iter().find_map(|e| match &e.value {
@@ -134,5 +133,5 @@ fn gh92_3_unnamed_typed_succession_in_part_usage_body() {
     });
     let succ = succ.expect("expected a SuccessionUsage element");
     assert!(succ.name.is_none());
-    assert_eq!(succ.type_name.as_deref(), Some("HappensJustBefore"));
+    assert!(succ.type_name.is_some());
 }

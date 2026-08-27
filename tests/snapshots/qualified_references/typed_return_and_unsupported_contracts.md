@@ -1,0 +1,82 @@
+# META
+~~~sexpr
+(snapshot (type recovery) (description "Structured return-reference bodies, portion kinds, KerML feature/class declarations, and reference connection usages retain semantics, while unimplemented KerML semantic/feature-form declarations and malformed annotation syntax are explicitly unsupported/malformed."))
+~~~
+# SOURCE
+~~~sysml
+package TypedContracts {
+    datatype DeferredType;
+    feature deferredFeature : DeferredType;
+    class DeferredClass;
+    multiplicity exactlyOne [1..1];
+    interaction DeferredInteraction;
+    predicate deferredPredicate;
+
+    verification def Verify {
+        return ref result[0..*] {
+            doc /* Result documentation. */
+            return Results::accepted.item;
+        }
+        return ref empty;
+    }
+
+    part def Timeline {
+        snapshot initial;
+        then timeslice later;
+        ref connection unresolved { } :> Ghost::subset;
+    }
+
+    interface def BrokenInterface {
+        @@@ bogus ###;
+    }
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "typed_return_and_unsupported_contracts.md"
+    (diagnostics
+      (diagnostic (code "malformed_annotation_head") (severity error) (category parseerror) (span (offset 609) (line 24) (column 9) (len 19)) (message "malformed metadata reference in interface definition body"))
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package TypedContracts {
+    datatype DeferredType;
+    feature deferredFeature : DeferredType;
+    class DeferredClass;
+    multiplicity exactlyOne[1];
+    interaction DeferredInteraction;
+    predicate deferredPredicate;
+    verification def Verify {
+        return ref result[0..*] {
+            doc
+            /* Result documentation. */
+            return Results::accepted.item;
+        }
+        return ref empty;
+    }
+    part def Timeline {
+        snapshot initial;
+        then timeslice later;
+        ref connection unresolved :> Ghost::subset {
+        }
+    }
+    interface def BrokenInterface {
+        @@@ bogus ###;
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 82) (line 3) (column 31) (len 12)) (segments (segment 0 (token "DeferredType") (name "DeferredType") (separator none) (span (offset 82) (line 3) (column 31) (len 12)))))
+    (reference r1 (scope relative) (span (offset 355) (line 12) (column 20) (len 17)) (segments (segment 0 (token "Results") (name "Results") (separator none) (span (offset 355) (line 12) (column 20) (len 7))) (segment 1 (token "accepted") (name "accepted") (separator colon-colon) (span (offset 364) (line 12) (column 29) (len 8)))))
+    (reference r2 (scope relative) (span (offset 373) (line 12) (column 38) (len 4)) (segments (segment 0 (token "item") (name "item") (separator none) (span (offset 373) (line 12) (column 38) (len 4)))))
+  )
+  (root (package (name "TypedContracts") (body brace (kerml-classifier (keyword datatype) (abstract false) (name "DeferredType") (specializes none) (conjugates none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "deferredFeature") (specializations (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0))))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)) (kerml-classifier (keyword class) (abstract false) (name "DeferredClass") (specializes none) (conjugates none) (body semicolon)) (kerml-classifier (keyword multiplicity) (abstract false) (name "exactlyOne") (specializes none) (conjugates none) (body semicolon)) (kerml-classifier (keyword interaction) (abstract false) (name "DeferredInteraction") (specializes none) (conjugates none) (body semicolon)) (kerml-classifier (keyword predicate) (abstract false) (name "deferredPredicate") (specializes none) (conjugates none) (body semicolon)) (verification-case-def (name "Verify") (modifiers) (body brace (return-ref (name "result") (body-span (span (offset 290) (line 10) (column 33) (len 98))) (body brace (doc (name none) (locale none) (body (span (offset 310) (line 11) (column 19) (len 23)) (normalized "Result documentation. "))) (result (expression (span (offset 355) (line 12) (column 20) (len 22)) (member-access (base (expression (span (offset 355) (line 12) (column 20) (len 17)) (ref r1))) (separator dot) (member (ref r2))))))) (return-ref (name "empty") (body-span (span (offset 413) (line 14) (column 25) (len 1))) (body semicolon)))) (part-def (name "Timeline") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion snapshot) (extensions)) (declaration "initial") (short-name none) (target none) (body semicolon)) (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion timeslice) (extensions)) (declaration "later") (short-name none) (target none) (body semicolon)) (connection))) (interface-def (name "BrokenInterface") (modifiers) (specializes none) (body brace (malformed (code "malformed_annotation_head") (found "@@@ bogus ###;") (span (offset 609) (line 24) (column 9) (len 19))))))))
+)
+~~~

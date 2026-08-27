@@ -40,6 +40,10 @@ pub struct FeatureValue {
     /// Whether the `default` keyword prefixed the clause. Independent of `kind`: `default =`,
     /// `default :=`, and bare `default expr` all set this `true`.
     pub is_default: bool,
+    /// Whether an explicit `=`/`:=` operator was authored. Always `true` for the non-`default`
+    /// forms (they have no operator-less spelling); `false` for the bare `default expr` /
+    /// `default {expr}` forms, so emission does not fabricate an `=` the author never wrote.
+    pub has_operator: bool,
     pub expression: Node<Expression>,
     /// Span of the whole value clause, from the start of the operator/`default` keyword through
     /// the end of the expression.
@@ -52,6 +56,7 @@ impl PartialEq for FeatureValue {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
             && self.is_default == other.is_default
+            && self.has_operator == other.has_operator
             && self.expression == other.expression
     }
 }

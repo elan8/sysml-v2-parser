@@ -1,29 +1,28 @@
 //! Shared occurrence-style body parsing for occurrence defs and generic `DefinitionBody` users.
 
 use crate::ast::{
-    AssertConstraintMember, ConstraintDefBody, DefinitionBody, DefinitionBodyElement, Membership,
-    Node, OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
-    SuccessionUsage,
+    AssertConstraintMember, DefinitionBody, DefinitionBodyElement, Membership, Node,
+    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, OccurrenceUsagePrefix,
+    ParseErrorNode, SuccessionUsage,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
-use crate::parser::connector::connect_body;
-use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
+use crate::parser::constraint::constraint_def_body;
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_name, recover_body_element, starts_with_keyword,
+    name, qualified_reference, recover_body_element, reference_path, starts_with_keyword,
     visibility_prefix, ws1, ws_and_comments,
 };
-use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
-use crate::parser::part::exhibit_state_as_state_usage;
-use crate::parser::part::part_usage;
-use crate::parser::requirement::{doc_comment, satisfy};
+use crate::parser::occurrence_prefix::{
+    next_word_is_reserved, occurrence_usage_prefix, optional_keyword_token,
+};
+use crate::parser::part::{bind_, exhibit_state_as_state_usage, part_usage};
+use crate::parser::requirement::satisfy;
 use crate::parser::usage::{
     multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses,
-    targets_display_string,
 };
 use crate::parser::Input;
 use nom::branch::alt;
@@ -35,11 +34,21 @@ use nom::Parser;
 
 pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"allocate",
+    b"bind",
     b"doc",
     b"event",
+    // `assert`, `not` and `satisfy` are the three FIRST tokens of a `SatisfyRequirementUsage`;
+    // see `PART_BODY_STARTERS` for why all three have to be recovery boundaries.
     b"assert",
+    b"not",
     b"satisfy",
     b"attribute",
+    // `occurrence_body_element` owns keyword-less redefinition feature bindings. These three
+    // are their complete prefix FIRST set, so recovery before a later valid binding does not
+    // swallow that sibling into the malformed span.
+    b":>>",
+    b":>",
+    b"redefines",
     b"flow",
     b"message",
     b"succession",
@@ -56,6 +65,14 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"private",
     b"in",
     b"connection",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) -- `#`, `abstract`, `in`, `individual`, `ref`,
+    // `snapshot` and `timeslice` are already listed above. See
+    // `planning/occurrence-usage-prefix-matrix.md` §4.
+    b"constant",
+    b"derived",
+    b"inout",
+    b"out",
+    b"variation",
 ];
 
 // Note: "succession" is intentionally NOT in this list — `succession_usage()` in
@@ -90,24 +107,41 @@ fn occurrence_definition_body_with_labels<'a>(
 ) -> IResult<Input<'a>, DefinitionBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, DefinitionBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            DefinitionBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         OCCURRENCE_BODY_STARTERS,
         scope_label,
         recovery_code,
         |input| {
             let start = input;
+            // Structured first, opaque capture only as the fallback -- the order every other
+            // body uses. Reversed, the capture claimed every member whose first token is one of
+            // the opaque starters, so `private attribute seBeforeNum : Natural[1] = ...;`
+            // (`sysml.library/Systems Library/Flows.sysml`) was captured whole even though
+            // `attribute_usage` parses a visibility prefix perfectly well.
             let (input, element) = nom::branch::alt((
-                nom::combinator::map(
-                    |i| capture_opaque_member(i, DEFINITION_BODY_OPAQUE_STARTERS),
-                    DefinitionBodyElement::Other,
-                ),
                 nom::combinator::map(
                     occurrence_body_element,
                     DefinitionBodyElement::OccurrenceMember,
+                ),
+                nom::combinator::map(
+                    |i| {
+                        crate::parser::recovery::unsupported_member(
+                            i,
+                            DEFINITION_BODY_OPAQUE_STARTERS,
+                            "definition body",
+                        )
+                    },
+                    DefinitionBodyElement::Unsupported,
                 ),
             ))
             .parse(input)?;
@@ -128,272 +162,196 @@ fn occurrence_definition_body_with_labels<'a>(
             )
         },
     )?;
-    Ok((input, DefinitionBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
-/// Everything an occurrence usage's leading keywords contribute to the node it builds. Grouped
-/// into one struct so [`occurrence_usage_tail`] keeps a readable signature as the BNF
-/// `OccurrenceUsagePrefix` slots accumulate.
-struct OccurrencePrefix {
-    is_individual: bool,
-    is_then: bool,
+/// Everything an occurrence usage's head contributes beyond the shared `OccurrenceUsagePrefix`.
+///
+/// `then` is a `SourceSuccessionMember` and the visibility keyword is a `MemberPrefix`, so both
+/// sit outside the prefix and outside the usage; `event` and `occurrence` are kind keywords that
+/// follow it. None of the four is a prefix slot.
+struct OccurrenceHead {
+    prefix: OccurrenceUsagePrefix,
+    then_span: Option<crate::ast::Span>,
     is_event: bool,
-    is_reference: bool,
-    is_abstract: bool,
-    is_constant: bool,
-    portion_kind: Option<String>,
+    /// `EventOccurrenceUsage`'s first alternative -- `event <path>` names an existing occurrence
+    /// rather than declaring one, so there is no declaration label to read.
+    is_event_reference: bool,
+    /// See `OccurrenceUsage::has_occurrence_keyword`.
+    has_occurrence_keyword: bool,
     membership: Membership,
 }
 
-impl Default for OccurrencePrefix {
-    fn default() -> Self {
-        Self {
-            is_individual: false,
-            is_then: false,
-            is_event: false,
-            is_reference: false,
-            is_abstract: false,
-            is_constant: false,
-            portion_kind: None,
-            membership: Membership::feature(None, crate::ast::Span::dummy()),
-        }
-    }
-}
-
-/// Optional `ref` keyword (BNF `RefPrefix`, §6 G29) before an occurrence usage's kind keyword.
-fn occurrence_ref_prefix(input: Input<'_>) -> IResult<Input<'_>, bool> {
-    let (input, kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"ref"[..])), ws1)).parse(input)?;
-    Ok((input, kw.is_some()))
-}
-
-/// GH-51: `abstract`/`constant` prefix keywords (BNF `RefPrefix`, §8.2.2.9.2), ahead of `ref` per
-/// that production's order. Real usage: Systems Library `Domain Libraries/Cause and Effect/
-/// CausationConnections.sysml`'s `abstract constant ref occurrence causes[1..*] :>> causes :>
-/// participant { ... }`.
-fn occurrence_abstract_constant_prefix(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> {
-    let (input, is_abstract) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"abstract"[..])),
-        ws1,
-    ))
-    .parse(input)?;
-    let (input, is_constant) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"constant"[..])),
-        ws1,
-    ))
-    .parse(input)?;
-    Ok((input, (is_abstract.is_some(), is_constant.is_some())))
-}
-
+/// The four spellings that share one `OccurrenceUsagePrefix`, parsed as one production.
+///
+/// ```text
+/// OccurrenceUsage      = OccurrenceUsagePrefix 'occurrence' Usage                    -- BNF 573
+/// IndividualUsage      = BasicUsagePrefix 'individual' UsageExtensionKeyword* Usage  -- 576
+/// PortionUsage         = BasicUsagePrefix 'individual'? PortionKind
+///                        UsageExtensionKeyword* Usage                                -- 580
+/// EventOccurrenceUsage = OccurrenceUsagePrefix 'event'
+///                        ( OwnedReferenceSubsetting FeatureSpecializationPart?
+///                        | 'occurrence' UsageDeclaration? ) UsageCompletion           -- 589
+/// ```
+///
+/// The prefix is identical in all four -- `IndividualUsage` and `PortionUsage` inline the same
+/// slots instead of naming the production -- so what distinguishes them is which slots were
+/// authored and which kind keyword follows, not which prefix grammar applies. Parsing them as one
+/// production is what makes `individual snapshot s : Ind;` and `in individual :>> testVehicle :
+/// TestVehicle1 { … }` parse: both are in the pinned corpus, and both were recovery nodes while
+/// four separate parsers each accepted a different subset of the prefix.
+///
+/// Wrapped in a reference transaction because a `UsageExtensionKeyword` allocates an arena entry
+/// for its qualified name before the production is known to apply.
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, (is_abstract, is_constant)) = occurrence_abstract_constant_prefix(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    occurrence_usage_with_modifiers(
-        input,
-        OccurrencePrefix {
-            is_reference,
-            is_abstract,
-            is_constant,
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"individual"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_individual: true,
-            is_reference,
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"snapshot"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_reference,
-            portion_kind: Some("snapshot".to_string()),
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"timeslice"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_reference,
-            portion_kind: Some("timeslice".to_string()),
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-/// `then timeslice ...`: a succession-continuation form, not a distinct BNF production with its
-/// own `BasicUsagePrefix`/visibility grammar (unlike `occurrence`/`individual`/`snapshot`/
-/// `timeslice`, each `OccurrenceUsagePrefix`-backed per the BNF and captured above) -- ad hoc
-/// site, `visibility: None`, matching this rollout's established convention for constructs with
-/// no visibility grammar of their own (see `AttributeUsage`'s ad hoc sites).
-pub(crate) fn then_timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = tag(&b"timeslice"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_then: true,
-            is_reference,
-            portion_kind: Some("timeslice".to_string()),
-            membership: Membership::feature(None, crate::ast::Span::dummy()),
-            ..Default::default()
-        },
-    )
-}
-
-fn occurrence_usage_with_modifiers(
-    input: Input<'_>,
-    prefix: OccurrencePrefix,
-) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    // §6 G7: `event occurrence <name>;` (BNF `EventOccurrenceUsage`) and its succession form
-    // `then event occurrence <name>;`. Real usage: OMG spec Annex `17a-Sequence-Modeling.sysml`.
-    // Handled here rather than as a separate parser so every dispatcher that already reaches
-    // `occurrence_usage` picks both forms up.
-    let (input, then_kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"then"[..])), ws1)).parse(input)?;
-    let (input, event_kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"event"[..])), ws1)).parse(input)?;
-    // `occurrence` is only optional after `event`: the reference form `event <path>;` names an
-    // existing occurrence rather than declaring one (OMG spec Annex `17b-Sequence-Modeling.sysml`).
-    let (input, occurrence_kw) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"occurrence"[..])),
-        ws1,
-    ))
-    .parse(input)?;
-    if occurrence_kw.is_none() && event_kw.is_none() {
+    // The production has keyword-less spellings (`individual snapshot s : Ind;`), so the guard
+    // asks whether any word this production can begin with leads: `then`, visibility, a prefix
+    // slot keyword or `#` extension, `event`, or `occurrence`. Exact word matches, not first
+    // bytes, so `attribute`/`part`/... members refuse here instead of parsing a whole prefix
+    // inside an arena transaction and rolling it back.
+    if !crate::parser::occurrence_prefix::could_start_occurrence_usage(input) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    occurrence_usage_tail(
+    crate::parser::span::reference_transaction(input, occurrence_usage_inner)
+}
+
+fn occurrence_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
+    let (input, _) = ws_and_comments(input)?;
+    // The node's own span has to start at the first authored token, not at the kind keyword:
+    // every prefix span it now records sits ahead of the declaration, and deserialization checks
+    // that each one lies inside the node that owns it.
+    let start = input;
+    // `DefinitionBodyItem = ( SourceSuccessionMember )? OccurrenceUsageMember`, and
+    // `OccurrenceUsageMember = MemberPrefix …`, so `then` precedes the visibility keyword, which
+    // precedes the usage's own prefix.
+    let (input, then_span) = optional_keyword_token(input, b"then")?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, prefix) = occurrence_usage_prefix(input)?;
+    let (input, event_span) = optional_keyword_token(input, b"event")?;
+    // `occurrence` is optional only after `event`: `EventOccurrenceUsage`'s first alternative
+    // names an existing occurrence (`event someOccurrence;`, OMG spec Annex
+    // `17b-Sequence-Modeling.sysml`).
+    let (input, occurrence_span) = optional_keyword_token(input, b"occurrence")?;
+    let has_kind_keyword = event_span.is_some() || occurrence_span.is_some();
+    // `IndividualUsage` and `PortionUsage` are the two spellings with no kind keyword of their
+    // own; each requires the prefix slot that names it. Without one of those slots there is no
+    // production here, and consuming the prefix anyway would turn a sibling family's declaration
+    // into an occurrence usage.
+    if !has_kind_keyword && prefix.individual_span().is_none() && prefix.portion().is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // `ref individual item :>> driver : Alice;` (`training/28. Individuals/Individuals and Time
+    // Slices.sysml:10`) is an `ItemUsage` whose prefix happens to end where this one would: the
+    // next token is `item`, that family's kind keyword, not a declaration label. A reserved
+    // keyword can never be an unquoted declaration name, so the keyword-less spellings refuse it
+    // and leave the member to the family that owns it.
+    if !has_kind_keyword && next_word_is_reserved(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (rest, usage) = occurrence_usage_tail(
         input,
-        OccurrencePrefix {
-            is_then: prefix.is_then || then_kw.is_some(),
-            is_event: event_kw.is_some(),
-            ..prefix
+        OccurrenceHead {
+            prefix,
+            then_span,
+            is_event: event_span.is_some(),
+            is_event_reference: event_span.is_some() && occurrence_span.is_none(),
+            has_occurrence_keyword: occurrence_span.is_some(),
+            membership: Membership::feature(visibility, visibility_span),
         },
-    )
+    )?;
+    Ok((rest, node_from_to(start, rest, usage.value)))
 }
 
 fn occurrence_usage_tail(
     input: Input<'_>,
-    prefix: OccurrencePrefix,
+    head: OccurrenceHead,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
     // §6 G22: `occurrence :>> causes;` redefines an inherited occurrence without renaming it, so
-    // the name is optional here (OMG spec Annex `14c-Language Extensions.sysml`). The dotted form
-    // (`event publish_message.sourceEvent;`) names a nested feature, so a `.`-joined path is read
-    // as the name, matching how `perform` handles `perform providePower.generateTorque`.
-    let (input, name_str) = if starts_specialization_or_body(input) {
-        (input, String::new())
+    // the declaration name is optional. The keyword-less event form instead references an
+    // existing occurrence and may use a dotted/qualified path.
+    let (input, name, occurrence_reference) = if head.is_event_reference {
+        let (input, reference) = reference_path(input)?;
+        (input, None, Some(reference))
+    } else if starts_specialization_or_body(input) {
+        (input, None, None)
     } else {
-        occurrence_name_path(input)?
+        let (input, name) = name(input)?;
+        (input, Some(name), None)
     };
+    // BNF puts the multiplicity directly after the identification, before the typing part:
+    // `event occurrence zeroCrossingEvents[0..*] : ZeroCrossingEventDef { ... }` (Domain
+    // Libraries/Analysis/StateSpaceRepresentation.sysml). The emitter canonicalizes it to the
+    // after-type position, which reparses below into the same AST.
+    let (input, early_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
-    let type_name = type_name.map(|(_, is_conjugated, targets)| {
-        let name = targets_display_string(&targets);
-        if is_conjugated {
-            format!("~{name}")
-        } else {
-            name
-        }
-    });
+    let type_is_conjugated = type_name
+        .as_ref()
+        .is_some_and(|(_, is_conjugated, _, _)| *is_conjugated);
+    let type_name = type_name.and_then(|(_, _, targets, _)| targets.first().copied());
     // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
     // multiplicity`'s doc comment.
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, late_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let multiplicity = early_multiplicity.or(late_multiplicity);
     // `#73`: `abstract occurrence situations : Situation[*] nonunique;` — feature modifiers after
     // multiplicity; without skipping them the usage fails and becomes `KermlFeatureDecl`.
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
+    // Optional value clause, e.g. `in occurrence terminatedOccurrence default that as
+    // Occurrence { ... }` (Systems Library `Actions.sysml`).
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = occurrence_usage_body(input)?;
-    let (input, post_body_clauses) = specialization_clauses(input)?;
-    let subsets = post_body_clauses
+    // `Usage = UsageDeclaration UsageCompletion`, and `UsageCompletion` is only the optional
+    // value followed by `UsageBody` (SysML BNF 305-315; Pilot `SysML.xtext` 360-369).
+    // Specializations therefore end before the body. A speculative post-body `:>>` previously
+    // stole the next anonymous feature binding from this enclosing occurrence body, then failed
+    // when that sibling's `=` was not a terminator for the nested occurrence.
+    let subsets = trailing_clauses
         .subsets
         .map(|(name, _filter)| name)
-        .or_else(|| trailing_clauses.subsets.map(|(name, _filter)| name))
         .or_else(|| leading_clauses.subsets.map(|(name, _filter)| name));
-    let redefines = post_body_clauses
-        .redefines
-        .or(trailing_clauses.redefines)
-        .or(leading_clauses.redefines);
-    let references = post_body_clauses
-        .references
-        .or(trailing_clauses.references)
-        .or(leading_clauses.references);
-    let crosses = post_body_clauses
-        .crosses
-        .or(trailing_clauses.crosses)
-        .or(leading_clauses.crosses);
-    let intersects = post_body_clauses
-        .intersects
-        .or(trailing_clauses.intersects)
-        .or(leading_clauses.intersects);
-    let input = if post_body_clauses.had_any {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
-    };
+    let redefines = trailing_clauses.redefines.or(leading_clauses.redefines);
+    let references = trailing_clauses.references.or(leading_clauses.references);
+    let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
+    let intersects = trailing_clauses.intersects.or(leading_clauses.intersects);
     Ok((
         input,
         node_from_to(
             start,
             input,
             OccurrenceUsage {
-                is_individual: prefix.is_individual,
-                is_then: prefix.is_then,
-                is_event: prefix.is_event,
-                is_reference: prefix.is_reference,
-                is_abstract: prefix.is_abstract,
-                is_constant: prefix.is_constant,
-                portion_kind: prefix.portion_kind,
-                name: name_str,
+                short_name,
+                prefix: head.prefix,
+                then_span: head.then_span,
+                is_event: head.is_event,
+                has_occurrence_keyword: head.has_occurrence_keyword,
+                name,
+                occurrence_reference,
                 type_name,
+                type_is_conjugated,
                 multiplicity,
                 subsets,
                 redefines,
                 references,
                 crosses,
                 intersects,
+                value,
                 body,
-                membership: prefix.membership,
+                membership: head.membership,
             },
         ),
     ))
@@ -409,38 +367,24 @@ fn starts_specialization_or_body(input: Input<'_>) -> bool {
     frag.starts_with(b":") || frag.starts_with(b"{") || frag.starts_with(b";")
 }
 
-/// `name` or `name.nested.feature` -- the occurrence's own name, or a path to the nested feature
-/// being referenced.
-fn occurrence_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, first) = name(input)?;
-    let (input, rest) = nom::multi::many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    Ok((
-        input,
-        std::iter::once(first)
-            .chain(rest)
-            .collect::<Vec<_>>()
-            .join("."),
-    ))
-}
-
 fn occurrence_usage_body(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b";"[..]), |_| OccurrenceUsageBody::Semicolon),
+        crate::parser::body::semicolon_body,
         occurrence_usage_body_brace,
     ))
     .parse(input)
 }
 
 fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let open_start = input;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // `OccurrenceBodyElement` includes `AnnotatingElement`; retain a bare regular comment
+        // for that dispatcher rather than consuming it as lexical trivia at the body boundary.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().is_empty() {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -449,12 +393,22 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
             )));
         }
         if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, OccurrenceUsageBody::Brace { elements }));
+            let (close_start, _) = ws_and_comments(input)?;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            return Ok((
+                input,
+                OccurrenceUsageBody::Brace {
+                    open_span,
+                    elements,
+                    close_span: crate::parser::span::span_from_to(close_start, input),
+                },
+            ));
         }
+        let reference_checkpoint = input.extra.reference_checkpoint();
         match occurrence_body_element(input) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
+                    input.extra.rollback_references(reference_checkpoint);
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::Many0,
@@ -464,12 +418,34 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
                 input = next;
             }
             Err(_) => {
+                input.extra.rollback_references(reference_checkpoint);
                 let start_unknown = input;
                 let (next, _) = recover_body_element(input, OCCURRENCE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, OccurrenceUsageBody::Brace { elements }));
+                    let (closing, _) = crate::parser::body::advance_to_closing_brace(input)?;
+                    let recovery = build_recovery_error_node_from_span(
+                        start_unknown,
+                        closing,
+                        OCCURRENCE_BODY_STARTERS,
+                        "occurrence body",
+                        "recovered_occurrence_body_element",
+                    );
+                    let node: Node<ParseErrorNode> = node_from_to(start_unknown, closing, recovery);
+                    elements.push(node_from_to(
+                        start_unknown,
+                        closing,
+                        OccurrenceBodyElement::Error(node),
+                    ));
+                    let (close_start, _) = ws_and_comments(closing)?;
+                    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                    return Ok((
+                        input,
+                        OccurrenceUsageBody::Brace {
+                            open_span,
+                            elements,
+                            close_span: crate::parser::span::span_from_to(close_start, input),
+                        },
+                    ));
                 }
                 let recovery = build_recovery_error_node_from_span(
                     start_unknown,
@@ -493,11 +469,50 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
 pub(crate) fn occurrence_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<OccurrenceBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = OccurrenceBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = satisfy(start) {
+            let elem = OccurrenceBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = OccurrenceBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = OccurrenceBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
-        map(doc_comment, OccurrenceBodyElement::Doc),
-        map(annotation, OccurrenceBodyElement::Annotation),
+        map(
+            crate::parser::body::annotating_member,
+            OccurrenceBodyElement::Annotating,
+        ),
+        // Both `#` productions, in the order the grammar disambiguates them: the `ExtendedUsage`
+        // member spelling requires its own `;`/`{`, so a head without one falls through to the
+        // `PrefixMetadataMember` spelling, which leaves the prefixed declaration for the next
+        // member iteration. Grouped into a sub-`alt` to stay under nom's 21-branch limit.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                OccurrenceBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                OccurrenceBodyElement::MetadataKeywordUsage,
+            ),
+        )),
         map(
             assert_constraint_member,
             OccurrenceBodyElement::AssertConstraint,
@@ -509,8 +524,13 @@ pub(crate) fn occurrence_body_element(
             OccurrenceBodyElement::AttributeUsage,
         ),
         map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
+        // `BindingConnectorAsUsage` is a `NonOccurrenceUsageElement`, which an occurrence
+        // definition body admits through `DefinitionBodyItem` (SysML BNF 237-247, 349-353,
+        // 702-707; the pinned Pilot SysML grammar agrees). Reuse its typed parser so connector
+        // ends and an optional usage body remain source-backed rather than becoming recovery.
+        map(bind_, OccurrenceBodyElement::Bind),
         map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
-        map(satisfy, OccurrenceBodyElement::Satisfy),
+        map(satisfy, |n| OccurrenceBodyElement::Satisfy(Box::new(n))),
         // Allocation / connection ends in structured definition bodies (`allocation def { end …; }`).
         map(
             |i| crate::parser::connector::end_decl(i, true),
@@ -531,18 +551,6 @@ pub(crate) fn occurrence_body_element(
             crate::parser::item::item_usage,
             OccurrenceBodyElement::ItemUsage,
         ),
-        map(individual_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(snapshot_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(timeslice_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(then_timeslice_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
         map(occurrence_usage, |n| {
             OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
         }),
@@ -552,6 +560,15 @@ pub(crate) fn occurrence_body_element(
         map(
             exhibit_state_as_state_usage,
             OccurrenceBodyElement::StateUsage,
+        ),
+        map(crate::parser::part::connection_usage_member, |n| {
+            OccurrenceBodyElement::ConnectionUsage(Box::new(n))
+        }),
+        // Last of the structured arms: `ref_decl` accepts a bare `ref` with no kind keyword, so
+        // trying it earlier would claim members the kinded parsers above own.
+        map(
+            crate::parser::connector::ref_decl,
+            OccurrenceBodyElement::RefDecl,
         ),
     ))
     .parse(input)?;
@@ -565,6 +582,18 @@ pub(crate) fn occurrence_body_element(
 /// only valid inside an action body). Real usage from the SysML Systems Library
 /// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
 pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"succession") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, succession_usage_inner)
+}
+
+fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
@@ -603,7 +632,7 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
@@ -619,7 +648,7 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
     let (input, target_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -643,6 +672,20 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
 pub(crate) fn assert_constraint_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"assert") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, assert_constraint_member_inner)
+}
+
+fn assert_constraint_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
@@ -655,32 +698,33 @@ pub(crate) fn assert_constraint_member(
     // a previously-declared standalone `constraint` by name and rebinding its `in` parameters, is
     // real usage (`assert massAnalysis3 { in totalMass = mass; ... }`, Simple Tests/
     // ConstraintTest.sysml:78), richer than the already-supported `assert constraint ...` form.
-    let (input, _) = opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
+    let (input, constraint_keyword) =
+        opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, name) = if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";")
-    {
-        (input, None)
-    } else {
-        let (input, parsed_name) = name(input)?;
-        (input, Some(parsed_name))
-    };
+    let (input, declaration_name, target) =
+        if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";") {
+            (input, None, None)
+        } else if constraint_keyword.is_some() {
+            let (input, parsed_name) = name(input)?;
+            (input, Some(parsed_name), None)
+        } else {
+            let (input, target) = reference_path(input)?;
+            (input, None, Some(target))
+        };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    let (input, body) = structured_constraint_body(input)?;
-    let body = match body {
-        StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
-        StructuredConstraintBody::Brace { elements } => ConstraintDefBody::Brace { elements },
-    };
+    let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             AssertConstraintMember {
-                name,
+                declaration_name,
+                target,
                 type_name,
                 body,
                 is_negated,
@@ -697,19 +741,23 @@ pub(crate) fn assert_constraint_member(
 #[cfg(test)]
 mod assert_constraint_name_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
     fn assert_constraint_accepts_a_name() {
-        let (rest, node) =
-            assert_constraint_member(input("assert constraint engineSelectionRational { }"))
-                .expect("named assert constraint");
+        let source = input("assert constraint engineSelectionRational { }");
+        let (rest, node) = assert_constraint_member(source).expect("named assert constraint");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("engineSelectionRational"));
+        assert_eq!(
+            node.value
+                .declaration_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"engineSelectionRational"[..])
+        );
+        assert!(node.value.target.is_none());
         assert!(!node.value.is_negated);
     }
 
@@ -718,17 +766,22 @@ mod assert_constraint_name_tests {
     /// Expression and Constraint Definition.sysml`.
     #[test]
     fn assert_constraint_accepts_a_name_and_a_type() {
-        let (rest, node) = assert_constraint_member(input(
+        let source = input(
             "assert constraint discBrakeFitConstraint_Alt: DiscBrakeFitConstraint_Alt { in wheel = WheelAssy::wheel; }",
-        ))
-        .expect("typed assert constraint");
+        );
+        let (rest, node) = assert_constraint_member(source).expect("typed assert constraint");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value.name.as_deref(),
-            Some("discBrakeFitConstraint_Alt")
+            node.value
+                .declaration_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"discBrakeFitConstraint_Alt"[..])
         );
         assert_eq!(
-            node.value.type_name.as_deref(),
+            node.value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
             Some("DiscBrakeFitConstraint_Alt")
         );
     }
@@ -759,15 +812,21 @@ mod assert_constraint_name_tests {
         let (rest, node) =
             assert_constraint_member(input("assert constraint { }")).expect("anonymous form");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, None);
+        assert_eq!(node.value.declaration_name, None);
+        assert!(node.value.target.is_none());
     }
 
     #[test]
     fn assert_constraint_negated_named_form() {
-        let (rest, node) = assert_constraint_member(input("assert not constraint c { }"))
-            .expect("negated named form");
+        let source = input("assert not constraint c { }");
+        let (rest, node) = assert_constraint_member(source).expect("negated named form");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("c"));
+        assert_eq!(
+            node.value
+                .declaration_name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"c"[..])
+        );
         assert!(node.value.is_negated);
     }
 }
@@ -775,23 +834,21 @@ mod assert_constraint_name_tests {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
     fn occurrence_usage_captures_intersects() {
-        let (rest, node) =
-            occurrence_usage(input("occurrence o1 : O1 intersects a;")).expect("occurrence usage");
+        let source = input("occurrence o1 : O1 intersects a;");
+        let (rest, node) = occurrence_usage(source).expect("occurrence usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value
                 .intersects
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
+                .map(|n| crate::parser::usage::reference_list_text(source, &n.value.target)),
             Some("a".to_string())
         );
     }
@@ -814,57 +871,118 @@ mod membership_tests {
 
     #[test]
     fn occurrence_usage_without_visibility_prefix_has_no_membership_visibility() {
-        let (_, node) = occurrence_usage(input("occurrence o1 : O1;")).expect("occurrence usage");
+        let source = input("occurrence o1 : $::Occurrences::O1;");
+        let (_, node) = occurrence_usage(source).expect("occurrence usage");
         assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Occurrences::O1")
+        );
+    }
+
+    #[test]
+    fn event_shorthand_keeps_its_dotted_reference_in_the_arena() {
+        let source = input("event sequence.publishMessage;");
+        let (rest, node) = occurrence_usage(source).expect("event reference");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.name.is_none());
+        assert_eq!(
+            node.value
+                .occurrence_reference
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("sequence.publishMessage")
+        );
     }
 
     #[test]
     fn occurrence_usage_accepts_abstract_nonunique() {
-        let (rest, node) = occurrence_usage(input(
-            "abstract occurrence situations : Situation[*] nonunique;",
-        ))
-        .expect("abstract nonunique occurrence");
+        let source = input("abstract occurrence situations : Situation[*] nonunique;");
+        let (rest, node) = occurrence_usage(source).expect("abstract nonunique occurrence");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_abstract);
-        assert_eq!(node.value.name, "situations");
+        assert_eq!(
+            node.value
+                .prefix
+                .basic()
+                .expect("basic head")
+                .ref_prefix
+                .variance
+                .as_ref()
+                .map(|node| node.value),
+            Some(crate::ast::DefinitionPrefix::Abstract)
+        );
+        assert_eq!(
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(source, n)),
+            Some(&b"situations"[..])
+        );
     }
 
     #[test]
     fn individual_usage_visibility_prefix_is_captured_on_membership() {
         let (_, node) =
-            individual_usage(input("private individual o1 : O1;")).expect("individual usage");
+            occurrence_usage(input("private individual o1 : O1;")).expect("individual usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Private)
         );
+        assert!(node.value.prefix.individual_span().is_some());
     }
 
     #[test]
     fn snapshot_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) = snapshot_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
+        let (_, node) =
+            occurrence_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Public)
         );
+        assert_eq!(
+            node.value.prefix.portion().map(|node| node.value),
+            Some(crate::ast::OccurrencePortionKind::Snapshot)
+        );
+    }
+
+    /// BNF places the multiplicity directly after the identification, before the typing part:
+    /// `event occurrence zeroCrossingEvents[0..*] : ZeroCrossingEventDef` (Domain Libraries/
+    /// Analysis/StateSpaceRepresentation.sysml). Surfaced by spec42 Gap 33 once action bodies
+    /// dispatched `event` members through `occurrence_usage`.
+    #[test]
+    fn occurrence_usage_retains_multiplicity_authored_before_the_typing() {
+        let (rest, node) = occurrence_usage(input("event occurrence z[0..*] : Z;"))
+            .expect("event occurrence with early multiplicity");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_event);
+        assert!(node.value.multiplicity.is_some());
+        assert!(node.value.type_name.is_some());
     }
 
     #[test]
     fn timeslice_usage_visibility_prefix_is_captured_on_membership() {
         let (_, node) =
-            timeslice_usage(input("protected timeslice o1 : O1;")).expect("timeslice usage");
+            occurrence_usage(input("protected timeslice o1 : O1;")).expect("timeslice usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Protected)
         );
+        assert_eq!(
+            node.value.prefix.portion().map(|node| node.value),
+            Some(crate::ast::OccurrencePortionKind::Timeslice)
+        );
     }
 
+    /// `SourceSuccessionMember = 'then' …` precedes `OccurrenceUsageMember`'s `MemberPrefix`, so
+    /// a `then` form has no visibility of its own unless one is written after it.
     #[test]
     fn then_timeslice_usage_always_has_no_membership_visibility() {
-        // Ad hoc site with no visibility grammar of its own -- see the doc comment on
-        // `then_timeslice_usage`.
         let (_, node) =
-            then_timeslice_usage(input("then timeslice o1 : O1;")).expect("then timeslice usage");
+            occurrence_usage(input("then timeslice o1 : O1;")).expect("then timeslice usage");
         assert_eq!(node.value.membership.visibility, None);
+        assert!(node.value.then_span.is_some());
     }
 
     #[test]

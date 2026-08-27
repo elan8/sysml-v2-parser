@@ -1,20 +1,28 @@
-use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Membership, Node, PayloadFeature};
+use crate::ast::{
+    FlowDeclaration, FlowDef, FlowEndpoints, FlowPayloadClause, FlowUsage, FlowUsageKind,
+    Membership, Node, PayloadFeature,
+};
 
-type FlowEndpoints<'a> =
-    nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
+type ParsedFlowEndpoints<'a> = nom::IResult<
+    Input<'a>,
+    (
+        Option<Node<crate::ast::KermlConnectorEnd>>,
+        Option<Node<crate::ast::KermlConnectorEnd>>,
+    ),
+>;
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{
-    conjugated_qualified_name, feature_usage_header, multiplicity_node, optional_typings,
-    targets_display_string,
+    conjugated_qualified_name, multiplicity_node, optional_typings, usage_declaration,
+    usage_declaration_without_identification,
 };
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
+use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -25,6 +33,7 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
         input,
         DefinitionPrefixOptions::new(b"flow")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
@@ -34,6 +43,8 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
             start,
             input,
             FlowDef {
+                definition_prefix: prefix.basic_prefix,
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -55,15 +66,17 @@ fn flow_usage_keyword(input: Input<'_>) -> IResult<Input<'_>, FlowUsageKind> {
     .parse(input)
 }
 
-fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<PayloadFeature>>> {
-    let (peek, _) = ws_and_comments(input)?;
-    if starts_with_keyword(peek.fragment(), b"of") {
-        let (input, _) = preceded(ws_and_comments, tag(&b"of"[..])).parse(input)?;
-        let (input, payload) = preceded(ws1, payload_feature).parse(input)?;
-        Ok((input, Some(payload)))
-    } else {
-        Ok((input, None))
-    }
+fn payload_clause(input: Input<'_>) -> IResult<Input<'_>, Node<FlowPayloadClause>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let of_start = input;
+    let (input, _) = tag(&b"of"[..]).parse(input)?;
+    let of_span = crate::parser::span_from_to(of_start, input);
+    let (input, feature) = preceded(ws1, payload_feature).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, FlowPayloadClause { of_span, feature }),
+    ))
 }
 
 /// SysML v2 §8.2.2.16 `PayloadFeature`: an optionally-named feature typed by (and/or given a
@@ -83,14 +96,10 @@ fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<PayloadF
 fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>> {
     let start = input;
     if let Ok((after_name, feature_name)) = preceded(ws_and_comments, name).parse(input) {
-        if let Ok((after_typing, Some((_, is_conjugated, targets)))) = optional_typings(after_name)
+        if let Ok((after_typing, Some((_, is_conjugated, targets, _)))) =
+            optional_typings(after_name)
         {
-            let base = targets_display_string(&targets);
-            let type_name = Some(if is_conjugated {
-                format!("~{base}")
-            } else {
-                base
-            });
+            let type_name = targets.first().copied();
             let (rest, multiplicity) =
                 nom::combinator::opt(preceded(ws_and_comments, multiplicity_node))
                     .parse(after_typing)?;
@@ -102,6 +111,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
                     PayloadFeature {
                         name: Some(feature_name),
                         type_name,
+                        type_is_conjugated: is_conjugated,
                         multiplicity,
                     },
                 ),
@@ -109,10 +119,9 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
         }
     }
     // Bare type reference: no explicit feature name.
-    let (input, (conjugated, target)) =
+    let (input, (is_conjugated, target)) =
         preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
-    let base = targets_display_string(std::slice::from_ref(&target));
-    let type_name = Some(if conjugated { format!("~{base}") } else { base });
+    let type_name = Some(target);
     let (input, multiplicity) =
         nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     Ok((
@@ -123,13 +132,14 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
             PayloadFeature {
                 name: None,
                 type_name,
+                type_is_conjugated: is_conjugated,
                 multiplicity,
             },
         ),
     ))
 }
 
-fn flow_endpoints(input: Input<'_>) -> FlowEndpoints<'_> {
+fn flow_endpoints(input: Input<'_>) -> ParsedFlowEndpoints<'_> {
     let (peek, _) = ws_and_comments(input)?;
     let fragment = peek.fragment();
     if fragment.starts_with(b";") || fragment.starts_with(b"{") {
@@ -137,81 +147,90 @@ fn flow_endpoints(input: Input<'_>) -> FlowEndpoints<'_> {
     }
     if starts_with_keyword(peek.fragment(), b"from") {
         let (input, _) = preceded(ws_and_comments, tag(&b"from"[..])).parse(input)?;
-        let (input, from) = preceded(ws1, expression).parse(input)?;
+        let (input, from) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to) = preceded(ws1, expression).parse(input)?;
+        let (input, to) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         return Ok((input, (Some(from), Some(to))));
     }
-    // Shorthand: expr `to` expr (no `from` keyword).
-    let (input, from) = expression(input)?;
+    // Shorthand: end `to` end (no `from` keyword).
+    let start = input;
+    let (input, from) = crate::parser::constraint::kerml_connector_end(input)?;
     let (peek, _) = ws_and_comments(input)?;
     if starts_with_keyword(peek.fragment(), b"to") {
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to) = preceded(ws1, expression).parse(input)?;
+        let (input, to) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         Ok((input, (Some(from), Some(to))))
     } else {
-        Ok((input, (None, None)))
+        // No `to`: this member has no endpoints; leave the input untouched.
+        Ok((start, (None, None)))
     }
 }
 
-fn flow_usage_named(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
-    let (input, name_str) = name(input)?;
-    let (input, header) = feature_usage_header(input)?;
-    let (input, payload) = optional_payload(input)?;
+fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
+    // `Identification` is optional in `UsageDeclaration`. The `of` keyword starts the following
+    // payload clause, so it must not be claimed as an invented declaration name. This remains the
+    // declaration-led grammar alternative; the endpoint-only alternative is selected separately.
+    let (input, declaration) = if starts_with_keyword(input.fragment(), b"of") {
+        usage_declaration_without_identification(input)?
+    } else {
+        usage_declaration(input)?
+    };
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
+    // Retain every authored clause. The pinned grammar admits one optional clause, but KerML's
+    // `validateFlowPayloadFeature` is an at-most-one rule; preserving a repeated clause gives the
+    // validation layer an authorable violating side instead of collapsing it into generic body
+    // recovery (spec42 Gap 62).
+    let (input, payloads) = many0(payload_clause).parse(input)?;
     let (input, (from, to)) = flow_endpoints(input)?;
+    let endpoints = match (from, to) {
+        (None, None) => None,
+        (Some(from), Some(to)) => Some(FlowEndpoints { from, to }),
+        // `flow_endpoints` recognizes the pair atomically, so a one-sided result would be a
+        // parser defect rather than a valid AST state.
+        (Some(_), None) | (None, Some(_)) => unreachable!("flow endpoints are coupled"),
+    };
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
         FlowUsage {
             kind: FlowUsageKind::Flow, // overwritten by caller
-            name: Some(name_str),
-            type_name: header.type_name,
-            payload,
-            from,
-            to,
+            declaration: FlowDeclaration::Declared {
+                declaration: Box::new(declaration),
+                value,
+                payloads,
+                endpoints: Box::new(endpoints),
+            },
             body,
             membership: Membership::feature(None, crate::ast::Span::dummy()), // overwritten by caller
         },
     ))
 }
 
-/// Payload-first flow usage (§6 G12): `flow of <payload> (from <a> to <b>)? (`;` | `{ }`)`.
-fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
-    let (input, payload) = optional_payload(input)?;
+fn flow_usage_endpoint_only(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
     let (input, (from, to)) = flow_endpoints(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = semicolon_or_structured_definition_body(input)?;
-    Ok((
-        input,
-        FlowUsage {
-            kind: FlowUsageKind::Flow, // overwritten by caller
-            name: None,
-            type_name: None,
-            payload,
-            from,
-            to,
-            body,
-            membership: Membership::feature(None, crate::ast::Span::dummy()), // overwritten by caller
-        },
-    ))
-}
-
-fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
-    let (input, from) = expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, to) = preceded(ws1, expression).parse(input)?;
+    let (Some(from), Some(to)) = (from, to) else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    };
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
         FlowUsage {
             kind: FlowUsageKind::Flow,
-            name: None,
-            type_name: None,
-            payload: None,
-            from: Some(from),
-            to: Some(to),
+            declaration: FlowDeclaration::EndpointOnly {
+                endpoints: FlowEndpoints { from, to },
+            },
             body,
             membership: Membership::feature(None, crate::ast::Span::dummy()), // overwritten by caller
         },
@@ -227,30 +246,10 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
     let (input, kind) = flow_usage_keyword(input)?;
     let (input, _) = ws1(input)?;
 
-    let (input, mut usage) = {
-        let peek = input;
-        // §6 G12: `flow of fuel : Fuel from a to b;` puts the payload clause before the endpoints
-        // and has no name of its own (OMG spec Annex `3d-Function-based Behavior-item.sysml`).
-        // Checked before the name dispatch below, which would otherwise take `of` as the name.
-        if starts_with_keyword(peek.fragment(), b"of") {
-            flow_usage_payload_first(peek)?
-        } else {
-            match name(peek) {
-                Ok((after_name, _name_str)) => {
-                    let (after_name, _) = ws_and_comments(after_name)?;
-                    let fragment = after_name.fragment();
-                    let is_anonymous =
-                        fragment.starts_with(b".") || starts_with_keyword(fragment, b"to");
-                    if is_anonymous {
-                        flow_usage_anonymous(peek)?
-                    } else {
-                        flow_usage_named(peek)?
-                    }
-                }
-                Err(_) => flow_usage_anonymous(input)?,
-            }
-        }
-    };
+    let (input, mut usage) =
+        crate::parser::span::reference_transaction(input, flow_usage_endpoint_only).or_else(
+            |_| crate::parser::span::reference_transaction(input, flow_usage_with_declaration),
+        )?;
     usage.kind = kind;
     usage.membership = Membership::feature(visibility, visibility_span);
     Ok((input, node_from_to(start, input, usage)))
@@ -262,57 +261,11 @@ pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>
 }
 
 #[cfg(test)]
-mod payload_first_gap_tests {
-    use super::*;
-    use nom_locate::LocatedSpan;
-
-    fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
-    }
-
-    /// PARSER_BACKLOG_ROADMAP.md §6, G12: the payload clause may precede the endpoints, with no
-    /// name on the flow itself. `of` was previously consumed as the flow's name. Real usage: OMG
-    /// spec Annex `3d-Function-based Behavior-item.sysml`.
-    #[test]
-    fn flow_usage_accepts_a_payload_before_the_endpoints() {
-        let (rest, node) = flow_usage_member(input(
-            "flow of fuel : Fuel from storageTank.fuelOutPort.fuel to pump.fuelInPort.fuel;",
-        ))
-        .expect("payload-first flow");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, None);
-        let payload = node.value.payload.expect("payload");
-        assert_eq!(payload.value.name.as_deref(), Some("fuel"));
-        assert_eq!(payload.value.type_name.as_deref(), Some("Fuel"));
-        assert!(node.value.from.is_some() && node.value.to.is_some());
-    }
-
-    #[test]
-    fn flow_usage_accepts_a_payload_before_a_brace_body() {
-        let (rest, node) =
-            flow_usage_member(input("flow of fuel : Fuel from a.b to c.d { /* note */ }"))
-                .expect("payload-first flow");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.payload.is_some());
-    }
-
-    /// A flow whose name genuinely is `of`-prefixed (e.g. `offset`) must not take the G12 path.
-    #[test]
-    fn flow_usage_still_names_identifiers_that_merely_start_with_of() {
-        let (rest, node) =
-            flow_usage_member(input("flow offset from a to b;")).expect("named flow");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("offset"));
-    }
-}
-
-#[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on FlowDef/FlowUsage ---

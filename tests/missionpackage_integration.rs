@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use sysml_v2_parser::ast::{
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RootElement,
+    AnnotatingMember, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RootElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -30,34 +30,28 @@ fn missionpackage_structures_connection_and_comment_members() {
     let mut structured_connection_count = 0usize;
     let mut structured_comment_count = 0usize;
     let mut opaque_connection_count = 0usize;
-    let mut fallback_comment_count = 0usize;
 
-    let package = match &parsed.root.elements[0].value {
+    let package = match &parsed.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package brace body");
     };
     for element in elements {
         let PackageBodyElement::PartDef(part_def) = &element.value else {
             continue;
         };
-        let PartDefBody::Brace { elements } = &part_def.value.body else {
+        let PartDefBody::Brace { elements, .. } = &part_def.value.body else {
             continue;
         };
         for member in elements {
             match &member.value {
                 PartDefBodyElement::Connection(_) => structured_connection_count += 1,
-                PartDefBodyElement::Comment(_) => structured_comment_count += 1,
-                PartDefBodyElement::OpaqueMember(opaque)
-                    if opaque.value.keyword == "connection" =>
-                {
-                    opaque_connection_count += 1
+                PartDefBodyElement::Annotating(AnnotatingMember::Comment(_)) => {
+                    structured_comment_count += 1
                 }
-                PartDefBodyElement::Other(text) if text.starts_with("comment ") => {
-                    fallback_comment_count += 1
-                }
+                PartDefBodyElement::UnsupportedMember(_) => opaque_connection_count += 1,
                 _ => {}
             }
         }
@@ -75,8 +69,6 @@ fn missionpackage_structures_connection_and_comment_members() {
         opaque_connection_count, 0,
         "connection members should not degrade to opaque members"
     );
-    assert_eq!(
-        fallback_comment_count, 0,
-        "comment members should not degrade to fallback Other nodes"
-    );
+    // A part definition body member can no longer degrade to opaque text: the scope has no such
+    // variant, so `structured_comment_count` above is the only way a comment can be represented.
 }

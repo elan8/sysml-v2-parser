@@ -2,7 +2,7 @@
 //!
 //! Consolidates typed headers and specialization without changing public AST shapes.
 
-use crate::ast::{Node, TypingRelationship};
+use crate::ast::{Node, Span, TypingRelationship};
 use crate::parser::specialization::parse_optional_definition_header_with_raw;
 use crate::parser::usage::{feature_usage_header, UsageHeader};
 use crate::parser::Input;
@@ -12,9 +12,9 @@ use nom::IResult;
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct DefinitionHeaderParts {
     pub specializes: Option<Node<TypingRelationship>>,
-    /// Raw text swallowed by the plain `: Type` header scan, when that branch was taken. See
-    /// [`crate::parser::specialization::parse_optional_definition_header_with_raw`].
-    pub raw_header: Option<String>,
+    /// Span of the text swallowed by the plain `: Type` header scan, when that branch was taken.
+    /// See [`crate::parser::specialization::parse_optional_definition_header_with_raw`].
+    pub raw_header: Option<Span>,
 }
 
 /// Parse optional definition header after identification (typing + `:>` / `specializes`).

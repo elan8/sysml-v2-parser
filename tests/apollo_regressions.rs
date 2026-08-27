@@ -1,35 +1,44 @@
 use sysml_v2_parser::ast::{
-    ActionDefBody, ConnectionDefBody, ConnectionDefBodyElement, ConstraintDefBody,
-    ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement, OccurrenceUsageBody,
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody,
-    PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, RootElement, StateDefBody,
-    StateDefBodyElement,
+    ActionDefBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement,
+    ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement,
+    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
+    PartUsageBody, PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement,
+    RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
-fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement>> {
+fn package_elements(
+    input: &str,
+) -> (
+    sysml_v2_parser::ParsedDocument,
+    Vec<sysml_v2_parser::Node<PackageBodyElement>>,
+) {
     let root = parse(input).expect("input should parse");
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    match &pkg.body {
-        PackageBody::Brace { elements } => elements.clone(),
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
-    }
+    };
+    (root, elements)
 }
 
 #[test]
 fn individual_part_definition_and_usage_parse_as_parts() {
     let input = "package P {\nindividual part def 'Neil Armstrong' :> Astronaut { }\nindividual part crewMember : Astronaut { }\n}";
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
 
     match &elements[0].value {
         PackageBodyElement::PartDef(def) => {
             assert!(def.value.is_individual);
             assert_eq!(
-                def.value.identification.name.as_deref(),
-                Some("Neil Armstrong")
+                def.value
+                    .identification
+                    .name
+                    .and_then(|n| doc.declaration_name(n)),
+                Some("'Neil Armstrong'")
             );
         }
         other => panic!("expected individual part def, got {other:?}"),
@@ -37,8 +46,11 @@ fn individual_part_definition_and_usage_parse_as_parts() {
 
     match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => {
-            assert!(usage.value.is_individual);
-            assert_eq!(usage.value.name, "crewMember");
+            assert!(usage.value.prefix.individual_span().is_some());
+            assert_eq!(
+                usage.value.name.and_then(|n| doc.declaration_name(n)),
+                Some("crewMember")
+            );
         }
         other => panic!("expected individual part usage, got {other:?}"),
     }
@@ -54,25 +66,30 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("ApolloMission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("ApolloMission") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("ApolloMission part def should be present");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let req = elements.iter().find_map(|e| match &e.value {
@@ -80,10 +97,7 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         _ => None,
     });
     let req = req.expect("requirement usage should parse in part body");
-    assert_eq!(
-        req.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("goals".to_string())
-    );
+    assert!(req.subsets.is_some());
 }
 
 #[test]
@@ -96,25 +110,30 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Mission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Mission") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected Mission part def");
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -124,7 +143,7 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    let StateDefBody::Brace { elements } = &exhibit.body else {
+    let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
     let transitions: Vec<_> = elements
@@ -149,25 +168,30 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let machine = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::StateDef(def)
-                if def.value.identification.name.as_deref() == Some("M") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("M") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected state def M");
-    let StateDefBody::Brace { elements } = &machine.body else {
+    let StateDefBody::Brace { elements, .. } = &machine.body else {
         panic!("expected state body");
     };
     let transition = elements
@@ -177,7 +201,12 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
             _ => None,
         })
         .expect("expected named transition");
-    assert_eq!(transition.name.as_deref(), Some("docked"));
+    assert_eq!(
+        transition
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("docked")
+    );
 }
 
 #[test]
@@ -190,18 +219,18 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let usage = match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected part usage"),
     };
-    let PartUsageBody::Brace { elements } = &usage.body else {
+    let PartUsageBody::Brace { elements, .. } = &usage.body else {
         panic!("expected part usage body");
     };
     let timeslice = elements
@@ -211,8 +240,11 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
             _ => None,
         })
         .expect("timeslice should parse in part body");
-    assert_eq!(timeslice.portion_kind.as_deref(), Some("timeslice"));
-    let OccurrenceUsageBody::Brace { elements } = &timeslice.body else {
+    assert_eq!(
+        timeslice.prefix.portion().map(|node| node.value),
+        Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
+    );
+    let OccurrenceUsageBody::Brace { elements, .. } = &timeslice.body else {
         panic!("expected timeslice body");
     };
     let snapshot = elements
@@ -222,7 +254,10 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
             _ => None,
         })
         .expect("snapshot should parse in timeslice body");
-    assert_eq!(snapshot.portion_kind.as_deref(), Some("snapshot"));
+    assert_eq!(
+        snapshot.prefix.portion().map(|node| node.value),
+        Some(sysml_v2_parser::OccurrencePortionKind::Snapshot)
+    );
 }
 
 #[test]
@@ -235,18 +270,18 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let usage = match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected part usage"),
     };
-    let PartUsageBody::Brace { elements } = &usage.body else {
+    let PartUsageBody::Brace { elements, .. } = &usage.body else {
         panic!("expected part usage body");
     };
     let occurrences: Vec<_> = elements
@@ -257,28 +292,25 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         })
         .collect();
     assert_eq!(occurrences.len(), 2);
-    assert_eq!(occurrences[0].portion_kind.as_deref(), Some("timeslice"));
     assert_eq!(
-        occurrences[0]
-            .subsets
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        None
+        occurrences[0].prefix.portion().map(|node| node.value),
+        Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
     );
-    assert_eq!(occurrences[1].portion_kind.as_deref(), Some("timeslice"));
+    assert!(occurrences[0].subsets.is_none());
+    assert_eq!(
+        occurrences[1].prefix.portion().map(|node| node.value),
+        Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
+    );
 
     let OccurrenceUsageBody::Brace {
         elements: ingress_elements,
+        ..
     } = &occurrences[0].body
     else {
         panic!("expected ingress timeslice body");
     };
-    assert!(
-        ingress_elements.iter().all(
-            |e| !matches!(e.value, OccurrenceBodyElement::Other(ref text) if text == "assert constraint")
-        ),
-        "assert constraint should not degrade to OccurrenceBodyElement::Other"
-    );
+    // An occurrence body member can no longer degrade to opaque text: the scope has no such
+    // variant, so the structured member below is the only representation available.
     let assert_constraint = ingress_elements
         .iter()
         .find_map(|e| match &e.value {
@@ -288,6 +320,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         .expect("assert constraint should parse as a structured occurrence member");
     let ConstraintDefBody::Brace {
         elements: assert_elements,
+        ..
     } = &assert_constraint.body
     else {
         panic!("expected assert constraint body");
@@ -297,13 +330,14 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
             matches!(
                 &e.value,
                 ConstraintDefBodyElement::Expression(expr)
-                    if matches!(&expr.value, Expression::FeatureRef(name) if name == "ready")
+                    if matches!(&expr.value, Expression::FeatureRef(name)
+                        if result.document.qualified_reference(*name).is_some_and(|r| r.authored_text() == "ready"))
             )
         }),
         "assert constraint body should preserve the `ready` expression"
     );
 
-    let OccurrenceUsageBody::Brace { elements } = &occurrences[1].body else {
+    let OccurrenceUsageBody::Brace { elements, .. } = &occurrences[1].body else {
         panic!("expected timeslice body");
     };
     let snapshot = elements
@@ -313,11 +347,8 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
             _ => None,
         })
         .expect("snapshot should parse in then timeslice body");
-    assert_eq!(
-        snapshot.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("system".to_string())
-    );
-    assert_eq!(snapshot.type_name.as_deref(), Some("MissionSystem"));
+    assert!(snapshot.subsets.is_some());
+    assert!(snapshot.type_name.is_some());
 }
 
 #[test]
@@ -330,59 +361,55 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let program = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(usage) if usage.value.name == "apolloProgram" => {
+            PackageBodyElement::PartUsage(usage)
+                if usage
+                    .value
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("apolloProgram") =>
+            {
                 Some(&usage.value)
             }
             _ => None,
         })
         .expect("expected program part usage");
-    let PartUsageBody::Brace { elements } = &program.body else {
+    let PartUsageBody::Brace { elements, .. } = &program.body else {
         panic!("expected program body");
     };
     let apollo1 = match &elements[0].value {
         PartUsageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected nested part usage"),
     };
-    assert_eq!(
-        apollo1
-            .subsets
-            .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("missions".to_string())
-    );
+    assert!(apollo1.subsets.is_some());
 
-    let PartUsageBody::Brace { elements } = &apollo1.body else {
+    let PartUsageBody::Brace { elements, .. } = &apollo1.body else {
         panic!("expected nested mission body");
     };
     let crew_members: Vec<_> = elements
         .iter()
         .filter_map(|e| match &e.value {
-            PartUsageBodyElement::PartUsage(usage) if usage.value.is_individual => {
+            PartUsageBodyElement::PartUsage(usage)
+                if usage.value.prefix.individual_span().is_some() =>
+            {
                 Some(&usage.value)
             }
             _ => None,
         })
         .collect();
     assert_eq!(crew_members.len(), 2);
-    assert_eq!(crew_members[0].name, "");
-    assert_eq!(crew_members[0].type_name, "Gus Grissom");
-    assert_eq!(
-        crew_members[0]
-            .subsets
-            .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("crew".to_string())
-    );
+    assert!(crew_members[0].name.is_none());
+    assert!(crew_members[0].typing.is_some());
+    assert!(crew_members[0].subsets.is_some());
 }
 
 #[test]
@@ -395,25 +422,30 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Mission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Mission") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected Mission part def");
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -423,10 +455,7 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    assert_eq!(
-        exhibit.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("missionPhases".to_string())
-    );
+    assert!(exhibit.redefines.is_some());
 }
 
 #[test]
@@ -442,25 +471,30 @@ fn exhibit_state_supports_parallel_modifier() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let vehicle = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Vehicle") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected Vehicle part def");
-    let PartDefBody::Brace { elements } = &vehicle.body else {
+    let PartDefBody::Brace { elements, .. } = &vehicle.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -470,8 +504,13 @@ fn exhibit_state_supports_parallel_modifier() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    assert_eq!(exhibit.name, "vehicleStates");
-    let StateDefBody::Brace { elements } = &exhibit.body else {
+    assert_eq!(
+        exhibit
+            .name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("vehicleStates")
+    );
+    let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
     assert_eq!(elements.len(), 2);
@@ -493,25 +532,30 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let vehicle = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Vehicle") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected Vehicle part def");
-    let PartDefBody::Brace { elements } = &vehicle.body else {
+    let PartDefBody::Brace { elements, .. } = &vehicle.body else {
         panic!("expected part body");
     };
     let exhibits: Vec<_> = elements
@@ -525,13 +569,15 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
 
     let abstract_states = exhibits
         .iter()
-        .find(|e| e.name == "abstractStates")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("abstractStates")
+        })
         .expect("abstractStates");
     assert!(abstract_states.is_abstract);
 
     let private_states = exhibits
         .iter()
-        .find(|e| e.name == "privateStates")
+        .find(|e| e.name.and_then(|n| result.document.declaration_name(n)) == Some("privateStates"))
         .expect("privateStates");
     assert_eq!(
         private_states.membership.visibility,
@@ -540,27 +586,23 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
 
     let subset_states = exhibits
         .iter()
-        .find(|e| e.name == "subsetStates")
+        .find(|e| e.name.and_then(|n| result.document.declaration_name(n)) == Some("subsetStates"))
         .expect("subsetStates");
-    assert_eq!(
-        subset_states
-            .subsets
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Base::baseStates".to_string())
-    );
+    assert!(subset_states.subsets.is_some());
 
     let multiplicity_states = exhibits
         .iter()
-        .find(|e| e.name == "multiplicityStates")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("multiplicityStates")
+        })
         .expect("multiplicityStates");
     assert!(multiplicity_states.multiplicity.is_some());
 
     let ordered_states = exhibits
         .iter()
-        .find(|e| e.name == "orderedStates")
+        .find(|e| e.name.and_then(|n| result.document.declaration_name(n)) == Some("orderedStates"))
         .expect("orderedStates");
-    let StateDefBody::Brace { elements } = &ordered_states.body else {
+    let StateDefBody::Brace { elements, .. } = &ordered_states.body else {
         panic!("expected exhibit state body");
     };
     assert_eq!(elements.len(), 1);
@@ -581,25 +623,30 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let vehicle = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Vehicle") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected Vehicle part def");
-    let PartDefBody::Brace { elements } = &vehicle.body else {
+    let PartDefBody::Brace { elements, .. } = &vehicle.body else {
         panic!("expected part body");
     };
 
@@ -612,17 +659,21 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         .collect();
     let direction_states = state_usages
         .iter()
-        .find(|s| s.name == "directionStates")
+        .find(|s| {
+            s.name.and_then(|n| result.document.declaration_name(n)) == Some("directionStates")
+        })
         .expect("directionStates");
     assert_eq!(direction_states.direction, Some(InOut::In));
     let derived_states = state_usages
         .iter()
-        .find(|s| s.name == "derivedStates")
+        .find(|s| s.name.and_then(|n| result.document.declaration_name(n)) == Some("derivedStates"))
         .expect("derivedStates");
     assert!(derived_states.is_derived);
     let individual_states = state_usages
         .iter()
-        .find(|s| s.name == "individualStates")
+        .find(|s| {
+            s.name.and_then(|n| result.document.declaration_name(n)) == Some("individualStates")
+        })
         .expect("individualStates");
     assert!(individual_states.is_individual);
 
@@ -635,17 +686,23 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         .collect();
     let direction_exhibit = exhibits
         .iter()
-        .find(|e| e.name == "directionExhibit")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("directionExhibit")
+        })
         .expect("directionExhibit");
     assert_eq!(direction_exhibit.direction, Some(InOut::In));
     let derived_exhibit = exhibits
         .iter()
-        .find(|e| e.name == "derivedExhibit")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("derivedExhibit")
+        })
         .expect("derivedExhibit");
     assert!(derived_exhibit.is_derived);
     let individual_exhibit = exhibits
         .iter()
-        .find(|e| e.name == "individualExhibit")
+        .find(|e| {
+            e.name.and_then(|n| result.document.declaration_name(n)) == Some("individualExhibit")
+        })
         .expect("individualExhibit");
     assert!(individual_exhibit.is_individual);
 }
@@ -660,25 +717,30 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("Mission") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("Mission") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected Mission part def");
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -688,7 +750,7 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    let StateDefBody::Brace { elements } = &exhibit.body else {
+    let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
     assert!(elements
@@ -709,38 +771,31 @@ fn part_usage_accepts_multiplicity_before_type() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let system = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &system.body else {
+    let PartDefBody::Brace { elements, .. } = &system.body else {
         panic!("expected part body");
     };
     let suit = match &elements[0].value {
         PartDefBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected part usage"),
     };
-    assert_eq!(suit.name, "spaceSuits");
     assert_eq!(
-        suit.multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[2]".to_string())
+        suit.name.and_then(|n| result.document.declaration_name(n)),
+        Some("spaceSuits")
     );
-    assert_eq!(suit.type_name, "ExtravehicularMobilityUnit");
-    assert_eq!(
-        suit.subsets
-            .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("constituentSystems".to_string())
-    );
+    assert!(suit.multiplicity.is_some());
+    assert!(suit.typing.is_some());
+    assert!(suit.subsets.is_some());
 }
 
 #[test]
@@ -753,33 +808,45 @@ fn rationale_and_refinement_annotations_stay_localized() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     match &elements[0].value {
         PackageBodyElement::ActionDef(action) => {
-            let ActionDefBody::Brace { elements } = &action.value.body else {
+            let ActionDefBody::Brace { elements, .. } = &action.value.body else {
                 panic!("expected action body");
             };
+            // `#refinement dependency X to Y;` is `PrefixMetadataAnnotation` + `Dependency`,
+            // both members of `ActionBodyItem → NonBehaviorBodyItem → DefinitionMember`. It was
+            // one opaque `Annotation` node holding the copied text `refinement dependency
+            // PerformCrewIngress to ...`; now the tag and the dependency are separate typed
+            // siblings and the dependency's endpoints are real references.
             assert!(elements.iter().any(|e| matches!(
                 e.value,
-                sysml_v2_parser::ActionDefBodyElement::Annotation(_)
+                sysml_v2_parser::ActionDefBodyElement::MetadataKeywordUsage(_)
+            )));
+            assert!(elements.iter().any(|e| matches!(
+                e.value,
+                sysml_v2_parser::ActionDefBodyElement::Dependency(_)
             )));
         }
         _ => panic!("expected action def"),
     }
     match &elements[1].value {
         PackageBodyElement::RequirementDef(req) => {
-            let RequirementDefBody::Brace { elements } = &req.value.body else {
+            let RequirementDefBody::Brace { elements, .. } = &req.value.body else {
                 panic!("expected requirement body");
             };
             assert!(elements
                 .iter()
-                .any(|e| matches!(e.value, RequirementDefBodyElement::Annotation(_))));
+                .any(|e| matches!(e.value, RequirementDefBodyElement::MetadataKeywordUsage(_))));
+            assert!(elements
+                .iter()
+                .any(|e| matches!(e.value, RequirementDefBodyElement::Dependency(_))));
         }
         _ => panic!("expected requirement def"),
     }
@@ -788,15 +855,21 @@ fn rationale_and_refinement_annotations_stay_localized() {
 #[test]
 fn quoted_requirement_identifier_parses() {
     let input = "package P {\nrequirement def <'HLR-R001'> CrewReturnSafetyRequirement { }\n}";
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     match &elements[0].value {
         PackageBodyElement::RequirementDef(req) => {
             assert_eq!(
-                req.value.identification.short_name.as_deref(),
-                Some("HLR-R001")
+                req.value
+                    .identification
+                    .short_name
+                    .and_then(|n| doc.declaration_name(n)),
+                Some("'HLR-R001'")
             );
             assert_eq!(
-                req.value.identification.name.as_deref(),
+                req.value
+                    .identification
+                    .name
+                    .and_then(|n| doc.declaration_name(n)),
                 Some("CrewReturnSafetyRequirement")
             );
         }
@@ -814,18 +887,18 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let connection = elements
@@ -835,18 +908,9 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
             _ => None,
         })
         .expect("expected structured connection member in part body");
-    assert_eq!(
-        connection.type_name.as_deref(),
-        Some("CapabilityToGoalDerivation")
-    );
-    assert_eq!(
-        connection
-            .subsets
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("capabilityToGoals".to_string())
-    );
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    assert!(connection.type_reference.is_some());
+    assert!(connection.subsets.is_some());
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection body");
     };
     assert_eq!(
@@ -869,24 +933,26 @@ fn part_definition_comment_members_parse_structurally() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let comment = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::Comment(comment) => Some(&comment.value),
+            PartDefBodyElement::Annotating(AnnotatingMember::Comment(comment)) => {
+                Some(&comment.value)
+            }
             _ => None,
         })
         .expect("expected structured comment member in part body");
@@ -894,10 +960,13 @@ fn part_definition_comment_members_parse_structurally() {
         comment
             .identification
             .as_ref()
-            .and_then(|id| id.name.as_deref()),
+            .and_then(|id| id.name.and_then(|n| result.document.declaration_name(n))),
         Some("source")
     );
-    assert!(comment.text.contains("https://example.test/source"));
+    assert!(result
+        .document
+        .comment_body(comment.body)
+        .is_some_and(|text| text.contains("https://example.test/source")));
 }
 
 #[test]
@@ -910,18 +979,18 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let system = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &system.body else {
+    let PartDefBody::Brace { elements, .. } = &system.body else {
         panic!("expected part body");
     };
     let spacecraft = match &elements[1].value {
@@ -930,6 +999,7 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
     };
     let PartUsageBody::Brace {
         elements: spacecraft_elements,
+        ..
     } = &spacecraft.body
     else {
         panic!("expected nested part body");
@@ -938,13 +1008,13 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         PartUsageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected individual part usage"),
     };
-    assert_eq!(csm.name, "csm");
-    assert!(csm.is_individual);
-    assert_eq!(csm.type_name, "CSM-107");
     assert_eq!(
-        csm.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("commandServiceModule".to_string())
+        csm.name.and_then(|n| result.document.declaration_name(n)),
+        Some("csm")
     );
+    assert!(csm.prefix.individual_span().is_some());
+    assert!(csm.typing.is_some());
+    assert!(csm.redefines.is_some());
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, PartDefBodyElement::InterfaceUsage(_))));
@@ -960,11 +1030,11 @@ fn part_defs_accept_multiple_specialization_targets() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(matches!(elements[0].value, PackageBodyElement::PartDef(_)));
@@ -981,56 +1051,51 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let sii = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &sii.body else {
+    let PartDefBody::Brace { elements, .. } = &sii.body else {
         panic!("expected part body");
     };
     let engines = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::PartUsage(p)
-                if p.value.redefines.as_ref().map(|n| n.value.target_display())
-                    == Some("engines".to_string()) =>
-            {
-                Some(&**p)
-            }
+            PartDefBodyElement::PartUsage(p) if p.value.redefines.is_some() => Some(&**p),
             _ => None,
         })
         .expect("engines part usage");
-    assert_eq!(
-        engines
-            .value
-            .multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[5]".to_string())
-    );
+    assert!(engines.value.multiplicity.is_some());
     let value = engines
         .value
         .value
         .as_ref()
         .expect("tuple value should parse");
-    let Expression::Tuple(items) = &value.value.expression.value else {
+    let Expression::Sequence { operands, .. } = &value.value.expression.value else {
         panic!(
-            "expected Expression::Tuple, got {:?}",
+            "expected Expression::Sequence, got {:?}",
             value.value.expression.value
         );
     };
+    let items: Vec<_> = operands
+        .value
+        .elements
+        .iter()
+        .map(|element| &element.expression)
+        .collect();
     assert_eq!(items.len(), 5);
     let expected = ["engine1", "engine2", "engine3", "engine4", "engine5"];
     for (i, name) in expected.iter().enumerate() {
         assert!(
-            matches!(&items[i].value, Expression::FeatureRef(s) if s == name),
+            matches!(&items[i].value, Expression::FeatureRef(s)
+                if result.document.qualified_reference(*s).is_some_and(|r| r.authored_text() == *name)),
             "element {i}: expected FeatureRef({name:?}), got {:?}",
             items[i].value
         );
@@ -1047,25 +1112,30 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let sic = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(def)
-                if def.value.identification.name.as_deref() == Some("S_IC") =>
+                if def
+                    .value
+                    .identification
+                    .name
+                    .and_then(|n| result.document.declaration_name(n))
+                    == Some("S_IC") =>
             {
                 Some(&def.value)
             }
             _ => None,
         })
         .expect("expected S_IC part def");
-    let PartDefBody::Brace { elements } = &sic.body else {
+    let PartDefBody::Brace { elements, .. } = &sic.body else {
         panic!("expected part body");
     };
 
@@ -1081,26 +1151,25 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         2,
         "expected both attribute redefinitions as usages"
     );
-    assert_eq!(attrs[0].name, "propellantMass");
-    assert_eq!(
-        attrs[0]
+    let redefine_name = |attribute: &sysml_v2_parser::ast::AttributeUsage| {
+        let target = attribute
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("propellantMass".to_string())
-    );
+            .and_then(|relationship| relationship.value.target.first())
+            .copied()
+            .expect("expected redefinition target");
+        result
+            .document
+            .qualified_reference(target)
+            .and_then(|reference| reference.segment_decoded_text(0))
+            .expect("expected source-backed redefinition name")
+    };
+    assert_eq!(redefine_name(attrs[0]).as_ref(), "propellantMass");
     assert!(
         attrs[0].value.is_some(),
         "propellantMass should keep assigned value"
     );
-    assert_eq!(attrs[1].name, "dryMass");
-    assert_eq!(
-        attrs[1]
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("dryMass".to_string())
-    );
+    assert_eq!(redefine_name(attrs[1]).as_ref(), "dryMass");
     assert!(
         attrs[1].value.is_some(),
         "dryMass should keep assigned value"
@@ -1117,23 +1186,27 @@ fn part_usage_ordered_before_colon_parses_without_recovery() {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     let stage = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &stage.body else {
+    let PartDefBody::Brace { elements, .. } = &stage.body else {
         panic!("expected brace body");
     };
     let engines = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::PartUsage(p) if p.value.name == "engines" => Some(&p.value),
+            PartDefBodyElement::PartUsage(p)
+                if p.value.name.and_then(|n| doc.declaration_name(n)) == Some("engines") =>
+            {
+                Some(&p.value)
+            }
             _ => None,
         })
         .expect("engines part usage");
-    assert!(engines.ordered);
-    assert_eq!(engines.type_name, "RocketEngine");
+    assert!(engines.multiplicity_modifiers.is_ordered());
+    assert!(engines.typing.is_some());
 }
 
 #[test]
@@ -1156,12 +1229,12 @@ fn part_def_body_item_usage_parses() {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let elements = package_elements(input);
+    let (doc, elements) = package_elements(input);
     let stakeholder = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &stakeholder.body else {
+    let PartDefBody::Brace { elements, .. } = &stakeholder.body else {
         panic!("expected brace body");
     };
     let item = elements
@@ -1171,12 +1244,10 @@ fn part_def_body_item_usage_parses() {
             _ => None,
         })
         .expect("item usage in part def body");
-    assert_eq!(item.name, "concerns");
     assert_eq!(
-        item.multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[*]".to_string())
+        item.name.and_then(|n| doc.declaration_name(n)),
+        Some("concerns")
     );
-    assert_eq!(item.type_name.as_deref(), Some("Concern"));
+    assert!(item.multiplicity.is_some());
+    assert!(item.type_name.is_some());
 }

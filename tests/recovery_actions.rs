@@ -12,11 +12,11 @@ action def A {
 }
 }"#;
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let action = elements
@@ -26,7 +26,7 @@ action def A {
             _ => None,
         })
         .expect("action def should be present");
-    let ActionDefBody::Brace { elements } = &action.body else {
+    let ActionDefBody::Brace { elements, .. } = &action.body else {
         panic!("expected action body");
     };
     assert!(
@@ -67,11 +67,11 @@ action def ComputeBatteryInfo {
         .as_deref()
         .is_some_and(|s| s.contains("perform batCap")));
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let action = elements
@@ -81,7 +81,7 @@ action def ComputeBatteryInfo {
             _ => None,
         })
         .expect("action def should be present");
-    let ActionDefBody::Brace { elements } = &action.body else {
+    let ActionDefBody::Brace { elements, .. } = &action.body else {
         panic!("expected action body");
     };
     assert!(elements

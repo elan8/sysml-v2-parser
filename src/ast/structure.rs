@@ -1,26 +1,28 @@
 use super::behavior::{
-    ActionDef, ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut,
-    InOutDecl, StateDefBody, StateDefBodyElement, StateUsage,
+    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, FlowUsage, InOut, InOutDecl,
+    StateDefBody, StateUsage,
 };
-use super::common::{
-    CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
-    TextualRepresentation,
-};
+use super::body::Body;
+use super::common::DeclarationName;
+use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
-use super::relationship_target::RelationshipTarget;
-use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
+use super::multiplicity_part::MultiplicityModifiers;
+use super::requirement::{
+    Dependency, EnumerationUsage, ItemUsage, RequirementUsage, SatisfyRequirementUsage,
+};
 use super::view::{CalcUsage, ConstraintDef, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
+use crate::ast::QualifiedReferenceId;
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartDef {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix).
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// Whether this is an `individual part def`.
     pub is_individual: bool,
     pub identification: Identification,
@@ -37,8 +39,34 @@ pub struct PartDef {
     pub membership: Membership,
 }
 
-/// BNF BasicDefinitionPrefix: `abstract` | `variation`.
+/// `ExtendedDefinition` (SysML §8.2.2.27): `DefinitionExtensionKeyword+ 'def' DefinitionDeclaration
+/// DefinitionBody` -- one or more bare `#<name>` metadata-keyword tags standing *in place of* the
+/// usual classifier keyword (`part`/`attribute`/`action`/...) that would otherwise introduce a
+/// `Definition`, e.g. `#situation def Failure;`, `#SecurityRelated #situation def Vulnerability;`,
+/// `abstract #situation def AbstractFailure;`. Reuses [`crate::ast::PackageBody`] for the body so any ordinary
+/// package/definition member (`part p;`, nested definitions, ...) parses inside it exactly as at
+/// package scope.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedDefinition {
+    /// One-or-more `#<name>` prefix keyword tags (BNF `DefinitionExtensionKeyword+`), in source
+    /// order. Reuses the exact `#name` tag representation `metadata_keyword_prefix` already
+    /// builds for a bare `#name` reference.
+    pub prefix_keywords: Vec<Node<MetadataKeywordUsage>>,
+    /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
+    /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    pub identification: Identification,
+    /// Supertype after `:>`.
+    pub specializes: Option<Node<TypingRelationship>>,
+    pub body: super::package::PackageBody,
+}
+
+/// BNF BasicDefinitionPrefix: `abstract` | `variation`.
+///
+/// The same two-alternative group `RefPrefix` spells for a usage; see
+/// [`crate::ast::RefPrefix::variance`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DefinitionPrefix {
     Abstract,
@@ -46,13 +74,36 @@ pub enum DefinitionPrefix {
 }
 
 /// Body of a part definition: `;` or `{` PartDefBodyElement* `}`.
+pub type PartDefBody = Body<PartDefBodyElement>;
+
+/// `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix` (SysML BNF 299).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PartDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PartDefBodyElement>>,
-    },
+pub enum UnextendedUsagePrefix {
+    End(crate::ast::EndUsagePrefix),
+    Basic(crate::ast::BasicUsagePrefix),
+}
+
+/// `ExtendedUsage : Usage = UnextendedUsagePrefix UsageExtensionKeyword+ Usage` (SysML BNF 341;
+/// reference `SysML.xtext:728-730`): one or more `#Tag` keywords standing in place of a kind
+/// keyword, then an ordinary usage declaration, value and body -- `#systemdd service_registry_DD
+/// :> service_registry { #servicedd :>> serviceDiscovery : ServiceDiscoveryDD { #idd
+/// serviceDiscovery_HTTP; } }` (`AHFCoreLib.sysml`).
+///
+/// The empty-declaration spelling (`#Tag;`, `#Tag { … }`) is still
+/// [`MetadataKeywordUsage`] with a body, as every scope dispatches it; this node carries the
+/// spellings that declare something.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedUsage {
+    pub prefix: UnextendedUsagePrefix,
+    /// `UsageExtensionKeyword+`, in authored order; never empty.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
+    pub declaration: Node<crate::ast::UsageDeclaration>,
+    pub value: Option<Node<FeatureValue>>,
+    /// `UsageBody = DefinitionBody`, the same members a part usage body admits.
+    pub body: PartUsageBody,
+    pub membership: Membership,
 }
 
 /// Element inside a part definition body.
@@ -60,14 +111,19 @@ pub enum PartDefBody {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// Nested `package` definition. `PartDefinition` owns a `DefinitionBody`, whose
+    /// `DefinitionMember` admits `DefinitionElement`, including `Package` (SysML textual BNF
+    /// 180-207, 234-248; the pinned Pilot SysML grammar agrees).
+    Package(Node<crate::ast::Package>),
+    /// Nested `library package` / `standard library package` definition. This remains distinct
+    /// from [`Self::Package`], matching the grammar's separate `LibraryPackage` alternative and
+    /// retaining its standard-library spelling without a mirrored discriminator flag.
+    LibraryPackage(Node<crate::ast::LibraryPackage>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),
-    Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` / `name = expr;` without a kind keyword (SysML DefaultReferenceUsage).
@@ -76,19 +132,19 @@ pub enum PartDefBodyElement {
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
     Ref(Node<RefDecl>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     PartUsage(Box<Node<PartUsage>>),
     PartDef(Node<PartDef>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     InterfaceDef(Node<InterfaceDef>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     /// `connection` usage member inside a part definition body.
     Connection(Node<ConnectionUsageMember>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
-    OpaqueMember(Node<OpaqueMemberDecl>),
+    UnsupportedMember(Node<crate::ast::UnsupportedGrammarNode>),
     /// `exhibit state` name `:` type (`;` or body).
     ExhibitState(Node<ExhibitState>),
     /// Calculation usage (`calc` keyword) inside a part definition body.
@@ -100,27 +156,33 @@ pub enum PartDefBodyElement {
     /// `constraint <name>[: Type] { ... }` usage inside a part definition body. See
     /// [`PartDefBodyElement::ConstraintDef`].
     ConstraintUsage(Node<ConstraintUsage>),
+    /// A requirement-constraint membership admitted in a non-requirement owner so the semantic
+    /// `validateRequirementConstraintMembershipOwningType` rule can observe and reject that
+    /// owner. Pilot's concrete grammar places this production in `RequirementBodyItem`, while
+    /// SysML 8.3.21.7 separately constrains its abstract-syntax owner; retaining the same typed
+    /// member here preserves the invalid model instead of replacing semantic validation with an
+    /// `unexpected_keyword_in_scope` parse error.
+    RequireConstraint(Box<Node<crate::ast::RequireConstraint>>),
     /// `(private|public|protected)? import <qualified-name>;` inside a part definition body
     /// (§6 G16). See [`PartUsageBodyElement::Import`].
     Import(Node<crate::ast::Import>),
     /// `action` / `ref action` usage inside a part definition body (Systems Library
-    /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMemberDecl`].
+    /// `Parts::performedActions` and similar).
     ActionUsage(Box<Node<ActionUsage>>),
     /// `action def` nested inside a part definition body (GH-14: previously only `ActionUsage`
     /// was reachable here, so a nested definition fell through to opaque recovery with a
     /// misleading "expected ';' or '{' after action definition header" diagnostic).
     ActionDef(Node<ActionDef>),
-    /// `state` / `ref state` usage inside a part definition body. Previously fell through to
-    /// [`OpaqueMemberDecl`].
+    /// `state` / `ref state` usage inside a part definition body.
     StateUsage(Node<StateUsage>),
     /// Enumeration usage (`enum` keyword) inside a part definition body.
     EnumerationUsage(Node<EnumerationUsage>),
     /// `assert (not)? constraint { ... }` inside a part definition body (previously only
     /// reachable from occurrence definition bodies).
     AssertConstraint(Node<AssertConstraintMember>),
-    /// `satisfy <ref> (by <expr>)?;` inside a part definition body (previously only reachable
+    /// `SatisfyRequirementUsage` inside a part definition body (previously only reachable
     /// at package level).
-    Satisfy(Node<Satisfy>),
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     /// `variant` name `;` — a variant member inside a `variation part def` body.
     VariantUsage(Node<VariantUsage>),
     /// `state def` nested inside a part definition body (PAR-002: previously only reachable
@@ -143,7 +205,7 @@ pub enum PartDefBodyElement {
     /// `connection def` nested inside a part definition body (PAR-002: previously only
     /// `ConnectionUsageMember`, a usage shape, was reachable here).
     ConnectionDef(Node<ConnectionDef>),
-    /// `port def` nested inside a part definition body, using `port_def_required` (PAR-002:
+    /// `port def` nested inside a part definition body, using `port_def` (PAR-002:
     /// previously only `PortUsage` was reachable here).
     PortDef(Node<PortDef>),
     /// `calc def` nested inside a part definition body, using `calc_def_required` (PAR-002:
@@ -161,6 +223,16 @@ pub enum PartDefBodyElement {
     ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
     RenderingDef(Node<crate::ast::view::RenderingDef>),
     RenderingUsage(Node<crate::ast::view::RenderingUsage>),
+    /// A view-specific `render` membership retained in a non-view definition so semantic owner
+    /// validation can distinguish it from the legal generic `rendering` usage above.
+    ViewRendering(Node<crate::ast::view::ViewRenderingUsage>),
+    /// A requirement-verification membership retained outside a requirement body for semantic
+    /// owning-type validation.
+    VerifyRequirement(Node<crate::ast::requirement::VerifyRequirementMember>),
+    /// Nested KerML classifier declaration (`struct`, `classifier`, `datatype`, `assoc`,
+    /// `behavior`, ...) inside a part definition body (spec42 Gap 38); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
     CaseDef(Node<crate::ast::requirement::CaseDef>),
     CaseUsage(Node<crate::ast::requirement::CaseUsage>),
     UseCaseDef(Node<crate::ast::requirement::UseCaseDef>),
@@ -188,22 +260,12 @@ pub enum PartDefBodyElement {
     AliasDef(Node<AliasDef>),
 }
 
-/// Library-tolerant part member preserved without forcing it into an unrelated node shape.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OpaqueMemberDecl {
-    pub keyword: String,
-    pub name: String,
-    pub text: String,
-    pub body: AttributeBody,
-}
-
 /// Connection usage member inside part definitions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionUsageMember {
-    pub name: Option<String>,
-    pub type_name: Option<String>,
+    pub name: Option<DeclarationName>,
+    pub type_reference: Option<QualifiedReferenceId>,
     /// Multiplicity after the type, e.g. `[0..1]` in `connection trailerHitch :
     /// TrailerHitch[0..1];` (OMG spec Annex `3c-Function-based Behavior-structure mod.sysml`).
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -225,6 +287,11 @@ pub struct ConnectionUsageMember {
     /// same "genuine new grammar coverage, not just discarded data" rationale --
     /// `connection_usage_member` did not previously accept a visibility prefix either.
     pub membership: Membership,
+    /// `true` when the member was declared as `ref connection ...` (a reference connection
+    /// usage) rather than a plain `connection ...` usage. See `unsupported_part_member`'s former
+    /// `ReferenceConnectionUsage` short-circuit in `src/parser/part/body.rs`, now folded into
+    /// `connection_usage_member_inner`.
+    pub by_reference: bool,
 }
 
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
@@ -245,8 +312,10 @@ pub struct ExhibitState {
     pub is_reference: bool,
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
-    pub name: String,
-    pub type_name: Option<String>,
+    /// Declaration label in the explicit `exhibit state name` form.
+    pub name: Option<DeclarationName>,
+    /// Referenced state path in the shorthand `exhibit path` form.
+    pub state_reference: Option<QualifiedReferenceId>,
     /// Structured typing clause when a `:` target was written.
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, when present.
@@ -255,6 +324,10 @@ pub struct ExhibitState {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause, from before or after the body.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored `parallel`/`initial` modifier before the body, with its keyword span:
+    /// `ExhibitStateUsage` shares `StateUsageBody` with a plain state usage. See
+    /// [`crate::ast::StateBodyModifier`].
+    pub body_modifier: Option<Node<crate::ast::StateBodyModifier>>,
     pub body: StateDefBody,
     pub membership: Membership,
 }
@@ -263,27 +336,29 @@ pub struct ExhibitState {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeDef {
-    pub name: String,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `AttributeDefinition` (SysML BNF 510) reaches it through
+    /// `DefinitionPrefix` (SysML BNF 225).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
-    pub short_name: Option<String>,
-    /// Type after `:>`, e.g. `Some(TypingRelationship { target: "ISQ::mass", .. })` (PAR-004
-    /// item 1). `typing_span` duplicates the node's own `span` for existing consumers that read
-    /// the span without the node.
+    pub short_name: Option<DeclarationName>,
+    /// Type after `:>`, represented by a relationship whose target IDs resolve through the
+    /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
+    /// node's own `span` for existing consumers that read the span without the node.
     pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
-    /// Span of the defined name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type after `:>`, if present (for semantic tokens).
     pub typing_span: Option<Span>,
     /// Span of the default/binding expression value, when present.
     pub value_span: Option<Span>,
-    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6). Legal on a feature
-    /// declaration generally; previously consumed and discarded by `ignored_feature_modifiers`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
     /// [`crate::ast::MembershipKind::OwningMembership`] for a `*Def` -- a nested attribute definition becomes
     /// a new named member of its owning namespace, not a feature of it. `visibility` captures an
@@ -300,23 +375,16 @@ impl PartialEq for AttributeDef {
         self.name == other.name
             && self.short_name == other.short_name
             && self.typing == other.typing
+            && self.multiplicity == other.multiplicity
             && self.value == other.value
             && self.body == other.body
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.membership == other.membership
     }
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AttributeBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<AttributeBodyElement>>,
-    },
-}
+pub type AttributeBody = Body<AttributeBodyElement>;
 
 // See `RequirementDefBodyElement`'s `#[allow(clippy::large_enum_variant)]` doc comment --
 // `AttributeUsage`'s size relative to `Doc`/`Error` is an accepted, crate-wide tradeoff, not
@@ -325,10 +393,17 @@ pub enum AttributeBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    /// Keyword-less `DefaultReferenceUsage` (`RefPrefix Usage`) nested in an attribute/item
+    /// body. It is distinct from `AttributeUsage`, whose `attribute` keyword is required.
+    DefaultReferenceUsage(Node<DefaultReferenceUsage>),
     /// `occurrence ...` usage (§6 G27). `AttributeBody` is shared with `item def` / `item` usage
     /// bodies, and an item *is* an occurrence, so `occurrence :>> causes;` is a legal member --
     /// see the OMG spec Annex `14c-Language Extensions.sysml`.
@@ -348,13 +423,57 @@ pub enum AttributeBodyElement {
     RefDecl(Node<RefDecl>),
     /// Nested `part` usage inside an item / attribute body (validation `3e`, `14c`).
     PartUsage(Box<Node<PartUsage>>),
-    Other(String),
+    /// Nested `item` usage inside an item / attribute body, e.g. `item picture : Picture;`
+    /// inside `attribute def Show { ... }` (`tests/snapshots/sysml/training/
+    /// 21_messaging_with_ports.md`). Reuses the same `item_usage` parser `PartDefBodyElement`/
+    /// `PartUsageBodyElement` already dispatch to.
+    ItemUsage(Box<Node<ItemUsage>>),
+    /// KerML feature member (`feature x : Natural[1];`, `member feature ...`, `composite
+    /// feature ...`, `portion feature all ...`, `var x : Integer;`, `step s : S;`, `expr e
+    /// { ... }`) nested in a KerML `class`/`struct`/`datatype` body, which shares this body
+    /// grammar via `class_def`; see [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
+    /// KerML invariant member (`inv checkIt { ... }`) nested in a KerML type body; see
+    /// [`crate::ast::KermlInvariantMember`].
+    Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
+    /// KerML connector member (`connector a ::> a.x to b;`) nested in a KerML type body; see
+    /// [`crate::ast::KermlConnectorMember`].
+    KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),
+    /// Nested KerML classifier declaration for the rest of the keyword family (`struct`,
+    /// `classifier`, `datatype`, `assoc`, `behavior`, ...; spec42 Gap 38); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
+    /// Named/multiplicity-qualified binding member nested in an attribute/item body
+    /// (`binding [1] bind [0..*] base.edges = [0..*] be;`, Geometry `ShapeItems.sysml`;
+    /// spec42 Gap 49a).
+    Bind(Box<Node<Bind>>),
+    /// Named/typed connection usage nested in an attribute/item body (`connection : MatesWith
+    /// connect [1] tfe to [1] tfe;`, Geometry `ShapeItems.sysml`; spec42 Gap 49a).
+    Connection(Box<Node<ConnectionUsageMember>>),
+    /// Nested `calc def` (spec42 Gap 49a).
+    CalcDef(Box<Node<crate::ast::view::CalcDef>>),
+    /// Nested `calc` usage (`private calc getElapsedUtcTime { ... }` inside `attribute def
+    /// Clock`, Quantities and Units `Time.sysml`; spec42 Gap 49a).
+    CalcUsage(Box<Node<crate::ast::view::CalcUsage>>),
+    /// Plain (non-`assert`) constraint usage nested in an attribute/item body (`abstract
+    /// constraint checkedConstraints : ConstraintCheck[0..*] :> ... { ... }`, Systems Library
+    /// `Items.sysml`; spec42 Gap 49a).
+    ConstraintUsage(Box<Node<ConstraintUsage>>),
+    /// `variant` member via `DefinitionBodyItem → VariantUsageMember` (SysML textual BNF
+    /// 237-252; pinned Pilot `SysML.xtext` 518-531). `AttributeBody` is shared by attribute,
+    /// item, and type bodies, so this owns the member once at that grammar boundary.
+    VariantUsage(Node<VariantUsage>),
 }
 
 /// Item definition: `item def` Identification body (for events, etc.).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ItemDefinition` (SysML BNF 611) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual item def John :> Person { ... }` (GH-90.1, `Individuals Examples/
     /// JohnIndividualExample.sysml:19`).
     pub is_individual: bool,
@@ -372,6 +491,11 @@ pub struct ItemDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndividualDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `IndividualDefinition` (SysML BNF 551;
+    /// Pilot `SysML.xtext` 817) spells it directly, ahead of the mandatory `individual`.
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
@@ -382,37 +506,41 @@ pub struct IndividualDef {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartUsage {
-    /// Optional `abstract` or `variation` prefix on a part usage.
-    pub usage_prefix: Option<DefinitionPrefix>,
-    pub is_individual: bool,
-    /// Leading `ref` from BNF `BasicUsagePrefix` (`isReference ?= 'ref'`), reached via
-    /// `PartUsage = OccurrenceUsagePrefix 'part' Usage` → `OccurrenceUsagePrefix :
-    /// BasicUsagePrefix ...`. Distinguishes `ref part origin : T :> x;` from composite
-    /// `part origin : T :> x;`. Parallel to `ActionUsage::is_reference` / `StateUsage::is_reference`.
-    pub is_reference: bool,
-    /// Direction prefix when parsed as `in`/`out`/`inout part ...` (BNF `RefPrefix`, reachable
-    /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`, same production
-    /// chain `AttributeUsage.direction` uses).
-    pub direction: Option<InOut>,
-    /// `derived` keyword from `RefPrefix` -- see `AttributeUsage::is_derived` for the BNF
-    /// citation; the same `OccurrenceUsagePrefix` chain applies to part usages.
-    pub is_derived: bool,
-    /// `constant` keyword from `RefPrefix` -- see `AttributeUsage::is_constant`.
-    pub is_constant: bool,
-    pub name: String,
+    /// The complete `OccurrenceUsagePrefix` this usage was written with
+    /// (`PartUsage = OccurrenceUsagePrefix 'part' Usage`, SysML BNF 623).
+    ///
+    /// The same shared component `OccurrenceUsage`, `ItemUsage` and `SatisfyRequirementUsage`
+    /// carry; see `planning/part-usage-prefix-matrix.md` and
+    /// `planning/occurrence-usage-prefix-matrix.md`. It replaced six independent fields
+    /// (`usage_prefix`, `is_individual`, `is_reference`, `direction`, `is_derived`,
+    /// `is_constant`) that between them kept no authored span and represented neither a
+    /// `PortionKind` nor a `UsageExtensionKeyword`, so `snapshot part vehicle_1_t0 { ... }`
+    /// (`training/28. Individuals/Individuals and Roles-1.sysml:14`) reached recovery and
+    /// `#logical part vehicleLogical : Vehicle { ... }` (`Vehicle Example/SysML v2 Spec Annex A
+    /// SimpleVehicleModel.sysml:487`) became two sibling members.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
+    /// `SourceSuccessionMember : FeatureMembership = 'then' ownedRelatedElement += SourceSuccession`
+    /// (SysML BNF 597), as the authored keyword's span.
+    ///
+    /// `DefinitionBodyItem` and `NonBehaviorBodyItem` both spell
+    /// `( SourceSuccessionMember )? …UsageMember`, so a `then` precedes the *membership* -- and
+    /// therefore the visibility keyword and the whole prefix -- rather than being a prefix slot.
+    /// It is a separate field for that reason, not a member of
+    /// [`OccurrenceUsagePrefix`](crate::ast::OccurrenceUsagePrefix).
+    /// `SourceSuccession` and `SourceEndMember` below it contribute no further tokens, so the
+    /// keyword's span is the whole authored fact.
+    pub then_span: Option<Span>,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
-    pub short_name: Option<String>,
-    /// Type after `:`, e.g. "Vehicle", "AxleAssembly". A comma-separated multi-target clause
-    /// (`part vehicle : Vehicle, SpatialItem;`) joins into one display string here; see `typing`
-    /// for the structured, multi-target-capable form (S42-004).
-    pub type_name: String,
+    pub short_name: Option<DeclarationName>,
     /// Structured typing clause mirroring `AttributeUsage.typing`: every comma-separated target
-    /// from `:`/`defined by`/`typed by`, not just the first (S42-004). `None` when no typing
-    /// clause was written (`type_name` is then empty).
+    /// from `:`/`defined by`/`typed by`, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
-    pub ordered: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` feature and value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
@@ -420,8 +548,6 @@ pub struct PartUsage {
     /// Value expression (= expr, default = expr, := expr).
     pub value: Option<Node<FeatureValue>>,
     pub body: PartUsageBody,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
@@ -433,18 +559,13 @@ pub struct PartUsage {
 
 impl PartialEq for PartUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.usage_prefix == other.usage_prefix
-            && self.is_individual == other.is_individual
-            && self.is_reference == other.is_reference
-            && self.direction == other.direction
-            && self.is_derived == other.is_derived
-            && self.is_constant == other.is_constant
+        self.prefix == other.prefix
+            && self.then_span == other.then_span
             && self.name == other.name
             && self.short_name == other.short_name
-            && self.type_name == other.type_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.value == other.value
@@ -454,75 +575,186 @@ impl PartialEq for PartUsage {
 }
 
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PartUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PartUsageBodyElement>>,
-    },
-}
+pub type PartUsageBody = Body<PartUsageBodyElement>;
 
-/// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
+/// The `@` spelling of a metadata feature -- the `MetadataFeature` alternative of
+/// `AnnotatingElement` (KerML 8.2.5.12 `MetadataFeature`, SysML 8.2.2.27 `MetadataUsage`).
+///
+/// ```text
+/// MetadataFeature = ( PrefixMetadataMember )* ( '@' | 'metadata' )
+///                   MetadataFeatureDeclaration
+///                   ( 'about' Annotation ( ',' Annotation )* )?
+///                   MetadataBody
+/// MetadataFeatureDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping
+/// ```
+///
+/// # Why the *type* is the reference, and the head is not
+///
+/// The declaration ends at a required `OwnedFeatureTyping`, so the last qualified name is always
+/// the annotated metadata type. The `Identification` in front of `:` / `typed by` is a
+/// **declared name**: `@Tag;` names nothing and is typed by `Tag`, while `@t : Tag;` declares
+/// `t` and is typed by `Tag`. The superseded shape stored whatever followed `@` as a
+/// `QualifiedReferenceId` and demoted the type to an `Option`, so `@t : Tag` allocated an arena
+/// reference for the declaration label `t` -- a reference synthesized from a declaration.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataAnnotation {
-    pub name: String,
-    pub type_name: Option<String>,
-    pub about_targets: Vec<String>,
-    pub body: AttributeBody,
-    pub head_span: Option<Span>,
-    pub type_span: Option<Span>,
+    /// Prefix metadata applied to this metadata feature, in authored order.
+    pub prefixes: Vec<Node<MetadataKeywordUsage>>,
+    /// Authored `MetadataFeature` introducer. KerML and SysML both allow `@` or `metadata`.
+    pub introducer: MetadataFeatureIntroducer,
+    /// `MetadataFeatureDeclaration`'s optional `Identification ( ':' | 'typed' 'by' )` prefix,
+    /// present exactly when a separator keyword was authored.
+    pub declared_name: Option<Node<MetadataDeclaredName>>,
+    /// `OwnedFeatureTyping` -- the annotated metadata type. Required by the production.
+    pub type_reference: QualifiedReferenceId,
+    /// Exact span of the `OwnedFeatureTyping` qualified name.
+    pub type_span: Span,
+    /// `'about' Annotation ( ',' Annotation )*`, where `Annotation = [QualifiedName]`.
+    pub about_targets: Vec<QualifiedReferenceId>,
+    /// `MetadataBody`.
+    pub body: MetadataBody,
+}
+
+/// `MetadataBody = ';' | '{' MetadataBodyElement* '}'`.
+///
+/// This body is deliberately not an [`AttributeBody`]. Its keyword-less members are reference
+/// redefinitions, not attributes with declaration labels, so sharing the old body would make
+/// `totalRisk { probability = 0.3; }` look like nested attribute declarations.
+pub type MetadataBody = Body<MetadataBodyElement>;
+
+/// One member of a metadata body (SysML textual BNF 1678-1693; KerML 1423-1438).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// The complete `AnnotatingElement` production.
+    Annotating(AnnotatingMember),
+    /// `MetadataBodyUsage`, a reference redefinition owned by the metadata type.
+    Usage(Node<MetadataBodyUsage>),
+    /// `MetadataBody`'s `DefinitionMember` alternative (SysML BNF 1677): a nested declaration
+    /// owned by the metadata type rather than a redefinition of one of its features.
+    ///
+    /// Carried as an [`AttributeBodyElement`], the shared type-body member the crate already uses
+    /// for `metadata def` bodies. That dispatcher is a *superset* of `DefinitionMember` -- it also
+    /// admits usages -- so this variant over-accepts against the production in exactly the way
+    /// `metadata def` bodies already did, rather than in a new way. Rejecting the member outright,
+    /// which is what happened before, lost the declaration and its span entirely.
+    Definition(Box<Node<AttributeBodyElement>>),
+    /// `MetadataBody`'s `AliasMember` alternative (SysML BNF 1677).
+    Alias(Node<AliasDef>),
+    /// `MetadataBody`'s `Import` alternative (SysML BNF 1677).
+    Import(Box<Node<crate::ast::Import>>),
+}
+
+/// The optional authored redefinition introducer before a metadata-body target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataBodyRedefinitionOperator {
+    ColonGreaterGreater { span: Span },
+    Redefines { span: Span },
+}
+
+/// `MetadataBodyUsage`: a reference redefinition and its recursive metadata body.
+///
+/// `target` is the grammar's required `OwnedRedefinition`, not a declaration name. The optional
+/// `ref` and redefinition operator retain their own source spans so emission never reconstructs
+/// spelling from a string or makes an implicit relationship look explicit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MetadataBodyUsage {
+    pub ref_span: Option<Span>,
+    pub operator: Option<MetadataBodyRedefinitionOperator>,
+    pub target: QualifiedReferenceId,
+    pub value: Option<Node<FeatureValue>>,
+    pub body: MetadataBody,
 }
 
 impl PartialEq for MetadataAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.type_name == other.type_name
+        self.prefixes == other.prefixes
+            && self.introducer == other.introducer
+            && self.declared_name == other.declared_name
+            && self.type_reference == other.type_reference
             && self.about_targets == other.about_targets
             && self.body == other.body
     }
 }
 
-/// User-defined metadata keyword usage: `#keyword` (`:` Type)? (`about` targets)? body.
+/// The mutually exclusive introducers of `MetadataFeature`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataFeatureIntroducer {
+    At { span: Span },
+    Metadata { span: Span },
+}
+
+/// `MetadataFeatureDeclaration`'s `Identification ( ':' | 'typed' 'by' )` prefix.
+///
+/// The two parts are one field because the grammar makes them inseparable: the separator is only
+/// written when an identification precedes it, and an identification is only reachable through
+/// the separator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MetadataDeclaredName {
+    /// The declared name. A declaration label, never a reference.
+    pub identification: Identification,
+    /// Which separator keyword the author wrote.
+    pub typed_by: MetadataTypedBy,
+    /// Exact `:` or `typed by` token span.
+    pub typed_by_span: Span,
+}
+
+/// The authored spelling of `MetadataFeatureDeclaration`'s `( ':' | 'typed' 'by' )` separator.
+///
+/// Both spell the same relationship, so emission reproduces what was written rather than
+/// canonicalizing one into the other. Only these two are legal here, which is why this is its
+/// own enum rather than a reuse of the wider [`crate::ast::TypingSpelling`]: `specializes` and
+/// `defined by` are not reachable from this production and must not be representable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataTypedBy {
+    /// `:`
+    Colon,
+    /// `typed by`
+    TypedBy,
+}
+
+/// The `#` spelling of a metadata reference.
+///
+/// ```text
+/// PrefixMetadataMember     : OwningMembership = '#' ownedRelatedElement += PrefixMetadataFeature
+/// PrefixMetadataAnnotation : Annotation       = '#' ownedRelatedElement += PrefixMetadataFeature
+/// PrefixMetadataFeature    : MetadataFeature  = ownedRelationship += OwnedFeatureTyping
+/// ```
+///
+/// `OwnedFeatureTyping` is `[QualifiedName]`, so what follows `#` is a **reference to a metadata
+/// type** -- possibly qualified (`#ISQ::mass`), possibly quoted -- and never a fabricated name.
+/// The `#` is syntax and is kept as a span rather than folded into the name.
+///
+/// Unlike the `@` spelling, `PrefixMetadataFeature` admits no `Identification`, no
+/// `:` / `typed by` clause and no `about` clause: those belong to `MetadataFeature`, which `#`
+/// does not reach. Fields for them were removed rather than left permanently empty --
+/// `#Tag about X;` is not a production in either layer.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataKeywordUsage {
-    pub keyword: String,
-    pub type_name: Option<String>,
-    pub about_targets: Vec<String>,
-    pub body: AttributeBody,
-    pub keyword_span: Span,
-    pub type_span: Option<Span>,
+    /// The `#` sigil. Syntax and provenance, never part of the reference.
+    pub hash_span: Span,
+    /// `OwnedFeatureTyping` -- the metadata type this tag refers to.
+    pub reference: QualifiedReferenceId,
+    /// Which of the two `#` productions this is.
+    ///
+    /// `None` is `PrefixMetadataMember` / `PrefixMetadataAnnotation`: the tag prefixes the
+    /// declaration that follows it (`#safety part def X;`) and owns no body. `Some` is
+    /// `ExtendedUsage` with an empty `UsageDeclaration` (`#safety;`, `#safety { ... }`), a
+    /// member of the enclosing body that writes its own `UsageBody`.
+    pub body: Option<AttributeBody>,
 }
 
 impl PartialEq for MetadataKeywordUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.keyword == other.keyword
-            && self.type_name == other.type_name
-            && self.about_targets == other.about_targets
-            && self.body == other.body
-    }
-}
-
-/// Generic annotation or metadata usage captured in body scopes.
-#[derive(Debug, Clone, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Annotation {
-    pub sigil: String,
-    pub head: String,
-    pub type_name: Option<String>,
-    pub body: ConnectBody,
-    pub head_span: Option<Span>,
-    pub type_span: Option<Span>,
-}
-
-impl PartialEq for Annotation {
-    fn eq(&self, other: &Self) -> bool {
-        self.sigil == other.sigil
-            && self.head == other.head
-            && self.type_name == other.type_name
-            && self.body == other.body
+        self.reference == other.reference && self.body == other.body
     }
 }
 
@@ -531,21 +763,31 @@ impl PartialEq for Annotation {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    Annotation(Node<Annotation>),
+    /// `end name;` / `end ref name;` inside a usage body, e.g. the two ends of the transfer
+    /// constraint in `ref :>> outgoingTransfersFromSelf :> ... { end ref source; end ref
+    /// target; }` (Systems Library `Ports.sysml:37`). Occurrence bodies already modelled this
+    /// member; part usage bodies did not.
+    EndDecl(Node<EndDecl>),
+    /// Directed parameter declaration with no kind keyword, e.g. `in :>> MessageTransfer::payload,
+    /// MessageAction::payload;` inside a `ref` body (Systems Library `Actions.sysml`). Port and
+    /// action bodies already modelled this member; part usage bodies did not, so the same line
+    /// was an unexpected keyword here.
+    InOutDecl(Node<InOutDecl>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` without a kind keyword (SysML DefaultReferenceUsage).
     DefaultReferenceUsage(Node<DefaultReferenceUsage>),
     EnumerationUsage(Node<EnumerationUsage>),
     PartUsage(Box<Node<PartUsage>>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     Bind(Node<Bind>),
     /// `ref` name `:` type body (reference binding in part usage).
     Ref(Node<RefDecl>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     Perform(Node<Perform>),
     /// `succession` (name)? (`: Type`)? multiplicity? `first` ... `then` ...`;` (GH-92.3, BNF
     /// `SuccessionAsUsage`), e.g. `succession : HappensJustBefore first vehicle1_t0 then
@@ -553,12 +795,14 @@ pub enum PartUsageBodyElement {
     /// for `ConnectionDefBodyElement`/`OccurrenceBodyElement`; just not dispatched here.
     SuccessionUsage(Node<SuccessionUsage>),
     Allocate(Node<Allocate>),
-    Satisfy(Node<Satisfy>),
+    /// `SatisfyRequirementUsage` inside a part usage body.
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     StateUsage(Node<StateUsage>),
     /// `action` / `ref action` usage inside a part usage body.
     ActionUsage(Box<Node<ActionUsage>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `ExtendedUsage` with a declaration; see [`ExtendedUsage`].
+    ExtendedUsage(Box<Node<ExtendedUsage>>),
     /// `variant` name `;` inside a variation part usage body.
     VariantUsage(Node<VariantUsage>),
     /// `state def` nested inside a part usage body (PAR-002: usage bodies legally contain
@@ -573,7 +817,7 @@ pub enum PartUsageBodyElement {
     RequirementDef(Node<crate::ast::requirement::RequirementDef>),
     /// `occurrence def` nested inside a part usage body. See `StateDef`.
     OccurrenceDef(Node<OccurrenceDef>),
-    /// `port def` nested inside a part usage body, using `port_def_required`. See `StateDef`.
+    /// `port def` nested inside a part usage body, using `port_def`. See `StateDef`.
     PortDef(Node<PortDef>),
     /// `calc def` nested inside a part usage body, using `calc_def_required`. See `StateDef`.
     CalcDef(Node<crate::ast::view::CalcDef>),
@@ -640,6 +884,20 @@ pub enum PartUsageBodyElement {
     /// }` (Simple Tests/VerificationTest.sysml:35). Already dispatched in `PartDefBodyElement`,
     /// just not here.
     VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
+    /// The view family. `RenderingUsage`, `ViewUsage` and `ViewpointUsage` are
+    /// `StructureUsageElement`/`BehaviorUsageElement` alternatives and the three definitions are
+    /// `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits all six here
+    /// exactly as `PartDefBodyElement` already did. This scope had none of them.
+    ViewDef(Node<crate::ast::view::ViewDef>),
+    ViewUsage(Node<crate::ast::view::ViewUsage>),
+    ViewpointDef(Node<crate::ast::view::ViewpointDef>),
+    ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
+    RenderingDef(Node<crate::ast::view::RenderingDef>),
+    RenderingUsage(Node<crate::ast::view::RenderingUsage>),
+    /// Nested KerML classifier declaration (`struct Car1_ { ... }` inside a `part` usage body,
+    /// KerML `time_varying_car_driver`; spec42 Gap 38); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a
@@ -648,23 +906,29 @@ pub enum PartUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariantUsage {
-    /// The variant's own name — the referenced usage's name for the untyped form, or the
-    /// nested usage's own name for the typed form.
-    pub name: String,
-    /// Present when declared with a kind keyword (`variant part ...;`); `None` for the untyped
-    /// reference form (`variant name;` / `variant name { ... }`).
-    pub typed: Option<VariantTypedUsage>,
-    /// Optional nested body on the untyped reference form, e.g. `variant q { attribute b : B
-    /// :>> a; }` (`Simple Tests/VariabilityTest.sysml:16`) or a quoted name `variant '6cylEngine'
-    /// { ... }` (`Variability Examples/VehicleVariabilityModel.sysml:78`). Always `None` when
-    /// `typed` is `Some` (the nested typed usage owns its own body).
-    pub body: Option<PartUsageBody>,
+    /// Exactly one `VariantUsageElement` alternative. This discriminant prevents invalid states
+    /// such as an untyped reference paired with an inline typed usage.
+    pub form: VariantUsageForm,
     /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
     /// [`crate::ast::MembershipKind::VariantMembership`] -- confirmed against
     /// `SysML-textual-bnf.kebnf`'s `VariantUsageMember : VariantMembership = MemberPrefix
     /// 'variant' ownedVariantUsage = VariantUsageElement`, which legally carries a visibility
     /// prefix before this increment added support for parsing one.
     pub membership: Membership,
+}
+
+/// The two non-overlapping shapes of `VariantUsageElement` retained by this parser.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum VariantUsageForm {
+    /// `variant path;` or `variant path { ... }`. The optional body belongs only to this
+    /// reference form, e.g. `variant q { attribute b : B :>> a; }`.
+    Reference {
+        reference: QualifiedReferenceId,
+        body: Option<PartUsageBody>,
+    },
+    /// An inline declared usage (`variant part ...`, `variant action ...`, etc.).
+    Typed(VariantTypedUsage),
 }
 
 /// The nested usage of a typed `variant` member (BNF `VariantUsageElement`, restricted here to
@@ -676,52 +940,59 @@ pub enum VariantTypedUsage {
     Attribute(Box<Node<AttributeUsage>>),
     Item(Box<Node<ItemUsage>>),
     Port(Box<Node<PortUsage>>),
+    /// `variant action a;` through `VariantUsageElement → BehaviorUsageElement → ActionUsage`
+    /// (SysML textual BNF 374-390 and 392-413; pinned Pilot `SysML.xtext` 679-719).
+    Action(Box<Node<ActionUsage>>),
     /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
     Perform(Box<Node<Perform>>),
+    /// `variant requirement r1;` inside a `variation requirement r { ... }` body (spec42
+    /// Gap 44).
+    Requirement(Box<Node<crate::ast::RequirementUsage>>),
 }
 
-/// Enacted performance: `perform` action_path `{` body `}` inside a part usage.
+/// Enacted performance: `perform` [`PerformActionTarget`] value/body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Perform {
     /// Optional `abstract` / `variation` prefix (§6 G5). `variation perform action doXorY { ... }`
     /// is real usage in the OMG spec Annex `7a1-Variant Configuration - General Concept-a.sysml`.
     pub usage_prefix: Option<DefinitionPrefix>,
-    /// Qualified action name (e.g. "provide power" or "provide power.generate torque"). Empty for
-    /// the anonymous forms (`perform action { ... }`, `perform action :>> target = value;`),
-    /// matching [`PartUsage::name`]'s convention.
-    pub action_name: String,
-    /// Type after `:` in "perform action name : Type" form.
-    pub type_name: Option<String>,
-    /// Multiplicity after the name (GH-89), e.g. `[*]` in `perform action takePicture[*] :>
-    /// PictureTaking::takePicture;` (Camera Example/Camera.sysml:4).
-    pub multiplicity: Option<Node<Multiplicity>>,
-    /// Redefinition target after `:>>`, e.g. `doXorY` in `perform action :>> doXorY = doX;`.
-    pub redefines: Option<String>,
-    /// Subsetting target after `:>` (GH-89), e.g. `PictureTaking::takePicture` in `perform action
-    /// takePicture[*] :> PictureTaking::takePicture;` (Camera Example/Camera.sysml:4). Mutually
-    /// exclusive with `redefines` (whichever specialization keyword is present).
-    pub subsets: Option<String>,
+    /// The grammar-owned `PerformActionUsageDeclaration` alternative.
+    pub target: PerformActionTarget,
     /// Bound value after `=`, e.g. `doX` in `perform action :>> doXorY = doX;`.
     pub value: Option<Node<FeatureValue>>,
     pub body: PerformBody,
 }
 
-/// Body of a perform: `;` or `{` PerformBodyElement* `}`.
+/// `PerformActionUsageDeclaration` before its shared `ValuePart?` and action body.
+///
+/// The alternatives must remain distinct: a declared action owns a complete
+/// [`crate::ast::UsageDeclaration`], while the currently supported shorthand is a referenced
+/// action plus its reference-subsetting tail. Neither is a string mirror of the other.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PerformBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PerformBodyElement>>,
+pub enum PerformActionTarget {
+    /// `'action' UsageDeclaration?`, including the zero-width anonymous declaration.
+    Action(Box<Node<crate::ast::UsageDeclaration>>),
+    /// `OwnedReferenceSubsetting FeatureSpecializationPart?` as currently supported: a
+    /// source-backed action reference with an optional `:>>` redefinition target.
+    Reference {
+        action: QualifiedReferenceId,
+        redefines: Option<Node<SubsettingRelationship>>,
     },
 }
 
+/// Body of a perform: `;` or `{` PerformBodyElement* `}`.
+pub type PerformBody = Body<PerformBodyElement>;
+
 /// Element inside a perform body: doc comment, in/out binding, or variant member.
+// Keep the same direct-node representation as `ActionDefBodyElement`; see its size rationale.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBodyElement {
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     InOut(Node<PerformInOutBinding>),
     /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
     Variant(Node<VariantUsage>),
@@ -738,12 +1009,12 @@ pub enum PerformBodyElement {
     AttributeUsage(Box<Node<AttributeUsage>>),
 }
 
-/// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
+/// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PerformInOutBinding {
     pub direction: InOut,
-    pub name: String,
+    pub target: QualifiedReferenceId,
     pub value: Node<Expression>,
 }
 
@@ -751,13 +1022,14 @@ pub struct PerformInOutBinding {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
-    pub name: String,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present, e.g. `attribute <wcf> wheelCoordinateFrame : ...`
     /// (confirmed real usage in the OMG Geometry domain library's
     /// `VehicleGeometryAndCoordinateFrames.sysml`). See `AttributeDef::short_name`.
-    pub short_name: Option<String>,
-    /// Type after `:` or `:>`, e.g. `Some(TypingRelationship { target: "MassValue", .. })`
-    /// (PAR-004 item 1). `typing_span` duplicates the node's own `span`.
+    pub short_name: Option<DeclarationName>,
+    /// Type after `:` or `:>`, represented by a relationship whose target IDs resolve through the
+    /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
+    /// node's own `span`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Subsets target after `:>` / `subsets`.
     pub subsets: Option<Node<SubsettingRelationship>>,
@@ -772,8 +1044,6 @@ pub struct AttributeUsage {
     /// Value expression.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type after `:` / `:>`, if present (for semantic tokens).
     pub typing_span: Option<Span>,
     /// Span of the redefines target after `redefines`, if present (for semantic tokens).
@@ -782,10 +1052,9 @@ pub struct AttributeUsage {
     pub direction: Option<InOut>,
     /// Structured multiplicity range from `MultiplicityPart` (e.g. `[0..1]`), when present.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `derived` keyword from `RefPrefix` (BNF §8.2.2.6.2) -- usage-only, no `Definition`
     /// equivalent (`AttributeDefinition` uses `DefinitionPrefix`, which has no `derived`).
     pub is_derived: bool,
@@ -827,22 +1096,27 @@ impl PartialEq for AttributeUsage {
             && self.body == other.body
             && self.direction == other.direction
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.is_derived == other.is_derived
             && self.is_constant == other.is_constant
             && self.is_end == other.is_end
+            && self.is_reference == other.is_reference
+            && self.usage_prefix == other.usage_prefix
             && self.membership == other.membership
     }
 }
 
-/// SysML `DefaultReferenceUsage` (BNF §8.2.2.6 / Spec §7.6.4): a usage without a kind keyword,
-/// e.g. `Capacity : Real;`. Distinct from [`AttributeUsage`], which requires the `attribute`
-/// keyword. Historically parsed via `attribute_usage_shorthand` into `AttributeUsage`.
+/// SysML `DefaultReferenceUsage` (BNF §8.2.2.6.3): `RefPrefix Usage`, a usage without a kind
+/// keyword such as `Capacity : Real;`. Distinct from [`AttributeUsage`], which requires the
+/// `attribute` keyword. The Pilot-only `end` extension is intentionally not representable.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefaultReferenceUsage {
-    pub name: String,
+    /// The source-backed pinned `RefPrefix` (direction, derived, variance, constant).
+    pub prefix: crate::ast::RefPrefix,
+    pub name: Option<DeclarationName>,
+    /// Optional declaration short name from `Identification`.
+    pub short_name: Option<DeclarationName>,
     /// Type after `:` / `defined by` / `typed by`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Optional `:>` subsetting clause (GH-87), e.g. `torquePerCurrent :>
@@ -851,21 +1125,41 @@ pub struct DefaultReferenceUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `:>>` redefinition clause (GH-87), same shorthand position as `subsets`.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Optional `::>` / `references` relationship.
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// Optional `=>` / `crosses` relationship.
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// Optional `intersects` relationship.
+    pub intersects: Option<Node<SubsettingRelationship>>,
     /// Optional feature value after `=` / `default`.
     pub value: Option<Node<FeatureValue>>,
-    pub name_span: Option<Span>,
+    /// Multiplicity clause, e.g. `private instantNum: Natural[1] = ...;` (Kernel Semantic
+    /// Library `Occurrences.kerml`). Previously unparseable on keyword-less bindings.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart` ordering/uniqueness slots, retained independently of the range.
+    pub multiplicity_modifiers: MultiplicityModifiers,
     pub typing_span: Option<Span>,
     pub membership: Membership,
+    /// `UsageBody = DefinitionBody`, represented by this slice's shared attribute/item body.
+    pub body: AttributeBody,
 }
 
 impl PartialEq for DefaultReferenceUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.prefix == other.prefix
+            && self.name == other.name
+            && self.short_name == other.short_name
             && self.typing == other.typing
             && self.subsets == other.subsets
             && self.redefines == other.redefines
+            && self.references == other.references
+            && self.crosses == other.crosses
+            && self.intersects == other.intersects
             && self.value == other.value
+            && self.multiplicity == other.multiplicity
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.membership == other.membership
+            && self.body == other.body
     }
 }
 
@@ -877,13 +1171,18 @@ impl PartialEq for DefaultReferenceUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `PortDefinition` (SysML BNF 628) reaches it through
+    /// `DefinitionPrefix` (SysML BNF 225).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: PortDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::OwningMembership`]. Like `PartDef`, `port_def`/
-    /// `port_def_required` did not previously accept a visibility prefix at all (BNF
+    /// `port_def` did not previously accept a visibility prefix at all (BNF
     /// `DefinitionMember : OwningMembership = MemberPrefix ownedRelatedElement +=
     /// DefinitionElement` legally allows one before any definition) -- confirmed as a genuine
     /// parsing gap the same way as `PartDef::membership`. See `port::parse_port_def`.
@@ -891,21 +1190,18 @@ pub struct PortDef {
 }
 
 /// Body of a port definition: `;` or `{` PortDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PortDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PortDefBodyElement>>,
-    },
-}
+pub type PortDefBody = Body<PortDefBodyElement>;
 
 /// Element inside a port definition body (in/out declarations or nested port usages).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortDefBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     InOutDecl(Node<InOutDecl>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Error(Node<ParseErrorNode>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
@@ -915,28 +1211,51 @@ pub enum PortDefBodyElement {
     ItemUsage(Node<ItemUsage>),
     /// Enumeration usage nested inside a port definition body (PAR-002 widening).
     EnumerationUsage(Node<EnumerationUsage>),
-    PortUsage(Node<PortUsage>),
-    Other(String),
+    PortUsage(Box<Node<PortUsage>>),
+    /// `#keyword` metadata tag nested inside a port definition body, either the bare form or the
+    /// `PrefixMetadataMember`-style form prefixing the next port-body member (e.g. `#idd port
+    /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
+    /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `abstract ref port interfacingPorts : Port[0..*]
+    /// nonunique :> ports { ... }` and `ref self: Port :>> Object::self;` (Systems Library
+    /// `Ports.sysml`). This scope accepted no `ref` member at all, so every one of them was
+    /// captured as unsupported grammar.
+    RefDecl(Node<RefDecl>),
+    /// `variant` member via this scope's `DefinitionBodyItem` grammar.
+    VariantUsage(Node<VariantUsage>),
+    /// `PortDefinition = DefinitionPrefix PortDefKeyword Definition …` (SysML BNF 955), so a port
+    /// body is an ordinary `DefinitionBody` and its `DefinitionBodyItem` (514) reaches
+    /// `OccurrenceUsageMember -> StructureUsageMember -> PartUsage` like every other definition
+    /// body. The scope modelled no part member, so `port def PD { part x : T; }` was rejected as
+    /// `unexpected_keyword_in_scope` -- the composite modifier and the declaration with it.
+    ///
+    /// Boxed: `PartUsage` carries the shared `OccurrenceUsagePrefix` and is much the largest
+    /// member of this scope.
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortUsage {
-    /// Direction prefix when parsed as `in`/`out`/`inout port ...` (BNF `RefPrefix`, reachable
-    /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`).
-    pub direction: Option<InOut>,
-    /// Leading `abstract` keyword (Systems Library e.g. `abstract port ownedPorts`).
-    pub is_abstract: bool,
-    /// `derived` keyword from `RefPrefix`. See `AttributeUsage::is_derived`.
-    pub is_derived: bool,
-    /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
-    pub is_constant: bool,
-    pub name: String,
+    /// `PortUsage = OccurrenceUsagePrefix 'port' Usage` (SysML BNF 645): the whole shared prefix,
+    /// in the one order the production allows, each slot carrying the authored keyword's span.
+    ///
+    /// Replaced five spanless fields -- `direction`, `is_abstract`, `is_derived`, `is_constant`,
+    /// `is_individual` -- that between them represented neither `variation`, `ref`, a
+    /// `PortionKind` nor a `UsageExtensionKeyword`, and were parsed and emitted in two different
+    /// orders, neither of them the grammar's. See `planning/port-usage-prefix-matrix.md`.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
-    pub short_name: Option<String>,
-    pub type_name: Option<String>,
+    pub short_name: Option<DeclarationName>,
+    /// Structured, multi-target typing clause after `:` / `typed by` / `defined by`.
+    pub typing: Option<Node<TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Subsets feature and optional value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -952,8 +1271,6 @@ pub struct PortUsage {
     /// another port instead of declaring a fresh one.
     pub value: Option<Node<crate::ast::FeatureValue>>,
     pub body: PortBody,
-    /// Span of the usage name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type reference after `:`, if present (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
@@ -965,14 +1282,12 @@ pub struct PortUsage {
 
 impl PartialEq for PortUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.direction == other.direction
-            && self.is_abstract == other.is_abstract
-            && self.is_derived == other.is_derived
-            && self.is_constant == other.is_constant
+        self.prefix == other.prefix
             && self.name == other.name
             && self.short_name == other.short_name
-            && self.type_name == other.type_name
+            && self.typing == other.typing
             && self.multiplicity == other.multiplicity
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.references == other.references
@@ -985,14 +1300,7 @@ impl PartialEq for PortUsage {
 }
 
 /// Body of a port usage: `;` or `{` PortBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PortBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PortBodyElement>>,
-    },
-}
+pub type PortBody = Body<PortBodyElement>;
 
 /// Element inside a port usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1001,13 +1309,35 @@ pub enum PortBody {
 pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
-    PortUsage(Node<PortUsage>),
-    Doc(Node<DocComment>),
+    PortUsage(Box<Node<PortUsage>>),
+    /// An occurrence usage nested in a port body. In particular, this owns SysML's
+    /// `EventOccurrenceUsage` forms such as `event occurrence received;` and
+    /// `event sourceEvent;`.
+    OccurrenceUsage(Box<Node<OccurrenceUsage>>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Attribute usage nested inside a port usage body (PAR-002 widening; this enum previously
     /// had no attribute/item coverage at all).
     AttributeUsage(Node<AttributeUsage>),
     /// Item usage nested inside a port usage body. See `AttributeUsage`.
     ItemUsage(Node<ItemUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `protected ref thisParticipant :>> self;` and
+    /// `protected ref otherParticipants : Port[1..*] nonunique :> interfacingPorts default …;`
+    /// (Systems Library `Interfaces.sysml:52-54`, inside `ref port :>> participant : Port [2..*]
+    /// nonunique ordered { … }`).
+    ///
+    /// `UsageBody = DefinitionBody`, so a port usage body owns the same `ref` member a port
+    /// *definition* body already models as [`PortDefBodyElement::RefDecl`]; this scope carried no
+    /// `ref` member at all, which only became reachable when `port_usage` started claiming the
+    /// `ref port …` declarations that own these bodies.
+    RefDecl(Node<RefDecl>),
+    /// `variant` member via `UsageBody = DefinitionBody`.
+    VariantUsage(Node<VariantUsage>),
+    /// Part usage nested in a port usage body. `UsageBody = DefinitionBody` (SysML BNF 604), so
+    /// this scope reaches `DefinitionBodyItem -> OccurrenceUsageMember -> StructureUsageMember ->
+    /// PartUsage` (514, 623) exactly as [`PortDefBodyElement::PartUsage`] does on the definition
+    /// side. Boxed for the same reason: `PartUsage` carries the shared `OccurrenceUsagePrefix`.
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2
@@ -1020,12 +1350,15 @@ pub struct ConnectStmt {
     /// Additional ends beyond `from`/`to` from the parenthesized n-ary form; empty for the
     /// ordinary binary `from ... to ...` form.
     pub extra_ends: Vec<Node<ConnectionEnd>>,
-    pub body: ConnectBody,
-    /// Real annotation content from a braced body (`body: ConnectBody::Brace`), tracked
-    /// separately from `body` since `ConnectBody` itself is shared as a bare semicolon/brace
-    /// marker across several very differently-shaped contexts (bind, TypedConnect, this plain
-    /// connect statement). Empty for `ConnectBody::Semicolon`.
-    pub body_elements: Vec<Node<RelationshipBodyElement>>,
+    /// `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody`, and
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set -- not only the
+    /// annotating subset a `RelationshipBody` allows.
+    ///
+    /// This was a `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) paired with a
+    /// separate `body_elements` list: one body fact in two fields, which is what
+    /// [`crate::ast::Body`] exists to prevent. The shared container carries the `;` or the two
+    /// brace spans with it.
+    pub body: PartUsageBody,
 }
 
 // ---------------------------------------------------------------------------
@@ -1036,6 +1369,8 @@ pub struct ConnectStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterfaceDef {
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: InterfaceDefBody,
@@ -1043,20 +1378,19 @@ pub struct InterfaceDef {
 }
 
 /// Body of an interface definition: `;` or `{` InterfaceDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum InterfaceDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<InterfaceDefBodyElement>>,
-    },
-}
+pub type InterfaceDefBody = Body<InterfaceDefBodyElement>;
 
 /// Element inside an interface definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceDefBodyElement {
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
@@ -1071,43 +1405,71 @@ pub enum InterfaceDefBodyElement {
     /// `item def`, using `item_def_required`. See `AttributeDef`.
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
-    /// `port def`, using `port_def_required`. See `AttributeDef`.
+    /// `port def`, using `port_def`. See `AttributeDef`.
     PortDef(Node<PortDef>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// GH-85: bare `flow <a> to <b>;` shorthand connecting two of this interface's own ends, e.g.
     /// `flow p1.torque to p2.torque;` (OMG spec Annex `Vehicle Example/SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml`). Previously unmodeled -- this body had no flow arm at all.
-    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
+    /// `constraint` usage through `InterfaceBodyItem -> InterfaceOccurrenceUsageMember ->
+    /// InterfaceOccurrenceUsageElement -> BehaviorUsageElement -> ConstraintUsage` (SysML BNF
+    /// 727-750, 374-389, 1382-1395). The existing source-backed ConstraintUsage owns its
+    /// occurrence prefix, declaration, and CalculationBody.
+    ConstraintUsage(Box<Node<ConstraintUsage>>),
 }
 
-/// GH-53: the nested-usage kinds confirmed by real usage as an [`EndDecl`]'s target (see
-/// `EndDecl::nested_usage`'s doc comment). Only `occurrence`/`item` are evidenced; extend this
-/// only alongside a matching real-usage citation, not speculatively.
+/// The immediate declaration introducer after an `end` prefix.
+///
+/// `ref` is the required keyword of the pinned `ReferenceUsage` production after its
+/// `EndUsagePrefix`; `feature` is the distinct KerML compatibility spelling already accepted by
+/// the shared end parser. They are alternatives, not a boolean layered on top of the end.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum EndNestedUsage {
-    Occurrence(Box<Node<OccurrenceUsage>>),
-    Item(Box<Node<ItemUsage>>),
+pub enum EndDeclIntroducer {
+    /// The existing bare end-declaration form has no intervening introducer.
+    Bare,
+    /// Source-backed `ref` from `EndUsagePrefix 'ref' Usage`.
+    Reference { keyword_span: Span },
+    /// Source-backed KerML compatibility `feature` spelling.
+    KerMLFeature { keyword_span: Span },
 }
 
 /// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
-/// target | nested `occurrence`/`item` usage, see [`nested_usage`](EndDecl::nested_usage)) `;`.
+/// target) `;`. A kind-keyworded end (`end [1] part bead : TireBead;`) is not this node: it is the
+/// usage family's own node with an [`EndUsagePrefix`](crate::ast::EndUsagePrefix) head.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
-    pub name: String,
-    /// Display string for the type (`:` form) or reference target (`::>`/`references` form).
-    /// Kept for backward compatibility and simple display; see `references` for the structured
-    /// reference-subsetting form (GH-19).
-    pub type_name: String,
-    /// True when this end used `::>`/`references` reference subsetting instead of `:` typing.
-    pub uses_derived_syntax: bool,
+    /// `RefPrefix` between `end` and the declaration.
+    ///
+    /// `DefaultReferenceUsage : ReferenceUsage = ( isEnd ?= 'end' )? RefPrefix UsageDeclaration
+    /// ValuePart? UsageBody` (SysML BNF 630; reference `SysML.xtext:630-633`) is the one
+    /// production that spells `end` *and* a `RefPrefix`, so `end derived x : T;` and
+    /// `end in x : T;` are legal where `end derived part p : T;` is not --
+    /// `UnextendedUsagePrefix = EndUsagePrefix | BasicUsagePrefix` (298) makes the keyworded
+    /// forms an exclusive choice.
+    ///
+    /// This is the spelling that makes `validateFeatureEndNoDirection` and
+    /// `validateFeatureEndNotDerivedAbstractCompositeOrPortion` reachable from textual notation,
+    /// which is why the Pilot's own textual validator checks them. Retaining the prefix here is
+    /// therefore what lets a semantic layer report those rules against authored text rather than
+    /// treating them as unreachable.
+    pub ref_prefix: crate::ast::RefPrefix,
+    /// `Bare`, source-backed `ref`, or source-backed KerML `feature` immediately after `end`.
+    pub introducer: EndDeclIntroducer,
+    pub short_name: Option<DeclarationName>,
+    /// A normal declared name or a fixed derivation-end role. `#original`/`#derive` are grammar
+    /// roles, not declaration labels.
+    pub identity: EndIdentity,
+    /// Structured typing for the `: Type` form. A reference-only end has no typing and stores its
+    /// target in `references`.
+    pub typing: Option<Node<TypingRelationship>>,
     /// Structured reference-subsetting relationship for the `::>`/`references` form (GH-19):
     /// `end name ::> target;` / `end name references target;` names a reference, not a type, so
-    /// it must not be modeled as typing (`endType`) downstream. Also populated (with
-    /// `uses_derived_syntax: false`) when `::>` *trails* an explicit `: Type` instead of
-    /// replacing it, e.g. `end port p3: P ::> p.p1;` (GH-85, `Simple Tests/
-    /// ConjugationTest.sysml`). `None` when no reference-subsetting clause was written at all.
+    /// it must not be modeled as typing (`endType`) downstream. Also populated when `::>`
+    /// *trails* an explicit `: Type` instead of replacing it, e.g. `end p3: P ::> p.p1;`.
+    /// `None` when no reference-subsetting clause was written at all.
     pub references: Option<Node<SubsettingRelationship>>,
     /// Optional multiplicity after the type/reference target, e.g. `[1]` in `end hub ::>
     /// mainSwitch[1];` (BNF `DefaultInterfaceEnd`'s `Usage` production carries the same optional
@@ -1118,34 +1480,47 @@ pub struct EndDecl {
     /// `end source: Anything :>> BinaryLinkObject::source;` (Systems Library `Connections.sysml`).
     /// `None` when absent or when this end used the `::>`/`references` form instead.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// GH-85: `crosses` cross-subsetting clause trailing the `: Type` typed form, e.g. `end item
-    /// cart: ShoppingCart[1] crosses selectedProduct.inCart;` (OMG spec Annex `Association
-    /// Examples/ProductSelection_UnownedEnds.sysml`). `None` when absent.
+    /// `crosses` cross-subsetting clause trailing the `: Type` typed form. `None` when absent.
     pub crosses: Option<Node<SubsettingRelationship>>,
-    /// GH-53: an alternative end-declaration form where the target is itself a complete, nested
-    /// kind-prefixed usage rather than a bare type/reference, e.g. `end theCauses [*] occurrence
-    /// theCause :> causes :>> source { ... }` (Systems Library `Domain Libraries/Cause and
-    /// Effect/CausationConnections.sysml`) / `end touchesToo [0..*] item touchedItemToo :>>
-    /// separateSpaceToo, thisOccurrence;` (`Items.sysml`). `theCauses`/`touchesToo` is still this
-    /// `EndDecl`'s own `name`; the nested usage supplies this end's typing/structure instead of a
-    /// `:`/`::>` clause. `None` for the ordinary forms above.
-    pub nested_usage: Option<Box<EndNestedUsage>>,
-    /// Span of the name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
     pub type_ref_span: Option<Span>,
 }
 
+/// Identity position of a connector end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EndIdentity {
+    /// No label at all: `UsageDeclaration = Identification? …`, so `end : TireBead[1];`
+    /// (`Wheel Package - Updated.sysml`) and `end :>> source ::> producer.publicationPort;`
+    /// (`ServerSequenceRealization_2.sysml`) declare an end through its specialization alone.
+    Anonymous,
+    /// Ordinary declaration label with its authored token span.
+    Declaration(DeclarationName),
+    /// Fixed derivation role with its authored `#...` token span.
+    Derivation(Node<DerivationEndRole>),
+}
+
+/// Fixed roles inside a `#derivation connection` body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DerivationEndRole {
+    /// The `#original` end.
+    Original,
+    /// The `#derive` end.
+    Derive,
+}
+
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.type_name == other.type_name
-            && self.uses_derived_syntax == other.uses_derived_syntax
+        self.ref_prefix == other.ref_prefix
+            && self.introducer == other.introducer
+            && self.short_name == other.short_name
+            && self.identity == other.identity
+            && self.typing == other.typing
             && self.references == other.references
             && self.multiplicity == other.multiplicity
             && self.redefines == other.redefines
             && self.crosses == other.crosses
-            && self.nested_usage == other.nested_usage
     }
 }
 
@@ -1157,13 +1532,28 @@ pub struct RefDecl {
     /// `part def` body (`Simple Tests/ItemTest.sysml:15`). Only parsed by `part_ref_usage`;
     /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
     pub direction: Option<InOut>,
-    pub name: String,
-    /// Type after `:`, e.g. "Vehicle". A comma-separated multi-target clause joins into one
-    /// display string here; see `typing` for the structured, multi-target-capable form.
-    pub type_name: String,
+    /// `derived` from BNF `RefPrefix`, e.g. `derived ref item receiverArgument : Expression[0..1]
+    /// subsets Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml:14`).
+    pub is_derived: bool,
+    /// `abstract` or `variation` from `RefPrefix` -- alternatives there, so one field, matching
+    /// [`AttributeUsage::usage_prefix`]. E.g. `abstract ref port outgoingTransfersFromSelf : ...`
+    /// (`sysml.library/Systems Library/Ports.sysml`).
+    pub usage_prefix: Option<DefinitionPrefix>,
+    /// `constant` from `RefPrefix`. See [`AttributeUsage::is_constant`].
+    pub is_constant: bool,
+    /// Kind keyword after `ref` (`ref item scene : Scene;`, `ref port :>> participant ...`).
+    /// Previously parsed by `connector::ref_decl` and discarded, so formatting dropped the
+    /// authored keyword.
+    pub kind_keyword: Option<RefDeclKind>,
+    /// `UsageExtensionKeyword+` of `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
+    /// Usage` (reference `SysML.xtext:728-730`) after `ref`, or `OccurrenceUsagePrefix`'s
+    /// trailing run ahead of a kind keyword: `private ref #Classified #Security z1;`
+    /// (`MetadataTest.sysml`). Empty when none was authored.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
-    /// comma-separated target from a `:` clause, not just the first (S42-004). `None` when no
-    /// typing clause was written (`type_name` is then empty).
+    /// comma-separated target from a `:` clause, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
     /// Redefines target from an optional leading `:>>` clause, e.g. `ref sentMessage :>>
     /// sentTransfer: MessageTransfer, MessageAction { ... }` (Systems Library `Actions.sysml`).
@@ -1174,11 +1564,17 @@ pub struct RefDecl {
     /// requirement originalRequirement[1] :>> originalRequirements :> participant { ... }`
     /// (Systems Library `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Multiplicity clause (BNF `MultiplicityPart`), from either the pre-specialization
+    /// position (`ref originalRequirement[1] :>> ...`) or the post-typing position (`ref
+    /// otherParticipants : Port [1..*] nonunique :> ...`, Systems Library `Interfaces.sysml`).
+    /// Previously parsed and discarded by `connector::ref_decl`.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
-    /// Span of the name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
     /// Ownership/visibility wrapper (`FeatureMembership`). Populated when a visibility prefix
@@ -1189,51 +1585,85 @@ pub struct RefDecl {
 impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.type_name == other.type_name
+            && self.short_name == other.short_name
+            && self.direction == other.direction
+            && self.is_derived == other.is_derived
+            && self.usage_prefix == other.usage_prefix
+            && self.is_constant == other.is_constant
+            && self.kind_keyword == other.kind_keyword
             && self.typing == other.typing
             && self.redefines == other.redefines
             && self.subsets == other.subsets
+            && self.multiplicity == other.multiplicity
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.value == other.value
             && self.body == other.body
             && self.membership == other.membership
     }
 }
 
-/// Body of a ref declaration: `;` or `{` members `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The kind keyword after `ref` on a [`RefDecl`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RefBody {
-    Semicolon,
-    Brace { elements: Vec<Node<RefBodyElement>> },
+pub enum RefDeclKind {
+    /// `part`.
+    Part,
+    /// `port`.
+    Port,
+    /// `item`.
+    Item,
+    /// `requirement`.
+    Requirement,
+    /// `use case` (`ref use case self : UseCase :>> Case::self;`, Systems Library
+    /// `UseCases.sysml`; spec42 Gap 34).
+    UseCase,
+    /// `concern` (`ref concern :>> self: ConcernCheck;`, Systems Library `Requirements.sysml`).
+    Concern,
+    /// `viewpoint` (`ref viewpoint :>> self : ViewpointCheck;`, Systems Library `Views.sysml`).
+    Viewpoint,
+    /// `rendering` (`abstract ref rendering subrenderings : Rendering[0..*] :> renderings;`,
+    /// Systems Library `Views.sysml`).
+    Rendering,
+    /// `view` (`abstract ref view subviews : View[0..*] :> views { ... }`, Systems Library
+    /// `Views.sysml`).
+    View,
+    /// `action` (`private ref action thisConnection = self;`, Systems Library `Flows.sysml`).
+    Action,
+    /// `case` (`ref case self : Case :>> Calculation::self;`, Systems Library `Cases.sysml`).
+    Case,
+    /// `verification` (`ref verification self : VerificationCase :>> Case::self;`, Systems
+    /// Library `VerificationCases.sysml`).
+    Verification,
 }
 
-/// Element of a ref declaration's braced body (`RefBody::Brace`), wrapping whichever member
-/// shape is real for the owning context. BNF `ReferenceUsage` resolves `ref`'s body to a generic
-/// `Usage` body, so its real content follows whatever the owning context allows: full nested
-/// action members inside an action body, part-usage members inside a part usage body, state
-/// members inside a state body. Connection/interface `ref` bodies don't yet have a dedicated
-/// member grammar, so they get the same doc/comment/metadata + recovery baseline as
-/// [`RelationshipBodyElement`].
-///
-/// `PartUsageBodyElement`/`ActionDefBodyElement` are inherently larger than the annotation-only
-/// variants (same size-difference tradeoff already accepted for `AttributeUsage` in several
-/// other body-element enums crate-wide); not boxing keeps this variant shape consistent with
-/// those siblings rather than partially addressing the size difference.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RefBodyElement {
-    Action(Node<ActionDefBodyElement>),
-    PartUsage(Node<PartUsageBodyElement>),
-    State(Node<StateDefBodyElement>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
-    Error(Node<ParseErrorNode>),
-    /// Unmodeled body content captured as raw text (used for library parsing).
-    Other(String),
+impl RefDeclKind {
+    /// The authored keyword spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Part => "part",
+            Self::Port => "port",
+            Self::Item => "item",
+            Self::Requirement => "requirement",
+            Self::UseCase => "use case",
+            Self::Concern => "concern",
+            Self::Viewpoint => "viewpoint",
+            Self::Rendering => "rendering",
+            Self::View => "view",
+            Self::Action => "action",
+            Self::Case => "case",
+            Self::Verification => "verification",
+        }
+    }
 }
+
+/// Body of a ref declaration: `;` or `{` members `}`.
+/// A `ref` usage body.
+///
+/// `UsageBody = DefinitionBody` (SysML 8.2.2.6.2), so a `ref` body holds the same members as any
+/// other usage body no matter which declaration owns the `ref`. It previously had its own element
+/// enum whose contents depended on which of five parsers ran -- an encoding of parser provenance
+/// rather than of grammar.
+pub type RefBody = Body<PartUsageBodyElement>;
 
 /// Shared annotation-only body element for KerML `RelationshipBody` contexts -- BNF
 /// `RelationshipBody : Relationship = ';' | '{' (ownedRelationship += OwnedAnnotation)* '}'`,
@@ -1243,14 +1673,14 @@ pub enum RefBodyElement {
 /// silently discarded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::large_enum_variant)]
 pub enum RelationshipBodyElement {
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// Owned feature member (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s
+    /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     Error(Node<ParseErrorNode>),
-    /// Unmodeled body content captured as raw text (used for library parsing).
-    Other(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -1258,10 +1688,22 @@ pub enum RelationshipBodyElement {
 // ---------------------------------------------------------------------------
 
 /// Connection definition: `connection def` Identification body (BNF ConnectionDefinition).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DerivationConnectionRole {
+    /// The fixed `#derivation` grammar marker.
+    Derivation,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
-    pub annotation: Option<String>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
+    /// `individual connection def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix
+    /// `isIndividual`, GH-90.1), mirroring `ActionDef::is_individual`.
+    pub is_individual: bool,
+    /// Fixed derivation role and exact marker span. Ordinary connections have no role.
+    pub derivation_role: Option<Node<DerivationConnectionRole>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConnectionDefBody,
@@ -1274,14 +1716,7 @@ pub struct ConnectionDef {
 }
 
 /// Body of a connection definition: `;` or `{` end/ref/connect* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ConnectionDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConnectionDefBodyElement>>,
-    },
-}
+pub type ConnectionDefBody = Body<ConnectionDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -1289,7 +1724,13 @@ pub enum ConnectionDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Error(Node<ParseErrorNode>),
     /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
     AttributeDef(Node<AttributeDef>),
@@ -1297,9 +1738,9 @@ pub enum ConnectionDefBodyElement {
     /// `item def`, using `item_def_required`. See `AttributeDef`.
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
-    /// `port def`, using `port_def_required`. See `AttributeDef`.
+    /// `port def`, using `port_def`. See `AttributeDef`.
     PortDef(Node<PortDef>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// GH-51: real Systems/Domain Library connection defs own `assert constraint`
     /// (`Cause and Effect/CausationConnections.sysml`, `Requirement Derivation/
     /// DerivationConnections.sysml`) and `occurrence` usages with `abstract`/`constant`/`ref`
@@ -1336,10 +1777,10 @@ pub struct MetadataDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
-    pub name: String,
-    pub type_name: Option<String>,
-    pub about_targets: Vec<String>,
-    pub body: AttributeBody,
+    pub name: DeclarationName,
+    pub type_reference: Option<QualifiedReferenceId>,
+    pub about_targets: Vec<QualifiedReferenceId>,
+    pub body: MetadataBody,
     pub membership: Membership,
 }
 
@@ -1357,20 +1798,73 @@ pub struct EnumDef {
     pub membership: Membership,
 }
 
+pub type EnumerationBody = Body<EnumerationBodyElement>;
+
+/// A member of an `enum def { ... }` body.
+///
+/// `EnumerationBody` is the one production that names the membership directly --
+/// `';' | '{' ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'`
+/// (SysML 8.2.2.8) -- so this scope's member set is the annotating production plus enumerated
+/// values, and nothing else.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum EnumerationBody {
-    Semicolon,
-    Brace { values: Vec<Node<EnumeratedValue>> },
+pub enum EnumerationBodyElement {
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    /// Boxed alongside the full usage alternative so this heterogeneous body enum stays compact
+    /// for every member kind rather than reserving annotation-sized inline storage for each one.
+    Annotating(Box<AnnotatingMember>),
+    /// `EnumerationUsageMember`, one enumerated value.
+    ///
+    /// The full `Usage` header is intentionally stored on the value rather than flattened into
+    /// text. Box it at this heterogeneous body boundary so that those typed relationships do not
+    /// inflate every `EnumerationBodyElement`, including annotating and recovery members.
+    Value(Box<Node<EnumeratedValue>>),
+    /// Malformed syntax retained by the structured recovery parser. This body had no recovery
+    /// representation at all: an unparseable member sent it to the closing brace, discarding
+    /// everything in between with no node and no diagnostic.
+    Error(Node<ParseErrorNode>),
 }
 
-/// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
-/// an optional inline body or `= expr` initializer that the parser discards (BNF
-/// EnumeratedValue). Only the name and its span are retained.
+/// One `EnumerationUsageMember` inside an `enum def { ... }` body.
+///
+/// The pinned SysML grammar gives this its own membership boundary:
+/// `EnumerationUsageMember = MemberPrefix EnumeratedValue`,
+/// `EnumeratedValue = 'enum'? Usage` (SysML-textual-bnf.kebnf 528-535).  It is therefore a
+/// complete usage declaration -- not merely a literal name and initializer -- with the same
+/// typed feature-specialization and multiplicity surface as the grammar-owned `Usage` tail.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumeratedValue {
-    pub name: String,
+    /// `UsageExtensionKeyword*` ahead of the optional keyword: `EnumeratedValue =
+    /// UsageExtensionKeyword* 'enum'? Usage` (reference `SysML.xtext:784-786`; the published
+    /// BNF 531 omits the run). `#Security enum secret : ClassificationLevel = 2;`
+    /// (`MetadataTest.sysml`).
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
+    /// Authored optional `enum` keyword.  Its presence is syntactic provenance, not an inferred
+    /// boolean; emission streams it only when the source contained it.
+    pub enum_keyword_span: Option<Span>,
+    /// `UsageDeclaration` identification.
+    pub identification: Identification,
+    /// Exact aggregate span of the optional short name and declared name. The decoded
+    /// [`Self::identification`] remains the semantic view; emission streams this source span so
+    /// quoted BASIC_NAME and escaped UNRESTRICTED_NAME spellings are not normalized away.
+    pub identification_span: Span,
+    /// Full `FeatureSpecializationPart` header, kept as typed relationships rather than a
+    /// reconstructed declaration string.
+    pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: MultiplicityModifiers,
+    /// `subsets` plus its grammar-owned optional `= expression` value.  The pair keeps the value
+    /// attached to the relationship slot that owns it rather than duplicating a feature value.
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
+    pub value: Option<Node<FeatureValue>>,
+    pub body: PartUsageBody,
+    /// `MemberPrefix` is a `VariantMembership`, including its optional visibility indicator.
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------
@@ -1381,7 +1875,11 @@ pub struct EnumeratedValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `OccurrenceDefinition` (SysML BNF 548) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual occurrence def IO2 { ... }` (GH-90.1, `Simple Tests/IndividualTest.sysml:3`).
     pub is_individual: bool,
     pub identification: Identification,
@@ -1394,22 +1892,35 @@ pub struct OccurrenceDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceUsage {
-    pub is_individual: bool,
-    pub is_then: bool,
+    /// The complete `OccurrenceUsagePrefix` this usage was written with.
+    ///
+    /// One shared component rather than six independent fields: the production is
+    /// `BasicUsagePrefix ('individual')? PortionKind? UsageExtensionKeyword*`, every slot keeps
+    /// its authored span, and the three mutually exclusive slots cannot hold two alternatives at
+    /// once. `IndividualUsage`, `PortionUsage` and `EventOccurrenceUsage` inline or name the same
+    /// production, so all four spellings of this family share one value; which of them was
+    /// written is the combination of slots plus the kind keyword recorded below.
+    pub prefix: super::occurrence_prefix::OccurrenceUsagePrefix,
+    /// `SourceSuccessionMember`'s `then`, as the authored keyword's span; see
+    /// [`PartUsage::then_span`]. Was a `bool`, which kept no provenance -- one representation per
+    /// syntactic fact, and `Some` *is* the flag.
+    pub then_span: Option<Span>,
     /// True for `event occurrence <name>;` (BNF `EventOccurrenceUsage`, §6 G7) — an occurrence
-    /// that marks a point in time rather than owning a lifetime.
+    /// that marks a point in time rather than owning a lifetime. A kind keyword after the prefix,
+    /// not a prefix slot.
     pub is_event: bool,
-    /// Leading `ref` keyword (BNF `RefPrefix`, §6 G29), as in `ref individual :>> vehicleUnderTest
-    /// : TestVehicle1 { ... }` from the OMG spec Annex `9-Verification-simplified.sysml`.
-    pub is_reference: bool,
-    /// Leading `abstract` keyword (BNF `RefPrefix`, §8.2.2.9.2). GH-51: real usage in Systems
-    /// Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`.
-    pub is_abstract: bool,
-    /// Leading `constant` keyword (BNF `RefPrefix`). See `is_abstract`.
-    pub is_constant: bool,
-    pub portion_kind: Option<String>,
-    pub name: String,
-    pub type_name: Option<String>,
+    /// True when the literal `occurrence` kind keyword was authored (BNF `OccurrenceUsage`),
+    /// distinct from the prefix's `individual` slot -- `individual occurrence o1;` and bare
+    /// `individual o1;` both author `individual`, but only the former also authors this (gap #7).
+    /// Needed so emission doesn't fabricate or drop the keyword relative to what was authored.
+    pub has_occurrence_keyword: bool,
+    /// Declaration label for ordinary occurrence usages.
+    pub name: Option<DeclarationName>,
+    pub short_name: Option<DeclarationName>,
+    /// Existing occurrence referenced by the shorthand `event path` form.
+    pub occurrence_reference: Option<QualifiedReferenceId>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub type_is_conjugated: bool,
     /// GH-51: `occurrence_usage` previously had no multiplicity support at all, so real usage
     /// like `abstract constant ref occurrence causes[1..*] :>> causes :> participant { ... }`
     /// (Systems Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`) fell
@@ -1420,31 +1931,29 @@ pub struct OccurrenceUsage {
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
+    /// Optional value clause (BNF `ValuePart`), e.g. `in occurrence terminatedOccurrence
+    /// default that as Occurrence { ... }` (Systems Library `Actions.sysml`).
+    pub value: Option<Node<FeatureValue>>,
     pub body: OccurrenceUsageBody,
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OccurrenceUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<OccurrenceBodyElement>>,
-    },
-}
+pub type OccurrenceUsageBody = Body<OccurrenceBodyElement>;
 
 /// Occurrence-level assert member: `assert constraint` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssertConstraintMember {
-    /// Optional name after `constraint`, e.g. `engineSelectionRational` in
+    /// Optional declared name after `constraint`, e.g. `engineSelectionRational` in
     /// `assert constraint engineSelectionRational { ... }`. `None` for the anonymous form
     /// (`assert constraint { ... }`).
-    pub name: Option<String>,
+    pub declaration_name: Option<DeclarationName>,
+    /// Referenced constraint in the shorthand `assert path { ... }` form.
+    pub target: Option<QualifiedReferenceId>,
     /// Optional type after `:`, e.g. `DiscBrakeFitConstraint_Alt` in `assert constraint
     /// discBrakeFitConstraint_Alt : DiscBrakeFitConstraint_Alt { ... }` (§6 G22 — the named form
     /// was closed in G3 but the typed one still fell through to opaque recovery).
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub body: ConstraintDefBody,
     /// `true` for a negated assert: `assert not constraint ...`.
     pub is_negated: bool,
@@ -1459,11 +1968,22 @@ pub struct AssertConstraintMember {
 #[allow(clippy::large_enum_variant)]
 pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    Annotation(Node<Annotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. `OccurrenceDefinition`/
+    /// `OccurrenceUsage` reach both through `DefinitionExtensionKeyword`/`UsageExtensionKeyword`
+    /// and `DefinitionBodyItem → NonOccurrenceUsageMember → ExtendedUsage`; this scope was the
+    /// one body that modelled neither and captured `#` as opaque text instead.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AssertConstraint(Node<AssertConstraintMember>),
-    Other(String),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    /// `bind` connector usage in an occurrence body. `OccurrenceDefinition`/`OccurrenceUsage`
+    /// bodies admit `NonOccurrenceUsageMember`, whose `NonOccurrenceUsageElement` includes
+    /// `BindingConnectorAsUsage` (SysML textual BNF 237-247, 349-353, 702-707; the pinned
+    /// Pilot SysML grammar agrees). Keep the existing structured connector rather than
+    /// recovering its text or rediscovering its ends during emission.
+    Bind(Node<Bind>),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
     /// `item x;` inside an occurrence definition/usage body (GH-87), e.g. `occurrence def Occ {
@@ -1472,9 +1992,9 @@ pub enum OccurrenceBodyElement {
     ItemUsage(Node<ItemUsage>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     SuccessionUsage(Node<SuccessionUsage>),
-    /// `satisfy <ref> (by <expr>)?;` inside an occurrence definition body (previously only
+    /// `SatisfyRequirementUsage` inside an occurrence definition body (previously only
     /// reachable at package level).
-    Satisfy(Node<Satisfy>),
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     /// `allocate <source> to <target>;` nested inside an allocation usage body (§6 G17), which
     /// decomposes the outer allocation. Real usage: OMG spec Annex `12b-Allocation.sysml`.
     Allocate(Node<Allocate>),
@@ -1485,6 +2005,14 @@ pub enum OccurrenceBodyElement {
     /// exhibits states just as a part usage does -- real usage: `exhibit vehicleStates.on { ... }`
     /// in the OMG spec Annex `6-Individual and Snapshots.sysml`.
     StateUsage(Node<StateUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref self : SuccessionFlow :>> Flow::self,
+    /// FlowTransfer::self;` and `private ref action thisConnection = self;` (Systems Library
+    /// `Flows.sysml`). Occurrence bodies accepted no `ref` member at all.
+    RefDecl(Node<RefDecl>),
+    /// Connection usage, e.g. `connection :HappensDuring connect sourceEvent to [1] self;`
+    /// (Systems Library `Flows.sysml`). Part and attribute bodies already dispatched this
+    /// member; occurrence bodies did not.
+    ConnectionUsage(Box<Node<ConnectionUsageMember>>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the
@@ -1500,13 +2028,13 @@ pub struct SuccessionUsage {
     /// prefix, mirrored by `action::succession_prefix` for the `first`-embedded form). GH-51:
     /// real usage in Systems Library `Domain Libraries/Cause and Effect/
     /// CausationConnections.sysml`.
-    pub name: Option<String>,
+    pub name: Option<DeclarationName>,
     /// Type of the succession usage itself (BNF `UsageDeclaration`'s `FeatureSpecializationPart`),
     /// e.g. `HappensJustBefore` in the unnamed `succession : HappensJustBefore first a then b;`
     /// (GH-92.3, `Vehicle Example/VehicleIndividuals.sysml:49`). Mirrors
     /// `FirstStmt::succession_type`'s identical field for the sibling action-body `first`-embedded
     /// form.
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity of the succession feature itself, e.g. `[seBeforeNum]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub source: Node<Expression>,
@@ -1515,7 +2043,10 @@ pub struct SuccessionUsage {
     pub target: Node<Expression>,
     /// Multiplicity on the `then` end, e.g. `[0..1]`.
     pub target_multiplicity: Option<Node<Multiplicity>>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
     pub membership: Membership,
 }
 
@@ -1524,23 +2055,22 @@ pub struct SuccessionUsage {
 // ---------------------------------------------------------------------------
 
 /// Generic definition body: `;` or `{` DefinitionBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DefinitionBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<DefinitionBodyElement>>,
-    },
-}
+pub type DefinitionBody = Body<DefinitionBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum DefinitionBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// Every recognized member of this body, including the annotating ones. This scope shares
+    /// the occurrence-body member set rather than restating it, so it has no annotating variant
+    /// of its own: a `Doc` variant here had no construction site in the parser at all --
+    /// documentation in a flow, allocation or message body has always arrived as
+    /// `OccurrenceMember(OccurrenceBodyElement::Annotating(..))`.
     OccurrenceMember(Node<OccurrenceBodyElement>),
-    Other(String),
 }
 // ---------------------------------------------------------------------------
 // Part usage body: bind, interface usage, connect
@@ -1554,9 +2084,9 @@ pub struct Bind {
     /// `BindingConnectorAsUsage`'s optional `'binding' UsageDeclaration` prefix, §8.2.2.13.2).
     /// `None` for the bare `bind a = b;` form (no `binding` keyword) or an unnamed `binding`
     /// prefix (e.g. `binding [1] bind ...`).
-    pub binding_name: Option<String>,
+    pub binding_name: Option<DeclarationName>,
     /// Type of the binding connector itself, e.g. `binding ab1 : AB bind a = b;`.
-    pub binding_type: Option<String>,
+    pub binding_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the binding connector feature itself, e.g. `binding [1] bind ...`
     /// (Systems Library `Domain Libraries/Geometry/ShapeItems.sysml`).
     pub binding_multiplicity: Option<Node<Multiplicity>>,
@@ -1568,12 +2098,75 @@ pub struct Bind {
     pub right: Node<Expression>,
     /// Multiplicity on the right (`=`) end, e.g. `... = [0..*] be;`.
     pub right_multiplicity: Option<Node<Multiplicity>>,
-    /// Optional body after the bind (semicolon or brace); 3a fixture uses `bind x = y { }`.
-    pub body: Option<ConnectBody>,
-    /// Real content from a braced body (`body: Some(ConnectBody::Brace)`), the same part-usage
-    /// member set `PartUsageBody` uses (BNF `BindingConnectorAsUsage`'s body is `UsageBody`, the
-    /// same general usage-member production). Empty otherwise.
-    pub body_elements: Vec<Node<PartUsageBodyElement>>,
+    /// The body after the bind, delimiters included (`bind x = y;`, `bind x = y { ... }`).
+    ///
+    /// `BindingConnectorAsUsage`'s body is `UsageBody`, the same general usage-member production
+    /// `PartUsageBody` uses. This was the last `ConnectBody` marker in the AST: a
+    /// `Semicolon | Brace` flag with no delimiter spans, paired with a separate `body_elements`
+    /// list, so one body fact lived in two fields and an empty `{ }` was indistinguishable from
+    /// a `{ ... }` whose members had been discarded.
+    ///
+    /// Not an `Option`: `BindingConnectorAsUsage` ends at `UsageCompletion`, so a bind always
+    /// writes `;` or `{ ... }`. The parser only ever produced `Some`.
+    pub body: PartUsageBody,
+}
+
+/// Interface usage: typed+connect or connection form.
+///
+/// `InterfacePart` is intentionally separate from expression-based [`ConnectionEnd`]. The
+/// pinned `InterfaceEnd` production owns an optional declaration name plus a reference
+/// subsetting, so treating it as a path expression loses `left ::> port`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfacePart {
+    Binary {
+        from: Node<InterfaceEnd>,
+        to_span: Span,
+        to: Box<Node<InterfaceEnd>>,
+    },
+    Nary {
+        open_span: Span,
+        ends: Vec<InterfaceEndMember>,
+        close_span: Span,
+    },
+}
+
+/// One ordered endpoint in the parenthesized `NaryInterfacePart` form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InterfaceEndMember {
+    /// `None` only for the first endpoint; every later member owns its preceding comma.
+    pub comma_span: Option<Span>,
+    pub end: Node<InterfaceEnd>,
+}
+
+/// A source-backed `InterfaceEnd` (SysML textual BNF 778-784).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InterfaceEnd {
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub target: InterfaceEndTarget,
+}
+
+/// `InterfaceEnd`'s required reference subsetting, with its optional declaration label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfaceEndTarget {
+    Direct(QualifiedReferenceId),
+    Named {
+        /// The authored `NAME` token labelling this end.
+        name: DeclarationName,
+        operator: InterfaceEndReferenceOperator,
+        target: QualifiedReferenceId,
+    },
+}
+
+/// The authored `REFERENCES` spelling joining an interface-end label to its target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InterfaceEndReferenceOperator {
+    Symbol { span: Span },
+    Keyword { span: Span },
 }
 
 /// Interface usage: typed+connect or connection form.
@@ -1586,18 +2179,24 @@ pub enum InterfaceUsage {
     /// previously only the typed (`interface name: Type connect ...`) and fully anonymous
     /// (`Connection` variant) forms were reachable.
     TypedConnect {
-        name: Option<String>,
-        interface_type: Option<String>,
-        from: Node<Expression>,
-        to: Node<Expression>,
-        body: ConnectBody,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        name: Option<DeclarationName>,
+        interface_type: Option<QualifiedReferenceId>,
+        subsets: Option<Node<SubsettingRelationship>>,
+        redefines: Option<Node<SubsettingRelationship>>,
+        part: Node<InterfacePart>,
+        /// The `InterfaceBody`, delimiters included. Was a `ConnectBody` marker beside a separate
+        /// element list -- one body fact in two fields, with no span for either brace.
+        body: Body<InterfaceUsageBodyElement>,
     },
     /// `interface` from `to` to body.
     Connection {
-        from: Node<Expression>,
-        to: Node<Expression>,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        subsets: Option<Node<SubsettingRelationship>>,
+        redefines: Option<Node<SubsettingRelationship>>,
+        part: Node<InterfacePart>,
+        /// See [`InterfaceUsage::TypedConnect`]'s body. This variant kept only an element list
+        /// that was always empty -- the parser discarded the body outright -- so the `;`/`{}`
+        /// distinction and every member were lost.
+        body: Body<InterfaceUsageBodyElement>,
     },
     /// `interface` (name (multiplicity)?)? (`:` Type)? body -- a declared interface usage with
     /// no inline `connect` clause (GH-16). Per BNF `InterfaceUsageDeclaration = UsageDeclaration
@@ -1607,10 +2206,12 @@ pub enum InterfaceUsage {
     /// `interface_usage` unconditionally required either a `connect` clause or a bare `from to
     /// to` form.
     Declaration {
-        name: Option<String>,
-        interface_type: Option<String>,
-        body: ConnectBody,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        name: Option<DeclarationName>,
+        interface_type: Option<QualifiedReferenceId>,
+        subsets: Option<Node<SubsettingRelationship>>,
+        redefines: Option<Node<SubsettingRelationship>>,
+        /// See [`InterfaceUsage::TypedConnect`]'s body.
+        body: Body<InterfaceUsageBodyElement>,
     },
 }
 
@@ -1618,18 +2219,29 @@ pub enum InterfaceUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsageBodyElement {
+    /// A malformed member recovered within an interface usage body.
+    Error(Node<ParseErrorNode>),
     /// `ref` `:>>` name `=` value body.
     RefRedef {
-        name: String,
+        target: QualifiedReferenceId,
         value: Node<Expression>,
         body: RefBody,
     },
-    Doc(Node<DocComment>),
-    /// GH-85: `end` member inside a typed, non-`connect` interface usage's body, e.g. `interface
-    /// i: I { end port p3: P ::> p.p1; end port p4: ~P ::> p.p2; }` (`Simple Tests/
-    /// ConjugationTest.sysml`), parallel to the already-supported `connection a: A { end port
-    /// p3: ...; }` form. Boxed: `EndDecl` is much larger than `RefRedef`, the other variant here.
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `end` member inside a typed, non-`connect` interface usage's body. Boxed: `EndDecl` is
+    /// much larger than `RefRedef`, the other variant here.
     EndDecl(Box<Node<EndDecl>>),
+    /// `PortUsage = OccurrenceUsagePrefix 'port' Usage` with an `end` head: `end port p3 : P
+    /// ::> p.p1;` (`ConjugationTest.sysml`), reached through `UsageBody = DefinitionBody`.
+    PortUsage(Box<Node<PortUsage>>),
+    /// A behavior occurrence usage in an interface body. `InterfaceOccurrenceUsageElement`
+    /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
+    /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.
+    FlowUsage(Box<Node<FlowUsage>>),
+    /// `PerformActionUsage`, retained as the grammar-owned perform production rather than a
+    /// reference-shaped interface-body special case.
+    Perform(Box<Node<Perform>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.
@@ -1638,7 +2250,47 @@ pub enum InterfaceUsageBodyElement {
 pub struct Connect {
     pub from: Node<ConnectionEnd>,
     pub to: Node<ConnectionEnd>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+}
+
+/// Package-level `BindingConnectorAsUsage` (BNF §8.2.2.13.2), the keyword-less sibling of
+/// [`Bind`]: `binding` (`all`)? name? multiplicity? (`of` | `bind`)? left `=` right body.
+/// Distinct from `Bind`/`bind_` (used inside part-def/part-usage bodies), which requires the
+/// literal `bind` keyword between the optional `binding` prefix and the `left = right` pair --
+/// here that keyword (or the alternative `of`) is itself optional decoration around the same
+/// `left = right` pair, confirmed by real usage: `binding instant[instantNum] of startShot =
+/// endShot;`, `binding all startShot = endShot;`, `binding x bind a = b;`, `binding [0..1] a =
+/// b;` all bind the same `left = right` shape regardless of which (if any) keyword separates the
+/// prefix from it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BindingConnectorUsage {
+    /// `true` for the `binding all ...` form.
+    pub all: bool,
+    /// Span of the binding connector's own name, e.g. `instant` in `binding
+    /// instant[instantNum] of startShot = endShot;`. `None` when no name is given (e.g. `binding
+    /// all ...`, `binding [0..1] ...`). The name text lives in the document source and is
+    /// resolved through it rather than copied into this node.
+    pub name: Option<DeclarationName>,
+    /// Multiplicity on the binding connector itself, e.g. `[instantNum]` / `[0..1]`.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `true` when the `of` keyword introduced `left` (e.g. `of startShot`); `false` when `left`
+    /// was introduced by `bind` or appeared bare. Retained for exact re-emission.
+    pub uses_of_keyword: bool,
+    /// `true` when the `bind` keyword introduced `left` (e.g. `binding x bind a = b;`). Retained
+    /// for exact re-emission.
+    pub uses_bind_keyword: bool,
+    pub left: QualifiedReferenceId,
+    pub right: QualifiedReferenceId,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
 }
 
 // ---------------------------------------------------------------------------
@@ -1652,13 +2304,10 @@ pub struct AliasDef {
     pub identification: Identification,
     /// The aliased element's qualified name, e.g. `ISQ::mass` in `alias m for ISQ::mass;`.
     ///
-    /// Structured the same way as [`crate::ast::TypingRelationship::target`]/
-    /// [`crate::ast::SubsettingRelationship::target`] (parser work item 2) rather than a plain
-    /// joined `String`, so `::`-qualified segments stay distinguishable and the target carries
-    /// its own span. Unlike those fields this is a single [`crate::ast::RelationshipTarget`], not
-    /// a `Vec` -- an alias target (`[QualifiedName]` per the grammar) is always exactly one
-    /// qualified name, with no comma-separated multi-target concept (parser work item 4a).
-    pub target: RelationshipTarget,
+    /// This is one document-local arena identity rather than a `Vec`: an alias target
+    /// (`[QualifiedName]` per the grammar) is always exactly one qualified name, with no
+    /// comma-separated multi-target concept.
+    pub target: crate::ast::QualifiedReferenceId,
     pub body: AliasBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
     /// always [`crate::ast::MembershipKind::Alias`] -- the variant reserved for this struct since
@@ -1671,11 +2320,4 @@ pub struct AliasDef {
 }
 
 /// Body of an alias definition: `;` or `{` ... `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AliasBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<RelationshipBodyElement>>,
-    },
-}
+pub type AliasBody = Body<RelationshipBodyElement>;

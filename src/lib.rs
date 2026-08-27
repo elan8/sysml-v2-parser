@@ -11,16 +11,22 @@
 //!   mid-edit.
 //!
 //! **Invariant:** for any input where [`parse`] succeeds, [`parse_for_editor`] on the same input
-//! reports zero diagnostics and builds the identical AST (once spans are normalized out -- see
-//! [`ast::RootNamespace::normalize_for_test_comparison`]). Don't mix the two entry points for the
-//! same document within one caller (e.g. parsing once with each and comparing/reparsing across
-//! them) -- that was the GH-66/GH-69 bug class, where an apparent AST mismatch was really just
-//! the two entry points disagreeing, not a real emit/parser bug. Covered by
-//! `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
+//! reports zero diagnostics and builds the identical document-local reference arena and AST (once
+//! spans are normalized out -- see [`ast::RootNamespace::normalize_for_test_comparison`]). Don't
+//! mix the two entry points for the same document within one caller (e.g. parsing once with each
+//! and comparing/reparsing across them) -- that was the GH-66/GH-69 bug class, where an apparent
+//! AST mismatch was really just the two entry points disagreeing, not a real emit/parser bug.
+//! Covered by `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
+// The deeply mutually recursive AST (type bodies nest parameters that nest type bodies, e.g.
+// `KermlFeature` -> `CalcDefBody` -> `InOutDecl` -> `ActionDefBodyElement` -> ...)
+// exceeds the default trait-solver recursion limit when rustdoc computes auto traits such as
+// `RefUnwindSafe`.
+#![recursion_limit = "256"]
 #![cfg_attr(
     not(test),
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
+#![cfg_attr(not(test), warn(clippy::wildcard_enum_match_arm))]
 
 pub mod ast;
 pub mod emit;
@@ -28,42 +34,77 @@ pub mod error;
 pub mod parser;
 
 pub use ast::{
-    ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AliasBody, AliasDef, AllocationDef, AllocationUsage, AnalysisCaseDef,
-    AnalysisCaseUsage, Annotation, Argument, AstNode, AttributeBody, AttributeDef, AttributeUsage,
-    Bind, CaseDef, CaseUsage, CollectionOperator, CommentAnnotation, Connect, ConnectBody,
-    ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, DocComment, EndDecl,
-    Expression, FeatureChain, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt,
-    FlowDef, FlowUsage, FlowUsageKind, Identification, Import, InOut, InOutDecl, InterfaceDef,
-    InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement,
-    ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement, OccurrenceUsage,
-    OccurrenceUsageBody, Package, PackageBody, PackageBodyElement, ParseErrorNode, PartDef,
-    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    PayloadFeature, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, PortBody,
-    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefBodyElement,
-    RefDecl, RelationshipBodyElement, RequireConstraint, RequireConstraintBody, RequirementDef,
-    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace,
-    Span, TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef,
-    VerificationCaseUsage, Visibility,
+    ActionBodyParameter, ActionDef, ActionDefBody, ActionDefBodyElement, ActionNodePrefix,
+    ActionNodeUsageDeclaration, ActionUsage, ActionUsageBody, ActionUsageBodyElement, AliasBody,
+    AliasDef, AllocationDef, AllocationUsage, AnalysisCaseDef, AnalysisCaseUsage, Argument,
+    AstNode, AttributeBody, AttributeDef, AttributeUsage, BasicUsagePrefix, Bind, CaseDef,
+    CaseUsage, CollectionOperator, CollectionOperatorBody, CollectionOperatorParameter,
+    CommentAnnotation, Connect, ConnectStmt, ConnectionDef, ConnectionDefBody,
+    ConnectionDefBodyElement, DeclarationName, Dependency, DerivationConnectionRole,
+    DerivationEndRole, DocComment, EndDecl, EndDeclIntroducer, EndIdentity, Expression,
+    FilterMember, FilterPackageMember, FirstMergeBody, FirstMergeBodyElement, FirstStmt, FlowDef,
+    FlowUsage, FlowUsageKind, ForLoop, ForLoopInParameter, ForVariableDeclaration, Identification,
+    Import, ImportShape, ImportSuffixSpans, ImportTarget, InOut, InOutDecl,
+    InlineRequirementDeclaration, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceEnd, InterfaceEndMember, InterfaceEndReferenceOperator, InterfaceEndTarget,
+    InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, ItemUsage, LoopStmt, MergeStmt,
+    NamespaceDecl, Node, OccurrenceBodyElement, OccurrencePortionKind, OccurrenceUsage,
+    OccurrenceUsageBody, OccurrenceUsagePrefix, Package, PackageBody, PackageBodyElement,
+    ParseErrorNode, ParsedDocument, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
+    PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform, PerformActionTarget, PerformBody,
+    PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef, PortDefBody,
+    PortDefBodyElement, PortUsage, QualifiedDeclarationName, QualifiedIdentification,
+    QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceMetadata,
+    QualifiedReferenceValidationError, QualifiedReferenceView, RefBody, RefDecl, RefPrefix,
+    ReferenceSegment, ReferenceSeparator, RelationshipBodyElement, RequireConstraint,
+    RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef,
+    ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace, SatisfactionSubject,
+    SatisfiedRequirement, SatisfyRequirementUsage, SegmentRange, SourceStorage, Span,
+    TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, UntilParameter, UsageDeclaration,
+    UsageExtensionKeyword, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use emit::{
-    emit_sysml, emit_sysml_with_options, opacity_report, EmitError, EmitOptions, OpacityHit,
-    OpacityKind, OpacityReport,
+    emit_recovered_sysml, emit_sysml, emit_sysml_with_options, opacity_report, EmitError,
+    EmitOptions, OpacityHit, OpacityKind, OpacityReport,
 };
 pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 78;
-pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
+pub const PARSE_AST_VERSION: u32 = 248;
 
-/// Parse a SysML v2 textual input into a root namespace AST.
+/// The pinned grammar release understood by this build of the parser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SupportedGrammar {
+    pub release_tag: &'static str,
+    pub release_repository: &'static str,
+    /// Hash over the pinned SysML and KerML textual BNF filenames and bytes.
+    pub content_hash: &'static str,
+}
+
+/// Authoritative SysML/KerML grammar pin, generated from `docs/conformance-target` at build time.
+pub const SUPPORTED_GRAMMAR: SupportedGrammar = SupportedGrammar {
+    release_tag: env!("SYSML_PARSER_RELEASE_TAG"),
+    release_repository: env!("SYSML_PARSER_RELEASE_REPO"),
+    content_hash: env!("SYSML_PARSER_GRAMMAR_CONTENT_HASH"),
+};
+pub use parser::{
+    parse_root, parse_root_owned, parse_with_diagnostics, parse_with_diagnostics_owned, ParseResult,
+};
+
+/// Parse a SysML v2 textual input into an atomic source/arena/AST document.
 ///
 /// Returns an error if the input is not valid SysML or if not all input is consumed. See the
 /// crate-level "Entry points" section for how this relates to [`parse_for_editor`].
 #[allow(clippy::result_large_err)]
-pub fn parse(input: &str) -> Result<RootNamespace, ParseError> {
+pub fn parse(input: &str) -> Result<ParsedDocument, ParseError> {
     parse_root(input)
+}
+
+/// Parse an owned SysML v2 source buffer without cloning the complete document.
+#[allow(clippy::result_large_err)]
+pub fn parse_owned(input: String) -> Result<ParsedDocument, ParseError> {
+    parse_root_owned(input)
 }
 
 /// Parse for editor/LSP use: returns a partial AST plus diagnostics, never fails.
@@ -73,4 +114,28 @@ pub fn parse(input: &str) -> Result<RootNamespace, ParseError> {
 /// for the equivalence guarantee between the two on clean input.
 pub fn parse_for_editor(input: &str) -> ParseResult {
     parse_with_diagnostics(input)
+}
+
+/// Parse an owned source buffer for editor/LSP use without cloning the complete document.
+pub fn parse_for_editor_owned(input: String) -> ParseResult {
+    parse_with_diagnostics_owned(input)
+}
+
+#[cfg(test)]
+mod owned_source_tests {
+    #[test]
+    fn parse_owned_reuses_the_callers_source_allocation() {
+        let source = String::from("package Owned;");
+        let allocation = source.as_ptr();
+        let document = super::parse_owned(source).expect("owned parse");
+        assert_eq!(document.source.as_str().as_ptr(), allocation);
+    }
+
+    #[test]
+    fn parse_for_editor_owned_reuses_the_callers_source_allocation() {
+        let source = String::from("not valid");
+        let allocation = source.as_ptr();
+        let result = super::parse_for_editor_owned(source);
+        assert_eq!(result.document.source.as_str().as_ptr(), allocation);
+    }
 }

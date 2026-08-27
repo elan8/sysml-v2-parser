@@ -910,10 +910,12 @@ dependencies = [
  "criterion",
  "env_logger",
  "log",
+ "memchr",
  "nom",
  "nom_locate",
  "proptest",
  "serde",
+ "serde_json",
  "stacker",
 ]
 

@@ -2,7 +2,9 @@
 //! See plan: fix_surveillancedrone_test — step 1.
 
 use std::path::Path;
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{
+    AnnotatingMember, ImportShape, PackageBody, PackageBodyElement, RootElement,
+};
 use sysml_v2_parser::parse;
 
 /// Parses "package SurveillanceDrone { attribute def Real; }" (no doc/comment before first element).
@@ -22,12 +24,14 @@ fn test_parse_minimal_package_one_attribute() {
         other => panic!("expected Package, got {:?}", other),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(body.len(), 1, "expected one body element");
     match &body[0].value {
-        PackageBodyElement::AttributeDef(a) => assert_eq!(a.name, "Real"),
+        PackageBodyElement::AttributeDef(a) => {
+            assert_eq!(a.name.and_then(|n| root.declaration_name(n)), Some("Real"))
+        }
         other => panic!("expected AttributeDef, got {:?}", other),
     }
 }
@@ -53,7 +57,7 @@ fn test_parse_package_with_doc_and_line_comment() {
         other => panic!("expected Package, got {:?}", other),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(
@@ -62,12 +66,12 @@ fn test_parse_package_with_doc_and_line_comment() {
     );
     // First element is doc comment, second is attribute def Real
     match &body[0].value {
-        PackageBodyElement::Doc(_) => {}
+        PackageBodyElement::Annotating(AnnotatingMember::Doc(_)) => {}
         other => panic!("expected first element Doc, got {:?}", other),
     }
     let attr = body
         .iter()
-        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name == "Real"));
+        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name.and_then(|n| root.declaration_name(n)) == Some("Real")));
     assert!(
         attr.is_some(),
         "expected AttributeDef(Real) in body, got {:?}",
@@ -91,20 +95,21 @@ fn test_parse_fixture_exact_start() {
         Ok(ast) => ast,
         Err(e) => panic!("fixture start should parse: {:?}", e),
     };
-    assert_eq!(root.elements.len(), 1);
-    let pkg = match &root.elements[0].value {
+    // Element 0 is the file's leading `/* ... */` header, a keyword-less `Comment` member.
+    assert_eq!(root.elements.len(), 2);
+    let pkg = match &root.elements[1].value {
         sysml_v2_parser::ast::RootElement::Package(p) => &p.value,
         other => panic!("expected Package, got {:?}", other),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(!body.is_empty(), "expected at least one body element");
     // First element is doc comment, then attribute def Real
     let attr = body
         .iter()
-        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name == "Real"));
+        .find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name.and_then(|n| root.declaration_name(n)) == Some("Real")));
     assert!(
         attr.is_some(),
         "expected AttributeDef(Real) in body, got {:?}",
@@ -135,7 +140,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         _ => panic!("expected package"),
     };
     let pkg_body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let part_usage = pkg_body
@@ -146,7 +151,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         })
         .expect("expected part usage p");
     let part_body = match &part_usage.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => elements,
         _ => panic!("expected part brace body"),
     };
     let perform = part_body
@@ -157,7 +162,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         })
         .expect("expected perform");
     let perform_body = match &perform.body {
-        sysml_v2_parser::ast::PerformBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PerformBody::Brace { elements, .. } => elements,
         _ => panic!("expected perform brace body"),
     };
     assert_eq!(
@@ -166,17 +171,26 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         "perform body must have Doc then InOut (doc comments are not skipped)"
     );
     match &perform_body[0].value {
-        sysml_v2_parser::ast::PerformBodyElement::Doc(d) => assert!(
-            d.value.text.contains("allocation comment"),
-            "doc text should contain the comment content, got {:?}",
-            d.value.text
-        ),
+        sysml_v2_parser::ast::PerformBodyElement::Annotating(
+            sysml_v2_parser::ast::AnnotatingMember::Doc(d),
+        ) => {
+            let text = root.comment_body(d.value.body).expect("doc body");
+            assert!(
+                text.contains("allocation comment"),
+                "doc text should contain the comment content, got {text:?}"
+            )
+        }
         other => panic!("expected first element Doc, got {:?}", other),
     }
     match &perform_body[1].value {
         sysml_v2_parser::ast::PerformBodyElement::InOut(b) => {
             assert_eq!(b.value.direction, sysml_v2_parser::ast::InOut::In);
-            assert_eq!(b.value.name, "x");
+            assert_eq!(
+                root.qualified_reference(b.value.target)
+                    .expect("perform binding target resolves")
+                    .authored_text(),
+                "x"
+            );
         }
         other => panic!("expected second element InOut, got {:?}", other),
     }
@@ -200,17 +214,28 @@ fn test_import_filter_package() {
         _ => panic!("expected Package"),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let imp = match &body[0].value {
         PackageBodyElement::Import(i) => &i.value,
         _ => panic!("expected Import"),
     };
-    assert!(imp.filter_members.is_some(), "expected filter_members");
-    let members = imp.filter_members.as_ref().unwrap();
+    let ImportShape::Filter {
+        recursive_suffix,
+        members,
+    } = &imp.target.shape
+    else {
+        panic!("expected filter import, got {:?}", imp.target.shape);
+    };
+    assert!(recursive_suffix.is_none());
     assert_eq!(members.len(), 2, "two filter members [ 1 ] [ 2 + 3 ]");
-    assert_eq!(imp.target, "MyPkg");
+    assert_eq!(
+        root.qualified_reference(imp.target.reference)
+            .expect("import target reference")
+            .authored_text(),
+        "MyPkg"
+    );
 }
 
 /// KerML: top-level namespace declaration (same body as package).
@@ -229,14 +254,21 @@ fn test_namespace_declaration() {
         RootElement::Namespace(n) => &n.value,
         _ => panic!("expected Namespace"),
     };
-    assert_eq!(ns.identification.name.as_deref(), Some("N"));
+    assert_eq!(
+        ns.identification
+            .simple_name()
+            .and_then(|n| root.declaration_name(n)),
+        Some("N")
+    );
     let body = match &ns.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(body.len(), 1);
     match &body[0].value {
-        PackageBodyElement::AttributeDef(a) => assert_eq!(a.name, "Real"),
+        PackageBodyElement::AttributeDef(a) => {
+            assert_eq!(a.name.and_then(|n| root.declaration_name(n)), Some("Real"))
+        }
         _ => panic!("expected AttributeDef Real"),
     }
 }

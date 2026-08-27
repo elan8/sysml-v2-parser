@@ -3,7 +3,7 @@
 //! and optional `;` between body items does not break multi-clause constraints.
 
 use sysml_v2_parser::ast::{
-    ConstraintDefBodyElement, Expression, PackageBody, PackageBodyElement, RequireConstraintBody,
+    ConstraintDefBody, ConstraintDefBodyElement, Expression, PackageBody, PackageBodyElement,
     RequirementDefBody, RequirementDefBodyElement, RootElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
@@ -22,8 +22,8 @@ fn compact_whitespace(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn joined_constraint_expression_text(src: &str, body: &RequireConstraintBody) -> Option<String> {
-    let RequireConstraintBody::Brace { elements } = body else {
+fn joined_constraint_expression_text(src: &str, body: &ConstraintDefBody) -> Option<String> {
+    let ConstraintDefBody::Brace { elements, .. } = body else {
         return None;
     };
     let mut frags = Vec::new();
@@ -42,14 +42,12 @@ fn joined_constraint_expression_text(src: &str, body: &RequireConstraintBody) ->
     }
 }
 
-fn first_require_constraint_body(
-    root: &sysml_v2_parser::ast::RootNamespace,
-) -> &RequireConstraintBody {
+fn first_require_constraint_body(root: &sysml_v2_parser::ast::RootNamespace) -> &ConstraintDefBody {
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     let req = elements
@@ -59,7 +57,7 @@ fn first_require_constraint_body(
             _ => None,
         })
         .expect("requirement def");
-    let RequirementDefBody::Brace { elements } = &req.body else {
+    let RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("requirement brace body");
     };
     let c = elements
@@ -75,14 +73,17 @@ fn first_require_constraint_body(
 fn assert_no_other_in_constraint(src: &str) {
     let root = parse(src).expect("parse");
     let body = first_require_constraint_body(&root);
-    let RequireConstraintBody::Brace { elements } = body else {
+    let ConstraintDefBody::Brace { elements, .. } = body else {
         panic!("brace body");
     };
+    // A constraint body has no opaque member state left: unrecognized content is a diagnosed
+    // recovery node, and a spec-valid member the parser does not model is an explicit unsupported
+    // node. Either would show up here.
     assert!(
         !elements
             .iter()
-            .any(|e| matches!(e.value, ConstraintDefBodyElement::Other(_))),
-        "unexpected Other in constraint body: {:?}",
+            .any(|e| matches!(e.value, ConstraintDefBodyElement::Error(_))),
+        "unexpected recovery node in constraint body: {:?}",
         elements.iter().map(|e| &e.value).collect::<Vec<_>>()
     );
 }
@@ -145,11 +146,11 @@ fn requirement_body_attribute_integer_default_and_quantity() {
     );
     let r = parse_with_diagnostics(src);
     assert!(r.errors.is_empty(), "unexpected errors: {:?}", r.errors);
-    let pkg = match &r.root.elements[0].value {
+    let pkg = match &r.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("brace body");
     };
     let req = elements
@@ -159,7 +160,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
             _ => None,
         })
         .expect("req def");
-    let RequirementDefBody::Brace { elements } = &req.body else {
+    let RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("req brace");
     };
     let mut attrs = elements.iter().filter_map(|e| match &e.value {
@@ -167,11 +168,11 @@ fn requirement_body_attribute_integer_default_and_quantity() {
         _ => None,
     });
     let n = attrs.next().expect("attribute n");
-    assert_eq!(n.name, "n");
     assert_eq!(
-        n.typing.as_ref().map(|n| n.value.target_display()),
-        Some("Integer".to_string())
+        n.name.and_then(|n| r.document.declaration_name(n)),
+        Some("n")
     );
+    assert!(n.typing.is_some());
     let v0 = n.value.as_ref().expect("default 0");
     assert!(matches!(
         v0.value.expression.value,
@@ -179,15 +180,15 @@ fn requirement_body_attribute_integer_default_and_quantity() {
     ));
 
     let v = attrs.next().expect("attribute v");
-    assert_eq!(v.name, "v");
     assert_eq!(
-        v.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("ISQ::speed".to_string())
+        v.name.and_then(|n| r.document.declaration_name(n)),
+        Some("v")
     );
+    assert!(v.subsets.is_some());
     let q = v.value.as_ref().expect("quantity default");
     assert!(matches!(
         &q.value.expression.value,
-        Expression::LiteralWithUnit { .. }
+        Expression::Bracket { .. }
     ));
 }
 

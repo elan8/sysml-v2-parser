@@ -48,6 +48,11 @@ jobs:
       - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
 
+      - name: Semantic parser snapshot drift
+        run: |
+          cargo snapshot update
+          git diff --exit-code -- tests/snapshots/qualified_references
+
       - name: cargo test
         run: cargo test
         env:

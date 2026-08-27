@@ -48,19 +48,19 @@ fn count_packages_and_elements(root: &RootNamespace) -> (usize, usize) {
         match &el.value {
             RootElement::Package(p) => {
                 n_pkgs += 1;
-                if let PackageBody::Brace { elements } = &p.value.body {
+                if let PackageBody::Brace { elements, .. } = &p.value.body {
                     n_elements += elements.len();
                 }
             }
             RootElement::LibraryPackage(lp) => {
                 n_pkgs += 1;
-                if let PackageBody::Brace { elements } = &lp.value.body {
+                if let PackageBody::Brace { elements, .. } = &lp.value.body {
                     n_elements += elements.len();
                 }
             }
             RootElement::Namespace(n) => {
                 n_pkgs += 1;
-                if let PackageBody::Brace { elements } = &n.value.body {
+                if let PackageBody::Brace { elements, .. } = &n.value.body {
                     n_elements += elements.len();
                 }
             }
@@ -76,8 +76,8 @@ fn parse_file(file_path: &Path) -> Result<(RootNamespace, usize), ParseError> {
     let content = fs::read_to_string(file_path)
         .map_err(|e| ParseError::new(format!("failed to read file: {}", e)))?;
     let n_lines = content.lines().count();
-    let root = parse_root(&content)?;
-    Ok((root, n_lines))
+    let document = parse_root(&content)?;
+    Ok((document.root, n_lines))
 }
 
 /// Full validation suite: parse all .sysml files in SysML-v2-Release sysml/src/validation.

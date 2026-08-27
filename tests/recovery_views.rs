@@ -8,11 +8,11 @@ use sysml_v2_parser::parse_with_diagnostics;
 fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
     let input = "package P { view def V { filter ; render r : Renderer; } }";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let view = elements
@@ -22,7 +22,7 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
             _ => None,
         })
         .expect("view def should be present");
-    let ViewDefBody::Brace { elements } = &view.body else {
+    let ViewDefBody::Brace { elements, .. } = &view.body else {
         panic!("expected view def body");
     };
     assert!(
@@ -43,11 +43,11 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
 fn view_usage_recovery_inserts_error_node_and_keeps_later_satisfy() {
     let input = "package P { view v : V { expose ; satisfy VP; } }";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let view = elements
@@ -57,7 +57,7 @@ fn view_usage_recovery_inserts_error_node_and_keeps_later_satisfy() {
             _ => None,
         })
         .expect("view usage should be present");
-    let ViewBody::Brace { elements } = &view.body else {
+    let ViewBody::Brace { elements, .. } = &view.body else {
         panic!("expected view body");
     };
     assert!(

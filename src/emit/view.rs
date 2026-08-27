@@ -2,9 +2,12 @@
 
 use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_doc, emit_identification};
-use super::structure::emit_typing_clause;
-use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
+use super::root::emit_identification;
+use super::structure::{
+    emit_definition_prefix, emit_multiplicity, emit_multiplicity_modifiers, emit_subsetting_clause,
+    emit_typing_clause,
+};
+use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AssertConstraintMember, CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef,
@@ -17,8 +20,12 @@ pub(crate) fn emit_constraint_def(
     def: &ConstraintDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("constraint def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -31,13 +38,33 @@ pub(crate) fn emit_constraint_usage(
     usage: &ConstraintUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    w.push_str("constraint ");
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    // `ConstraintUsage = OccurrenceUsagePrefix 'constraint' …`: the same typed prefix boundary
+    // the other migrated families stream through.
+    crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
+    // No trailing space for the anonymous body-only form (`constraint { ... }`, spec42
+    // Gap 49a): the body emits its own leading space.
+    w.push_str("constraint");
+    if let Some(short_name) = usage.short_name {
+        w.push_str(" <");
+        w.push_declaration_name(&format!("{path}/short_name"), short_name)?;
+        w.push_char('>');
+    }
+    if let Some(name) = usage.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &usage.multiplicity {
+        super::structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
     }
     emit_constraint_body(w, path, &usage.body)
 }
@@ -48,11 +75,11 @@ pub(crate) fn emit_constraint_body(
     body: &ConstraintDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ConstraintDefBody::Semicolon => {
+        ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ConstraintDefBody::Brace { elements } => {
+        ConstraintDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -73,15 +100,16 @@ pub(crate) fn emit_constraint_body_element(
     el: &ConstraintDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        ConstraintDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
-        ConstraintDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        ConstraintDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        ConstraintDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        ConstraintDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
+        ConstraintDefBodyElement::MetadataKeywordUsage(usage) => {
+            super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
+        }
+        ConstraintDefBodyElement::AliasDef(alias) => {
+            super::structure::emit_alias_def(w, path, &alias.value)
+        }
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ConstraintDefBodyElement::Expression(e) => {
             emit_expression(w, &e.value)?;
@@ -89,26 +117,32 @@ pub(crate) fn emit_constraint_body_element(
             Ok(())
         }
         ConstraintDefBodyElement::Constraint(c) => emit_constraint_usage(w, path, &c.value),
+        ConstraintDefBodyElement::FeatureDecl(declaration) => {
+            super::structure::emit_default_reference_usage(w, path, &declaration.value)
+        }
+        ConstraintDefBodyElement::RequireConstraint(require) => {
+            super::requirement::emit_require_constraint(w, path, &require.value)
+        }
+        ConstraintDefBodyElement::PartUsage(p) => {
+            super::structure::emit_part_usage(w, path, &p.value)
+        }
+        // The same `ReturnParameterMember` emitter the calculation scope uses; both scopes end
+        // in the one `CalculationBody`.
+        ConstraintDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         ConstraintDefBodyElement::AttributeUsage(a) => {
-            // Keyword-less `:>> name = …` inside `require name { … }` (validation `10c`).
+            // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
                 && a.value.subsets.is_none()
                 && a.value.references.is_none()
                 && a.value.direction.is_none()
                 && !a.value.is_end
                 && a.value.short_name.is_none()
-                && a.value
-                    .redefines
-                    .as_ref()
-                    .is_some_and(|r| r.value.target_display() == a.value.name)
+                && a.value.name.is_none()
             {
                 super::requirement::emit_redefinition_attribute_binding(w, path, &a.value)
             } else {
                 super::structure::emit_attribute_usage(w, path, &a.value)
             }
-        }
-        ConstraintDefBodyElement::MetadataAnnotation(_) => {
-            w.unsupported(path, "Constraint MetadataAnnotation")
         }
     }
 }
@@ -119,8 +153,15 @@ pub(crate) fn emit_calc_def(
     def: &CalcDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("calc def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
+    if let Some(spec) = &def.specializes {
+        super::structure::emit_typing_clause(w, &spec.value)?;
+    }
     emit_calc_body(w, path, &def.body)
 }
 
@@ -133,16 +174,45 @@ pub(crate) fn emit_calc_usage(
     if let Some(dir) = usage.direction {
         super::structure::emit_direction(w, dir);
     }
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
+    if usage.is_reference {
+        w.push_str("ref ");
+    }
     w.push_str("calc ");
-    if let Some(redefines) = &usage.redefines {
+    let leading_target = usage.redefines.as_ref().and_then(|targets| {
+        (targets.len() == 1
+            && usage.identification.name.is_none()
+            && usage.identification.short_name.is_none())
+        .then_some(targets[0])
+    });
+    if let Some(target) = leading_target {
         w.push_str(":>> ");
-        w.push_str(&format_qualified_name(redefines));
+        w.push_qualified_reference(&format!("{path}/redefines[0]"), target)?;
     } else {
-        emit_identification(w, &usage.identification);
+        emit_identification(w, &usage.identification)?;
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &usage.multiplicity {
+        super::structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if leading_target.is_none() {
+        if let Some(redefines) = &usage.redefines {
+            w.push_str(" :>> ");
+            for (index, target) in redefines.iter().copied().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
+            }
+        }
+    }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
@@ -150,13 +220,17 @@ pub(crate) fn emit_calc_usage(
     emit_calc_body(w, path, &usage.body)
 }
 
-fn emit_calc_body(w: &mut EmitWriter<'_>, path: &str, body: &CalcDefBody) -> Result<(), EmitError> {
+pub(crate) fn emit_calc_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &CalcDefBody,
+) -> Result<(), EmitError> {
     match body {
-        CalcDefBody::Semicolon => {
+        CalcDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        CalcDefBody::Brace { elements } => {
+        CalcDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -177,17 +251,46 @@ fn emit_calc_body_element(
     el: &CalcDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        CalcDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
-        CalcDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        CalcDefBodyElement::Doc(d) => emit_doc(w, &d.value),
-        CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
+        CalcDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        CalcDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
+        CalcDefBodyElement::MetadataKeywordUsage(usage) => {
+            super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
+        }
+        CalcDefBodyElement::Package(member) => {
+            emit_visibility(w, member.membership.visibility);
+            super::root::emit_package(w, path, &member.package.value)
+        }
+        CalcDefBodyElement::LibraryPackage(member) => {
+            emit_visibility(w, member.membership.visibility);
+            super::root::emit_library_package(w, path, &member.package.value)
+        }
+        CalcDefBodyElement::ActionMember(n) => {
+            super::behavior::emit_action_def_body_element(w, path, &n.value)
+        }
+        CalcDefBodyElement::KermlRelationship(n) => {
+            super::root::emit_kerml_relationship_decl(w, path, &n.value)
+        }
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
+        CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature(w, path, &f.value),
+        CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),
+        CalcDefBodyElement::Connector(c) => emit_kerml_connector_member(w, path, &c.value),
+        CalcDefBodyElement::AssertConstraint(a) => emit_assert_constraint(w, path, &a.value),
+        CalcDefBodyElement::KermlClassifier(k) => {
+            super::root::emit_kerml_classifier_decl(w, path, &k.value)
+        }
+        CalcDefBodyElement::Binding(b) => emit_kerml_binding_member(w, path, &b.value),
+        CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
+        CalcDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
+        CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
+        CalcDefBodyElement::AliasDef(a) => super::structure::emit_alias_def(w, path, &a.value),
+        CalcDefBodyElement::AttributeUsage(a) => {
+            super::structure::emit_attribute_usage(w, path, &a.value)
+        }
+        CalcDefBodyElement::DefaultReferenceUsage(d) => {
+            super::structure::emit_default_reference_usage(w, path, &d.value)
+        }
         CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
         CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
         CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
@@ -196,31 +299,364 @@ fn emit_calc_body_element(
             w.push_char(';');
             Ok(())
         }
-        CalcDefBodyElement::MetadataAnnotation(_) => w.unsupported(path, "Calc MetadataAnnotation"),
     }
 }
 
-fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
+/// `BasicFeaturePrefix` (KerML BNF 577) as authored keywords, in the production's order.
+///
+/// Appends rather than writing, so callers that must not emit a trailing space can join.
+fn push_basic_feature_prefix(head: &mut Vec<&str>, prefix: &crate::ast::BasicFeaturePrefix) {
+    if let Some(direction) = &prefix.direction {
+        head.push(match direction.value {
+            crate::ast::InOut::In => "in",
+            crate::ast::InOut::Out => "out",
+            crate::ast::InOut::InOut => "inout",
+        });
+    }
+    if prefix.derived_span.is_some() {
+        head.push("derived");
+    }
+    if prefix.abstract_span.is_some() {
+        head.push("abstract");
+    }
+    if let Some(portioning) = &prefix.portioning {
+        head.push(portioning.value.keyword());
+    }
+    if let Some(variability) = &prefix.variability {
+        head.push(variability.value.keyword());
+    }
+}
+
+/// `OwnedCrossFeature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), the cross feature
+/// between `end` and the feature keyword. Ends with a trailing space so the keyword follows.
+fn emit_owned_cross_feature(
+    w: &mut EmitWriter<'_>,
+    cross: &crate::ast::OwnedCrossFeature,
+) -> Result<(), EmitError> {
+    let mut head: Vec<&str> = Vec::new();
+    push_basic_feature_prefix(&mut head, &cross.prefix);
+    if !head.is_empty() {
+        w.push_str(&head.join(" "));
+        w.push_char(' ');
+    }
+    if let Some(name) = cross.name {
+        w.push_declaration_name("owned-cross-feature/name", name)?;
+        w.push_char(' ');
+    }
+    if let Some(multiplicity) = &cross.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    emit_multiplicity_modifiers(w, &cross.multiplicity_modifiers);
+    if let Some(subsets) = &cross.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_feature(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    feature: &crate::ast::KermlFeature,
+) -> Result<(), EmitError> {
+    emit_visibility(w, feature.membership.visibility);
+    let mut head: Vec<&str> = Vec::new();
+    if feature.is_member {
+        head.push("member");
+    }
+    // `FeaturePrefix` (KerML BNF 584), in the production's own order. Keywords go through `head`
+    // rather than straight to the writer so an unkeyworded member (`portion redefines
+    // portionOfLife = ...;`) cannot leave a trailing space before its `redefines` clause.
+    let cross = match &feature.prefix.head {
+        crate::ast::FeaturePrefixHead::End { prefix, cross } => {
+            if prefix.constant_span.is_some() {
+                head.push("const");
+            }
+            head.push("end");
+            cross.as_ref()
+        }
+        crate::ast::FeaturePrefixHead::Basic(basic) => {
+            push_basic_feature_prefix(&mut head, basic);
+            None
+        }
+    };
+    // The owned cross feature is a declaration, not a keyword, so the prefix words flush first.
+    if let Some(cross) = cross {
+        w.push_str(&head.join(" "));
+        w.push_char(' ');
+        head.clear();
+        emit_owned_cross_feature(w, &cross.value)?;
+    }
+    // `( ownedRelationship += PrefixMetadataMember )*` trails the choice (KerML BNF 584). Each is
+    // a reference, not a keyword, so these flush too.
+    if !feature.prefix.metadata_keywords.is_empty() {
+        if !head.is_empty() {
+            w.push_str(&head.join(" "));
+            w.push_char(' ');
+            head.clear();
+        }
+        for (index, keyword) in feature.prefix.metadata_keywords.iter().enumerate() {
+            w.push_char('#');
+            w.push_qualified_reference(
+                &format!("{path}/prefix/metadata[{index}]"),
+                keyword.value.annotation,
+            )?;
+            w.push_char(' ');
+        }
+    }
+    if let Some(kind) = &feature.kind {
+        head.push(kind.value.as_str());
+    }
+    if feature.is_all {
+        head.push("all");
+    }
+    w.push_str(&head.join(" "));
+    if let Some(name) = feature.name {
+        if !head.is_empty() {
+            w.push_char(' ');
+        }
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
+    for specialization in &feature.specializations {
+        match specialization {
+            crate::ast::FeatureSpecialization::Typing(typing) => {
+                emit_typing_clause(w, &typing.value)?
+            }
+            crate::ast::FeatureSpecialization::Subsetting {
+                relationship,
+                value,
+            } => {
+                emit_subsetting_clause(w, &relationship.value)?;
+                if let Some(value) = value {
+                    w.push_str(" = ");
+                    emit_expression(w, &value.value)?;
+                }
+            }
+            crate::ast::FeatureSpecialization::ReferenceSubsetting(relationship)
+            | crate::ast::FeatureSpecialization::CrossSubsetting(relationship)
+            | crate::ast::FeatureSpecialization::Redefinition(relationship) => {
+                emit_subsetting_clause(w, &relationship.value)?
+            }
+        }
+    }
+    if let Some(multiplicity) = &feature.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
+    for (index, part) in feature.relationship_parts.iter().enumerate() {
+        emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
+    }
+    if let Some(value) = &feature.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_calc_body(w, path, &feature.body)
+}
+
+fn emit_feature_relationship_part(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    part: &crate::ast::FeatureRelationshipPart,
+) -> Result<(), EmitError> {
+    match part {
+        crate::ast::FeatureRelationshipPart::TypeRelationship(relationship) => {
+            w.push_char(' ');
+            w.push_str(relationship.value.keyword.as_str());
+            w.push_char(' ');
+            for (index, target) in relationship.value.targets.iter().copied().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference(&format!("{path}/target[{index}]"), target)?;
+            }
+        }
+        crate::ast::FeatureRelationshipPart::Chaining { target } => {
+            w.push_str(" chains ");
+            w.push_qualified_reference(&format!("{path}/target"), *target)?;
+        }
+        crate::ast::FeatureRelationshipPart::Inverting { target } => {
+            w.push_str(" inverse of ");
+            w.push_qualified_reference(&format!("{path}/target"), *target)?;
+        }
+        crate::ast::FeatureRelationshipPart::TypeFeaturing(featuring) => {
+            w.push_str(" featured by ");
+            for (index, target) in featuring.value.targets.iter().copied().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference(&format!("{path}/target[{index}]"), target)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_invariant_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    invariant: &crate::ast::KermlInvariantMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, invariant.membership.visibility);
+    w.push_str("inv");
+    if invariant.is_negated {
+        w.push_str(" not");
+    }
+    if let Some(name) = invariant.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
+    emit_calc_body(w, path, &invariant.body)
+}
+
+pub(crate) fn emit_kerml_connector_end(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    end: &crate::ast::KermlConnectorEnd,
+) -> Result<(), EmitError> {
+    if let Some(multiplicity) = &end.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    w.push_qualified_reference(path, end.target)?;
+    if let Some(references) = end.references {
+        w.push_str(" references ");
+        w.push_qualified_reference(&format!("{path}/references"), references)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_connector_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    connector: &crate::ast::KermlConnectorMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, connector.membership.visibility);
+    w.push_str("connector");
+    if connector.is_all {
+        w.push_str(" all");
+    }
+    if let Some(name) = connector.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
+    if let Some(typing) = connector.typing {
+        if connector.name.is_none() {
+            // The anonymous library form is spelled with no space: `connector :HappensDuring`.
+            w.push_str(" :");
+        } else {
+            w.push_str(": ");
+        }
+        w.push_qualified_reference(&format!("{path}/type"), typing)?;
+    }
+    if let Some(multiplicity) = &connector.multiplicity {
+        if connector.name.is_none() && connector.typing.is_none() {
+            // `connector [0..1] ...` -- keep the keyword and the multiplicity separated.
+            w.push_char(' ');
+        }
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if let (Some(from), Some(to)) = (&connector.from, &connector.to) {
+        w.push_str(" from ");
+        emit_kerml_connector_end(w, &format!("{path}/from"), &from.value)?;
+        w.push_str(" to ");
+        emit_kerml_connector_end(w, &format!("{path}/to"), &to.value)?;
+    }
+    emit_calc_body(w, path, &connector.body)
+}
+
+pub(crate) fn emit_kerml_binding_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    binding: &crate::ast::KermlBindingMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, binding.membership.visibility);
+    w.push_str("binding");
+    if binding.all_span.is_some() {
+        w.push_str(" all");
+    }
+    if let Some(name) = binding.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+        if let Some(multiplicity) = &binding.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+    }
+    if let Some(pair) = &binding.inline_ends {
+        w.push_char(' ');
+        if pair.value.of_span.is_some() {
+            w.push_str("of ");
+        }
+        emit_kerml_connector_end(
+            w,
+            &format!("{path}/inline-ends/left"),
+            &pair.value.left.value,
+        )?;
+        w.push_str(" = ");
+        emit_kerml_connector_end(
+            w,
+            &format!("{path}/inline-ends/right"),
+            &pair.value.right.value,
+        )?;
+    }
+    emit_calc_body(w, path, &binding.body)
+}
+
+pub(crate) fn emit_kerml_succession_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    succession: &crate::ast::KermlSuccessionMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, succession.membership.visibility);
+    w.push_str("succession ");
+    if succession.is_all {
+        w.push_str("all ");
+    }
+    if let Some(name) = succession.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+        if let Some(multiplicity) = &succession.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+        w.push_str(" first ");
+    }
+    emit_kerml_connector_end(w, &format!("{path}/first"), &succession.first.value)?;
+    w.push_str(" then ");
+    emit_kerml_connector_end(w, &format!("{path}/then"), &succession.then.value)?;
+    w.push_char(';');
+    Ok(())
+}
+
+pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
     w.push_str("return ");
     if ret.is_redefine {
         w.push_str(":>> ");
     }
-    if !ret.name.is_empty() {
-        w.push_str(&format_name(&ret.name));
+    if let Some(kind) = ret.kind_keyword {
+        w.push_str(kind.as_str());
+        w.push_char(' ');
     }
-    if ret.is_subsetting {
-        w.push_str(":>");
-    } else if ret.name.is_empty() {
-        w.push_str(": ");
-    } else {
-        w.push_str(" : ");
+    w.push_short_name_prefix("calc-return/short_name", ret.short_name)?;
+    if let Some(name) = ret.name {
+        w.push_declaration_name("calc-return/name", name)?;
     }
-    w.push_str(&format_qualified_name(&ret.type_name));
+    if let Some(type_name) = ret.type_name {
+        if ret.is_subsetting {
+            w.push_str(if ret.name.is_none() { ":> " } else { " :> " });
+        } else {
+            w.push_str(if ret.name.is_none() { ": " } else { " : " });
+        }
+        w.push_qualified_reference("calc-return/type", type_name)?;
+    }
+    if let Some(multiplicity) = &ret.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &ret.multiplicity_modifiers);
     if let Some(value) = &ret.value {
-        w.push_str(" = ");
-        emit_expression(w, &value.value)?;
+        emit_feature_value(w, value)?;
     }
-    w.push_char(';');
+    match &ret.body {
+        CalcDefBody::Semicolon { .. } => w.push_char(';'),
+        body @ CalcDefBody::Brace { .. } => emit_calc_body(w, "calc-return", body)?,
+    }
     Ok(())
 }
 
@@ -234,13 +670,20 @@ pub(crate) fn emit_assert_constraint(
     if assert.is_negated {
         w.push_str("not ");
     }
-    w.push_str("constraint ");
-    if let Some(name) = &assert.name {
-        w.push_str(&format_name(name));
+    if let Some(target) = assert.target {
+        w.push_qualified_reference(&format!("{path}/target"), target)?;
+    } else {
+        // No trailing space for the anonymous form (`assert constraint { ... }`) -- the body
+        // emitter supplies its own leading space.
+        w.push_str("constraint");
     }
-    if let Some(ty) = &assert.type_name {
+    if let Some(name) = assert.declaration_name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
+    if let Some(ty) = assert.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(path, ty)?;
     }
     emit_constraint_body(w, path, &assert.body)
 }
@@ -251,43 +694,58 @@ pub(crate) fn emit_view_def(
     def: &crate::ast::ViewDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("view def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::ViewDefBody::Semicolon => {
+        crate::ast::ViewDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewDefBody::Brace { elements } => {
+        crate::ast::ViewDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::ViewDefBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::ViewDefBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::ViewDefBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::ViewDefBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
-                    crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
-                    crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
-                        super::structure::emit_metadata_annotation(w, path, &m.value)?;
+                    crate::ast::ViewDefBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
+                    crate::ast::ViewDefBodyElement::MetadataKeywordUsage(usage) => {
+                        crate::emit::structure::emit_metadata_keyword_usage(w, path, &usage.value)?;
+                    }
+                    crate::ast::ViewDefBodyElement::AliasDef(alias) => {
+                        crate::emit::structure::emit_alias_def(w, path, &alias.value)?;
+                    }
+                    crate::ast::ViewDefBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
+                    crate::ast::ViewDefBodyElement::ViewpointUsage(v) => {
+                        emit_viewpoint_usage(w, path, &v.value)?
+                    }
+                    crate::ast::ViewDefBodyElement::Satisfy(s) => {
+                        crate::emit::requirement::emit_satisfy(w, path, &s.value)?
                     }
                     crate::ast::ViewDefBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }
                     crate::ast::ViewDefBodyElement::ViewRendering(r) => {
                         emit_view_rendering(w, path, &r.value)?;
+                    }
+                    crate::ast::ViewDefBodyElement::RenderingUsage(r) => {
+                        emit_rendering_usage(w, path, &r.value)?;
                     }
                 }
                 w.newline();
@@ -306,61 +764,88 @@ pub(crate) fn emit_view_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("view ");
-    if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(redefines) = &usage.redefines {
-        emit_typing_clause_as_subset(w, &redefines.value)?;
-    }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
-    }
-    if let Some(mult) = &usage.multiplicity {
-        super::structure::emit_multiplicity(w, &mult.value)?;
+    // The anonymous redefinition form parses `:>> target [mult]` (multiplicity after the
+    // target); the named form parses the multiplicity before the trailing subsets clause
+    // (`view columnView[0..*] ordered :> views`). Emit each in the order its parser reparses.
+    if usage.name.is_none() {
+        if let Some(redefines) = &usage.redefines {
+            emit_typing_clause_as_subset(w, &redefines.value)?;
+        }
+        if let Some(mult) = &usage.multiplicity {
+            super::structure::emit_multiplicity(w, &mult.value)?;
+        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
+    } else {
+        if let Some(ty) = &usage.type_name {
+            w.push_str(" : ");
+            w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+        }
+        if let Some(mult) = &usage.multiplicity {
+            super::structure::emit_multiplicity(w, &mult.value)?;
+        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
+        if let Some(redefines) = &usage.redefines {
+            emit_typing_clause_as_subset(w, &redefines.value)?;
+        }
+        if let Some(subsets) = &usage.subsets {
+            emit_typing_clause_as_subset(w, &subsets.value)?;
+        }
     }
     match &usage.body {
-        crate::ast::ViewBody::Semicolon => {
+        crate::ast::ViewBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewBody::Brace { elements } => {
+        crate::ast::ViewBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::ViewBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::ViewBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::ViewBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::ViewBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
                     }
-                    crate::ast::ViewBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewBodyElement::AliasDef(alias) => {
+                        crate::emit::structure::emit_alias_def(w, path, &alias.value)?;
+                    }
+                    crate::ast::ViewBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::ViewBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }
                     crate::ast::ViewBodyElement::ViewRendering(r) => {
                         emit_view_rendering(w, path, &r.value)?;
                     }
+                    crate::ast::ViewBodyElement::RenderingUsage(r) => {
+                        emit_rendering_usage(w, path, &r.value)?;
+                    }
                     crate::ast::ViewBodyElement::Expose(e) => {
                         w.push_str("expose ");
-                        w.push_str(&format_qualified_name(&e.value.target));
-                        w.push_char(';');
+                        super::root::emit_import_target(
+                            w,
+                            &format!("{path}/body[{i}]/expose/target"),
+                            &e.value.target,
+                        )?;
+                        super::structure::emit_relationship_body(
+                            w,
+                            &format!("{path}/body[{i}]"),
+                            &e.value.body,
+                        )?;
                     }
                     crate::ast::ViewBodyElement::Satisfy(s) => {
-                        w.push_str("satisfy ");
-                        w.push_str(&format_qualified_name(&s.value.viewpoint_ref));
-                        match &s.value.body {
-                            crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-                            crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-                        }
+                        crate::emit::requirement::emit_satisfy(
+                            w,
+                            &format!("{path}/body[{i}]"),
+                            &s.value,
+                        )?;
                     }
                 }
                 w.newline();
@@ -379,41 +864,43 @@ fn emit_typing_clause_as_subset(
     super::structure::emit_subsetting_clause(w, rel)
 }
 
-fn emit_view_rendering(
+pub(crate) fn emit_view_rendering(
     w: &mut EmitWriter<'_>,
     path: &str,
     r: &crate::ast::ViewRenderingUsage,
 ) -> Result<(), EmitError> {
     w.push_str("render ");
-    w.push_str(&format_name(&r.name));
+    w.push_declaration_name(&format!("{path}/name"), r.name)?;
     if let Some(ty) = &r.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
     }
     match &r.body {
-        crate::ast::RenderingUsageBody::Semicolon => {
+        crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } if elements.is_empty() => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } if elements.is_empty() => {
             w.push_str(" {}");
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::RenderingUsageBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/render[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::RenderingUsageBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/render[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingUsageBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
                         emit_view_usage(w, path, &v.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::Rendering(nested) => {
+                        emit_rendering_usage(w, &format!("{path}/body[{i}]"), &nested.value)?;
                     }
                 }
                 w.newline();
@@ -425,14 +912,28 @@ fn emit_view_rendering(
     }
 }
 
+pub(crate) fn emit_expose(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    expose: &crate::ast::ExposeMember,
+) -> Result<(), EmitError> {
+    w.push_str("expose ");
+    super::root::emit_import_target(w, &format!("{path}/expose/target"), &expose.target)?;
+    super::structure::emit_relationship_body(w, path, &expose.body)
+}
+
 pub(crate) fn emit_viewpoint_def(
     w: &mut EmitWriter<'_>,
     path: &str,
     def: &crate::ast::ViewpointDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("viewpoint def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
@@ -446,10 +947,16 @@ pub(crate) fn emit_viewpoint_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("viewpoint ");
-    w.push_str(&format_name(&usage.name));
-    if !usage.type_name.is_empty() {
+    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(&usage.type_name));
+        w.push_qualified_reference(&format!("{path}/type"), type_name)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
     super::requirement::emit_requirement_body_pub(w, path, &usage.body)
 }
@@ -460,35 +967,38 @@ pub(crate) fn emit_rendering_def(
     def: &crate::ast::RenderingDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("rendering def ");
-    emit_identification(w, &def.identification);
+    emit_identification(w, &def.identification)?;
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::RenderingDefBody::Semicolon => {
+        crate::ast::RenderingDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingDefBody::Brace { elements } => {
+        crate::ast::RenderingDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::RenderingDefBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::RenderingDefBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingDefBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::RenderingDefBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
-                    crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingDefBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
+                    crate::ast::RenderingDefBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::RenderingDefBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }
@@ -511,32 +1021,53 @@ pub(crate) fn emit_rendering_usage(
     usage: &crate::ast::RenderingUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    w.push_str("rendering ");
-    w.push_str(&format_name(&usage.name));
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
+    w.push_str("rendering");
+    if let Some(name) = usage.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &usage.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::RenderingUsageBody::Semicolon => {
+        crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::RenderingUsageBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::RenderingUsageBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingUsageBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
                         emit_view_usage(w, path, &v.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::Rendering(nested) => {
+                        emit_rendering_usage(w, &format!("{path}/body[{i}]"), &nested.value)?;
                     }
                 }
                 w.newline();

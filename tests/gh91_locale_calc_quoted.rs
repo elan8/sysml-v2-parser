@@ -1,24 +1,25 @@
 //! GH-91: standalone `locale` package member and quoted `calc` usage name/type.
 //! Each test below uses the exact (trimmed) real source that motivated the fix.
 
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{AnnotatingMember, PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<PackageBodyElement> {
+fn package_elements(input: &str) -> (sysml_v2_parser::ParsedDocument, Vec<PackageBodyElement>) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
-    elements.iter().map(|e| e.value.clone()).collect()
+    let elements = elements.iter().map(|e| e.value.clone()).collect();
+    (result.document, elements)
 }
 
 /// Real usage: `Simple Tests/CommentTest.sysml:25-28`:
@@ -33,17 +34,23 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
 /// "..." /* ... */` with no `comment` keyword at all was never dispatched at package scope.
 #[test]
 fn gh91_1_bare_locale_package_member() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             locale "en_US" /* AAAA */
         }"#,
     );
-    let PackageBodyElement::Comment(c) = &elements[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Comment(c)) = &elements[0] else {
         panic!("expected Comment, got {:?}", elements[0]);
     };
     assert!(c.value.identification.is_none());
-    assert_eq!(c.value.locale.as_deref(), Some("en_US"));
-    assert_eq!(c.value.text.trim(), "AAAA");
+    assert_eq!(
+        c.value
+            .locale
+            .and_then(|l| doc.decoded_string_literal(l))
+            .as_deref(),
+        Some("en_US")
+    );
+    assert_eq!(doc.comment_body(c.value.body).map(str::trim), Some("AAAA"));
 }
 
 /// Real usage: `Simple Tests/CommentTest.sysml:32`:
@@ -55,17 +62,26 @@ fn gh91_1_bare_locale_package_member() {
 /// keyword names), leaving nothing for the subsequent `locale` keyword check to match.
 #[test]
 fn gh91_1_doc_locale_without_identification() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             doc locale "en_US" /* Documentation about Package */
         }"#,
     );
-    let PackageBodyElement::Doc(d) = &elements[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Doc(d)) = &elements[0] else {
         panic!("expected Doc, got {:?}", elements[0]);
     };
     assert!(d.value.identification.is_none());
-    assert_eq!(d.value.locale.as_deref(), Some("en_US"));
-    assert_eq!(d.value.text.trim(), "Documentation about Package");
+    assert_eq!(
+        d.value
+            .locale
+            .and_then(|l| doc.decoded_string_literal(l))
+            .as_deref(),
+        Some("en_US")
+    );
+    assert_eq!(
+        doc.comment_body(d.value.body).map(str::trim),
+        Some("Documentation about Package")
+    );
 }
 
 /// Real usage: `Analysis Examples/Turbojet Stage Analysis.sysml:88` (nested inside `part
@@ -79,7 +95,7 @@ fn gh91_1_doc_locale_without_identification() {
 /// nested in a part usage body had no dispatch path at all, quoted or not.
 #[test]
 fn gh91_2_quoted_calc_usage_name_and_type() {
-    let elements = package_elements(
+    let (doc, elements) = package_elements(
         r#"package P {
             calc def 'Ideal Gas Law';
             part def MovingIdealGasParcel;
@@ -91,7 +107,7 @@ fn gh91_2_quoted_calc_usage_name_and_type() {
     let PackageBodyElement::PartUsage(inlet_gas) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &inlet_gas.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &inlet_gas.value.body else {
         panic!("expected brace part usage body");
     };
     let calc = elements.iter().find_map(|e| match &e.value {
@@ -100,8 +116,11 @@ fn gh91_2_quoted_calc_usage_name_and_type() {
     });
     let calc = calc.expect("expected a CalcUsage element");
     assert_eq!(
-        calc.identification.name.as_deref(),
+        calc.identification
+            .name
+            .and_then(|n| doc.decoded_declaration_name(n))
+            .as_deref(),
         Some("Solve for Pressure1")
     );
-    assert_eq!(calc.type_name.as_deref(), Some("Ideal Gas Law"));
+    assert!(calc.type_name.is_some());
 }

@@ -1,0 +1,75 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "SysML Training 36 (Variability): Variation Usages"))
+~~~
+# SOURCE
+~~~sysml
+package 'Variation Usages' {
+	private import 'Variation Definitions'::*;
+	
+	part def Vehicle;
+	part def Transmission;
+	part manualTransmission;
+	part automaticTransmission;
+	
+	abstract part vehicleFamily : Vehicle {
+		part engine : EngineChoices[1];
+		
+		variation part transmission : Transmission[1] {
+			variant manualTransmission;
+			variant automaticTransmission;
+		}
+		
+		assert constraint {
+			(engine == engine::'4cylEngine' and
+			 transmission == transmission::manualTransmission) xor
+			(engine == engine::'6cylEngine' and 
+			 transmission == transmission::automaticTransmission)
+		}	
+	}
+	
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "36_variation_usages.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package 'Variation Usages' {
+    private import 'Variation Definitions'::*;
+    part def Vehicle;
+    part def Transmission;
+    part manualTransmission;
+    part automaticTransmission;
+    abstract part vehicleFamily : Vehicle {
+        part engine : EngineChoices[1];
+        variation part transmission : Transmission[1] {
+            variant manualTransmission;
+            variant automaticTransmission;
+        }
+        assert constraint {
+            (engine == engine::'4cylEngine' && transmission == transmission::manualTransmission) xor (engine == engine::'6cylEngine' && transmission == transmission::automaticTransmission);
+        }
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 45) (line 2) (column 17) (len 23)) (segments (segment 0 (token "'Variation Definitions'") (name "Variation Definitions") (separator none) (span (offset 45) (line 2) (column 17) (len 23)))))
+    (reference r1 (scope relative) (span (offset 206) (line 9) (column 32) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 206) (line 9) (column 32) (len 7)))))
+    (reference r2 (scope relative) (span (offset 232) (line 10) (column 17) (len 13)) (segments (segment 0 (token "EngineChoices") (name "EngineChoices") (separator none) (span (offset 232) (line 10) (column 17) (len 13)))))
+    (reference r3 (scope relative) (span (offset 285) (line 12) (column 33) (len 12)) (segments (segment 0 (token "Transmission") (name "Transmission") (separator none) (span (offset 285) (line 12) (column 33) (len 12)))))
+    (reference r4 (scope relative) (span (offset 314) (line 13) (column 12) (len 18)) (segments (segment 0 (token "manualTransmission") (name "manualTransmission") (separator none) (span (offset 314) (line 13) (column 12) (len 18)))))
+    (reference r5 (scope relative) (span (offset 345) (line 14) (column 12) (len 21)) (segments (segment 0 (token "automaticTransmission") (name "automaticTransmission") (separator none) (span (offset 345) (line 14) (column 12) (len 21)))))
+  )
+  (root (package (name "Variation Usages") (body brace (import (target (span (span (offset 45) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 68) (line 2) (column 40) (len 3))) (separator (span (offset 68) (line 2) (column 40) (len 2))) (marker (span (offset 70) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "Vehicle") (modifiers) (body semicolon)) (part-def (name "Transmission") (modifiers) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "manualTransmission") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "automaticTransmission") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance abstract) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicleFamily") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "engine") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (multiplicity (lower (expression (span (offset 246) (line 10) (column 31) (len 1)) (integer 1))) (upper (expression (span (offset 246) (line 10) (column 31) (len 1)) (integer 1)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance variation) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "transmission") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (multiplicity (lower (expression (span (offset 298) (line 12) (column 46) (len 1)) (integer 1))) (upper (expression (span (offset 298) (line 12) (column 46) (len 1)) (integer 1)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (variant-usage (target (ref r4)) (usage none) (body absent)) (variant-usage (target (ref r5)) (usage none) (body absent)))) (assert-constraint))))))
+)
+~~~

@@ -33,7 +33,9 @@ pub(crate) fn owned_expression(
 }
 
 /// UsageDeclaration surface: name with optional usage header fragments.
-pub(crate) fn usage_declaration_surface(input: Input<'_>) -> IResult<Input<'_>, String> {
+pub(crate) fn usage_declaration_surface(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::DeclarationName> {
     let (input, n) = name(input)?;
     let (input, _) = opt(usage_header).parse(input)?;
     Ok((input, n))
@@ -49,10 +51,9 @@ pub(crate) fn definition_declaration_surface(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -73,16 +74,19 @@ mod tests {
 
     #[test]
     fn usage_declaration_surface_parses_header() {
-        let (_, name) =
-            usage_declaration_surface(span_input("wheel : Wheel ;")).expect("UsageDeclaration");
-        assert_eq!(name, "wheel");
+        let input = span_input("wheel : Wheel ;");
+        let (_, name) = usage_declaration_surface(input).expect("UsageDeclaration");
+        assert_eq!(crate::parser::lex::name_bytes(input, name), b"wheel");
     }
 
     #[test]
     fn definition_declaration_surface_parses_identification() {
-        let (_, id) =
-            definition_declaration_surface(span_input("MyPart ;")).expect("DefinitionDeclaration");
-        assert_eq!(id.name.as_deref(), Some("MyPart"));
+        let input = span_input("MyPart ;");
+        let (_, id) = definition_declaration_surface(input).expect("DefinitionDeclaration");
+        assert_eq!(
+            id.name.map(|n| crate::parser::lex::name_bytes(input, n)),
+            Some(&b"MyPart"[..])
+        );
     }
 
     #[test]
@@ -101,15 +105,15 @@ mod tests {
     #[test]
     fn bnf_lexical_terminals() {
         use crate::parser::lex::{
-            decimal_value_text, qualified_name, string_value, ws_and_comments,
+            decimal_value_text, qualified_reference, string_value, ws_and_comments,
         };
-        use crate::parser::usage::{feature_usage_header, multiplicity, typings};
+        use crate::parser::usage::{feature_usage_header, multiplicity_node, typings};
         let _ = name(span_input("foo")).expect("NAME");
         let _ = string_value(span_input("'bar'")).expect("STRING_VALUE");
         let _ = decimal_value_text(span_input("42")).expect("DECIMAL_VALUE");
-        let _ = qualified_name(span_input("A::B")).expect("QualifiedName");
+        let _ = qualified_reference(span_input("A::B")).expect("QualifiedName");
         let _ = ws_and_comments(span_input("  // c\n x")).expect("WHITE_SPACE");
-        let _ = multiplicity(span_input("[1..*]")).expect("Multiplicity");
+        let _ = multiplicity_node(span_input("[1..*]")).expect("Multiplicity");
         let _ = typings(span_input(": Type ;")).expect("Typings");
         let _ = feature_usage_header(span_input(": T subsets b ;")).expect("UsagePrefix");
     }

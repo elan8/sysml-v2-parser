@@ -5,14 +5,26 @@ pub const MISSING_TYPE_REFERENCE: &str = "missing_type_reference";
 pub const INVALID_TYPING_OPERATOR: &str = "invalid_typing_operator";
 pub const INVALID_QUALIFIED_NAME_SEPARATOR: &str = "invalid_qualified_name_separator";
 pub const MISSING_EXPRESSION_AFTER_OPERATOR: &str = "missing_expression_after_operator";
-pub const INVALID_UNIT_REFERENCE: &str = "invalid_unit_reference";
+pub const INVALID_BRACKET_EXPRESSION: &str = "invalid_bracket_expression";
 pub const INVALID_BARE_IDENTIFIER_IN_ACTION_BODY: &str = "invalid_bare_identifier_in_action_body";
 pub const INVALID_BARE_IDENTIFIER_IN_STATE_BODY: &str = "invalid_bare_identifier_in_state_body";
+/// A `FeaturePrefix` that combines `end` with a slot only the other alternative owns.
+///
+/// `FeaturePrefix = ( EndFeaturePrefix … | BasicFeaturePrefix )` (KerML BNF 584) is a choice, and
+/// `EndFeaturePrefix = ( isConstant ?= 'const' )? isEnd ?= 'end'` (573) has no direction, `derived`,
+/// `abstract`, `composite`, `portion` or `var` slot. Reported precisely so the authored keywords
+/// are observable to a consumer, rather than reaching the generic scope recovery as an
+/// unrecognized declaration.
+pub const END_FEATURE_INVALID_PREFIX: &str = "end_feature_invalid_prefix";
 pub const UNEXPECTED_KEYWORD_IN_SCOPE: &str = "unexpected_keyword_in_scope";
 pub const UNRECOGNIZED_DECLARATION_IN_SCOPE: &str = "unrecognized_declaration_in_scope";
 pub const BARE_COMMA_IN_FEATURE_VALUE: &str = "bare_comma_in_feature_value";
 pub const INVALID_REQUIREMENT_SHORT_NAME_SYNTAX: &str = "invalid_requirement_short_name_syntax";
 pub const UNSUPPORTED_ANNOTATION_SYNTAX: &str = "unsupported_annotation_syntax";
+/// A `#`/`@` sigil not followed by the `[QualifiedName]` its production requires. Kept apart
+/// from [`UNSUPPORTED_ANNOTATION_SYNTAX`], which reports valid metadata syntax this parser has
+/// not reached yet.
+pub const MALFORMED_ANNOTATION_HEAD: &str = "malformed_annotation_head";
 pub const RECOVERY_CASCADE_SUPPRESSED: &str = "recovery_cascade_suppressed";
 pub const RECOVERED_ROOT_BODY: &str = "recovered_root_body";
 pub const MISSING_CLOSING_BRACE: &str = "missing_closing_brace";
@@ -34,14 +46,16 @@ pub const DOCUMENTED_CODES: &[&str] = &[
     INVALID_TYPING_OPERATOR,
     INVALID_QUALIFIED_NAME_SEPARATOR,
     MISSING_EXPRESSION_AFTER_OPERATOR,
-    INVALID_UNIT_REFERENCE,
+    INVALID_BRACKET_EXPRESSION,
     INVALID_BARE_IDENTIFIER_IN_ACTION_BODY,
     INVALID_BARE_IDENTIFIER_IN_STATE_BODY,
+    END_FEATURE_INVALID_PREFIX,
     UNEXPECTED_KEYWORD_IN_SCOPE,
     UNRECOGNIZED_DECLARATION_IN_SCOPE,
     BARE_COMMA_IN_FEATURE_VALUE,
     INVALID_REQUIREMENT_SHORT_NAME_SYNTAX,
     UNSUPPORTED_ANNOTATION_SYNTAX,
+    MALFORMED_ANNOTATION_HEAD,
     RECOVERY_CASCADE_SUPPRESSED,
     RECOVERED_ROOT_BODY,
     MISSING_CLOSING_BRACE,

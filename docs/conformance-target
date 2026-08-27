@@ -7,5 +7,6 @@
 
 release_tag=2026-04
 release_repo=https://github.com/Systems-Modeling/SysML-v2-Release
+grammar_content_hash=fnv1a64:95f39e912f73b917
 sysml_bnf_productions=350
 kerml_bnf_productions=290

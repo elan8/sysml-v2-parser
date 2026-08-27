@@ -7,6 +7,2358 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Expose, verification, and view-rendering memberships retain invalid owners for semantic
+  validation.** Package bodies now carry typed `ExposeMember`s, while part-definition bodies carry
+  typed `VerifyRequirementMember` and `ViewRenderingUsage` nodes, allowing the corresponding SysML
+  owning-namespace/owning-type rules to diagnose invalid owners instead of receiving parser
+  recovery nodes. The legal Pilot productions remain represented in their view and requirement
+  bodies (`SysML.xtext` 2039-2045, 2262-2270, 2328-2377); the added variants are narrow semantic
+  validation boundaries and keep view-specific `render` distinct from generic `rendering` usage.
+  Semantic snapshots now expose render typings and inline verified-requirement typings, and
+  recovery tests prove malformed speculative references do not leak. **AST version 248.**
+
+- **Action bodies retain transitions for invalid-owner semantic validation.** Action definition
+  and usage bodies now carry an otherwise fully typed `Transition` member, including source,
+  trigger, guard, effect, target, and body, so SysML 8.3.18.9 can diagnose a triggered transition
+  whose source is an action rather than receiving `unexpected_keyword_in_scope`. Recovery treats
+  `transition` as a body-member boundary and does not leak references from malformed attempts;
+  emission, semantic snapshots, traversal, opacity inspection, and serialization are exhaustive
+  over both new variants. **AST version 247.**
+
+- **Requirement-constraint memberships retain invalid part-definition owners for semantic
+  validation.** `PartDefBodyElement::RequireConstraint` carries the same typed declaration,
+  target, typing, and body used in requirement-shaped owners, allowing SysML 8.3.21.7
+  `validateRequirementConstraintMembershipOwningType` to diagnose the authored owner instead of
+  receiving `unexpected_keyword_in_scope`. Source emission, semantic snapshots, traversal,
+  opacity inspection, recovery, and validated serialization consume the new variant. **AST
+  version 246.**
+
+- **KerML binding connectors may own connector ends in their type body.**
+  `KermlBindingMember` now represents the grammar's optional declaration-level binary end pair
+  as one `KermlBindingEndPair`, rather than requiring detached `left` and `right` fields. A
+  declaration-only connector such as `binding tern { end feature e1; ... }` therefore retains all
+  body-owned end features, while inline `of a = b` remains structurally paired. Authored `all`,
+  `of`, and `=` spans are preserved and validated during deserialization. **AST version 245.**
+
+- **KerML feature specializations preserve authored clause boundaries and order.**
+  `KermlFeature::specializations: Vec<FeatureSpecialization>` replaces the five optional
+  typing/subsetting/redefinition/reference/cross mirrors for this grammar family. Repeated
+  `references` and `crosses` clauses now remain distinct from one comma-separated clause, and
+  interleaved alternatives retain their source order and exact relationship spelling through
+  emission, semantic snapshots, traversal, and validated serialization. **AST version 244.**
+
+- **Flow payload clauses are ordered, source-backed syntax.** The declaration-led
+  `FlowDeclaration` now carries `payloads: Vec<Node<FlowPayloadClause>>` instead of one
+  `Option<Node<PayloadFeature>>`. Each clause retains its exact `of` span and typed payload
+  feature, so `flow of Thing of Other from source to target;` exposes two authored clauses to
+  KerML `validateFlowPayloadFeature` rather than becoming generic calc-body recovery. Emission,
+  traversal, semantic snapshots, and deserialization validation consume the new owning shape;
+  malformed repeated clauses still recover atomically without leaking speculative references.
+  **AST version 243.**
+
+- **99.3% fewer speculative arena rollbacks on the snapshot corpus** (133,240 -> 944 per pass;
+  attempts 159k -> 29.8k; ~+4.5% throughput). Instead of trying each transaction-wrapped parser
+  and rolling back, member dispatch now decides up front wherever a bounded lookahead can be
+  exact: `.?`/`.**` are postfix operators in the expression engine; ~50 member parsers refuse by
+  kind keyword, leading-word set, or `#`/`@`/`metadata` annotation gate before opening a
+  transaction (`kind_keyword_follows`/`hash_extension_follows` scan past trivia, `then`,
+  visibility, prefix slots, `#`-extension tags, and -- after `end` only -- multiplicities and
+  declared names); the `while`/`loop` spellings share one prefix parse; and a refused branch
+  that allocated nothing no longer performs a rollback at all. The 944 remaining rollbacks are
+  branches that allocated and were then refused -- malformed-input recovery and marker-ambiguous
+  members -- which is the containment speculation requires. Per-file parse results and the corpus
+  checksum are identical at every step.
+- **Declaration names and short names are typed source spans.** Every `name`, `short_name`,
+  `declared_name`, `declaration_name`, `state_name`, `succession_name` and `binding_name` field
+  that used to copy the token into a `String` is now a `DeclarationName { span }` resolved through
+  the owning document: `ParsedDocument::declaration_name` returns the authored spelling (quotes and
+  escapes intact) and `ParsedDocument::decoded_declaration_name` the decoded `NAME` value,
+  allocating only for an escaped unrestricted name. The parallel `name_span` fields are gone --
+  the name *is* the span -- and so are the `""` sentinels: a usage that admits an anonymous form
+  (`part :>> target`, `constraint { … }`, `actor : Person;`, `return : T`, …) now has
+  `name: Option<DeclarationName>`. The emitter streams names from their spans instead of
+  re-quoting a decoded string, so `format_name` is gone; the semantic projection still shows the
+  decoded value. `ast::DeclarationName` (the `Simple | Qualified` namespace-name enum) is renamed
+  `ast::NamespaceName`. Standalone `accept`/`send` control nodes were identified by a fabricated
+  `ActionUsage.name == "accept"`; they now carry `ActionUsage::keyword: ActionUsageKeyword` and
+  no name, and the semantic projection adds a `(keyword …)` slot to `action-usage`. `Span` is
+  now `Copy`. **AST version 240.**
+- **Real and string literal spelling are typed source spans.** `Expression::LiteralReal` holds a
+  `RealLiteral` and `Expression::LiteralString` a `StringLiteral`, resolved through
+  `ParsedDocument::real_literal`, `string_literal` (authored, quotes and escapes intact) and
+  `decoded_string_literal`. The emitter streams both from the source, which also fixes string
+  literals losing their `\"` escapes on round trip.
+- **Comment bodies and `locale`/`language` tokens are typed source spans.** `DocComment`,
+  `CommentAnnotation` and `TextualRepresentation` carry a `body: CommentBody` span (replacing the
+  `text` copy and its parallel `body_span`) and `StringLiteral` spans for `locale` and `language`
+  (`TextualRepresentation::language` is now `Option<StringLiteral>`, replacing the
+  `language`/`language_span` pair). `ParsedDocument::comment_body` returns the authored body and
+  `normalized_comment_body` the pinned-normalized view, borrowing when nothing changes;
+  `normalize_comment_body` now returns a `Cow`.
+- **Opaque declaration text and operator fallback spellings are typed source spans.** The
+  fallback nodes (`KermlSemanticDecl`, `KermlFeatureDecl`, `FeatureDecl`, `ClassifierDecl`,
+  `ExtendedLibraryDecl`) carry `text: OpaqueText` and a `keyword_span` for the starter keyword that
+  classified them, replacing the copied `text` and `bnf_production`/`keyword` strings
+  (`ParsedDocument::opaque_text`). `CollectionOperator::Other` holds an `OperatorSpelling` span
+  (`ParsedDocument::operator_spelling`, `CollectionOperator::classified_name`); the never-produced
+  `BinaryOperator::Other`/`UnaryOperator::Other` variants and `from_token` constructors are
+  removed.
+- **Parser throughput up ~40% on the snapshot corpus** (30 -> 42 MiB/s with `parser_profile`).
+  Profiling with `samply` drove five targeted changes: the parse result no longer deep-clones the
+  whole tree to collect recovery diagnostics, speculative prefix keywords (`private`, `in`,
+  `derived`, ...) are refused on their first byte before the `tag` alternations, the delimiter
+  prescan and line-start table use `memchr`, trivia skipping rebuilds the located input from the
+  byte count it already has instead of re-slicing through `nom_locate`, and the release profile
+  enables fat LTO with one codegen unit for the repository's own binaries and benches. No
+  observable parser behaviour changes; every snapshot checksum is identical.
+
+### Fixed
+
+- **Directed action parameters retain their usage-kind keyword.** The pinned
+  `ActionBodyParameter` spelling `in action body { ... }` previously consumed and discarded
+  `action`, making it indistinguishable from `in body { ... }` and causing downstream lowering to
+  treat the declared action as a plain parameter. `InOutDecl::kind` now records the exhaustive
+  `InOutDeclKind::Action` alternative with its exact keyword span; typed emission and the semantic
+  snapshot projection preserve the distinction. **AST version 242.**
+
+- **Explicit KerML relationship declarations remain structured inside type bodies.**
+  `TypeBodyElement -> NonFeatureMember` now dispatches `Subsetting`, `Redefinition`,
+  `Disjoining`, `FeatureInverting`, `TypeFeaturing`, and the other already-supported explicit
+  relationship declarations through `KermlRelationshipDecl`, just as package scope does. They no
+  longer fall through to the expression parser and fabricate operand references to relationship
+  keywords such as `subset`, `subsets`, and `disjoint`. **AST version 241.**
+- **An integer literal that does not fit `i64` is refused instead of silently parsing as `0`.**
+  The enclosing expression now recovers with a diagnostic, so an unrepresentable value can no
+  longer masquerade as a successfully parsed literal.
+- **Three round-trip and dispatch gaps in the last corpus snapshots.** A KerML classifier's
+  `ConjugationPart` (`type Conjugate4 ~ Conjugate1;`, `Types.kerml`) was parsed but neither
+  emitted nor projected, so it vanished silently; an interface *usage* body did not dispatch the
+  `end port` member (`ConjugationTest.sysml`); and an end declaration led by a redefinition
+  (`end :>> source ::> producer.publicationPort;`, `ServerSequenceRealization_2.sysml`) was
+  refused, and once accepted was re-emitted in an order that did not reparse. Every
+  corpus-derived snapshot under `tests/snapshots/spec42` now parses without a diagnostic.
+  **AST version 239.**
+
+- **The KerML `Conjugation` declaration.** `( 'conjugation' Identification )? 'conjugate'
+  conjugatedType CONJUGATES originalType RelationshipBody` (KerML BNF 463-475) joins the
+  relationship declarations, so `conjugation c1 conjugate Conjugate1 conjugates Original;`
+  (`Types.kerml`) no longer reaches recovery. `KermlRelationshipKeyword` gains `Conjugate`.
+  **AST version 238.**
+
+- **Two KerML corpus spellings.** A keyword-less feature with a comma-separated typing
+  (`private y: A, '2'[0..*];`, `Classes.kerml`) was shredded into three expression members
+  because the keyword-less member parser took one typing target; it now uses the shared
+  multi-target parser. `specialization subtype x :> y;` (`Types.kerml`) read `subtype` as the
+  specialization's name; the relationship keywords are excluded from the identification, and
+  the authored `specialization` / `disjoining` / `inverting` keyword keeps its span so the
+  keyword and the doubled `typing t1 typing …` spelling both round-trip. **AST version 237.**
+
+- **A named connector end.** `ConnectorEnd = OwnedCrossMultiplicityMember? ( declaredName =
+  Name ReferencesKeyword )? OwnedReferenceSubsetting` (reference `SysML.xtext:998-1002`), so
+  `connect bead references t.bead to mountingRim references w.rim;` (`09. Connections`) lost its
+  semicolon to recovery in every `connect` form except an interface's. `ConnectionEnd` gains
+  `declared_name` with the authored `::>` / `references` spelling. **AST version 236.**
+
+- **`ExtendedUsage` with a declaration.** `ExtendedUsage = UnextendedUsagePrefix
+  UsageExtensionKeyword+ Usage` (SysML BNF 341; reference `SysML.xtext:728-730`) was modelled
+  only as a `def`-less `ExtendedDefinition` -- which required a name and gave the member a
+  package body -- so `#servicedd :>> serviceDiscovery : ServiceDiscoveryDD { #idd
+  serviceDiscovery_HTTP; }` (`AHFCoreLib.sysml`) recovered. A typed `ExtendedUsage` node
+  carries the prefix choice, the keyword run, a `UsageDeclaration`, a value and a usage body,
+  in package and part-usage bodies; `ExtendedDefinition` requires `def` again and loses
+  `has_def_keyword`. **AST version 235.**
+
+- **`#Tag` prefixes after `ref`.** `ExtendedUsage = UnextendedUsagePrefix UsageExtensionKeyword+
+  Usage` (reference `SysML.xtext:728-730`), so `private ref #Classified #Security z1;`
+  (`MetadataTest.sysml`) recovered in a package body. `RefDecl` gains `extension_keywords`.
+  **AST version 234.**
+
+- **`#Tag` prefixes on an enumerated value.** `EnumeratedValue = UsageExtensionKeyword* 'enum'?
+  Usage` (reference `SysML.xtext:784-786`; the published BNF 531 omits the run), so `#Security
+  enum secret : ClassificationLevel = 2;` (`MetadataTest.sysml`) recovered. `EnumeratedValue`
+  gains `extension_keywords`, emitted and projected in authored order. **AST version 233.**
+
+- **Columns are O(1), so a long line is no longer quadratic to parse.** Every span took its
+  column from `nom_locate`'s `get_column`, a backward scan to the previous newline, so each node
+  on a line cost the whole line and a single 400 KB line (the deeply-nested-parentheses stack
+  test) took 240 s in a debug build -- the entire `cargo test` wall clock. `ParseContext` now
+  builds a line-start table once per document and every column is one subtraction. The suite
+  runs in ~14 s; spans, diagnostics and snapshots are byte-identical.
+
+### Added
+
+- **`end` on every usage family that owns `OccurrenceUsagePrefix`.** The reference grammar
+  (`SysML.xtext:836-843`) heads the prefix with `EndUsagePrefix | BasicUsagePrefix …`; the
+  published `.kebnf` (564-570) omits the first alternative, and the normative library authors it
+  (`Interfaces.sysml:72` `end port source: Port :>> …`, `Flows.sysml:82` `end occurrence source:
+  …`), so the parser follows the reference. `OccurrenceUsagePrefix` gains a `head` choice with
+  `EndUsagePrefix` carrying an optional `OwnedCrossUsage` (`end [1] part bead : TireBead;`,
+  `end theCauses [*] occurrence theCause :> causes;`); `EndDecl::nested_usage` is superseded by
+  it and deleted; `EndIdentity` gains `Anonymous` for `end : TireBead[1];`. Closes four corpus
+  snapshots and the library's `Interfaces.sysml`/`Flows.sysml` diagnostics. **AST version 232.**
+
+- **`cargo snapshot`.** A cargo alias for the snapshot driver (`cargo snapshot check|update`).
+
+- **`individual` on every `OccurrenceDefinitionPrefix` family.** `OccurrenceDefinitionPrefix =
+  BasicDefinitionPrefix? ( isIndividual ?= 'individual' ... )?` (SysML BNF 541; Pilot
+  `SysML.xtext` 804) is reached by calc, constraint, requirement, concern, case, verification,
+  use case, view, viewpoint and rendering definitions, and only the structural and action families
+  accepted it: `individual calc def D8;` fell to package-body recovery and cascaded over every
+  later sibling. The nine definition nodes and `ConcernUsage` gain `is_individual`, emitted and
+  projected; `StateDef` already carried it but its projection dropped it. Closes the
+  `coverage_individual` corpus snapshot. **AST version 231.**
+
+- **Five member forms the reference grammar spells.** Each verified against the Pilot
+  Implementation before implementation, not the published BNF alone: the `perform` reference form in
+  an action body (`SysML.xtext:1411-1417`), a part member in either port body (604/514/623), the
+  declared `require constraint c : C;` with its typing (2066-2071), a trigger on an accept *node*
+  (1459-1484), and the `include use case` alternative of `IncludeUseCaseUsage` (2300-2306), which
+  previously shredded into a `FeatureRef` naming the keyword `include`. **AST version 229.**
+
+- **A kinded directed parameter parses in a calc body again.** `calculation_body_element`'s
+  directed branch committed to `in_out_decl`, so `calc def C { in expr p : Boolean; }` fell to
+  recovery; it now falls through to the KerML route the same function already ends in. Regression
+  from the previous wave.
+
+### Fixed
+
+- **A subsetting clause keeps its authored spelling.** Each kind has an operator and a keyword
+  spelling and the AST carried neither, so the formatter rewrote every authored keyword into its
+  operator -- `feature f crosses a;` came back as `feature f => a;`, and corpus fixtures were
+  affected. `SubsettingRelationship` gains `spelling`, compared by equality so a formatter that
+  swaps spellings cannot pass a whole-AST comparison. **AST version 230.**
+
+### Added
+
+- **`MetadataBody` admits every member the grammar spells.** `MetadataBody = ';' | '{'
+  ( DefinitionMember | MetadataBodyUsageMember | AliasMember | Import )* '}'` (SysML BNF 1677) has
+  four alternatives and the parser dispatched two, so a nested declaration, an alias and an import
+  in a metadata body reached recovery with their declarations and spans lost.
+  `MetadataBodyElement` gains `Definition`, `Alias` and `Import`; the declaration member reuses the
+  shared `AttributeBodyElement`, as `metadata def` bodies already did. The keyword-less
+  `MetadataBodyUsage` is still tried first, so `q = 5;` stays a redefinition (spec42 Gap 70).
+  **AST version 226.**
+
+- **KerML conjugation declarations are modelled.** `ConjugationPart = ( 'conjugates' | '~' )
+  OwnedConjugation` (KerML BNF 462) had no node -- conjugation existed only as
+  `TypingRelationship::is_conjugated`, the `~T` flag on the type a feature is *typed by* -- so
+  `classifier One conjugates A;` reported `unsupported_grammar_form`. `ast::Conjugation` is carried
+  on `KermlClassifierDecl` beside `specializes`, which `TypeDeclaration` makes its exclusive
+  alternative, and `ConjugationSpelling` records which of the two interchangeable spellings was
+  authored (spec42 Gap 64). **AST version 225.**
+
+- **The state body modifier is preserved.** `StateDefBody = ';' | ( isParallel ?= 'parallel' )?
+  '{' StateBodyItem* '}'` (SysML BNF 1192) was rejected outright on a `state def` and
+  accepted-then-discarded on a `state` usage and an `exhibit state`. `ast::StateBodyModifier` is
+  now carried on all three as `Option<Node<_>>` over the authored keyword, so
+  `StateUsage::isSubstateUsage` and the parallel-subaction library specialization have something to
+  read (spec42 Gaps 65 and 80). **AST version 224.**
+
+### Added
+
+- **`end` carries its `RefPrefix` in the keyword-less reference usage.** `DefaultReferenceUsage =
+  ( isEnd ?= 'end' )? RefPrefix UsageDeclaration ValuePart? UsageBody` (SysML BNF 630; reference
+  `SysML.xtext:630-633`) is the one production that spells `end` beside a `RefPrefix`, so
+  `end derived x : T;`, `end in x : T;` and `end constant x : T;` are legal -- and were rejected.
+  `EndDecl` gains `ref_prefix`, retained with its spans, re-emitted by the formatter (it was
+  silently rewriting `end derived x : T;` as `end x : T;`) and projected as `(prefix ...)`.
+  This is the spelling that makes `validateFeatureEndNoDirection` and
+  `validateFeatureEndNotDerivedAbstractCompositeOrPortion` reachable from textual notation, which
+  is why the Pilot's own textual validator checks them (spec42 Gaps 59/67). **AST version 227.**
+
+### Changed
+
+- **An invalid `end` feature prefix is reported as itself.** `FeaturePrefix` is a choice and
+  `EndFeaturePrefix` (KerML BNF 573) spells only `( 'const' )? 'end'`, so `in end feature f;` and
+  `derived end feature f;` are correctly refused -- but `composite`/`portion`/`var` beside `end`
+  were reported as "`composite` is not a SysML keyword", which is false, and a direction as an
+  anonymous "unexpected token in calc body". Both now report the new
+  `end_feature_invalid_prefix`, naming the offending keyword and the production that excludes it.
+  Two `connection def` port ends previously lost to `recovery_cascade_suppressed` now each report
+  their real cause. The classification fires only where no production spells the combination: a
+  modifier *before* `end` (wrong in both languages), or a modifier after `end` followed by a
+  declaration keyword (the exclusive `UnextendedUsagePrefix`/`FeaturePrefix` choice). Followed by a
+  plain name it is the legal `DefaultReferenceUsage` above and is not reported, and each case names
+  the rule it actually breaks (spec42 Gaps 59 and 67).
+
+### Changed
+
+- **Flow AST alternatives use proportional indirection.** `FlowDeclaration` boxes only its
+  declaration-bearing alternative and the largest FlowUsage-owning package/part/interface body
+  variants now box their nodes. This preserves the grammar's discriminated shapes and serde wire
+  representation while preventing the endpoint-only and unrelated body alternatives from paying
+  for a full flow declaration. **AST version 223.**
+
+- **KerML directed keyword-less Features retain their own production.** In KerML type/classifier/
+  function bodies, `in value : T;`, `out result;`, and `in :>> inherited;` now route through the
+  existing source-backed `KermlFeature` parser (`BasicFeaturePrefix FeatureDeclaration`) rather
+  than the SysML-only `InOutDecl` state. `CalcDefBodyElement::InOutDecl` is removed; the separate
+  SysML `CalculationBody` action dispatcher retains it. Semantic snapshots now expose the complete
+  KerML feature prefix, declaration typing/multiplicity, relationship clauses, and value/body.
+  **AST version 222.**
+
+- **KerML TypeBody packages retain their owning membership.** `CalcDefBodyElement` now has
+  distinct source-backed `Package` and `LibraryPackage` members, each carrying the authored
+  `MemberPrefix` visibility beside its typed package node. This admits nested packages in KerML
+  type/classifier/function bodies without treating `private package` as expressions. **AST version
+  221.**
+
+### Fixed
+
+- **Occurrence usages stop at their grammar-owned body.** `OccurrenceUsage` no longer consumes
+  a following anonymous `:>>` feature binding as a post-body specialization; `UsageCompletion`
+  ends with its body, so that binding remains the enclosing occurrence body's next member.
+  Recovery now also synchronizes on the complete typed anonymous-binding prefix set. This retains
+  the nested decimal snapshot binding and later outer binding in TimeVaryingAttribute without a
+  `done`-specific parser path (SysML textual BNF 305-315, 572-586; pinned Pilot
+  `SysML.xtext` 845-858). No AST schema change.
+
+- **Action usages retain the complete accept parameter alternative.** `ActionUsage::accept` now
+  uses the existing structured `TransitionAccept` shape, preserving either a typed payload or a
+  source-backed bare payload reference and keeping `via` inside the accept parameter rather than
+  duplicating it in the send-only action field. Direct accept action nodes and inline `then action`
+  usages share one transactional payload boundary; emission, semantic projection, visitors,
+  opacity inspection, provenance validation, and serde retain every accepted alternative (SysML
+  textual BNF 954-965 and 1002-1020; pinned Pilot `SysML.xtext` 1438-1451). Focused and upstream
+  Training 27/ServerSequence snapshots cover typed and bare payloads plus recovery.
+  **AST version 220.**
+
+- **Interface usage bodies retain perform members and local recovery.** `InterfaceUsage` now
+  owns the existing source-backed `PerformActionUsage` node alongside its already typed flow
+  member, and malformed members recover inside the body without discarding the enclosing
+  interface or valid later siblings. The recovery boundary rolls back speculative references and
+  preserves the malformed source span. Emission, semantic projection, visitors, opacity
+  inspection, provenance validation, and serde cover both variants (SysML textual BNF 724-759,
+  374-390; pinned Pilot `SysML.xtext` 1109-1144). Flashlight plus semantic and recovery fixtures
+  cover the boundary. **AST version 219.**
+
+- **Then successions retain inline conditional action nodes.** `ThenTarget::If` now owns the
+  existing typed `IfStmt`, including its condition and braced or shorthand branches, rather than
+  recovering `then if ...` as an unrecognized action-body element. The parser dispatches the
+  pinned `IfNode` alternative before the feature fallback; emission, semantic projection,
+  visitors, opacity inspection, provenance validation, and serde traverse it exhaustively (SysML
+  textual BNF 954-965 and 1123-1141; pinned Pilot `SysML.xtext` 1438-1439 and 1596-1612).
+  Focused semantic/recovery snapshots and Training 17 cover the source succession boundary.
+  **AST version 218.**
+
+- **Perform action usage declarations retain their grammatical alternative.**
+  `PerformActionUsageDeclaration` now distinguishes a declared `action` with its shared,
+  source-backed `UsageDeclaration` (including an anonymous declaration) from the supported
+  reference-subsetting shorthand. This removes the invalid action-name/reference mirror, retains
+  typing, multiplicity, modifiers, relationships, value, and body through emission, semantic
+  projection, visitors, opacity inspection, provenance validation, and serde. The parser admits
+  either branch transactionally without expanding other owners or interface-body dispatch (SysML
+  textual BNF 944-952; pinned Pilot `SysML.xtext` 1411-1418). Training 18, retained perform
+  corpus examples, and semantic and malformed-recovery snapshots cover both alternatives.
+  **AST version 217.**
+
+- **Interface usage parts retain distinct named endpoints.** `InterfacePart` now owns the
+  binary and n-ary alternatives from `InterfaceUsageDeclaration`, with source-backed endpoint
+  multiplicities, optional declared names, `::>`/`references` operator spans, and ordered dotted
+  or qualified reference targets. Both declared-`connect` and bare-interface-part forms parse
+  transactionally; formatter, semantic projection, visitors, provenance validation, opacity, and
+  serde exhaustively retain the result without reusing `KermlConnectorEnd` or generic `connect`
+  expression endpoints. Interface bodies also retain their grammar-valid nested flow usages, so
+  VehicleUsages' named `driveShaft` interface no longer recovers as one opaque member (SysML
+  textual BNF 727-784; pinned Pilot `SysML.xtext` 1120-1186). VehicleUsages, Training 11/13,
+  semantic, and malformed-recovery snapshots cover binary, n-ary, and named-end boundaries.
+  **AST version 216.**
+
+- **Metadata bodies retain keyword-less reference usages.** `MetadataAnnotation` and
+  `MetadataUsage` now own a distinct, recursive `MetadataBody` whose typed
+  `MetadataBodyUsage` members retain the optional authored `ref`, `:>>`/`redefines` operator,
+  required redefinition target, value, and nested body. This replaces the incorrect
+  `AttributeBody` projection that treated `totalRisk { probability = 0.3; }` as an attribute
+  declaration, while leaving unsupported MetadataBody alternatives explicit recovery. Emission,
+  semantic projection, visitors, opacity inspection, provenance validation, and serde traverse
+  the new source-backed shape (SysML textual BNF 1678-1693; pinned Pilot `KerML.xtext`
+  1098-1115). Retained RiskMetadata and extracted SimpleVehicle fixtures, plus malformed-body
+  recovery, cover the boundary. **AST version 215.**
+
+- **Action bodies retain guarded successions as their own production.** The pinned
+  `GuardedSuccession = ('succession' UsageDeclaration)? 'first' FeatureChainMember
+  GuardExpressionMember 'then' TransitionSuccessionMember UsageBody` now has a distinct,
+  source-backed AST node in action definition and action usage bodies. It retains the optional
+  succession declaration, feature-chain reference, authored `if`/`then` spans, guard expression,
+  typed connector-end target, and definition body rather than collapsing them into `FirstStmt`.
+  Transactional dispatch precedes that legacy alternative; emission, semantic projection,
+  visitors, opacity inspection, recovery, and serde cover the complete shape (SysML textual BNF
+  1180-1185; pinned Pilot `SysML.xtext` 1719-1725). **AST version 214.**
+
+- **Collection-operator parameters retain their full usage declaration.** Body-expression
+  parameters now carry source-backed feature specialization, including `:>` subsetting, rather
+  than a second name-and-typing-only header. **AST version 213.**
+
+- **Usage declarations are source-backed shared grammar.** Action-node declarations, for-loop
+  variables, and flow/message usages now embed one typed `UsageDeclaration`, retaining complete
+  feature-specialization relationships rather than owner-specific field mirrors. **AST version
+  212.**
+
+- **For action nodes retain their complete pinned grammar structure.** `ForLoopNode` now shares
+  `ActionNodePrefix` with its loop/while siblings, owns a source-backed typed
+  `ForVariableDeclaration` (including the full usage header), a structured `in` node parameter,
+  and the mandatory `ActionBodyParameter`. Action definition, action usage, and use-case bodies
+  all dispatch and emit the same typed node. Semantic snapshots, recovery, visitors, opacity, and
+  serde cover this complete production (SysML textual BNF 954-965 and 1151-1155; pinned Pilot
+  `SysML.xtext` 1438-1439 and 1624-1628). **AST version 211.**
+
+- **Loop and while action nodes retain their shared prefix and termination parameter.** The
+  grammar-owned `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` now serves
+  both `loop` and `while` forms, retaining the optional source-backed `action`
+  `UsageDeclaration` and its complete feature-specialization header ahead of the node keyword.
+  `WhileLoopNode`'s empty-parameter `loop` alternative and conditional `while` alternative now
+  both retain their mandatory `ActionBodyParameter`, including its separate optional `action`
+  declaration before the braces, and optional source-spanned `until` expression tail
+  (SysML textual BNF 954-965 and 1143-1149; pinned Pilot `SysML.xtext` 1438-1439 and
+  1615-1621). Emission, semantic projection, visitors, opacity inspection, recovery dispatch,
+  and serde cover the shared shape; `ForLoopNode` remains a separate follow-up migration despite
+  naming the same prefix production. **AST version 210.**
+
+- **Reference-prefixed action and state usages retain their typed owner.** Complete `ref action`
+  and `ref state` forms now dispatch to the existing `ActionUsage` and `StateUsage` nodes ahead
+  of generic `ReferenceUsage` in action-definition, action-usage, state, package, and requirement
+  bodies. Generic `ref name` remains a transactional fallback. Both usage nodes now retain their
+  authored `MultiplicityPart` modifier slots, and emission, semantic projection, visitors, and
+  recovery expose the complete typed header and body. **AST version 209.**
+
+- **Enumeration values retain their full pin-valid usage declaration.** The pinned
+  `EnumerationUsageMember = MemberPrefix EnumeratedValue` and `EnumeratedValue = 'enum'? Usage`
+  productions (SysML textual BNF 528-535) now retain visibility, the authored optional `enum`
+  token, decoded `Identification` plus its exact authored source span, typed
+  feature-specialization relationships, multiplicity modifiers,
+  value, and body. This turns MetadataTest's ordinary typed `uncl` and `conf` values into
+  structured enum members while intentionally retaining the sibling Pilot-only
+  `#Security enum secret ...` extension as exact recovery: Pilot alone adds
+  `UsageExtensionKeyword*` before the optional `enum` token. Emission, semantic projection,
+  visitors, opacity inspection, recovery synchronization, and serde cover the complete shape.
+  **AST version 208.**
+
+- **KerML feature relationship tails retain ordered `featured by` clauses.** `KermlFeature` now
+  owns the complete ordered `FeatureRelationshipPart*` tail from `FeatureDeclaration`, including
+  source-backed, comma-separated `TypeFeaturingPart` targets. This replaces the lossy fixed
+  `chains`, `inverse_of`, and type-relationship slots, so repeated and interleaved `chains`,
+  type relationships, `inverse of`, and `featured by` clauses emit in authored order. The slice
+  covers the typed Feature/Step/Expression/BooleanExpression owners; connector declarations keep
+  their separate, optional `FeatureDeclaration` alternative for the follow-up shared-declaration
+  migration. Semantic formatting, visitors, opacity traversal, and serde now cover the exhaustive
+  relationship-part representation. **AST version 207.**
+
+- **Concern usage names retain their authored spelling.** `ConcernUsage` now records the exact
+  `NAME` span alongside its decoded name and emits it directly, preserving intentional quotes
+  around a BASIC_NAME and `\\'` escapes in an UNRESTRICTED_NAME at both package and nested
+  requirement-body positions. Its semantic projection is structured rather than a contentless
+  marker, and visitor/serde traversal includes the source-backed span. Focused and Training 42
+  snapshots cover the package and nested cases. **AST version 206.**
+
+- **Constraint calculation bodies retain aliases.** `ConstraintDefinition` and
+  `ConstraintUsage` both own `CalculationBody`, whose `CalculationBodyItem -> ActionBodyItem ->
+  NonBehaviorBodyItem` alternative includes `AliasMember` (SysML textual BNF 1359-1368,
+  1378-1382, and 901-917; pinned Pilot `SysML.xtext` agrees). The separate
+  `ConstraintDefBodyElement` now owns the existing source-backed `AliasDef` for both constraint
+  definitions and usages, with exhaustive emission, semantic projection, traversal, opacity
+  inspection, and recovery synchronization. Focused semantic and recovery snapshots cover the
+  body owners. **AST version 205.**
+
+- **KerML type and SysML calculation bodies retain aliases.** KerML `TypeBodyElement` admits
+  `AliasMember` directly (textual BNF 431-438; pinned Pilot `KerML.xtext` 363-370 agrees), and
+  SysML `CalculationBody` reaches the same member through `CalculationBodyItem -> ActionBodyItem
+  -> NonBehaviorBodyItem` (SysML textual BNF 1359-1368 and 901-917; pinned Pilot
+  `SysML.xtext` 1368-1381 and 1947-1959 agrees). `CalcDefBodyElement` now owns the existing
+  source-backed `AliasDef` rather than letting the expression fallback split it into bare
+  expressions; emission, semantic projection, traversal, opacity inspection, and recovery
+  synchronization are exhaustive. Semantic/recovery fixtures and both affected upstream KerML
+  examples cover this. **AST version 204.**
+
+- **End declarations retain their immediate `ref` / KerML `feature` introducer.** The pinned
+  `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` production (SysML textual BNF
+  285-286 and 335-337; pinned Pilot `SysML.xtext` agrees) now stores `EndDeclIntroducer` with the
+  keyword's exact source span. The shared connector-end parser, formatter, semantic projection,
+  traversal, and opacity inspection preserve both the reference and already-accepted KerML
+  feature spellings across connection, interface, occurrence, part/ref-body, and interface-usage
+  owners. This remains distinct from rejected Pilot-only occurrence-end prefixes and bare
+  DefaultReferenceUsage `end` forms. Semantic/recovery snapshots and the affected upstream
+  corpus snapshots cover the result. **AST version 203.**
+
+- **Variant usages retain every shared owning-body form.** `VariantUsageMember` owns the same
+  `VariantUsageElement` in `AttributeBody`, `ActionBody`, `PortBody`, and `PortDefBody`; that
+  element reaches `ActionUsage` through `BehaviorUsageElement` (SysML textual BNF 237-252,
+  374-413, and 894-917; pinned Pilot `SysML.xtext` 518-531, 679-719, and 1361-1381). Those
+  scopes now dispatch and recover typed variant members, while `VariantUsage` uses a discriminated
+  reference-or-typed form and adds the source-backed `variant action` alternative. Emission,
+  semantic projection, visitors, and opacity inspection are exhaustive. **AST version 202.**
+
+- **Action bodies retain direct imports.** `ActionBodyItem` admits `Import` through
+  `NonBehaviorBodyItem` (SysML textual BNF 894-917; pinned Pilot `SysML.xtext` 1361-1381), and
+  the same `ActionBody` is owned by both `ActionDefinition` and `ActionUsage`. Both typed action
+  body enums now retain the existing source-backed import node, including visibility and typed
+  import-target shape, through emission, semantic projection, traversal, opacity inspection, and
+  recovery synchronization. Focused semantic/recovery fixtures and the upstream
+  `Metadata Example-2.sysml` action body cover the direct and visibility-prefixed forms.
+  **AST version 201.**
+
+- **Subject usages retain their complete feature-specialization header.** `SubjectUsage` reaches
+  `UsageDeclaration FeatureSpecializationPart? UsageCompletion`, including every `Typings`,
+  `Subsettings`, `References`, `Crosses`, and `Redefinitions` alternative and a
+  `MultiplicityPart` before or after those relationships (SysML textual BNF 305-315 and
+  424-480; pinned Pilot `SysML.xtext` 365-467 and 592-605). `SubjectDecl` now owns the complete
+  typed relationships and multiplicity modifiers rather than a lossy single type reference and
+  redefinition slot; emission, semantic projection, visitors, and opacity traversal retain the
+  grammar-owned header together with the existing typed `DefinitionBody` and value. Focused
+  semantic/recovery fixtures and separate upstream-context fixtures cover the six reported
+  corpus forms. **AST version 200.**
+
+- **Interface-definition bodies retain constraint usages.** `InterfaceBodyItem` admits
+  `InterfaceOccurrenceUsageMember -> InterfaceOccurrenceUsageElement -> BehaviorUsageElement ->
+  ConstraintUsage` (SysML textual BNF 727-750, 374-389, and 1382-1395; the pinned Pilot
+  `SysML.xtext` agrees). The existing source-backed usage node now has an owning
+  `InterfaceDefBodyElement` variant with exhaustive emission, semantic projection, opacity
+  traversal, visitor support, and recovery synchronization at `constraint`. Fixtures:
+  `tests/snapshots/sysml/interface_def_constraint_usage.md` and
+  `tests/snapshots/sysml/interface_def_constraint_usage_recovery.md`. **AST version 199.**
+
+- **Analysis case usages retain their complete occurrence prefix.** `AnalysisCaseUsage` now owns
+  the shared source-backed `OccurrenceUsagePrefix`, as required by `AnalysisCaseUsage =
+  OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody` (SysML textual BNF
+  1533-1535; pinned Pilot `SysML.xtext` 2236). This claims Systems Library
+  `AnalysisCases.sysml:21`'s `ref analysis self : AnalysisCase :>> Case::self;` before a body
+  expression fallback can consume only `ref`, while leaving `ref case` and `ref verification`
+  on their existing `RefDecl` routes. Emission, semantic projection, visitors, and opacity
+  traversal retain the resulting typed usage. **AST version 198.**
+
+- **State-definition bodies retain part and constraint usages.** `StateBodyItem` admits
+  `NonBehaviorBodyItem -> StructureUsageMember -> PartUsage` and its sibling
+  `BehaviorUsageMember -> ConstraintUsage` (SysML textual BNF 1200-1205, 910-920, 262-268,
+  356-389, 623, and 1382-1395; the pinned Pilot `SysML.xtext` StateBodyItem agrees). Both
+  existing source-backed usage nodes now have owning `StateDefBodyElement` variants, exhaustive
+  emission, semantic projection, visitor, and opacity traversal. Recovery synchronizes at both
+  kinds and every shared occurrence-prefix starter. Fixtures:
+  `tests/snapshots/sysml/state_body_part_and_constraint_usages.md` and
+  `tests/snapshots/sysml/state_body_part_and_constraint_usages_recovery.md`. **AST version 197.**
+
+- **Control-node `then` targets retain anonymous declarations.** `merge`, `decide`, `join`, and
+  `fork` now share an explicit anonymous-or-named declaration state and retain their mandatory
+  `ActionBody` (SysML textual BNF 898-909, 969-998; the zero-width-capable
+  `UsageDeclaration` is defined at 42-44 and 308-312, while the pinned Pilot writes it as
+  optional at `SysML.xtext` 1650-1685). `then join` is now dispatched alongside the other three
+  control kinds; all emit, semantic, visitor, opacity, serialization, and recovery boundaries
+  cover it. **AST version 196.**
+
+- **Part-definition bodies retain nested package definitions.** A part definition owns a
+  `DefinitionBody`, whose `DefinitionBodyItem → DefinitionMember → DefinitionElement` path
+  admits both `Package` and `LibraryPackage` (SysML textual BNF 180-207 and 234-248; the pinned
+  Pilot SysML grammar agrees). `PartDefBodyElement` now has separate typed variants for those
+  productions, preserving `library`/`standard library` spelling in the existing
+  `LibraryPackage` node. Formatting, opacity traversal, semantic snapshots, and visitors recurse
+  through their package bodies; recovery synchronizes at `package`, `library`, and `standard`.
+  Fixtures: `tests/snapshots/sysml/part_def_nested_packages.md` and
+  `tests/snapshots/sysml/part_def_nested_packages_recovery.md`. **AST version 195.**
+
+- **Transition effects retain optional typed action bodies.** `EffectBehaviorUsage` admits the
+  perform, accept, send, and assignment alternatives with an optional `ActionBody` (SysML
+  textual BNF 1314-1334; Pilot `SysML.xtext` 1909-1919). Their brace bodies are now parsed as
+  typed `ActionDefBody` values, emitted, visited, checked for opacity, and projected in semantic
+  snapshots. This includes anonymous `do action { ... }`, which previously fell through to a
+  bare expression and discarded its body. Fixtures cover the AHF Norway corpus transition and
+  malformed-body recovery with a following valid sibling. **AST version 194.**
+
+- **Occurrence bodies retain typed binding connectors.** `DefinitionBodyItem` admits a
+  `NonOccurrenceUsageMember`, whose `NonOccurrenceUsageElement` includes
+  `BindingConnectorAsUsage` (SysML textual BNF 237-247, 349-353, 702-707); the pinned Pilot
+  SysML grammar agrees. `OccurrenceBodyElement::Bind` now owns the existing structured
+  connector, including its typed ends and usage body, and emission, opacity traversal, semantic
+  snapshots, and visitors handle it exhaustively. Recovery synchronizes on `bind`, preserving a
+  later valid connector after malformed content. Fixtures:
+  `tests/snapshots/sysml/occurrence_body_bind.md` and
+  `tests/snapshots/sysml/occurrence_body_bind_recovery.md`. **AST version 193.**
+
+- **Keyword-less DefaultReferenceUsage now has one source-backed, grammar-owned shape.** The
+  pinned SysML grammar defines `DefaultReferenceUsage = RefPrefix Usage`
+  (`SysML-textual-bnf.kebnf` 332-333), with the ordinary nullable `Identification`, full
+  `FeatureSpecializationPart`, `ValuePart`, and `UsageBody`. Package, part, and attribute-shaped
+  bodies now share that parser and retain declaration short names, each `RefPrefix` slot,
+  multiplicity modifiers, all five specialization relationships, values, and nested bodies in the
+  typed AST. `AttributeBodyElement` now dispatches the production directly rather than promoting
+  it to an `AttributeUsage`; older package/value/shorthand parsers and the mirrored `feature`
+  boolean/body shape are gone. The Pilot Xtext grammar's optional bare `end` extension is not in
+  the authoritative pin, so `end : T;` and `end :>> target;` recover explicitly while later
+  members remain intact. Fixtures: `tests/snapshots/sysml/default_reference_usage.md` and
+  `tests/snapshots/sysml/default_reference_usage_end_recovery.md`. **AST version 192.**
+
+- **Subject declarations retain their typed usage bodies.** `SubjectUsage` is a
+  `ReferenceUsage` (`SysML-textual-bnf.kebnf` 1416-1419), hence it completes through
+  `UsageBody = DefinitionBody` (305-315); the sibling Pilot grammar agrees at `SysML.xtext`
+  2049-2055 and 592-605. A braced `subject` body is now retained as `SubjectDecl::body`, emitted,
+  visited, included in opacity traversal, and projected in semantic snapshots instead of being
+  parsed as a constraint-body surrogate and discarded. Fixtures cover regular-comment retention
+  and member recovery after malformed subject-body content. **AST version 191.**
+
+- **Bracket, index, and parenthesized expressions now retain the grammar's typed sequence
+  operands instead of a unit-string special case.** KerML textual BNF §8.2.5.8.2 defines
+  `BracketExpression = PrimaryArgumentMember '[' SequenceExpressionListMember ']'`, and shares
+  that `SequenceExpressionList` with `IndexExpression` and `SequenceExpression`. The AST now
+  owns those source-spanned operands, comma delimiters, and opening/closing tokens in one form;
+  `[SI::mm]` is a qualified reference, `[N * m]` is a binary expression, and neither can become
+  a declaration multiplicity after a feature value has begun. The older `Unit`, unary bracket,
+  literal-with-unit, tuple, and parenthesized compatibility variants were removed. The sibling
+  Pilot grammar confirms the same repeatable primary-expression postfix at
+  `KerMLExpressions.xtext:299-323,389-394`. Empty or malformed bracket operands now report the
+  structural `invalid_bracket_expression` diagnostic rather than claiming an invalid unit.
+  Fixtures include `tests/snapshots/sysml/bracketed_unit_expressions.md` and the affected Spec42
+  value-expression corpus. **AST version 190.**
+
+- **View bodies retain their ordinary `rendering` and `alias` members.** `ViewBodyItem` and
+  `ViewDefinitionBodyItem` each inherit `DefinitionBodyItem`, which admits `AliasMember` and the
+  generic `RenderingUsage` alongside the view-specific `render` member. Both scopes now dispatch
+  those existing productions into typed AST variants, emit them, traverse their nested bodies for
+  opacity, and project their retained headers, targets, and bodies in semantic snapshots.
+  Fixtures: `tests/snapshots/sysml/view_body_rendering_and_alias.md` and
+  `tests/snapshots/sysml/view_body_rendering_and_alias_recovery.md`. **AST version 189.**
+
+- **Package attributes, anonymous reference redefinitions, and port-body events retain their
+  grammatical identity.** Def-less package `attribute` declarations now produce
+  `AttributeUsage`, `ref :>> target;` retains `target` as a redefinition rather than inventing a
+  declaration name, and event occurrences nested in port bodies use the typed occurrence node
+  instead of recovery. `PortBodyElement` gains `OccurrenceUsage`. **AST version 188.**
+
+- **A KerML type body owns the `flow` and keyword-less `redefines` members its `FeatureElement`
+  grants it, and a calculation body owns its `message` member.** Fixtures:
+  `tests/snapshots/spec42/kerml_type_body_flow_and_redefinition_members.md`,
+  `tests/snapshots/spec42/kerml_type_body_flow_and_redefinition_recovery.md`. **AST version 187.**
+
+  `TypeBodyElement = NonFeatureMember | FeatureMember | AliasMember | Import` (KerML BNF 434), and
+  `FeatureMember -> OwnedFeatureMember = MemberPrefix FeatureElement` (KerML BNF 519, 526) reaches
+  `FeatureElement` (KerML BNF 360), whose alternatives include `Flow` (KerML BNF 369, defined at
+  1303 as `FeaturePrefix 'flow' FlowDeclaration TypeBody`) and, through plain `Feature` (KerML BNF
+  361, defined at 562), the nameless redefinition spelling: a `Feature` may be nothing but its
+  `FeatureDeclaration` (601), whose second alternative is a bare `FeatureSpecializationPart` (632)
+  = `FeatureSpecialization+ MultiplicityPart?`, reaching `Redefinitions` (663) -> `Redefines` (666)
+  = `REDEFINES OwnedRedefinition`. `CalcDefBodyElement` -- the element set every KerML type body
+  uses, reached from `classifier`, `struct`, `class`, `behavior`, `datatype` and `function` -- had
+  a variant for neither.
+
+  Both therefore fell through the scope's keyword chain to its terminal bare-expression arm, which
+  reads any unclaimed keyword as an ordinary `FeatureRef`. `flow a.y to b.x1;` was silently
+  shredded into four invented members -- `'flow';`, `a.y;`, `'to';`, `b.x1;` -- and `redefines
+  predecessors [0];` into two, `'redefines';` and `predecessors ['0'];`. There was no diagnostic in
+  either case, and a round trip wrote every invented member back out, so the authored member was
+  not rejected, it was replaced.
+
+  The scope now dispatches the parsers its sibling scopes already own for these productions:
+  `flow::flow_usage_member` (the same node a `part def` body carries in) behind a `flow`-keyword
+  guard, and `attribute::redefinition_feature_binding` (the same node an `attribute` body, an
+  occurrence body and a constraint body carry in) behind a `redefines`-keyword guard. Both arms sit
+  ahead of the keyword-less `calc_named_binding` and the bare-expression fallback that had been
+  eating them, and `flow` and `redefines` join `CALC_DEF_BODY_STARTERS`, so recovery resynchronizes
+  on them instead of running past.
+
+  Only the `flow` keyword routes to `flow_usage_member` here. Its `message` spelling is
+  `Message : FlowUsage = OccurrenceUsagePrefix 'message' MessageDeclaration DefinitionBody` (SysML
+  BNF 805), a SysML-only production that no KerML `FeatureElement` alternative reaches, so a KerML
+  type body deliberately gains no `message` member. A SysML calculation body does own one --
+  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1366) -> `ActionBodyItem
+  -> NonBehaviorBodyItem` (901, 910) -> `StructureUsageMember` (917, 262) ->
+  `StructureUsageElement -> Message` (355, 362, 371) -- and it reached the same shredding, because
+  `CALCULATION_ACTION_STARTERS` routed `flow` to the action dispatcher but not `message`, even
+  though one parser keyed by `FlowUsageKind` owns both spellings. `message` joins that list, which
+  is the only place the calculation scope's extra member set is declared. The third
+  `flow_usage_member` spelling, `succession flow`, is not routed here either: `SuccessionFlow` is a
+  genuine `FeatureElement` alternative (KerML BNF 370, 1307) but the scope's `succession` arm
+  claims the keyword first and reports `unexpected_keyword_in_scope`, which is unchanged.
+
+- **A constraint body owns the `return` member its `CalculationBody` grants it.** Fixtures:
+  `tests/snapshots/sysml/constraint_body_return_member.md`,
+  `tests/snapshots/sysml/constraint_body_return_member_recovery.md`. **AST version 186.**
+
+  `ConstraintDefinition = OccurrenceDefinitionPrefix 'constraint' 'def' DefinitionDeclaration
+  CalculationBody` and `ConstraintUsage = OccurrenceUsagePrefix 'constraint'
+  ConstraintUsageDeclaration CalculationBody` (SysML BNF 1378, 1382), and `CalculationBodyItem =
+  ActionBodyItem | ReturnParameterMember` (SysML BNF 1359, 1366, 1370). A constraint body is a
+  calculation body, so a `ReturnParameterMember` is a member of it. `ConstraintDefBodyElement` had
+  no variant for one.
+
+  The member therefore fell through to the scope's terminal expression arm, which read `return` as
+  a name. `return totalMass <= massLimit;` was silently shredded into two invented members --
+  `'return';` and `totalMass <= massLimit;` -- and formatted back out that way. The library's own
+  spelling could not even do that: `return result = allTrue(assumptions()) implies
+  allTrue(constraints()) { doc /* ... */ }` (`sysml.library/Systems Library/Requirements.sysml:41`)
+  left the `=` unaccounted for after the invented pair and reported
+  `recovered_constraint_body_element` across the rest of the member, which was the last diagnostic
+  standing between the Systems Library and a clean L2 scorecard.
+
+  The constraint scope now dispatches the same three parsers the calculation scope does, in the
+  same order and behind the same named-return guard: `return_decl`, then the return-expression
+  statement, then the shared return recovery -- which grew a scope parameter so a malformed
+  `return` inside a constraint body reports `recovered_constraint_body_element` rather than
+  claiming to be a calc body member. `return` also joins `CONSTRAINT_DEF_BODY_STARTERS`, so
+  recovery resynchronizes on it. `ConstraintDefBodyElement` and `CalcDefBodyElement` model the one
+  `CalculationBody` production and are still two enums; the new variant records that, and unifying
+  them stays follow-up work, because this scope's `Constraint`, `RequireConstraint` and
+  `FeatureDecl` variants raise a separate question the coverage gap does not.
+
+- **A keyword-less `/* ... */` member is dispatched before the member set of every scope, not only
+  the scopes whose dispatch happened to reach `annotating_member`.** Fixtures:
+  `tests/snapshots/spec42/bare_comment_member_dispatch.md`,
+  `tests/snapshots/spec42/bare_comment_member_recovery.md`.
+
+  `Comment = ( 'comment' Identification ... )? ( 'locale' ... )? REGULAR_COMMENT` (KerML BNF 199)
+  makes every group before the body optional, so a bare block comment at a member position is the
+  production's shortest legal spelling. Four scopes dispatch their members by keyword lookup or by
+  an ordered `alt` whose alternatives each begin by skipping trivia, and `/*` selects no production
+  keyword: the calc-shaped body that KerML type bodies share with a SysML calculation body, an
+  action definition body, an action usage body, and a constraint body. In all four the comment fell
+  through to a sibling production, which consumed it as trivia and then read the *following*
+  member's declaration as its own.
+
+  With a KerML type-relationship tail the member then failed outright -- `/* c */ feature f : T
+  unions x;` reported `recovered_calc_body_element` on `": T unions x;"`, for all four of `unions`,
+  `intersects`, `differences` and `disjoint from`. Without one the same shredding was silent:
+  `/* c */ feature f : T [*];` became an expression statement `'feature';` plus an unrelated
+  binding named `f`, with no diagnostic at all, and formatted back out that way.
+
+  `body::starts_bare_comment` is the one place that test is written, so a scope that gains a
+  keyword-led dispatch cannot forget it.
+
+- **A requirement body owns the general usage families it inherits from `DefinitionBodyItem`.**
+  Fixtures: `tests/snapshots/sysml/requirement_body_usage_members.md`,
+  `tests/snapshots/sysml/requirement_body_usage_member_recovery.md`. **AST version 185.**
+
+  `RequirementBodyItem = DefinitionBodyItem | ...` (SysML BNF 1407) and `DefinitionBodyItem`
+  admits `NonOccurrenceUsageElement` and `OccurrenceUsageElement` (BNF 237), so a requirement
+  definition or usage body legally contains the whole usage zoo, not only the requirement-specific
+  members. `RequirementDefBodyElement` had no variant for any of them and each was rejected
+  outright with `unexpected_keyword_in_scope` -- not captured as an unsupported or recovery node,
+  so nothing downstream could see that legal syntax had been written at all.
+
+  Added, with starters, source-ordered traversal, emission and opacity walking: `ActionUsage`,
+  `SuccessionUsage`, `Perform` (both the `perform action a;` declaration and the `perform a;`
+  reference), `StateUsage`, `ItemUsage`, `PartUsage`, and both spellings of `ConnectionUsage` --
+  the keyword-less `Connect` and the `connection`-led `ConnectionUsageMember`. They are dispatched
+  after `ref_decl`, which requires its own `ref` token, so no `ref`-prefixed member moves off the
+  node it already parses to.
+
+- **An `intersects` clause on a KerML feature is no longer parsed and thrown away.** Fixture:
+  `tests/snapshots/spec42/bare_comment_member_dispatch.md`.
+
+  `intersects` on a `Type` -- and a `Feature` is one -- is `IntersectingPart`, one of the four
+  `TypeRelationshipPart` alternatives (KerML BNF 408, 424), alongside `unions`, `differences` and
+  `disjoint from`. `specialization_clauses` claimed it first, because the SysML usage headers that
+  helper also serves model it as a subsetting-family clause, and `kerml_feature` then read every
+  other clause it returns and dropped this one. An authored `feature f : T intersects g;` lost the
+  whole clause: no relationship, no subsetting, no diagnostic, and nothing to emit. It now joins
+  its three siblings in `type_relationships`, positioned by its authored span so the list's
+  documented source order still holds when `intersects` is written first.
+
+- **`first`/`merge`/`decide`/`join`/`fork` bodies share `Body` instead of a body type of their
+  own, and their `;` is no longer unlocatable.** **AST version 185.**
+
+  `FirstMergeBody` was `Semicolon | Brace(Node<FirstMergeBraceBody>)`, a hand-rolled duplicate of
+  the shared `Body<E>` that cost two things. Its semicolon alternative carried no span, so `first x
+  then y;` was the one body in the AST whose terminator could not be located without re-scanning
+  the source. Its brace alternative wrapped the delimiters in a second `Node`, making the body
+  extent two representations of one fact -- which its own provenance validation then had to
+  cross-check against each other. Both are gone: `FirstMergeBody` is now
+  `Body<FirstMergeBodyElement>`, `FirstMergeBraceBody` is removed from the public API, and the
+  semantic projection reads `(body semicolon (span ...))` and `(body brace (open-brace ...)
+  (members ...) (close-brace ...))`.
+
+  The delimiter checks this scope validated for itself are the ones
+  `ProvenanceVisitor::visit_body_braces` already applies to every `Body<E>`. The stricter rules it
+  added -- ordered non-empty element spans, no unmodeled non-trivia between members, and each
+  element's span matching the member it retains -- are kept in
+  `ast::behavior::validate_first_merge_body_provenance`. Generalizing the first three to all
+  fourteen body families is worthwhile and deliberately not attempted here.
+
+### Changed
+
+- **`ParsedDocument` implements `Send` and `Sync` explicitly, so consumers stop paying to prove
+  it.** Policy: `planning/shared-grammar.md`; proof: `ast::root::send_sync_structural_proof`;
+  gate: `tests/type_level_cost.rs`.
+
+  The longest simple path through the AST type graph is over 120 distinct types -- fourteen nested
+  body levels, each costing a `Body`, an element enum, the owning declaration, and three frames of
+  `Vec`/`RawVec`/`PhantomData` plumbing. Proving `ParsedDocument: Send` structurally cost 119
+  trait-solver frames before the requirement-body work above and 134 after it, against rustc's
+  default `recursion_limit` of 128. Every consumer wanting to move a document between threads paid
+  that, and had to raise its own limit to do so.
+
+  The explicit implementations make that obligation O(1) downstream. They are not an exemption from
+  the type-level cost gate but a relocation of it: `send_sync_structural_proof` destructures
+  `ParsedDocument` exhaustively and walks the whole AST type graph structurally inside this crate,
+  which already raises `recursion_limit`. Adding a field without an assertion is an `E0027`; an
+  `Rc`, `RefCell` or raw pointer added anywhere beneath it is an `E0277` naming the offending type.
+  Both are `cargo check` errors, so no separate lint is required. `tests/type_level_cost.rs`
+  continues to compile at the default limit and so still fails if the implementations are removed.
+
+- **KerML's `FeaturePrefix` is modelled as the choice the grammar writes, not as eight independent
+  booleans.** Audit and evidence: `planning/kerml-feature-prefix-matrix.md`.
+  **AST version 179 -> 184.**
+
+  The merged node is `KermlFeature` (was `KermlFeatureMember`), named for the production it models
+  rather than the membership that carries it; `PackageBodyElement::KermlFeatureMember` becomes
+  `::KermlFeature`, matching the three sibling body enums that already spelled it that way.
+
+  `KermlFeatureMember` carried `is_derived`, `is_abstract`, `is_composite`, `is_portion`, `is_var`,
+  `is_const` and `is_end` as seven separately settable flags, plus `kind` beside a
+  `has_kind_keyword` bool that could disagree with it. The pinned grammar writes one production:
+  `FeaturePrefix = ( EndFeaturePrefix ( OwnedCrossFeatureMember )? | BasicFeaturePrefix )
+  ( PrefixMetadataMember )*` (KerML BNF 584). The new `crate::ast::FeaturePrefix` component models
+  it, alongside `BasicFeaturePrefix` (577), `EndFeaturePrefix` (573), `OwnedCrossFeature` (595) and
+  the two one-slot alternations `FeaturePortionKind` (581) and `FeatureVariability` (582).
+
+  What this makes unrepresentable rather than merely unparsed:
+
+  - **`var const feature b;` was accepted**, setting `is_var` *and* `is_const`. `var` and `const`
+    are two alternatives of one slot, so the merged model has one field and the spelling is gone.
+  - **`in end feature x;`** cannot be built: `direction` lives only in `BasicFeaturePrefix`, and
+    `EndFeaturePrefix` is the *other* alternative of the choice.
+    `tests/snapshots/spec42/end_prefix_recovery.md` already pinned that conclusion for the parser;
+    it is now a property of the type.
+  - **`composite portion`** likewise collapses to one slot.
+
+  Each independent modifier is an `Option<Span>` carrying the authored keyword's exact position, so
+  emission writes a keyword because the author did rather than because a flag says so, and `kind`
+  becomes `Option<Node<KermlFeatureKind>>` — presence *is* "the keyword was authored".
+
+  One behaviour change follows from sharing the prefix: a directed feature now parses in every
+  scope that already accepted the undirected spelling, so `in newX : Real;` at namespace level is a
+  `Feature` (`BasicFeaturePrefix` direction slot, then `FeatureDeclaration`) instead of a second
+  recovery diagnostic. `tests/snapshots/spec42/empty_member_after_package.md` records it.
+
+- **The three nodes that spelled one KerML `Feature` production are one node.**
+  `TypedParameterMember`, `KermlParameterKind` and `KermlEndMember` are deleted, and
+  `CalcDefBodyElement` loses `TypedParameter` and `EndMember`.
+
+  The split was discriminated by *optional slots*, not by grammar. `feature a;` and `in feature b;`
+  are the same production with one `?` taken, and the directed node modelled only `direction` plus
+  `abstract` — so every other legal combination was refused outright. These four now parse instead
+  of reaching `recovered_calc_body_element`, pinned in
+  `tests/snapshots/spec42/kerml_feature_prefix_slots.md`:
+
+  ```
+  in derived feature q;      in composite feature o;
+  in var feature p;          in portion feature s;
+  ```
+
+  `KermlEndMember` wrapped a `KermlFeatureMember` while the wrapped node carried its own `is_end`
+  and `is_const`, so end-ness was representable twice on one member. It becomes
+  `FeaturePrefixHead::End`, and its owned cross feature (`OwnedCrossFeature`, KerML BNF 592/595)
+  gains what the wrapper could not hold: its own `BasicFeaturePrefix` and the `MultiplicityPart`
+  keyword slots.
+
+  **`FeaturePrefix`'s metadata tail is parsed where the feature parser owns the input.**
+  `PrefixMetadataMember*` trails the choice in BNF 584, so `derived #Tag feature z3;` and
+  `in var #Tag #Tag2 feature z4;` are legal — and were refused outright, because the feature parser
+  stopped dead at the `#`. They now carry their keywords in `FeaturePrefix::metadata_keywords` and
+  re-emit them. A `#`-*led* member is unchanged: the owning scopes dispatch their metadata arm
+  first, and `feature_prefix` deliberately refuses a run that no kind keyword follows, so
+  `#Tag feature z1;` stays a prefix member plus a feature and `#service port def Authorisation
+  { … }` keeps parsing as before. `planning/kerml-feature-prefix-matrix.md` §11 records the
+  remainder as a metadata-seam change rather than a prefix one.
+
+  **One production leaves rather than merging.** `in calc scenario : NominalScenario;`
+  (validation `10c-Fuel Economy Analysis`) is SysML's `CalculationUsage = OccurrenceUsagePrefix
+  'calc' …` (SysML BNF 1355) — not a KerML `Feature`, and not `FeaturePrefix`. It reached the
+  directed-parameter node only because the direction dispatch arm ran ahead of the `calc` arm.
+  `CalcUsage` already models direction, `abstract` and `ref` through `RefPrefix`, so it routes
+  there and `KermlParameterKind::Calc` is deleted.
+
+- **`BasicDefinitionPrefix` reaches every definition kind whose production spells it, and the two
+  that spell something else are modelled as such.** Audit and evidence:
+  `planning/spec42-upstream-gap-audit.md`. **AST version 178 -> 179.**
+
+  A previous slice gave the six connection-like and part definitions the spanned
+  `Option<Node<DefinitionPrefix>>` slot but left `variation` refused everywhere else, because the
+  other definition nodes stored this slot as a bare `is_abstract` bool that could not hold the
+  second alternative. Seventeen nodes now carry the typed slot:
+
+  - **Nine converted from `is_abstract: bool`** -- `RequirementDef`, `CaseDef`, `AnalysisCaseDef`,
+    `VerificationCaseDef`, `UseCaseDef`, `ConstraintDef`, `ViewDef`, `RenderingDef`,
+    `OccurrenceDef` -- so `variation requirement def V;` and its siblings parse instead of falling
+    through to the unimplemented extended-library declaration.
+  - **Eight had no field at all and were silently discarding `abstract`** -- `AttributeDef`,
+    `ItemDef`, `StateDef`, `ActionDef`, `CalcDef`, `ViewpointDef`, `PortDef`, `IndividualDef`. The
+    pinned library itself was losing the keyword on a round trip: `abstract attribute def
+    ScalarMeasurementReference`, `abstract calc def Calculation`, `abstract attribute def
+    MeasurementUnit` and a dozen more re-emitted without it.
+
+  `DefinitionPrefixOptions`' two loosely-coupled booleans (`abstract_allowed`, `variation_allowed`)
+  become one `BasicPrefixSlot` enum naming what each production actually spells, so
+  "`variation` but not `abstract`" is unrepresentable, and the `slot_is_abstract` bridging helper
+  is deleted.
+
+  **Two productions genuinely differ, and are not forced into uniformity.**
+  `EnumerationDefinition` (SysML BNF 518; Pilot `SysML.xtext` 767) reaches neither
+  `DefinitionPrefix` nor `OccurrenceDefinitionPrefix`, so it spells no prefix at all.
+  `MetadataDefinition` (BNF 1652; Pilot 121) inlines `isAbstract ?= 'abstract'` with no `variation`
+  alternative, so its `is_abstract` bool is the accurate shape. Both refuse what they do not spell,
+  pinned by `tests/snapshots/sysml/definition_prefix_refusals.md`.
+
+  `IndividualDefinition` (BNF 551) reaches the slot directly and was refusing both keywords; it now
+  accepts them.
+
+- **`MultiplicityPart` admits one keyword per slot, and the excess reaches recovery instead of
+  being swallowed.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`.
+
+  `MultiplicityPart` (SysML BNF 495-496, KerML BNF 639-640) is an alternation over two *distinct*
+  slots: at most one ordering keyword, at most one uniqueness keyword, either order, preceded by at
+  most one multiplicity range. The OMG Pilot matches it as an Xtext fragment exactly once, so the
+  token after it is a syntax error there.
+
+  This parser looped instead, and every excess spelling was dropped with **no diagnostic and a
+  silently different document**: `Real[0..*] ordered ordered` re-emitted as `Real[0..*] ordered`,
+  and `[1] ordered [2] nonunique` re-emitted as `[1] ordered nonunique` -- the `[2]` vanished.
+  That is the permissive fallback `AGENTS.md` forbids.
+
+  Each slot now fills at most once and any excess is left unconsumed, so the enclosing declaration
+  fails at that token and the scope's member recovery captures the whole member by source span with
+  a stable code, an exact span, and the valid sibling after it intact.
+
+  - **The cardinality is per declaration, not per parse position.** `FeatureSpecializationPart`
+    (SysML BNF 424-426, KerML BNF 632-634) lets the part sit either side of the specializations, so
+    the parsers offer the position twice and used to fold the two groups first-wins -- which is how
+    `ordered ordered` survived the narrowing, one slot per position. The value is now threaded
+    through both positions as an accumulator, so a filled field is what stops the next position
+    from consuming. `MultiplicityModifiers::merge` and the first-wins `set_ordering`/`set_uniqueness`
+    setters are deleted: that fallback was living in the owning API.
+  - **No new diagnostic code.** Every scope that owns member recovery already produces the exact
+    contract for this input -- stable code, precise span, `found` equal to the authored slice,
+    recovered emission reproducing it verbatim, surviving sibling. A `MultiplicityPart`-specific
+    code would duplicate it.
+
+  Corpus evidence for the narrowing being safe: across the pinned release the only authored
+  sequences are `nonunique` (440), `ordered` (203), `ordered nonunique` (82) and `nonunique
+  ordered` (5) -- all four legal, with no repetition, interleaving or adjacent range anywhere.
+  Neither `unique` nor `nonordered` appears in either Pilot grammar; both remain accepted and
+  retained here, now subject to the same cardinality as the spellings the production does list.
+
+- **A bare `/* ... */` is a `Comment`, not trivia, and every annotating body keeps its raw span
+  and one normalization policy.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`
+  (spec42 Gap 55). **AST version 177 -> 178.**
+
+  The pinned grammar defines three lexical forms and only two of them are notes:
+
+  ```text
+  SINGLE_LINE_NOTE = '//' LINE_TEXT
+  MULTILINE_NOTE   = '//*' COMMENT_TEXT '*/'
+  REGULAR_COMMENT  = '/*'  COMMENT_TEXT '*/'
+  ```
+
+  (KerML BNF 32-39.) Every group before the body in `Comment = ( 'comment' Identification
+  ( 'about' ... )? )? ( 'locale' ... )? body = REGULAR_COMMENT` (BNF 199) is optional, and
+  `Comment` is an `AnnotatingElement` (BNF 188), so a bare `/* ... */` at a member position is
+  syntax. `/** ... */` is not a separate production: it is a `Comment` whose body happens to begin
+  with `*`.
+
+  - **Legal members were deleted.** Both spellings were consumed as lexer trivia and were
+    unreachable from any AST node, so `package P { /* why this exists */ part def A; }` re-emitted
+    without the comment. They now reach `CommentAnnotation` with `keyword_span: None` -- the state
+    that field has documented since it was introduced and no parser had ever produced. Member
+    boundaries skip whitespace and notes only (`lex::ws_and_notes`); every other position keeps
+    skipping block comments, because the grammar has no member between the tokens of a declaration
+    for a comment there to be. A scope whose member set cannot yet hold an annotating element
+    still treats one as trivia rather than reporting it, so no previously-parsing document becomes
+    a recovered one.
+  - **Every consumer had to invent its own normalization.** `DocComment::text` was the raw slice
+    between `/*` and `*/` with no leading-`*` stripping and no dedent. The authored bytes still
+    live there -- that is what lets the formatter reproduce them -- and `normalize_comment_body`
+    now implements the pinned processing rules (KerML BNF 214 note 1, extended to
+    `TextualRepresentation` by BNF 231 note 1) once, exposed as `normalized_text()` on all three
+    types.
+  - **The body had no provenance.** `DocComment`, `CommentAnnotation` and `TextualRepresentation`
+    each gained `body_span`, the exact source span of the authored body text.
+
+  The semantic projection for `doc` and `rep` grows from a bare marker to the name, locale or
+  language, the body span, and the normalized text.
+
+- **`class` joins the other KerML classifier keywords; the bespoke `ClassDef` node is deleted.**
+  Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 59).
+  **AST version 176 -> 177.**
+
+  `class` was the one keyword in `KERML_CLASSIFIER_KEYWORDS` routed to its own `ClassDef` node
+  with an attribute body, ahead of the shared `KermlClassifierDecl` that `type`, `struct`,
+  `behavior`, `datatype` and the rest reach. Three things followed from that:
+
+  - **A legal member was refused.** `BasicFeaturePrefix` opens with `( direction =
+    FeatureDirection )?` (KerML BNF 582), and the Kernel Semantic Library authors `in feature`,
+    `out feature` and `inout feature` throughout, but the attribute body has no directed-parameter
+    member, so `class C { in feature x : T; }` reached recovery while `struct C { ... }` and
+    `behavior C { ... }` accepted the same line.
+  - **The formatter invented a keyword.** No production spells `class def`, yet `class C { ... }`
+    was re-emitted as `class def C { ... }`.
+  - **`abstract` was refused**, because `class_def` was configured `.no_abstract()`.
+
+  The semantic projection also improves from the bare `(class-def)` marker to the full classifier
+  declaration with its keyword, abstractness, specialization and body members. `class` and
+  `association` are added to the nested-classifier keyword set inside a type body, so
+  `class Inner { ... }` nests as its siblings already did.
+
+  This is the reachable half of spec42's Gap 59. The other half -- a direction beside `end` -- is
+  unauthorable in the pinned grammar and is pinned as recovery instead; see the audit.
+
+- **`ref`, `subject`, `actor` and namespace-level `calc` reach the declaration surface their
+  production gives them.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap
+  53). **AST version 175 -> 176.**
+
+  `UsageDeclaration = Identification FeatureSpecializationPart?` and
+  `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` (SysML BNF 42/308), so every
+  usage may carry a short name. Four declarations refused theirs and reached recovery instead:
+
+  - `part_ref_usage` -- the `ReferenceUsage` parser for namespace and part-definition bodies --
+    went straight to the declared name, so `ref <rd> rd : T;` was reported as an unrecognized
+    declaration even though `connector::ref_decl`, which owns the same production in the
+    definition-body scopes, already read it. It also discarded the multiplicity and the
+    `ordered`/`nonunique` slots, which the same `FeatureSpecializationPart` admits.
+  - `subject`, `actor` in a requirement body, and `actor` in a use-case body all rejected
+    `<shortName>`. `SubjectDecl`, `RequirementActorDecl` and `ActorUsage` now carry `short_name`,
+    and the use-case actor's multiplicity -- parsed but never projected -- is visible.
+
+  `CalculationUsage` is a `BehaviorUsageElement` and therefore a legal `PackageMember`, but no
+  namespace scope dispatched it: `calc estimate [1];` fell through to the unimplemented
+  extended-library declaration. `PackageBodyElement::CalcUsage` dispatches it *after* `calc_def`,
+  which stays `def`-optional for the bare definitions the Systems Library authors, so this arm
+  catches only what that grammar refuses.
+
+- **`BasicDefinitionPrefix` keeps its authored span, and `variation` reaches the connection-like
+  definitions.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 58).
+  **AST version 174 -> 175.**
+
+  `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'` (SysML BNF 219)
+  is one slot with two alternatives. `PartDef`, `ExtendedDefinition`, `ConnectionDef`, `FlowDef`,
+  `AllocationDef` and `InterfaceDef` stored it as a spanless `Option<DefinitionPrefix>`; all six
+  now carry `Option<Node<DefinitionPrefix>>`, so a consumer can point at the keyword instead of
+  searching the source for it. The semantic projection shows the authored span alongside the
+  spelling.
+
+  - **`variation` was refused on every connection-like definition.**
+    `OccurrenceDefinitionPrefix` (SysML BNF 541) opens with `BasicDefinitionPrefix?`, so
+    `variation connection def V;` is legal, but it fell through to the unimplemented
+    extended-library declaration production. `connection`, `flow`, `allocation` and `interface`
+    definitions now accept it in the same slot as `abstract`, with the same span.
+  - **Three hand-rolled copies of the slot are now one.** `part_def` and
+    `extended_definition_inner` each re-spelled the `abstract`/`variation` alternation; both call
+    the shared parser, which is where the span is captured once.
+
+  `variation` remains refused on the definition kinds that still store this slot as a bare
+  `is_abstract` bool, because accepting it there would consume the keyword and drop it. That
+  narrowing, and the list of nodes it applies to, is recorded in the audit.
+
+- **`MultiplicityPart`'s ordering and uniqueness keywords are retained with their authored spans;
+  `unique` and `nonordered` stop being swallowed.** Audit and evidence:
+  `planning/spec42-upstream-gap-audit.md` (spec42 Gap 52). **AST version 173 -> 174.**
+
+  `MultiplicityPart` (SysML BNF 495, KerML BNF 639) spells two independent keyword slots after the
+  multiplicity range. Thirteen nodes modelled them as an `ordered: bool` + `nonunique: bool` pair;
+  all thirteen now carry one `multiplicity_modifiers: MultiplicityModifiers`, whose slots are
+  `Option<Node<MultiplicityOrdering>>` and `Option<Node<MultiplicityUniqueness>>`.
+
+  - **An authored keyword was consumed and recorded nowhere.** `unique` and `nonordered` -- the
+    explicit spellings of the two metamodel defaults -- were "recognized and consumed, but not
+    recorded", so `attribute a : Real[0..*] unique;` re-emitted as `attribute a : Real[0..*];`.
+    Both spellings now reach a field, so an authored default is distinguishable from omission and
+    the formatter reproduces the document it was given.
+  - **A boolean pair could not carry a span.** Presence is now the authored fact and each slot
+    keeps the keyword's exact span, so a consumer highlighting or reporting on `nonunique` no
+    longer has to find it in the source itself.
+  - **Emission imposed its own order on the source.** The two slots are independent, so
+    `ordered nonunique` and `nonunique ordered` are both legal; the emitter always wrote `ordered`
+    first. It now orders by the authored spans, and `nonunique ordered` survives a round trip.
+  - **Modifier keywords matched without a token boundary.** `attribute a : Real[0..*] orderedBy;`
+    consumed `ordered` and left `By` behind. Keywords now match on a token boundary.
+
+  `readonly` and SysML `variable`, requested by the same gap, are spelled by no production in the
+  2026-04 pin and occur nowhere in its corpus; they continue to reach recovery with a stable
+  diagnostic and an exact span, now pinned by
+  `tests/snapshots/spec42/multiplicity_modifier_slots.md`.
+
+- **`PortUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`, and `port def` stops
+  claiming port usages.** Audit and evidence: `planning/port-usage-prefix-matrix.md`.
+  **AST version 172 -> 173.**
+
+  `PortUsage = OccurrenceUsagePrefix 'port' Usage` (SysML BNF 645), so `PortUsage` now carries the
+  same `prefix: OccurrenceUsagePrefix` that `OccurrenceUsage`, `ItemUsage`,
+  `SatisfyRequirementUsage`, `PartUsage` and `ConstraintUsage` already carry, and the five fields
+  that stood in for it -- `direction`, `is_abstract`, `is_derived`, `is_constant`,
+  `is_individual` -- are gone. `variation`, `ref`, `snapshot`/`timeslice` and
+  `UsageExtensionKeyword*` are represented for the first time, each with its authored span.
+
+  - **An illegal prefix order was accepted and silently rewritten; the legal one was refused.**
+    The five fields were probed in the order `individual abstract` direction `derived constant`
+    and emitted in the order direction `derived abstract constant individual`, neither of them the
+    grammar's. `individual abstract in derived constant port x;` parsed with no diagnostic and
+    came back out as `in derived abstract constant individual port x;`, while
+    `in derived abstract constant port y;` -- the only order the production allows -- was
+    recovered as malformed. Five order-free booleans is the shape in which a whole-AST comparison
+    cannot see that.
+  - **`port def` requires `def`.** `PortDefinition = DefinitionPrefix 'port' 'def' Definition`
+    makes the keyword mandatory; this parser made it optional, so every keyword-less package-scope
+    port usage was folded into a definition. `port p1 : T;` came back out as `port def p1 : T;`,
+    and `abstract port ports : Port[0..*] nonunique :> objects;`
+    (`Systems Library/Ports.sysml:48`) lost `abstract`, the multiplicity and `nonunique` and came
+    back out as `port def ports :> objects;` -- on a strict gate that passed, because both sides
+    of the round trip lost them identically. `port_def_required` is therefore gone: there is one
+    `port_def`, and it requires `def`. `PortUsage` gains `ordered`/`nonunique` (`MultiplicityPart`)
+    because the declarations it now claims write them.
+  - **`ref port …` is a port usage.** `BasicUsagePrefix` owns the `ref`, so `ref port q;`
+    (`Simple Tests/PartTest.sysml:21`), `ref port c2 : C;` and `ref port :>> participant : Port
+    [2..*] nonunique ordered { … }` (`Systems Library/Interfaces.sysml:45`) are `PortUsage`s with
+    `ref` in their prefix rather than `RefDecl`s. Every scope that owns a port usage gives it
+    first refusal through `occurrence_prefix::starts_contended_prefix`, so `#idd port APIS_HTTP
+    { … }` (`Arrowhead Framework Example/AHFNorwayTopics.sysml:22`) is one member instead of two,
+    and `connector::ref_decl` keeps every other kind it models.
+  - **`variation port :>> autoPort { … }` parses.**
+    (`Variability Examples/VehicleVariabilityModel.sysml:79`) used to be one recovery node
+    covering four lines; it is now a typed port usage. `PortBodyElement` gains the `RefDecl`
+    member `UsageBody = DefinitionBody` admits and the pinned library writes -- `protected ref
+    thisParticipant :>> self;` inside `Interfaces.sysml`'s `ref port` declaration -- which the
+    scope had no variant for at all. Its `variant` members are *not* modelled: that variant closes
+    a `PortBody -> VariantUsage -> PortUsage -> PortBody` type cycle that costs a downstream
+    consumer its default trait-solver recursion limit, and `tests/type_level_cost.rs` refuses it.
+    They remain recovery nodes with precise spans; matrix §10.1 has the evidence.
+  - **Projection.** A port usage projected its name, its direction and its clauses, with its body
+    reduced to an element count, and three of its nine owning scopes wrote a bare `(port-usage)`
+    marker. All nine now project the whole language-level declaration, prefix first, with the body
+    members matched exhaustively; `port def` likewise projects its declaration instead of a marker
+    in the three scopes that wrote one. `tests/snapshots/sysml/port_usage_prefix_owning_scopes.md`
+    shows every scope with the repeated member byte-identical across all of them.
+  - **Emission.** `port :>> pe = c1.pb;` came back out as `port  :>> pe = c1.pb;`: the kind
+    keyword's trailing space was stranded in front of a clause that supplies its own. Same fix
+    `emit_part_usage` and `emit_attribute_usage` already carry.
+  - **Recovery in the four brace scopes that own a port usage no longer eats the member after
+    malformed content.** `PORT_BODY_STARTERS`, `PORT_DEF_BODY_STARTERS`,
+    `INTERFACE_DEF_BODY_STARTERS` and `CONNECTION_DEF_BODY_STARTERS` gain the FIRST tokens each
+    lacked -- `INTERFACE_DEF_BODY_STARTERS` had listed four of the dozen members its scope
+    dispatches -- *and* all four scopes now actually resynchronize on their table.
+    `parse_structured_brace_members` defaults to a skip mode that scans to the next `;` and never
+    reads the `starters` argument, so completing a table was decorative in those scopes: an
+    unterminated `%%%` followed by `private port p;` produced one malformed node covering both.
+    `MemberPrefix` is why the visibility keywords matter as much as the prefix ones -- `port_usage`
+    accepts `public`/`private`/`protected` ahead of the occurrence prefix, so the member is lost
+    without them even when all thirteen prefix tokens are listed. Both halves are necessary and
+    neither is sufficient. Pre-existing rather than introduced here, but in exactly the scopes this
+    slice completes; `tests/snapshots/sysml/port_usage_prefix_scope_recovery.md` pins all four.
+  - **Breaking AST shape.** `PortUsage::{direction, is_abstract, is_derived, is_constant,
+    is_individual}` are replaced by `PortUsage::prefix`; `PortUsage::{ordered, nonunique}` are new;
+    the `PortUsage` variant of `PackageBodyElement`, `PartDefBodyElement`, `PartUsageBodyElement`,
+    `PortDefBodyElement`, `PortBodyElement`, `InterfaceDefBodyElement` and
+    `ConnectionDefBodyElement` is now boxed, which makes six of those enums *smaller* (1240 ->
+    1176 bytes); `PortBodyElement` gains `RefDecl` and `VariantUsage`.
+  - Still open, recorded rather than assumed closed: `PortDefinition`'s own `DefinitionPrefix` has
+    no field, so `abstract port def Port :> Object;` still discards `abstract` and `variation port
+    def V;` is still an `ExtendedLibraryDecl` -- that is the definition-prefix seam, not this one;
+    `then` before a port usage is still unrecognized (no corpus or fixture evidence for it); and
+    the seven definition bodies that the pin lets hold a port usage but this parser does not
+    dispatch one from are listed in the matrix §11.
+
+- **Every scope that can hold a part usage now shows it, and three silent-rewrite bugs the
+  projection exposed are fixed.** **AST version 170 -> 172.**
+
+  - **Projection.** `AttributeBody` (the body of every attribute, item and metadata definition and
+    usage), `OccurrenceUsageBody`, `ActionUsageBody`, `ConstraintDefBody`, `VariantUsage` and
+    KerML classifier declarations projected as contentless markers or bare element counts, so
+    every member they owned was invisible to the end-to-end contract -- a part usage among them.
+    All now match their members exhaustively. `ItemDef`, `AttributeDef`, `MetadataDef`,
+    `MetadataUsage`, `ConstraintDef` and `ConstraintUsage` project their declaration and body
+    instead of a marker. `tests/snapshots/sysml/part_usage_prefix_owning_scopes.md` shows all
+    fifteen scopes, with the repeated member byte-identical across every one.
+  - **A contentless projection is not a neutral placeholder: it disables the gates that run
+    through it.** Making `ConstraintDefBody` visible immediately failed the round-trip check on
+    Systems Library `Constraints.sysml`, which had been passing by comparing two markers.
+    `abstract constraint def ConstraintCheck` had been losing its `abstract`, and `ref constraint
+    self : ConstraintCheck :>> BooleanEvaluation::self;` had been coming apart into a bare
+    `'ref';` expression plus a separate usage. `ConstraintUsage` therefore carries
+    `prefix: OccurrenceUsagePrefix` -- the fifth family on that seam, purely additive -- and
+    `ConstraintDefinition` carries the `is_abstract` the shared definition-prefix helper already
+    parsed and had nowhere to put. Audit: `planning/constraint-usage-prefix-matrix.md`.
+  - **`part p;` in a calculation-shaped body** -- `calc def`, `calc` usage, `constraint def`,
+    `constraint` usage, and this crate's KerML type bodies, which share the container -- fell
+    through to the terminal expression arm and came apart into `'part';` plus `p;`, with no
+    diagnostic and a round trip that wrote both back out. `CalculationBodyItem -> ActionBodyItem
+    -> NonBehaviorBodyItem -> StructureUsageMember` admits a `PartUsage`; both scopes now dispatch
+    one, and their keyword guards look past `MemberPrefix` so `private ref constraint hidden;` is
+    claimed rather than shredded.
+  - **An incomplete `#` extension keyword swallowed the member behind it.**
+    `PrefixMetadataUsage`'s `OwnedFeatureTyping` is a `[QualifiedName]`, whose segments are
+    `NAME`s, and a reserved keyword is never a `NAME` -- but the `#` head parsed one anyway, so
+    `# part incompleteExtension : Engine;` became a fabricated reference named `part` plus a
+    separate member. Now refused with the exact authored span and no reference allocated at all.
+    Scoped to the `#` head alone; every other reference keeps the existing lexer, because a type
+    reference, a subsetting target and an expression path all legitimately reach reserved words.
+    A quoted name is never a keyword, so `#'part'` remains valid.
+  - **`then` before an occurrence usage member.**
+    `SourceSuccessionMember : FeatureMembership = 'then' ownedRelatedElement += SourceSuccession`
+    (BNF 597) precedes the membership, which precedes the prefix. `PartUsage` carries
+    `then_span: Option<Span>` -- not a prefix slot -- and `OccurrenceUsage::is_then`, a `bool`
+    that kept no provenance for the same keyword, moves to the same shape. That closes the last
+    diagnostic on `training/28. Individuals/Individuals and Roles-1.sysml`.
+  - Still open, recorded rather than assumed closed: `perform` bodies have no recovery starter
+    table; `variation`/`individual`/extension keywords on a *definition* prefix await the
+    `OccurrenceDefinitionPrefix` component; `ordered`/`nonunique` on a constraint usage has no
+    field, so it is still lost on emission and no round-trip check can see it.
+
+- **`PartUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`.** Audit and evidence:
+  `planning/part-usage-prefix-matrix.md`. **AST version 169 -> 170.**
+
+  - `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623), so `PartUsage` carries one
+    `prefix: OccurrenceUsagePrefix` -- the same component `OccurrenceUsage`, `ItemUsage` and
+    `SatisfyRequirementUsage` already carry -- and the six fields that stood in for it are
+    **removed**: `usage_prefix`, `is_individual`, `is_reference`, `direction`, `is_derived`,
+    `is_constant`. Between them they kept no authored span and represented neither a `PortionKind`
+    nor a `UsageExtensionKeyword`. This is a breaking public AST and serialized-shape change; a
+    consumer reads `usage.prefix.basic.ref_prefix.direction`, `usage.prefix.individual_span` and so
+    on, each of which is the authored keyword's span rather than a boolean beside one.
+  - **Pinned corpus syntax that did not parse before.** `snapshot part vehicle_1_t0 { … }` and
+    `timeslice part …` reached recovery (`training/28. Individuals/Individuals and Roles-1.sysml`,
+    `Individuals and Snapshots Example.sysml`); `#logical part vehicleLogical : Vehicle { … }`
+    became a metadata member plus a separate unprefixed usage (`Vehicle Example/SysML v2 Spec
+    Annex A SimpleVehicleModel.sysml:487`); and at package scope a part usage accepted no
+    direction, no `derived` and no `constant`, because `part_def_or_usage` parsed one prefix and
+    shared it between `PartDefinition` and `PartUsage` -- two different productions
+    (`OccurrenceDefinitionPrefix` vs `OccurrenceUsagePrefix`). It now tries `part_def`, which
+    requires `def`, and falls back to `part_usage`, each reading its own `MemberPrefix` and its
+    own prefix. `ref part def P;` is consequently no longer read as a usage *named* `def`.
+  - **`ref part …` is a `PartUsage` everywhere.** `ReferenceUsage`'s `Usage` opens with an
+    `Identification` whose name is a `NAME`, and `part` is a reserved keyword, so `ref part c : C;`
+    was never a `ReferenceUsage`. Attribute, item, metadata and use-case bodies read it as a
+    `RefDecl` because `connector::ref_decl` ran first; those scopes now give the part-usage parser
+    first refusal through `occurrence_prefix::starts_contended_prefix`, as part, occurrence,
+    action and connection bodies already did. `connector::ref_decl` keeps every other kind it
+    models, and no `*_def`-before-`*_usage` ordering moves: `abstract part def P { … }` still
+    reaches `part_def`.
+  - **`snapshot`/`timeslice` are a prefix slot, not a production selector.** The package grammar
+    table classified them as selecting `OccurrenceDefinition | OccurrenceUsage`, which skipped the
+    part dispatch entirely. They are a `PortionKind` that every occurrence-usage family spells, and
+    select `PortionUsage` only when no kind keyword follows.
+  - **Recovery starter tables** gained the FIRST tokens each scope lacked, so a malformed member
+    before a prefixed part usage synchronizes at the first prefix token instead of scanning to
+    `part` and consuming the usage: `ATTRIBUTE_BODY_STARTERS`, `METADATA_BODY_STARTERS`,
+    `CONNECTION_DEF_BODY_STARTERS`, `USE_CASE_BODY_STARTERS`, `ACTION_BODY_STARTERS`.
+  - **The semantic projection is complete in every scope that reaches it.** `write_part_usage`
+    showed a name, a typing and two multiplicity modifiers, and in ten of the thirteen owning
+    scopes only a contentless `(part-usage)` marker. It now names the whole prefix, the short
+    name, the typing, the multiplicity and its modifiers, subsets, redefines, the value and the
+    body, through one member entry point, so identical syntax projects identically wherever it is
+    written.
+  - **Emission** streams `PartUsage::prefix` through `emit_occurrence_usage_prefix`, the typed
+    boundary the migrated families already use, and stops emitting a stranded space after `part`
+    for the anonymous target-only forms (`ref part  :>> elements : SparePart;`).
+  - Coverage: `tests/snapshots/sysml/part_usage_prefix_alternatives.md`,
+    `..._owning_scopes.md`, `..._recovery.md`, `..._unterminated.md`, and
+    `tests/part_usage_prefix_owning_layer.rs` for arena rollback, strict/editor equivalence,
+    round-trip idempotence and validated-envelope rejection.
+  - Deliberately **not** done, with grammar evidence in that matrix §11: no other usage family
+    moves; `then` (`SourceSuccessionMember`) is not added to `PartUsage`, so `then snapshot part
+    …` is still a recovery node; `end part` (Pilot-only, newer than the 2026-04 pin) is not
+    accepted; `calc def` body dispatch is not widened; `item def`/`attribute def`/occurrence
+    body/action usage body/`variant` projections are still contentless markers of their own; and
+    `metadata_keyword_head` still accepts a reserved keyword as a reference segment.
+
+- **Three pre-existing gaps the occurrence-prefix seam surfaced but did not own.**
+
+  - A `connection def` body is an ordinary `DefinitionBody`, so it owns occurrence usages and
+    succession usages like any other; neither could be *emitted*, which made it the one legal
+    owning scope of those families with no round trip. Systems Library
+    `Domain Libraries/Cause and Effect/CausationConnections.sysml` writes both.
+    `tests/snapshots/sysml/connection_def_body_occurrence_and_succession.md` pins them.
+  - `ViewDef` projected as a contentless `(view-def)` marker in all three scopes that own one, so
+    a snapshot could show neither the declaration, nor `abstract`, nor the subclassification
+    clause, nor a single body member -- a `view def` was the one definition family whose entire
+    contents were invisible to the end-to-end contract. `view_def_body_members.md` now shows them.
+  - Two `CANONICAL_OUTPUT_DEBT` pins claimed formatter debt that no longer exists
+    (`sysml/ref_declaration_scopes.md`, `spec42/sysml.library/derivation_connections.md`), and the
+    first had additionally drifted out of sync with its own fingerprint, which is what made the
+    snapshot driver's exemption test fail. Both are removed. The test that guarded one hard-coded
+    path is now driven by the table itself and checks each entry both ways -- that it still
+    matches its fixture, and that it would not survive a change to it -- so neither a dead pin nor
+    a drifted one can go unnoticed again.
+
+- **One shared, typed `OccurrenceUsagePrefix`, and three families migrated onto it.** Audit and
+  evidence: `planning/occurrence-usage-prefix-matrix.md`. **AST version 168 -> 169.**
+
+  - `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')? PortionKind?
+    UsageExtensionKeyword*`, over `BasicUsagePrefix = RefPrefix ('ref')?` and `RefPrefix =
+    FeatureDirection? 'derived'? ('abstract'|'variation')? 'constant'?`. Every production that
+    spells this prefix spells all of it in this order, so the components are shared rather than
+    re-declared per family. The nesting is the grammar's own, so a later migration of `UsagePrefix`
+    or `ControlNodePrefix` reuses the exact sub-component its production names instead of a
+    superset that would make `ref merge m;` representable.
+  - The three mutually exclusive slots -- `in`/`out`/`inout`, `abstract`/`variation`,
+    `snapshot`/`timeslice` -- are one optional field holding an enum each, so an illegal
+    combination is unrepresentable rather than validated away. The four independent modifiers are
+    `Option<Span>`: presence is the property, so no second boolean can drift from the authored
+    span, and emission writes each keyword because the author did.
+  - `OccurrenceUsage` loses `direction`, `is_abstract`, `is_constant`, `is_reference`,
+    `is_individual` and `portion_kind`; `ItemUsage` loses `is_derived`, `usage_prefix`,
+    `is_constant`, `direction` and `is_individual`. Both carry `prefix` instead.
+    `SatisfyRequirementUsage` gains `prefix` and the `MemberPrefix` visibility it never modelled.
+    `OccurrencePortionKind` moves module but keeps its name; `DefinitionPrefix` gains `Copy`;
+    `RefPrefix`, `BasicUsagePrefix`, `OccurrenceUsagePrefix` and `UsageExtensionKeyword` are new
+    public types.
+  - Five parsers become one. `occurrence_usage`, `individual_usage`, `snapshot_usage`,
+    `timeslice_usage`, `then_timeslice_usage` and `directed_occurrence_usage` each accepted a
+    different subset of the prefix in a different order; `ItemUsage`'s `directed_item_usage` twin
+    is gone for the same reason. What that makes parse, all of it in the pinned corpus and all of
+    it previously a recovery node: `individual snapshot s : Ind;` and `individual timeslice t3 :>
+    ind;` (`Simple Tests/OccurrenceTest.sysml`), `in individual :>> testVehicle : TestVehicle1 {
+    … }` (`training/34. Verification`), `derived` and `variation` on any occurrence usage, `in
+    item;`, and every prefix at all on a satisfy usage.
+  - `ref individual item :>> driver : Alice;` (`training/28. Individuals/Individuals and Time
+    Slices.sysml:10`) was read as an occurrence usage *named* `item` and re-emitted as `ref
+    individual 'item' : Alice :>> driver;`. `item` is `ItemUsage`'s kind keyword; a reserved
+    keyword is never an unquoted declaration label, and the keyword-less spellings now refuse it.
+  - `UsageExtensionKeyword*` is the prefix's last slot, so a `#tag` run followed by a migrated
+    head is that usage's prefix rather than a sibling `PrefixMetadataMember`. `ReferenceUsage` and
+    a standalone `PrefixMetadataMember` share two of the prefix's FIRST tokens and run first in
+    several scopes; the migrated families now get first refusal when the prefix run reaches a
+    `ref` or a `#`, which also stops `derived ref item x;` from being read as an anonymous
+    `ReferenceUsage` named `item`.
+  - Recovery starter tables gain the FIRST tokens the prefix adds (`constant`, `derived`, `in`,
+    `inout`, `out`, `variation` and, for the satisfy scopes, the whole set), so a malformed member
+    before a prefixed usage no longer scans past the prefix and consumes it.
+  - Deserialization rejects a prefix keyword span that covers the wrong token, a direction or
+    portion claiming the wrong alternative, slots written out of the production's order, a sigil
+    that is not a `#`, an extension identity with no arena entry, and a keyword belonging to a
+    different member.
+  - A `connection def` body could not re-emit an occurrence usage at all; it can now. An anonymous
+    declaration (`ref individual :>> driver : Alice;`) no longer strands the keyword's trailing
+    space before a clause that brings its own.
+
+- **Closed the remaining verified parser-owned gaps from the spec42 upstream audit.** KerML
+  feature bodies now dispatch the complete pinned `MetadataFeature` production, retaining ordered
+  `#` prefixes and the authored `@`/`metadata` introducer instead of lowering `metadata` as an
+  expression operand. Anonymous `:>`/`:>>` bindings no longer fabricate declaration names.
+  Connection-, interface-, flow-, and allocation-definition prefixes retain `abstract` and
+  `individual`. Requirement bodies accept nested requirements, bare requirement usages, ports,
+  allocations, and framed concern declarations. Missing multiplicities, `PartUsage.nonunique`,
+  and usage short names are retained and emitted. Enumerated values now retain their full usage
+  identification, initializer, aggregate span, and body. The semantic snapshots cover each
+  owning scope. Claims for `that`, direction-plus-`end`, trivia comments, and
+  `readonly`/`variable`/authored-`unique` were rejected after comparison with the pinned 2026-04
+  grammar and sibling Pilot grammar because those claimed productions do not exist. **AST version
+  167 -> 168.**
+
+- **`SatisfyRequirementUsage` is modelled from its pinned production: typed alternatives, a real
+  `RequirementBody`, and no fabricated `by`.** Audit and evidence:
+  `planning/satisfy-requirement-usage-matrix.md`. **AST version 166 -> 167.**
+
+  - `SatisfyRequirementUsage = OccurrenceUsagePrefix 'assert' ( isNegated ?= 'not' ) 'satisfy'
+    ( OwnedReferenceSubsetting FeatureSpecializationPart? | 'requirement' UsageDeclaration )
+    ValuePart? ( 'by' SatisfactionSubjectMember )? RequirementBody`. The two requirement clauses
+    are mutually exclusive syntax, so they are a `SatisfiedRequirement` enum -- `Reference {
+    reference }` or `Declaration(Node<InlineRequirementDeclaration>)` -- rather than an
+    expression beside an `Option`. `Satisfy` and `InlineSatisfyRequirement` are removed.
+  - `InlineSatisfyRequirement.name: String` is gone. The inline declaration holds the
+    `Identification` node the rest of the parser uses for declaration labels, span-backed by its
+    `Node`, and the parser no longer parses the *same* text as both a name and a qualified
+    reference: `satisfy requirement myReq : T` used to allocate an arena reference for the
+    declaration label `myReq` and store it as `Expression::FeatureRef`.
+  - When `by` was absent the parser cloned the satisfied requirement into the target field, and
+    the emitter printed ` by ` unconditionally -- so `satisfy 'system structure perspective';`
+    re-emitted as `satisfy 'system structure perspective' by 'system structure perspective';` and
+    `satisfy requirement sv : SafetyViewpoint;` as `… by sv;`. `subject:
+    Option<Node<SatisfactionSubject>>` is absent when nothing was authored, and emission writes
+    `by` only when it is present. There is no mirror flag.
+  - `assert` was parsed and discarded, so `assert satisfy r by q;` re-emitted without it. It is
+    now `assert_span: Option<Span>` beside `not_span`, each keeping its authored token; `is_negated`
+    is gone. `assert satisfy` and `assert not satisfy` also parse at package scope now, where
+    `assert` had selected `AssertConstraintUsage` and nothing else
+    (`Simple Tests/RequirementTest.sysml:27`).
+  - The body is `RequirementBody` -- `Body<RequirementDefBodyElement>` -- not `ConstraintDefBody`.
+    `subject`, `require`/`assume`, `frame`, `actor`, `stakeholder`, a nested `requirement` usage
+    and a nested satisfy usage are members of it; a constraint body could represent none of them,
+    so `satisfy Requirements::engineSpecification by vehicle_b.engine { requirement … :>> … { … } }`
+    (`Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml:652`) parsed as three
+    unrelated fragments. `RequirementDefBodyElement` gains a `Satisfy` variant, which also makes
+    `requirement def R { satisfy … }` parse.
+  - `OwnedReferenceSubsetting` and `FeatureChainMember` are references, not expressions. Both the
+    satisfied requirement and the `by` subject are now one arena-backed reference with typed
+    `::`/`.` separators. Parsing them as expressions corrupted emission: `satisfy r by p.q::s;`
+    re-emitted as `… by p.q::s::s;` and `satisfy r [1] by p;` -- a `MultiplicityPart` -- as
+    `satisfy r ['1'] by p;`. `FeatureSpecializationPart?` and `ValuePart?` are now parsed on both
+    alternatives, and a KerML `intersects` clause, which is not one of this production's
+    `FeatureSpecialization`s, is refused instead of parsed and discarded.
+  - `SatisfyViewMember` is removed. A view usage body reaches the one satisfy production through
+    `ViewBodyItem -> DefinitionBodyItem -> ... -> BehaviorUsageElement`; the separate node it used
+    to own held a bare viewpoint reference and a `RelationshipBody`, so `satisfy VP by w;` and
+    `assert satisfy VP;` in a view body were recovery text and a braced body could hold only
+    annotations.
+  - The semantic snapshot projection showed a contentless `(satisfy)` marker in five scopes and a
+    viewpoint-only form in view bodies -- neither the prefixes, the alternative, the `by` clause,
+    nor any body member was observable, and the usage's references never appeared in the
+    document's reference list. It now projects every field.
+  - Deserialization validates the new provenance: the `assert`, `not`, `satisfy`, `requirement`
+    and `by` spans must each cover their own token inside their own node, and the prefixes must
+    appear in the order the production fixes.
+  - Requirement bodies now synchronize recovery on the next member's starter keyword rather than
+    on the next `;`, which a malformed member with no terminator of its own used to borrow from
+    the valid member after it. This is the boundary part definition and usage bodies already used,
+    and it matters here because a satisfy usage owns a requirement body.
+  - `UsageHeader` gains `typing: Option<Node<TypingRelationship>>` so a scope whose emitter must
+    reproduce the authored `Typings` spelling and every target no longer has to settle for the
+    first `type_reference`.
+  - Recovery synchronizes on `assert` and `not`, not only on `satisfy`. All three are FIRST tokens
+    of one production, but the starter tables listed only `satisfy` -- and `VIEW_DEF_BODY_STARTERS`
+    did not list even that -- so in every wired scope a malformed member before a prefixed satisfy
+    usage scanned past the prefix and consumed the whole usage, terminator included. The tables now
+    carry every accepted leading keyword. One consequence at package scope: the malformed
+    `not valid` in `recovery_references.md` now reports `missing_semicolon` rather than
+    `unexpected keyword \`not\``, at the same span and with the same recovered content.
+  - A comment between the production's keywords is trivia again. `assert /* why */ satisfy r by p;`
+    failed because the separator after `assert` was `ws1`, which consumes whitespace but stops at
+    `/`, leaving the comment in front of `satisfy`; the shared keyword token now separates with
+    `ws_and_comments`. A keyword *abutting* a comment (`satisfy/* c */ r`) is still rejected by the
+    crate-wide keyword-boundary predicate, exactly as `part/* c */ a;` is.
+
+- **The `@` and `#` metadata sigils are typed and source-backed; the last opaque annotation node
+  and `ConnectBody` are gone.** Audit and evidence: `planning/metadata-sigil-matrix.md`.
+  **AST version 165 -> 166.**
+
+  - `MetadataFeatureDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping`
+    ends at a *required* typing, so the last qualified name after `@` is the type and anything in
+    front of the separator is a declared name. `MetadataAnnotation` had this inverted -- the head
+    was a `QualifiedReferenceId` and the type an `Option` -- so `@t : Tag` allocated an arena
+    reference for the declaration label `t`. It now holds `declared_name:
+    Option<Node<MetadataDeclaredName>>` beside a required `type_reference`, and the `typed by`
+    spelling parses and round-trips instead of only `:`.
+  - `PrefixMetadataFeature = OwnedFeatureTyping`, which is `[QualifiedName]`, so what follows `#`
+    is a reference. `MetadataKeywordUsage` stored it as `keyword: String` -- a copied `NAME`, so
+    `#ISQ::mass` truncated to `ISQ` -- alongside `type_reference` and `about_targets` fields no
+    `#` production can produce. It is now `hash_span` + `reference: QualifiedReferenceId` +
+    `body: Option<AttributeBody>`, and those three fields are removed. `#Tag about X;` is no
+    longer accepted: no production spells it.
+  - The legacy `Annotation` type and `AnnotationHead`, including `AnnotationHead::Opaque(String)`,
+    are removed with their parsers (`annotation`, `hash_annotation`) and their variant on eight
+    body-element enums. Its `@` branch was unreachable -- `annotating_member` won first at every
+    dispatch site -- and its `#` branch captured everything to the next `;`/`{` as opaque text.
+    `#refinement dependency PerformCrewIngress to …;` in an action or requirement body was one
+    such node, with neither endpoint reaching the reference arena; `ActionBodyItem →
+    NonBehaviorBodyItem → DefinitionMember → DefinitionElement → Dependency` admits it, so both
+    scopes now dispatch `Dependency` and the tag is a separate typed sibling.
+  - `ConnectBody`, `connect_body` and `OpacityKind::OpaqueConnectBrace` are deleted.
+    `Bind` was its last owner besides `Annotation`, pairing the `Semicolon | Brace` marker with a
+    separate `body_elements` list -- one body fact in two fields, with an authored `{}`
+    indistinguishable from a `{ … }` whose members were discarded. `Bind.body` is a
+    `PartUsageBody`, matching `BindingConnectorAsUsage`'s `UsageBody`.
+  - Six scopes modelled no `#` member at all and reported one as unsupported:
+    `OccurrenceBodyElement`, `CalcDefBodyElement`, `ConstraintDefBodyElement`,
+    `ViewDefBodyElement`, `InterfaceDefBodyElement` and `ConnectionDefBodyElement`. Each admits
+    `ExtendedUsage` through `DefinitionBodyItem → NonOccurrenceUsageMember` and
+    `PrefixMetadataMember` on any member, and each now has a typed `MetadataKeywordUsage` variant.
+  - Recovery splits `#`/`@` into two states that were one. A sigil followed by something that can
+    begin a qualified name keeps `unsupported_annotation_syntax` (warning,
+    `UnsupportedGrammarForm`); a sigil with no reference behind it -- `#;`, `@ ;`, `#::x` -- is
+    the new `malformed_annotation_head` (error, `ParseError`). Valid-but-unsupported and malformed
+    were previously indistinguishable in both the recovery node and the diagnostic.
+  - The semantic snapshot projection showed `(metadata-annotation)` and
+    `(metadata-keyword-usage)` as contentless markers, and an extended definition's prefixes as
+    copied strings. All three now project typed fields: the annotated type as a reference, the
+    declared name and its separator spelling, the `about` targets, and the body form.
+  - Deserialization validates the new provenance: the `@` and `#` sigil spans must cover their own
+    token inside their own node, the `OwnedFeatureTyping` span must sit inside the annotation, and
+    a `MetadataTypedBy` variant must agree with the text its span covers.
+  - `emit_identification` wrote `"> "` unconditionally, leaving a trailing space on an
+    `Identification` written with only its short-name half, which the caller then doubled against
+    whatever it wrote next (`@<short>  : Tag`). The separator is now written only between the two
+    halves.
+  - `Requirements Examples/RequirementDerivationExample.sysml` is promoted into
+    `EXAMPLES_ROUNDTRIP_PASS`: `#derivation`/`#original`/`#derive` reach the typed prefix path
+    instead of the opaque capture that swallowed the rest of the statement.
+
+- **`transition`, `satisfy` and the three interface-usage forms hold a real body; four spec
+  fixtures become formattable.** `TransitionUsage = 'transition' … ActionBody` and
+  `InterfaceUsage = … InterfaceBody`; `satisfy` paired its marker with a second element list.
+  A `transition t then next { … }` body was an opaque `ConnectBody` marker, and an opaque node
+  makes `emit_sysml` refuse the *whole document* -- so `5-State-based Behavior-1`, `-1a`,
+  `2a-Parts Interconnection` and `8-Requirements` recorded
+  `(unavailable (reason opaque-ast))` for their entire FORMAT section. All four now format, and
+  the first two are promoted into `ROUNDTRIP_PASS`. `ConnectBody` now has a single owner left,
+  the legacy `Annotation`. **AST version 164 -> 165.**
+
+- **`connect`, `allocate`, `succession` and `binding` usages hold a real body, and a braced
+  `connect` can be formatted.** All four end in `UsageBody`, and `UsageBody = DefinitionBody`, so
+  each owns the whole usage member set; all four held a `ConnectBody` marker whose brace form was
+  parsed by `advance_to_closing_brace` and kept nothing. A braced `connect` body was worse than
+  lossy: `emit_connect` aborted with `OpacityKind::OpaqueConnectBrace`, so
+  `connect a to b { doc /* … */ }` inside a part definition made the whole document
+  unformattable. Each is now a `Body<PartUsageBodyElement>` with its own delimiter spans.
+  **AST version 163 -> 164.**
+
+- **`dependency`, `expose` and the view-body `satisfy` hold a real body.** All three carried a
+  `ConnectBody` marker -- two variants, no delimiter spans -- whose brace form `expose` and
+  `satisfy` skipped wholesale, so members written inside `expose Subject { doc /* ... */ }` were
+  discarded with no node and no diagnostic and the body re-emitted as `{}`. `Dependency`
+  additionally kept the members in a second field beside the marker, one body fact in two places.
+  All three are now one `Body<RelationshipBodyElement>` with its own `;` or brace spans, sharing
+  one emitter, one traversal and one projection. Making the body real also surfaced that `expose`
+  computed its import-target span the way `import_` explicitly does not -- looking for an absent
+  `::*` consumes the trivia before a braced body, so the span claimed a trailing space.
+  **AST version 162 -> 163.**
+
+- **A `connect` statement body holds the usage member set, in one field.**
+  `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody` and
+  `UsageBody = DefinitionBody`, so `connect a to b { … }` legally holds every definition-body
+  member. The parser routed it through `relationship_body`, which admits only the annotating
+  subset, so an `attribute`, a nested `part` or a `ref` inside a connect body reached recovery.
+  `ConnectStmt` also carried the body twice -- a `ConnectBody` marker (`Semicolon | Brace`, with
+  no delimiter spans) beside a separate `body_elements` list -- which is the shape
+  `ast::Body` exists to prevent; it is now one `Body<PartUsageBodyElement>` carrying its own `;`
+  or brace spans. One of the ten `ConnectBody` owners is gone. **AST version 161 -> 162.**
+
+- **A calculation body owns its action members, and `ref calc` parses as one declaration.**
+  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, so a calculation body holds every
+  action-body member. It held none of them, and the failure was silent rather than a diagnostic:
+  the body's keyword-less `DefaultReferenceUsage` fallback read each action keyword as a feature
+  name, so `first f;` parsed as two invented members -- `'first';` and `f;` -- and formatted back
+  that way. The same fallback swallowed the `ref` of `BasicUsagePrefix = RefPrefix
+  ( isReference ?= 'ref' )?`, so `ref calc self : Calculation :>> Action::self;` in the checked-in
+  `Calculations.sysml` fixture emitted as `'ref';` on its own line followed by a `calc` usage that
+  had lost its prefix. `CalcUsage::is_reference` retains the keyword and the calculation body now
+  routes action members to the action dispatcher. Only a calculation reaches it: `calc_def_body`
+  also serves KerML type bodies, whose `TypeBodyElement` has no action-node alternative.
+  **AST version 160 -> 161.**
+
+- **A part usage body takes the view family, and a part definition body can emit it.**
+  `ViewUsage`, `ViewpointUsage` and `RenderingUsage` are usage-element alternatives and their
+  three definitions are `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits
+  all six in a part usage body exactly as in a part definition body. The part usage scope modelled
+  none of them -- `rendering r { ... }` inside `part p { ... }` reached recovery -- and the part
+  definition scope, which parsed all six, had every one of them in its emitter's `unsupported`
+  group, so a document with a nested view definition parsed and then could not be formatted.
+  **AST version 159 -> 160.**
+
+- **A declared `interface` usage with no typing parses.** `InterfaceUsageDeclaration`'s
+  `UsageDeclaration` makes the `: Type` optional and its `( 'connect' InterfacePart )?` optional
+  too, but the parser reached a name only through the typed spelling or the `connect` spelling.
+  `interface i;` and `interface i { ... }` left the name unconsumed, the body parser then failed
+  on it, and the whole member went to recovery -- while `interface i : I { ... }` parsed.
+  **AST version 158 -> 159.**
+
+- **A `flow def` can be formatted.** `FlowDefinition = OccurrenceDefinitionPrefix ( 'flow' |
+  'message' ) 'def' Definition` is a `DefinitionElement`, so it is legal at package level and in a
+  part definition or part usage body. It parsed into a complete typed node in all three, and all
+  three emitters reported it as an unsupported construct -- a document containing one parsed
+  cleanly and then could not be emitted at all. Its body is a `DefinitionBody`, the same shape
+  `emit_allocation_def` already wrote.
+
+### Added
+
+- **Two more `examples/` files round-trip.** `Simple Tests/TextualRepresentationTest.sysml` and
+  `Metadata Examples/VerificationMetadataExample.sysml` are promoted into
+  `EXAMPLES_ROUNDTRIP_PASS`: the first needed a textual representation to be dispatched in action
+  and KerML type bodies at all, the second needed `@` metadata annotations to emit from the scopes
+  that own them and a comment to keep the elements its `about` clause names.
+
+- **A comment's `about` clause is parsed instead of scanned past.**
+  `Comment = ( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )? …`, and the
+  clause was skipped with `take_until("/*")` -- a raw substring search with no bound. It ran past
+  the comment's own end, past the enclosing `}`, and through however many later declarations it
+  took to reach a block comment, discarding every one of them with no diagnostic:
+  `comment about` with no target consumed the `attribute mass;` after it, the closing brace, and
+  the whole next `part def`. The annotated elements were dropped too, and so was a `locale` that
+  followed them. `CommentAnnotation::about_targets` holds them as the qualified references they
+  are, emission reproduces them, and an incomplete clause is a recovery node with an exact span
+  that later siblings survive. Three checked-in spec fixtures get their annotated elements back.
+  **AST version 157 -> 158.**
+
+- **An `enum def` body keeps its annotating members instead of silently dropping them.**
+  `EnumerationBody` is the one production that names the membership directly -- `';' | '{'
+  ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'` --
+  and the body parser recognised `doc` and `comment` only to discard them: no node, no span, no
+  diagnostic. `rep` and `@` were not recognised at all, and on any member it could not parse it
+  ran to the closing brace and dropped everything in between, still with no diagnostic. A body
+  with four annotating members and three values parsed clean and kept two values. It now goes
+  through the shared brace-member routine, so annotating members are retained in authored order
+  beside the values and a malformed member becomes an `Error` node with an exact span that later
+  values survive. Documentation reappears in the checked-in library fixtures that had it --
+  `RiskMetadata`, `15.10-Primitive Data Types`, `documentation_in_bodies`. `EnumerationBody` is
+  now `Body<EnumerationBodyElement>` rather than `Body<EnumeratedValue>`, and the semantic
+  projection names each member instead of the definition as a whole. **AST version 156 -> 157.**
+
+- **Package bodies use the shared annotating family.** No new syntax -- this scope already
+  accepted all four -- but its four variants collapse into `Annotating(AnnotatingMember)`, so the
+  emitter, the projection and the traversal reach the production through one path here too. The
+  per-production FIRST-set guards are kept: each alternative still dispatches under its own
+  `PackageProduction` tag, so scope drift is still detected per alternative.
+
+- **Requirement, case, constraint, calculation, view and rendering bodies accept the whole
+  annotating production, and a KerML type body stops shredding a `rep`.** `RequirementBodyItem`
+  extends `DefinitionBodyItem`, `CaseBodyItem` and `CalculationBodyItem` extend `ActionBodyItem`,
+  and `ViewDefinitionBodyItem`/`ViewBodyItem` extend `DefinitionBodyItem`, so all nine scopes own
+  the production; between them they accepted eight of the thirty-six alternative-scope pairs. The
+  worst case was the KerML type body, which shares `CalcDefBodyElement`: `rep x language "text"
+  /* … */` was not dispatched at all, and the fallback member parser broke it into four invented
+  members -- `'rep'; x; 'language'; "text";` -- with no diagnostic, so the document parsed clean
+  and formatted back as something else. A constraint or calculation body containing an `@`
+  metadata annotation parsed but could not be formatted at all. **AST version 155 -> 156.**
+
+- **Action, action-usage, state and control-node bodies accept the whole annotating production,
+  and can emit it.** `ActionBodyItem` and `StateBodyItem` both start at `NonBehaviorBodyItem`,
+  which reaches `AnnotatingElement` through `DefinitionMember`, so `comment /* ... */` belongs in
+  all of them and was a parse error in all of them. The other three alternatives parsed but could
+  not be formatted: `emit_action_def_body`, `emit_action_usage_body` and `emit_state_def_body`
+  each reported a metadata annotation or a textual representation as an unsupported construct, so
+  a document was parseable and unformattable at the same time. All four now go through the shared
+  annotating emitter. Control-node bodies (`first`, `merge`, `decide`, `join`, `fork`) inherit the
+  change with the action-body member set they already share. **AST version 154 -> 155.**
+
+- **Eleven structural body scopes accept the whole annotating production.** Part, attribute, port,
+  connection, interface and occurrence definitions, port, interface and perform usages, KerML
+  feature bodies, and metadata bodies each admitted documentation and nothing else -- or, for part
+  definitions, everything but a textual representation -- while the grammar reaches
+  `AnnotatingElement` in all of them through `DefinitionBodyItem -> DefinitionMember ->
+  DefinitionElement` (`NonFeatureMember -> MemberElement` on the KerML side). They now carry
+  `Annotating(AnnotatingMember)` and dispatch through the one parser, so `comment`, `rep` and the
+  `@` metadata spelling parse, emit and traverse identically wherever the production is legal. The
+  derived evidence is `planning/annotating-member-matrix.md`. **AST version 153 -> 154.**
+
+- **A comment's keyword span is validated on deserialization.** `comment` is optional in the
+  production and its presence is the only thing separating a member from a bare block comment,
+  which reparses as trivia and disappears -- so emission reads the span, and a wire document could
+  redirect it at another comment's keyword and silently change what the document says. It is now
+  checked like a delimiter: it must slice to `comment`, and it must lie inside the comment that
+  owns it rather than merely inside the enclosing declaration.
+
+### Removed
+
+- **`DefinitionBodyElement::Doc`, which the parser could not build.** Documentation in a flow,
+  allocation or message body has always arrived as
+  `OccurrenceMember(OccurrenceBodyElement::Doc)`; the sibling variant had no construction site
+  anywhere, so it was an unreachable state in a public enum and a second representation of the
+  same syntactic fact.
+
+### Fixed
+
+- **An anonymous connection definition no longer emits a doubled space.** The trailing space was
+  written with the `connection def` keyword rather than with the identification, so
+  `#derivation connection { ... }` formatted as `#derivation connection def  {`.
+
+- **Two adjacent comment members no longer fuse into one.** A comment's optional `locale`
+  lookahead skipped block comments as trivia, so it walked past the member's own body and found
+  the *next* member's `locale`: `comment named /* two */` followed by `locale "en_US" /* three */`
+  parsed as a single comment named `named`, in locale `en_US`, whose text was ` three `. The
+  second member's text was discarded with no diagnostic. `doc_comment` had the identical
+  lookahead and is fixed with it.
+
+- **An action-body `ref` declaration keeps its kind keyword, multiplicity and `:>` clause.**
+  `action_ref_decl_inner` parsed the `action` keyword and the multiplicity only to discard them,
+  never parsed a subsetting clause at all, and ended with a skip-to-terminator that swallowed
+  whatever was left -- so `derived ref action deferred : ActionUsage :> Metadata::metadataItems;`
+  formatted back as `derived ref deferred : ActionUsage;`. **AST version 152 -> 153.**
+
+### Changed
+
+- **An empty part-usage brace body formats as `{}`.** `emit_ref_decl` already wrote that form for
+  the same `Body<PartUsageBodyElement>`, so `part p {}` and the `ref x {}` beside it disagreed.
+
+- **A `connect` statement projects its body.** It was a bare `(connect)` marker, so no snapshot
+  could show that the body holds members -- which is how the missing member set stayed invisible.
+
+- **A calculation definition projects its body.** It was a bare `(calc-def)` marker, so no
+  snapshot could show whether a calculation body member survived parsing -- which is how the
+  shredding above stayed invisible. Action members reuse the exhaustive `ActionDefBodyElement`
+  writer rather than restating it.
+
+- **A package-level part usage projects its typing and its body.** It was a bare `(part-usage)`
+  marker, so a snapshot could not show any member of `part p { ... }` written at package level,
+  and the usage's own type reference never appeared in the projection's reference table.
+  `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive element
+  match that ref bodies already used covers this scope unchanged -- nothing called it. 112 fixtures
+  gain body detail; the reference tables renumber because the table is built from what the
+  projection reaches, in the order it reaches it.
+
+- **Ref and attribute usage projections name the `RefPrefix` chain.** The semantic projection
+  recorded neither `derived`/`abstract`/`variation`/`constant` nor the direction, so a snapshot
+  could not distinguish `derived abstract constant ref attribute x` from a bare `attribute x`,
+  and the fields added for those keywords had no structural coverage at all.
+
+- **Body expressions accept undirected parameters, leading documentation, and parameter bodies.**
+  `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/ShapeItems.sysml`)
+  declares an undirected parameter, which the grammar allows and the parser required a direction
+  for; `alternatives->minimize { doc /* ... */ ... }` opens with documentation; and
+  `selectOne {in ref a { doc /* ... */ } ...}` terminates a parameter with its own documented
+  body instead of `;` (both `TradeStudies.sysml`). `CollectionOperatorParameter::direction`
+  became optional and its `semicolon_span` became a typed `terminator`.
+- **`abstract calc` keeps its keyword and its `:>` clause.** `CalcUsage` had neither field, so
+  `abstract calc subcalculations : Calculation :> calculations, subactions { ... }`
+  (Systems Library `Calculations.sysml`) emitted as `calc subcalculations : Calculation`.
+  **AST version 151 -> 152.**
+
+- **Calc usages take the `RefPrefix` and are requirement-body members.** `in calc eval :
+  EvaluationFunction { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`)
+  had no arm in requirement bodies, and `calc_usage` parsed neither the direction nor `abstract`
+  -- `CalcUsage::direction` existed but nothing ever populated it, and the `abstract` keyword was
+  consumed and dropped. Both now come from the shared `ref_prefix`.
+  **AST version 150 -> 151.**
+
+- **Occurrence bodies accept directed occurrence usages and connection usages.**
+  `directed_occurrence_usage` was dispatched only in action bodies, and it required the
+  `occurrence` keyword immediately after the direction, so `in event occurrence sourceEvent [1]
+  default that.sourceEvent;` (`sysml.library/Systems Library/Flows.sysml`) failed twice over.
+  `connection :HappensDuring connect sourceEvent to [1] self;` had no arm in this scope either.
+- **Concern usages are requirement-body members, and keep their `abstract` and multiplicity.**
+  `abstract concern concerns[0..*] :> concernChecks { ... }` (`Requirements.sysml`) was only
+  reachable at package level, and `ConcernUsage` had no field for either the keyword or the
+  multiplicity, both of which the parser consumed and discarded. **AST version 149 -> 150.**
+
+- **A brace-bodied `require` / `assume` member is a constraint-body member.** The constraint body's
+  terminal arm falls through to `expression`, which read `require viewpointSatisfactions` as an
+  expression and then could not account for the `{` that followed
+  (`sysml.library/Systems Library/Views.sysml:43`). A typed arm now precedes it.
+- **Part usage bodies accept bare end declarations.** `ref :>> outgoingTransfersFromSelf :> ...
+  { end ref source; end ref target; }` (`Ports.sysml:37`) puts connector ends in a usage body;
+  occurrence bodies already modelled the member, part usage bodies did not.
+  **AST version 148 -> 149.**
+
+- **View definition bodies accept viewpoint usages and `satisfy requirement ... by ...`.** Both
+  are parsed by the same productions package and part bodies already dispatch; this scope had no
+  arm for them (`sysml.library/Systems Library/Views.sysml`).
+- **`abstract view def` and `abstract rendering def` keep the keyword.** `ViewDef` and
+  `RenderingDef` had no `is_abstract` field, so the definition prefix parser produced the flag
+  and emission dropped it. **AST version 147 -> 148.**
+- **A subject declaration accepts a multiplicity before a trailing `:>>`.** `subject subj :
+  View[1] :>> RequirementCheck::subj;` (`Views.sysml`) failed because the redefinition was
+  parsed first and the `[1]` blocked it. Emission also placed the multiplicity after the
+  redefinition target, where it would reparse as the *target's* multiplicity; it now precedes
+  the clause, as authored.
+- **A connection end may be declared by name alone.** `end ref source;` (`Ports.sysml`) has no
+  typing, reference subsetting or nested usage, and every branch of `end_decl` required one of
+  those.
+
+- **Nested case usages are members of case-family bodies, and keep their declaration tail.**
+  `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (`sysml.library/Systems
+  Library/Cases.sysml:56`) and its `use case` / `verification` siblings had no member arm in these
+  bodies, so they were recovered text. Worse, the parsers that did handle them elsewhere ran
+  `usage_header` and then skipped to the body with `take_until_terminator`, discarding the
+  multiplicity and, for `UseCaseUsage`, the subsets targets. All three now parse a real feature
+  usage header; `CaseUsage`, `VerificationCaseUsage` and `UseCaseUsage` gained the fields to
+  hold it. `Simple Tests/VerificationTest.sysml` round-trips as a result.
+  **AST version 146 -> 147.**
+
+- **A `return` declaration keeps a `:>>` clause written after its type.** `return verdict :
+  VerdictKind :>> result;` (`sysml.library/Systems Library/VerificationCases.sysml:22`) only had
+  a path for the leading anonymous form (`return :>> result;`), where the target stands in for
+  the declaration name; a trailing clause on a named declaration was recovered text.
+  `CaseReturnDecl` gained a `redefines` field, and the semantic projection shows it, so a
+  regression that dropped it would be visible in the AST rather than only in the emitted string.
+  **AST version 145 -> 146.**
+
+- **Two more members that had nowhere to go.** `RefDeclKind` gained `case` and `verification`
+  (`ref case self : Case :>> Calculation::self;`, `sysml.library/Systems Library/Cases.sysml`),
+  matched after the two-word `use case` keyword so that form still wins. Part usage bodies gained
+  the `InOutDecl` member that port and action bodies already had, so the keyword-less `in :>>
+  MessageTransfer::payload, MessageAction::payload;` inside a `ref` body
+  (`Actions.sysml`) is structured rather than an unexpected keyword. **AST version 144 -> 145.**
+
+- **The `in`/`out`/`inout` direction is part of the shared `RefPrefix`.** BNF
+  `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?` puts the
+  direction first, but it was parsed ad hoc by a few callers, so `in ref alternatives :
+  Anything[1..*] { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`) had no
+  path in the scopes that had not hand-rolled one. It is now a slot of the shared prefix, and
+  `RefDecl` finally records it instead of hardcoding `None`. One consequence: `out attribute
+  :>> a_out : T = v;` is now the `AttributeUsage` its `attribute` keyword says it is, carrying
+  the direction on `AttributeUsage::direction`, rather than an `InOutDecl`; the keyword-less
+  `in x : Real;` is still an `InOutDecl`.
+
+- **Occurrence-style definition bodies no longer swallow members behind a visibility prefix.**
+  `DefinitionBody` -- shared by `flow def`, `occurrence def`, `allocation def` and the rest --
+  tried its opaque unsupported-member capture *before* the structured dispatch, the reverse of
+  every other body. Any member starting with `private`, `ref`, `abstract`, `in` or `connection`
+  was captured whole even when the parser directly below handled it, so `private attribute
+  seBeforeNum : Natural[1] = ...;` (`sysml.library/Systems Library/Flows.sysml`) was
+  unsupported grammar while the same line without `private` parsed. These bodies also now
+  dispatch `ref` members. **AST version 143 -> 144.**
+
+- **`ref` members are accepted in every body whose grammar allows them.** Five scopes never
+  dispatched `connector::ref_decl` at all -- port definitions, requirement definitions, view
+  definitions, rendering definitions and view usages -- so `ref self : Port :>> Object::self;`
+  (`sysml.library/Systems Library/Ports.sysml`) and its siblings were captured as unsupported
+  grammar even though the same member parsed one scope over. `RefDeclKind` also gained the
+  `concern`, `viewpoint`, `rendering`, `view` and `action` keywords, each from a library line
+  that previously had nowhere to go. **AST version 142 -> 143.**
+
+- **The `RefPrefix` modifier chain is accepted on every usage that allows it.** BNF `RefPrefix
+  = 'derived'? ('abstract' | 'variation')? 'constant'?` may precede any usage keyword, but each
+  parser had hand-rolled whichever subset it happened to need, so a legal prefix was a parse gap
+  in the scopes that had not adopted it. `derived ref item receiverArgument : Expression[0..1]
+  subsets Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml`) and every one
+  of its 190 siblings fell through to unsupported-grammar capture. The chain is now parsed in
+  one place (`parser::usage::ref_prefix`) and used by all four `RefDecl` parsers plus
+  `item_usage` and `attribute_usage`. `RefDecl` and `ItemUsage` gained `is_derived`,
+  `usage_prefix` and `is_constant` to hold it; `ItemUsage::is_abstract` became `usage_prefix`,
+  which can also represent the `variation` alternative. **AST version 141 -> 142.**
+- **A repeated specialization clause keeps every target.** Writing a subsetting-family clause
+  kind twice in one header (`subsets parameter, usage subsets Metadata::metadataItems`) kept
+  only the last clause, dropping the earlier targets with no diagnostic. Repeated clauses now
+  accumulate into the one relationship they describe, and its span covers every authored
+  fragment.
+- **The `abstract` prefix on a `ref` declaration survives emission.** It was parsed and
+  discarded because `RefDecl` had nowhere to put it, so `abstract ref :>> trailerHitch[1];`
+  formatted as `ref :>> trailerHitch;`.
+- **One emission order for the `RefPrefix` keywords.** The part, port and attribute emitters
+  each spelled the chain inline and had drifted into three different orders, so `derived
+  abstract x` could come back out as `abstract derived x`.
+
+### Added
+
+- **`ast::Body<E>`, one container for every declaration body.** Twenty-seven per-family body
+  enums -- `PackageBody`, `PartDefBody`, `ActionDefBody`, and the rest -- were the same two
+  alternatives written out again for each scope: `;` or `{ member* }`. They are now type
+  aliases for one generic container, so the shape is stated once while the member set stays
+  typed per scope: `Body<PartDefBodyElement>` and `Body<ActionDefBodyElement>` remain different
+  types and a member still cannot appear in a scope whose grammar does not accept it. The
+  container carries shared accessors (`is_semicolon`, `braced_elements`, `members`), and
+  `braced_elements` returns `None` for a semicolon body so the `;`/`{}` distinction stays
+  visible rather than flattening to an empty list.
+- **One owning AST traversal boundary: `ast::visit`.** `ast::visit::Visitor` (borrowing) and
+  `ast::visit::mutable::VisitorMut` (in-place transformation) cover every node reachable from
+  `RootNamespace`. Both expand from a single inventory that destructures every struct without
+  `..` and matches every enum without `_`, so a new field or variant is a compile error at the
+  traversal until a deliberate decision is made about it -- and neither traversal direction can
+  drift from the other. Consumers implement only the node kinds they have a rule for; the
+  default methods walk children.
+
+### Added
+
+- **Body delimiters are retained.** `Body::Semicolon` keeps the `;` span and `Body::Brace` keeps
+  both brace spans, captured where the parser consumes them rather than recomputed. The one
+  hand-rolled reconstruction of those positions (arithmetic over consumed lengths, in the
+  `first`/`merge` body) is gone, and the shared brace-member routine now returns the delimiters
+  along with the members, so no scope has to consume `{` and `}` correctly on its own. There is
+  Deserialization validates them against the tree, not just against themselves: a delimiter must
+  slice to the token it claims, lie inside the declaration that owns it, and -- for a brace pair --
+  wrap that body's own members in order. Pointing a body's delimiters at another well-formed
+  `{ ... }` pair elsewhere in the document is therefore rejected. The traversal grew `enter_node`
+  and `leave_node` hooks so a consumer can tell which declaration it is inside. Both alternatives require an authored token, so the container cannot represent a
+  declaration with no body at all; the two places that accept one -- a `#Name` metadata keyword
+  used as a prefix, and an action usage whose terminator is inferred -- hold `Option<Body<_>>`,
+  which confines that state to them instead of offering it to every scope. There is deliberately
+  no state for a missing closing brace: an unterminated body does not currently
+  produce a body at all -- the enclosing declaration becomes a recovery node -- so a typed close
+  outcome would be an unreachable variant until recovery can retain the members it read.
+- **`ast::AnnotatingMember`, the grammar's annotating production as one type.** `AnnotatingElement
+  = Comment | Documentation | TextualRepresentation | MetadataFeature` is a single production in
+  both the KerML and SysML grammars, so the scopes that accept all of it -- relationship bodies
+  and `ref` bodies -- now hold one `Annotating(AnnotatingMember)` variant instead of four parallel
+  ones. One parser dispatches the production, one emitter renders it, and a `ref` body reuses both
+  directly rather than translating relationship-body members into its own. Scopes that accept only
+  part of the production keep their own variants until the parser supports the rest, so the type
+  never claims coverage the parser lacks. `#Name` prefix metadata stays separate: it is
+  `PrefixMetadataMember`, a prefix on a declaration rather than a body member.
+
+### Changed
+
+- **`ref` declarations project their structure in semantic snapshots.** Every scope rendered one
+  as a bare `(ref)` marker, so the snapshot could not show which members a `ref` body held, in what
+  order, or with what typing -- the invariant that one `ref` body parser exists to guarantee. One
+  projection now serves every owner, recursing into nested `ref` declarations, and reference
+  labels appear for the identities inside them, which were previously absent from the snapshot's
+  reference list entirely.
+
+### Fixed
+
+- **AST equality compares authored syntax that emission depends on.** Three hand-written
+  `PartialEq` impls excluded fields that are not provenance: `AttributeUsage` ignored the `ref` and
+  `abstract` prefixes, `RefDecl` ignored its direction, and `TypingRelationship` ignored whether the
+  author wrote `:>` or `specializes`. All three drive emitted output, so a formatter that dropped or
+  swapped one would have passed every whole-AST comparison in the suite -- including the round-trip
+  tests whose purpose is to catch exactly that. Span exclusion is unchanged: position is still not
+  identity.
+- **A constraint body accepts a feature declaration.** `constraint c { mass : Real; }` parsed
+  `mass` as a bare expression and left `: Real;` for recovery, which the opaque capture then hid.
+  A constraint definition body is a `DefinitionBody`, so it owns usages as well as the constraint
+  expression. Two more release examples now round-trip: `Analysis Examples/Dynamics.sysml` and
+  `Simple Tests/ConstraintTest.sysml`.
+- **A redundant `;` between body members is separator punctuation.** It reached the member parser
+  and was reported as unrecognized content; it is now consumed where members are collected.
+- **An import with a braced body could not be serialized.** Its target span ran past the reference
+  to wherever suffix parsing stopped, swallowing the whitespace before `{`, so the document failed
+  the crate's own provenance validation -- `15_10_primitive_data_types` in the snapshot corpus was
+  one. The target now ends at its last authored token. A new corpus test serializes and
+  round-trips every snapshot document, so provenance is checked against every construct the parser
+  handles rather than a handful of fixtures.
+- **Emission no longer invents a `;` for a body that was never written.** A `#Name` prefix on a
+  declaration and an action usage whose terminator the parser infers both stored their absent body
+  as the semicolon form, so formatting wrote a `;` the author never typed -- splitting
+  `#situation x : T;` into two members and `action a accept M via v;` into a member plus a stray
+  clause. `MetadataKeywordUsage::body` and `ActionUsage::body` are now `Option`, keeping "no body
+  was written" distinct from "a semicolon was written" without adding that state to every scope.
+- **The brace-less `if` branch keeps its authored spelling.** `if x then y;` was stored as a
+  one-member brace body and re-emitted as `if x  { then y; }` -- braces the author never wrote,
+  plus a doubled space. `ActionBranchBody` distinguishes the two spellings the grammar offers, so
+  each is emitted as authored.
+- **A `ref` body no longer depends on which declaration owns it.** `UsageBody = DefinitionBody`
+  (SysML 8.2.2.6.2), so a `ref` body holds the general usage-member set wherever it appears -- but
+  five parsers built one, each accepting its own member grammar and wrapping the result in a
+  per-owner variant, so `RefBodyElement` recorded which parser had run rather than what the grammar
+  allows. There is now one parser. A connection-owned `ref` body gains the usage members it was
+  rejecting (`assert constraint { ... }` in `john_individual_example` parses instead of reporting
+  `unexpected keyword 'assert' in ref usage body`), and part-, action-, and state-owned `ref`
+  bodies can be emitted at all -- their members previously failed emission as unsupported
+  constructs. Recovery diagnostics still name the `ref` body scope.
+- **Comment and textual-representation members now parse in usage bodies.** The general
+  usage-member scope accepted only two of the four annotating alternatives, so `comment /* ... */`
+  and `rep x language "..." /* ... */` were rejected inside a `part p { ... }` body even though the
+  grammar admits the whole `AnnotatingElement` production wherever a definition body is legal. It
+  now uses [`AnnotatingMember`], which brings all four. `#Name` prefix metadata stays a separate
+  member, as the grammar has it.
+- **An anonymous `comment` member survives format and reparse.** `CommentAnnotation` did not record
+  whether the optional `comment` keyword was authored, so emission omitted it whenever the member
+  had no name or locale -- and a bare `/* ... */` reparses as trivia, losing the member. The
+  keyword's span is now retained and reproduced. The keyword-less spelling
+  (`locale "en" /* ... */`) is no longer given a keyword it never had, either.
+- **A `rep` member now emits from every scope that accepts one.** Three copies of the same match
+  handled annotating members in relationship bodies and disagreed: a textual representation
+  emitted from an import body but failed as an unsupported construct from alias, dependency, and
+  `connect` bodies, so whether a document could be formatted depended on which construct owned the
+  body. One production now means one emitter.
+
+### Removed
+
+- **`Other(String)` is gone from every body scope.** Eleven scopes carried a member that held a
+  copy of the source with no span, no structure, and -- deliberately -- no diagnostic. It fired
+  along two different paths, and both were backwards: unrecognized text was swallowed silently
+  while *recognized* keywords got a diagnostic, and one path decided by sniffing the raw text for
+  `:>>` or a leading `ref`/`abstract`/`return`. Content the scope cannot parse is now a recovery
+  node with its authored span and a report; a spec-valid member the scope does not model is an
+  explicit `Unsupported` node carrying a warning. The two states stay distinct, and each exists
+  only in the scopes that can produce it. `capture_opaque_member` and `OpacityKind::Other` are
+  removed with the last producer.
+
+- **Two opaque body-member fallbacks the parser cannot produce.** `PartDefBodyElement::Other`
+  and `OccurrenceBodyElement::Other` retained unrecognized member text as a string, but no
+  parser path constructed either one: recovery in those scopes already produces a malformed or
+  unsupported node with its authored span. The variants only widened the type -- and its
+  deserialized contract -- with a state that could not occur, so the emitter and opacity report
+  carried policy for it, and two integration tests asserted members had not "degraded" into it.
+  Removing them makes that guarantee structural. Token-level `BinaryOperator::Other` and
+  `UnaryOperator::Other` are deliberately kept: they classify an authored operator spelling and
+  back a total `from_token` constructor, which is narrowly scoped opaque syntax rather than an
+  untyped scope member.
+
+### Changed
+
+- **`PARSE_AST_VERSION` is now 141.** `Body` carries its delimiters: `Semicolon` holds the `;`
+  span, `Brace` holds both brace spans, and a new `Absent` variant covers a declaration that
+  never had a body to write. `IfStmt`'s branches become `ActionBranchBody`. `RefBodyElement` is
+  removed: `RefBody` is now
+  `Body<PartUsageBodyElement>`, the usage-member set the grammar gives it. `CommentAnnotation`
+  gains `keyword_span`, and
+  `PartUsageBodyElement` replaces its `Doc` and `MetadataAnnotation` variants with `Annotating`.
+  Relationship and `ref` body elements replace their `Doc`,
+  `Comment`, `TextualRep`, and `MetadataAnnotation` variants with a single `Annotating` variant
+  wrapping [`AnnotatingMember`]. `EnumerationBody`'s brace members move from `values` to
+  `elements`, matching every other body. That is the only wire change from the body-container
+  work: the shared container keeps the variant and field names the other twenty-six bodies
+  already used, so their serialized shape is unchanged. Two duplicate container names collapse
+  into the type they were always equal to -- the public `RequireConstraintBody` and a
+  parser-internal `StructuredConstraintBody`, both `Body<ConstraintDefBodyElement>`, are now
+  `ConstraintDefBody`, which also removes two conversion functions that existed only to move
+  members between identical types.
+- **Whole-tree walks now go through `ast::visit` instead of hand-maintained recursion.** Test
+  span normalization (`RootNamespace::normalize_for_test_comparison`), recovery-diagnostic
+  collection, deserialization provenance validation, and qualified-reference-identity
+  validation were four independent traversals -- roughly 4,700 lines -- that each had to be
+  edited when a member could appear somewhere new, and each of which could silently miss a
+  scope. They are now four small policies over the shared traversal (under 300 lines in total), with
+  identical diagnostics across the snapshot and fixture corpus. Reference-identity validation
+  in particular no longer routes through a no-output `serde::Serializer`; it is a typed visit.
+- **`RootNamespace::normalize_for_test_comparison` now erases every span in the tree** rather
+  than the subset the hand-written copy happened to reach, and it preserves whether an optional
+  span was authored at all. Whether a construct recorded a `language` clause or a declaration
+  name is grammar and still compares; where it was authored is provenance and does not.
+
+### Fixed
+
+- **Recovered text is no longer dropped when formatting eight recovery forms.** Malformed
+  package-body, state-body, and requirement-body members, and root-level recovery, wrapped
+  their `ParseErrorNode` in a `Span::dummy()` sentinel while the enclosing member node held the
+  real span, so the emitter had no slice to stream and silently omitted the authored text.
+  Those nodes now carry their exact authored span, and formatting a recovered document emits
+  the malformed slice at its tree position.
+
+- **`PARSE_AST_VERSION` is now 135.** `StateDefBodyElement` gains `AttributeUsage`,
+  `ActionUsage`, `SuccessionUsage`, and `AssertConstraint` variants: the Systems Library's
+  `States.sysml` state-body members (`attribute :>> isTriggerDuring;`, `action :>> subactions
+  :> middle { ... }`, `succession stateSequencing first [0..1] exclusiveStates then [0..1]
+  exclusiveStates { ... }`, `assert constraint { ... }`) now dispatch to their existing typed
+  productions instead of opaque recovery (spec42 gap 42, state-def half). `action_usage`
+  additionally accepts a leading `:>`/`:>>` specialization clause standing in for the name
+  (mirroring `attribute_usage`'s prefix heads), which also fixes the same form inside
+  part/action bodies. Emitters no longer print a double space in anonymous `action {`/`action
+  :>>`/`assert constraint {` spellings; five more release example files roundtrip.
+- **`PARSE_AST_VERSION` is now 134.** `EntryAction`/`DoAction`/`ExitAction` gain
+  `declared_name`/`type_name`/`redefines` for declaring a *new* nested action (`entry action
+  entryAction :>> 'entry';`, `do action doAction : Action :>> 'do';`, Systems Library
+  `States.sysml`) and an `effect: Option<TransitionEffect>` for `assign`/`send`/`accept`
+  effects written directly under the keyword (`entry assign counter.count := 0;`), mirroring
+  `Transition::effect` (spec42 gap 43). The reference form keeps `action_reference`.
+- **`PARSE_AST_VERSION` is now 133.** `AttributeBodyElement` gains `Bind`, `Connection`,
+  `CalcDef`, `CalcUsage`, and `ConstraintUsage` variants: named/multiplicity-qualified binding
+  members, named/typed connection usages, nested calcs, and plain (non-`assert`) constraints
+  inside attribute/item-shaped bodies now dispatch to their existing typed productions instead
+  of opaque capture (Geometry `ShapeItems.sysml`, `Time.sysml`, `Items.sysml`; spec42 gap
+  49a). `constraint_usage` additionally accepts the anonymous body-only form
+  (`constraint { expr }`).
+- **`PARSE_AST_VERSION` is now 132.** Use-case-family and variant member widening (spec42 gaps
+  44/45/46): `VariantTypedUsage` gains a `Requirement` kind (`variant requirement r1;`);
+  `UseCaseDefBodyElement` gains `InOutDecl` for the directed parameter shorthand (`in scenario
+  = cityScenario;`); `ActorUsage.type_name` becomes optional for the bare untyped actor form
+  (`actor environment;`, `actor passenger [0..4];`, OMG spec Annex A). `InOutDecl` additionally
+  gains a typed `subsets` clause: the authored `:>` spelling on a directed parameter (`out
+  voltage :> ISQ::electricPotential = ...;`) is retained as a subsetting relationship instead
+  of being silently folded into `type_name`; `ConstraintDefBodyElement::InOutDecl` is boxed
+  (wire-format neutral).
+- **`PARSE_AST_VERSION` is now 131.** The `[unit]` annotation now applies to parenthesized
+  tuples, invocation/constructor results, and feature references in expression position
+  (`(0, shape.width/2, 0)[source]`, the Domain Geometry coordinate-frame idiom; spec42 gap
+  49c) via the existing `Expression::LiteralWithUnit` shape. Previously such brackets either
+  failed the whole statement (inside argument lists) or were silently captured as a bogus
+  declaration multiplicity after the value.
+- **`PARSE_AST_VERSION` is now 130.** The bare `:>>`/`:>` shorthand (no `attribute` keyword)
+  and its metadata-body twin accept comma-separated multi-target lists like every other
+  redefinition/subsets clause (`SI.kerml`'s `kelvin`; spec42 gap 49b), and `ref` declarations
+  no longer consume the `redefines`/`subsets`/`references`/`crosses` keyword spelling of a
+  relationship clause as their declared name (`Items.kerml`; spec42 gap 49d). Anonymous
+  attribute/ref declarations also stop emitting a double space / a fabricated `''` name.
+- **`PARSE_AST_VERSION` is now 129.** The canonical anonymous flow shorthand `flow from <a> to
+  <b>;` (and its `succession flow` sibling) no longer silently misparses the `from` keyword as
+  the flow's declared name: such statements now produce `FlowUsage { name: None, .. }`, so
+  cached parses from earlier versions are invalidated even though the serialized shape is
+  unchanged (spec42 gap 47). Anonymous flows also emit the `from`-keyword spelling instead of
+  the double-spaced endpoint shorthand.
+- **`PARSE_AST_VERSION` is now 128.** `ExtendedDefinition` gains `has_def_keyword`: the bare
+  `#<keyword>+ <Name> { ... }` extended-usage shorthand (no `def` keyword at all, e.g.
+  `#clouddd ArrowheadCore { ... }`) now parses into the same typed node as its `def`-suffixed
+  sibling instead of dropping the rest of the package body into unrecovered error-token
+  consumption (spec42 gap 39). Keyword-led `#tag <member>` prefix shapes stay on
+  `metadata_keyword_prefix`.
+- **`PARSE_AST_VERSION` is now 127.** `KermlFeatureMember` and `KermlEndMember` gain an
+  `is_const` prefix flag: `const end [1] feature a;` / `const end feature b;` (KerML
+  association bodies) now attach the `const` keyword to the end/feature member instead of
+  misparsing `const` as a dangling bare feature reference followed by an unrelated end member
+  (spec42 gap 36).
+- **`PARSE_AST_VERSION` is now 126.** `UseCaseDefBodyElement` gains a
+  `Ref(Box<Node<RefDecl>>)` variant and `RefDeclKind` gains `UseCase`, so full `ref use case
+  <name> : <Type> :>> <target>;` declarations inside use-case bodies (pervasive in Systems
+  Library `UseCases.sysml`) parse into typed `RefDecl` nodes instead of spraying per-token
+  error recovery; the bare `ref :>> target { ... }` shorthand keeps its dedicated
+  `RefRedefinition` node (spec42 gap 34).
+- **`PARSE_AST_VERSION` is now 125.** `SubjectDecl` gains a `redefines:
+  Option<Node<SubsettingRelationship>>` clause (`subject subj :>> Case::subj;`, and the
+  anonymous type-less `subject :>> vehicle = vehicle_large;`) and its `value` widens from a
+  bare `=`-only `Expression` to the shared `FeatureValue` clause, adding the `default`-keyword
+  spelling (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A;
+  spec42 gap 35). Subject emission no longer prints a double space for anonymous subjects.
+- **`PARSE_AST_VERSION` is now 124.** `RelationshipBodyElement` gains a
+  `KermlFeature(Box<Node<KermlFeatureMember>>)` variant: braced `RelationshipBody` forms
+  (dependency/alias/relationship-statement bodies) now own feature members (`dependency z to
+  x, y { feature e; }`) per the BNF's `ownedRelatedElement`, instead of dropping the whole
+  bodied statement to error recovery (spec42 gap 37). Ref bodies keep the annotation-only
+  subset.
+- **`PARSE_AST_VERSION` is now 123.** `PartDefBodyElement`, `PartUsageBodyElement`, and
+  `AttributeBodyElement` gain a `KermlClassifier(Box<Node<KermlClassifierDecl>>)` variant so
+  KerML classifier-keyword declarations (`struct`, `classifier`, `datatype`, `assoc`,
+  `behavior`, ...) nested inside part/attribute-shaped bodies parse into the same typed node
+  they already get at package scope instead of falling to error recovery (spec42 gap 38;
+  `class` keeps its dedicated `ClassDef` shape).
+- **`PARSE_AST_VERSION` is now 122.** The opaque `ActionBodyDecl` node (an unparsed
+  keyword + text blob for `attribute`/`calc`/`event` declarations and nested `action def`s in
+  action bodies) is retired: `ActionDefBodyElement`/`ActionUsageBodyElement` lose their `Decl`
+  variant and gain typed `AttributeUsage`, `CalcUsage`, and `ActionDef` variants, with `event`
+  forms dispatching through the existing typed `OccurrenceUsage` (spec42 gap 33).
+  `OpacityKind::ActionBodyDecl` is removed alongside. `OccurrenceUsage` additionally accepts a
+  multiplicity authored between the name and the typing (`event occurrence
+  zeroCrossingEvents[0..*] : ZeroCrossingEventDef`), per the BNF's declaration ordering.
+- **`PARSE_AST_VERSION` is now 121.** `AllocationUsage` and `FlowUsage` gain
+  `subsets`/`redefines` (previously parsed by the shared usage header and discarded) and typed
+  connector ends: `source`/`target` and `from`/`to` are now
+  `Option<Node<KermlConnectorEnd>>` (optional multiplicity + arena-backed feature chain +
+  optional `::>`/`references` end-name split) instead of opaque `Expression` nodes, so the
+  authored allocate end names (`allocate logical ::> torqueGenerator to physical ::>
+  powerTrain`) are retained rather than discarded (spec42 gaps 27/28).
+- **`PARSE_AST_VERSION` is now 120.** Typed-field gaps from the spec42 audit:
+  `ThenTarget` gains a `Send(Box<Node<ActionUsage>>)` variant (`then send new S() to b;`,
+  spec42 gap 30); `KermlFeatureMember` gains a `crosses` cross-subsetting clause (gap 32);
+  `ViewpointUsage` gains `subsets`/`redefines` mirroring `ViewUsage` (gap 25); and
+  `RequireConstraint` gains an arena-backed `target: Option<QualifiedReferenceId>` for the
+  keyword-less reference shorthand `require <qualified.name>;` (`name` now only carries the
+  `constraint`-keyword form's declared name; gap 29).
+- **`PARSE_AST_VERSION` is now 119.** Package-level KerML declarations are unified onto their
+  typed nodes (spec42 gaps 13/14/22/23):
+  - New `KermlRelationshipDecl` (`PackageBodyElement::KermlRelationship`) models the KerML
+    explicit relationship declarations (BNF §8.2.4): `subtype`/`subclassifier`/`typing`/
+    `subset`/`redefinition` with an optional `specialization <ident>` (or doubled-keyword)
+    prefix, `disjoining? disjoint a from b`, `inverting? inverse a of b`, and `featuring (I
+    of)? a by b`, each with the annotation-only `RelationshipBody`.
+  - `KermlClassifierKeyword` gains `Type` (`type UnionType unions A, B;`) and the spelled-out
+    `Association`; `subclassifier` moved from the classifier keywords to the relationship
+    family (it declares a relationship, not a classifier). `KermlTypeRelationshipKeyword`
+    gains `Differences`.
+  - Bare forward declarations of classifier keywords (`classifier X;`, `datatype D;`, ...)
+    now parse as `KermlClassifierDecl` with a `;` body -- a resolvable named declaration --
+    instead of the span-only `KermlBareDeclaration`.
+  - Plain `feature`-keyword package members route through `KermlFeatureMember`; the
+    superseded `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
+    `FeatureBodyElement::Expr`/`ExprMember`/`ExprMemberElement` machinery are removed
+    (`expr s { ... }` members parse as feature members of kind `expr`).
+  - Keyword-less implicit-feature package members parse (`causeA;`, `y = expr;`,
+    `z : Type;`) as `DefaultReferenceUsage`; bare *reserved keywords* (`then;`) still get
+    their targeted recovery diagnostic.
+  - Expression grammar: KerML dot shorthands `x.{...}` (collect) and `x.?{...}` (select)
+    parse as `CollectionOp` with a new authored-spelling `dot_shorthand` flag.
+- **`PARSE_AST_VERSION` is now 118.** KerML type-body members reach attribute-shaped bodies
+  (the body grammar `class_def`'s KerML `class`/`struct`/`datatype` definitions share with
+  SysML attribute/item bodies): `AttributeBodyElement` gains `KermlFeature`, `Invariant`,
+  `KermlConnector`, and nested `ClassDef` variants, so `feature x : Natural[1];`, `member
+  feature ...`, `composite feature ... subsets ...`, `portion feature all ...`, `var x : T;`,
+  `step`/`expr`/`bool` kinds, `inv name { ... }`, `connector a ::> a.x to b;`, and nested
+  `class` definitions parse instead of `unrecognized_declaration_in_scope` (spec42 gaps
+  15/16/17/18/19/21/24). Package bodies gain a `PackageBodyElement::KermlConnector` member
+  (`connector a2 from x.s to y.t;`, spec42 gap 16); connector ends accept the `::>` operator
+  spelling and an end-name-led binary shorthand; `InOutDecl` gains `is_var` (`out var y1;`,
+  spec42 gap 18). Resolves the `connector all` fixture wholesale.
+- **`PARSE_AST_VERSION` is now 117.** `TypingRelationship` gains a `spelling:
+  TypingSpelling` field recording whether the author wrote the symbolic operator (`:`/`:>`) or
+  the keyword form (`specializes`, `defined by`, `typed by`), and emission renders the authored
+  spelling instead of canonicalizing everything to the operator — `function abs specializes
+  ComplexFunctions::abs` now round-trips as written. Equality ignores the field (like spans):
+  `specializes B` and `:> B` name the same relationship; the spelling is provenance.
+- **`PARSE_AST_VERSION` is now 116.** Calc/type bodies no longer swallow unmodeled members as
+  diagnostic-silent opaque `Other(...)` captures: `CalcDefBodyElement::Other` is removed, every
+  unparseable member becomes an explicit recovery node with a `recovered_calc_body_element`
+  diagnostic, and the ~90 library members the swallow was hiding are structurally implemented:
+  - New type-body members: `KermlConnectorMember` (`connector :Type from [1] self to [1]
+    this;`, named/`all`/`from`-less forms, `references` end chains), `KermlBindingMember`
+    (`binding [1] a = [1] b;`, named `of` form, bodies), `KermlSuccessionMember` (`succession
+    [1] a then [*] b;`, `all`, named `first` form), `KermlEndMember` (`end name? [mult]?
+    subsets? feature ...` cross features), plus `Import`, `Comment`, `AttributeUsage`,
+    `AssertConstraint`, nested `KermlClassifier`, and keyword-less `DefaultReferenceUsage`
+    binding members (named `private x: T[1] = ...;` and anonymous `:>> x = ... { ... }` with
+    nested binding bodies via new `FeatureBodyElement::Binding`/`Doc` variants).
+  - `KermlFeatureMember` gains `chains`, type relationship clauses (`unions`/`intersects`/
+    `disjoint from`), an optional kind keyword (`portion redefines ... = ...;`), and an
+    optional name; `ReturnDecl` gains `attribute`/`feature` kind keywords, an optional type
+    (`return result [1..1];`), and merged multi-clause redefinitions;
+    `DefaultReferenceUsage` gains a multiplicity.
+  - Expression grammar: the KerML null-coalescing `??` operator
+    (`BinaryOperator::NullCoalesce`), parenthesis-free collection-operator function references
+    (`->reduce RealFunctions::'+'`), and a Range-operator lexing fix -- `1..4` previously
+    mis-lexed `1.` as a real literal, so `(1..size(x))` only "parsed" as a bogus member access
+    and plain ranges failed outright.
+  - `CalcDefBodyElement::ReturnDecl` boxes its node (clippy `large_enum_variant`).
+  The full-library scan stays at zero diagnostics with the swallow removed; the two tests that
+  asserted the old silent-`Other` behavior now assert the explicit recovery contract.
+- **`PARSE_AST_VERSION` is now 115.** `ViewUsage` retains its multiplicity on the named path
+  (the shared usage header already parsed it and the named constructor discarded it) and gains
+  `ordered`/`nonunique` multiplicity properties, so `view columnView[0..*] ordered { ... }`
+  (Systems Library `Views.sysml`) no longer loses `[0..*] ordered` on formatting. Emission
+  orders the clauses the way each form's parser reparses them (multiplicity after the target
+  for the anonymous `:>>` form, before the trailing subsets clause for the named form).
+- **`PARSE_AST_VERSION` is now 114.** Feature values gain a typed standalone KerML
+  `BodyExpression` form and authored-operator fidelity: new `Expression::BodyExpr` models
+  `{ parameters* result? }` as a primary expression (sharing `CollectionOperatorBody`'s shape),
+  so the pin initializers `in whileTest default {true} { ... }` (Systems Library
+  `Actions.sysml`) parse as typed values instead of being consumed opaquely and discarded by
+  `in_out_decl`; `feature_value_part` accepts `{ ... }` after any value operator. `FeatureValue`
+  gains `has_operator`, so the bare `default expr` / `default {expr}` spellings no longer emit
+  a fabricated `= ` (`return : Real default sum0(...)` now round-trips byte-for-byte).
+- **`PARSE_AST_VERSION` is now 113.** The remaining KerML declaration grammar used by the
+  pinned `sysml.library` is structurally implemented; the layered conformance scorecard's L2
+  claim now **passes for both the Systems Library and the full library** (94 files, zero
+  diagnostics, zero `ExtendedLibraryDecl`/`KermlSemanticDecl`/`KermlFeatureDecl` fallback
+  nodes). In detail:
+  - `KermlClassifierDecl` covers `datatype`/`metaclass`/`struct`/`assoc`/`assoc struct`/
+    `behavior`/`interaction`/`predicate`/`multiplicity`/`subclassifier`/`classifier`/`class`
+    (plus `function` from 112), with `all` sufficiency, a post-name multiplicity, `:` typing
+    for feature forms, and typed `disjoint from`/`unions`/`intersects` clauses
+    (`KermlTypeRelationship`).
+  - New `KermlFeatureMember` (calc/type-body and package scope) models `member`/`derived`/
+    `abstract`/`composite`/`portion`/`var`/`end` prefixes, the `feature`/`step`/`expr`/`bool`
+    kind keywords, `all`, leading or trailing redefinitions, multi-target typing, multiplicity
+    with `ordered`/`nonunique`, subsets/redefines/references clauses, `inverse of`, values, and
+    nested type bodies. New `KermlInvariantMember` models `inv (not)? name? { ... }` at both
+    scopes.
+  - `TypedParameterMember` gains `abstract`, the `calc`/`step` kinds, post-redefinition typing
+    and multiplicity; `InOutDecl` accepts the anonymous typed form (`in : T[1];`), the
+    spelled-out `redefines` operator, and typing/multiplicity trailing a redefinition.
+  - `ReturnDecl` gains a `{ ... }` result body (`CalcDefBody`); `RefDecl` retains its kind
+    keyword (`ref item scene : Scene;` no longer drops `item` on formatting) and
+    `RefBodyElement` gains an `AttributeUsage` variant; part usage bodies dispatch kinded
+    `ref item :>> a, b;` members; `DefaultReferenceUsage` accepts the anonymous leading
+    `:>> target = expr;` binding.
+  - Formatting quotes declared names that spell reserved keywords (`'in'`, `'ref'`,
+    `'about'`), which previously re-emitted bare and could not reparse.
+  - From 112 (folded in): `ExprMemberElement::ReturnDecl` boxes its node to keep the enum size
+    bounded (wire format unchanged).
+- **`PARSE_AST_VERSION` is now 112.** KerML `function` declarations parse as a structured
+  `PackageBodyElement::KermlClassifier` node (`KermlClassifierDecl`: `abstract` prefix, keyword
+  enum, identification, multi-target `specializes`/`:>` clause, calc-style body) instead of the
+  opaque `KermlSemanticDecl` fallback, covering the Kernel Function Library. Supporting grammar:
+  `ReturnDecl` gains `multiplicity`, `ordered`/`nonunique`, and a full `FeatureValue` value
+  clause (`return : Real[1] = x;`, `return : Anything[0..*] ordered nonunique;`, `return : Real
+  default …;`); new `CalcDefBodyElement::TypedParameter` models KerML kinded parameters
+  (`in expr fn[0..*] { … }`, `in bool test = expr;`, `in feature clock : Clock[1] default
+  localClock { … }`) whose bodies follow the calc-body member grammar; and `in_out_decl` rejects
+  the `expr`/`bool`/`feature` kind keywords so those forms reach the kinded-parameter arm.
+  Full-library diagnostics: 552 -> 250.
+- **`PARSE_AST_VERSION` is now 111.** `ItemUsage` gains `is_abstract` (BNF `RefPrefix`,
+  accepted by the parser for the first time), `subsets` (`:> objects`, previously parsed by the
+  shared usage header and discarded), and `ordered`/`nonunique` multiplicity properties
+  (previously skipped). Covers the package-level `abstract item items : Item[0..*] nonunique
+  :> objects { ... }` declarations (Systems Library `Items.sysml`/`Metadata.sysml`) that
+  previously fell through to the `ExtendedLibraryDecl` fallback. The shared
+  `feature_usage_header` now captures its post-typing multiplicity and `ordered`/`nonunique`
+  flags on `UsageHeader` instead of discarding them. The L2 Systems Library scorecard layer now
+  passes: zero diagnostics and zero fallback nodes across all 21 files.
+- **`PARSE_AST_VERSION` is now 110.** `RenderingUsage` retains its full declaration surface
+  instead of discarding everything but the name and type: `is_abstract`, `multiplicity`,
+  `ordered`/`nonunique`, `:>` subsets, `:>>` redefines, and a `ValuePart` feature value. The
+  declaration name is optional (anonymous `rendering :>> subrenderings[0..*] =
+  columnView.viewRendering;`, Systems Library `Views.sysml`), and
+  `RenderingUsageBodyElement` gains a `Rendering(Box<Node<RenderingUsage>>)` variant so
+  rendering usages can nest inside rendering usage bodies (`asElementTable`).
+- **`PARSE_AST_VERSION` is now 109.** Connection/interface `ref` declaration bodies are now a
+  structured member scope: `RefBodyElement` gains a `Ref(Box<Node<RefDecl>>)` variant for nested
+  keyword-less `ref` declarations, and `connector::ref_decl` accepts a `MemberPrefix` visibility
+  prefix (captured on `RefDecl::membership`) plus `nonunique`/`ordered` directly after the
+  post-typing multiplicity (before further specialization clauses). Covers Systems Library
+  `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique ordered { protected ref
+  thisParticipant :>> self; ... }`. Unrecognized members recover as
+  `recovered_ref_body_element` ("ref usage body") instead of
+  `recovered_relationship_body_element`. `RefDecl` gains `multiplicity`/`ordered`/`nonunique`
+  (previously parsed and discarded by `connector::ref_decl`, so `[2..*] nonunique ordered` was
+  dropped on formatting), `emit_ref_decl` emits typing before multiplicity before the
+  subsetting-family clauses (the one order every `RefDecl` parser reparses), and
+  `StateDefBodyElement::Ref` boxes its node to keep the enum size bounded.
+- **`PARSE_AST_VERSION` is now 108.** Direction-prefixed parameter declarations (`InOutDecl`)
+  now cover the full BNF `FeatureSpecializationPart`/`ValuePart` surface the Systems Library
+  uses: the multiplicity clause may precede the typing (`in transitionLinkSource[1]:
+  StateAction :>> ...`), `ordered`/`nonunique` multiplicity properties are retained as typed
+  flags, a `:>>` redefinition (including comma-separated multi-target form) may trail a named
+  declaration, the value clause is a full `FeatureValue` (`= expr` / `:= expr` /
+  `default (=|:=)? expr`) instead of a bare `= expr` expression, and a `{ ... }` terminator
+  body is retained as typed action-body elements instead of being consumed and discarded.
+  `OccurrenceUsage` gains `direction: Option<InOut>` (BNF `RefPrefix`, e.g. `in occurrence
+  terminatedOccurrence[1] { ... }`, dispatched in action bodies like directed `in item`/`in
+  part`) and `value: Option<Node<FeatureValue>>` (`in occurrence terminatedOccurrence default
+  that as Occurrence { ... }`), both from Systems Library `Actions.sysml`. To keep enum sizes
+  bounded, `ExprMemberElement::InOutDecl` and `CalcDefBodyElement::InOutDecl` now box their
+  node (`Box<Node<InOutDecl>>`; serialized form unchanged).
+- **`PARSE_AST_VERSION` is now 107.** `KermlBareDeclaration::keyword` is now an exhaustive
+  `KermlBareDeclarationKeyword` enum instead of an owned `String` (a finite grammar set, with
+  distinct variants for authored synonyms like `assoc`/`association`), and
+  `KermlBareDeclaration`/`BindingConnectorUsage` keep only a `name_span: Option<Span>` for the
+  declared name instead of also copying it into an owned `String` -- the name text is resolved
+  through the document source when needed, matching the "authored spelling lives in source, not
+  per-node strings" contract.
+- **`PARSE_AST_VERSION` is now 106.** New `PackageBodyElement::ExtendedDefinition` node models
+  SysML §8.2.2.27 `ExtendedDefinition`: one or more `#<name>` metadata-keyword tags standing in
+  place of the usual classifier keyword before `def` (`#situation def Failure;`,
+  `#SecurityRelated #situation def Vulnerability;`, `abstract #situation def AbstractFailure;`,
+  `variation #situation def V;`, with optional `:>` specialization and a `{ ... }` body reusing
+  `PackageBody`). Tried before `metadata_keyword_prefix` in package-body dispatch, so `def
+  Failure;` no longer falls through to raw error recovery.
+- **`PARSE_AST_VERSION` is now 105.** `AttributeBodyElement` gains a structured `ItemUsage`
+  variant. A nested `item name : Type;` inside an `attribute def`/`attribute`/`item def`/`item`
+  body now parses as a real item usage (reusing the same `item_usage` parser `part def`/`part`
+  bodies already dispatch to) instead of being swallowed by the opaque-capture fallback into
+  `AttributeBodyElement::Other`.
+- **`PARSE_AST_VERSION` is now 104.** Bare, `;`-terminated `classifier` forward declarations
+  (e.g. `classifier SpatialFrame;`) parse as a structured `KermlBareDeclaration` node with a real
+  `name` field instead of falling through to the opaque `ClassifierDecl` raw-text fallback.
+- **`PARSE_AST_VERSION` is now 103.** `ConcernUsage` (including `concern def`) retains its `:>`
+  subsetting and `:>>` redefinition clauses (`ConcernUsage::subsets`/`ConcernUsage::redefines`)
+  instead of discarding them after parsing, matching sibling usage kinds.
+- **`PARSE_AST_VERSION` is now 102.** `ViewUsage` retains its `:>` subsetting clause
+  (`ViewUsage::subsets`) instead of discarding it after parsing, matching sibling usage kinds such
+  as `OccurrenceUsage`/`StateUsage`/`PortUsage`.
+- **`PARSE_AST_VERSION` is now 101.** `individual item`/`individual occurrence`/`individual port`
+  short usage forms parse correctly instead of being misclassified or falling into a recovery
+  cascade: package-level `item def` now requires the `def` keyword so it no longer shadows
+  `individual item x;`; `individual` occurrence usages accept an optional `occurrence` kind
+  keyword (`OccurrenceUsage::has_occurrence_keyword` preserves whether it was authored); `port`
+  usages accept an `individual` prefix (`PortUsage::is_individual`); and `state def`/`connection
+  def` accept `individual` (`StateDef::is_individual`/`ConnectionDef::is_individual`).
+- **`PARSE_AST_VERSION` is now 100.** `InterfaceUsage` (all three variants) retains its `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
+- **`PARSE_AST_VERSION` is now 99.** `AnalysisCaseUsage` and `CaseUsage` retain their `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `RequirementUsage`/`PortUsage`/`StateUsage`.
+- **`PARSE_AST_VERSION` is now 97.** Package bodies gain `@ Name (: Type)? about target(,
+  ...)?;` standalone metadata-annotation support, accept stacked `#Prefix #Prefix ... member`
+  metadata tags before a member instead of at most one, and port definition bodies dispatch
+  `#Prefix`-tagged nested port declarations through the same shared metadata-keyword parsing other
+  definition bodies already use.
+- **`PARSE_AST_VERSION` is now 96.** `ConstraintUsage` retains its `:>`/`:>>` subsetting and
+  redefinition clauses (`ConstraintUsage::subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
+- **Canonical document source ranges.** `SourceStorage::position_at`, `SourceStorage::range_of`,
+  and `ParsedDocument::range` resolve byte-backed parser spans through one lazily built,
+  document-owned newline index. Downstream diagnostics and navigation can retain a `Span` and ask
+  the parsed document for its canonical multiline range without rescanning source text.
+- **`PARSE_AST_VERSION` is now 87.** In/out parameters retain their `ref` feature prefix and
+  typed multiplicity, and occurrence-body exhibit usages retain their arena-backed state path.
+  Emission also preserves quoting for compound unit names such as `'N/mm²'`.
+- **`PARSE_AST_VERSION` is now 86.** `FirstMergeBody` brace forms retain an aggregate source span,
+  exact opening- and closing-brace spans, and ordered typed action-body members. Valid output pins
+  and other recognized members remain semantic syntax; unsupported and malformed members are
+  explicit nodes that preserve diagnostics and recovery continuation. Formatting `first`, `merge`,
+  `decide`, `join`, and `fork` bodies consumes those typed members instead of fabricating `{}` or
+  treating a source slice as successful syntax.
+- **For-loop ranges are always typed expressions.** The parser no longer publishes
+  `Expression::Opaque(String)` when range parsing fails. Malformed ranges recover as explicit error
+  nodes, roll back speculative qualified-reference identities, and preserve later siblings.
+- **`PARSE_AST_VERSION` is now 84.** Return-reference bodies now contain typed documentation,
+  result-expression, and recovery elements; calculation/constraint returns and return references
+  roll back speculative arena identities on failure; occurrence portions use the
+  `OccurrencePortionKind` enum. Connection-like part members that are not yet implemented are
+  explicit `UnsupportedGrammarNode`s rather than header-scanned `OpaqueMemberDecl`s. Package-body
+  diagnostic collection is exhaustive and reports every retained KerML/library fallback instead
+  of silently ignoring new or opaque variants.
+- **`PARSE_AST_VERSION` is now 83.** State action targets, requirement redefinition contents,
+  collection-operator bodies, and nested use-case assertion members are structured typed syntax
+  rather than opaque or copied strings.
+- **Collection operator brace bodies are structured syntax.** `Expression::CollectionOp` now
+  retains a typed `CollectionOperatorBody` instead of an opaque copied `String`: ordered
+  `in`/`out`/`inout` parameters, optional `ref` and typing syntax, the semantic result expression,
+  source-backed reference identities, and exact body/declaration token spans remain available to
+  emitters, diagnostics, navigation, serialization, and semantic snapshots. Malformed bodies fail
+  transactionally into the enclosing recovery node without leaking speculative reference IDs.
+- **Grammar conformance is now machine-readable and scope checked.** The public
+  `SUPPORTED_GRAMMAR` constant exposes the release tag, repository, and deterministic content hash
+  derived from the single `docs/conformance-target` pin; builds with the BNF checkout present reject
+  mismatched grammar bytes. Package-body recovery starters now come from one typed production table
+  whose spec entries are linted against a nullable-aware `FIRST(PackageBodyElement)` derivation.
+  Spec-valid package forms that reach an unimplemented dispatch branch produce typed
+  `UnsupportedGrammarForm` nodes instead of blaming authored input with malformed nodes.
+  `PARSE_AST_VERSION` is now 82.
+- **Snapshot regeneration uses available CPU cores.** Both the default `cargo test` snapshot
+  contract and the `snapshot_tool` CLI evaluate independent fixtures concurrently, then restore
+  deterministic path order before comparison, reporting, or updates.
+- **Semantic references are now typed, source-backed, and document-local (#119).** `parse()` and
+  editor parsing return a `ParsedDocument` that atomically owns the BOM-normalized source,
+  `QualifiedReferenceArena`, and root AST. Imports, exposes, expressions, requirement references,
+  type references, and specialization relationships store opaque `QualifiedReferenceId` values;
+  consumers resolve them through `ParsedDocument::qualified_reference()` to borrow exact authored
+  text, aggregate/segment spans, absolute-scope metadata, and typed `::`/`.` separators without
+  splitting or reparsing display strings. Import/expose wildcard, recursive, and filter forms use
+  the typed `ImportShape` representation, including distinct `::*`, `::**`, and `::*::**` shapes;
+  their aggregate suffix, exact `::`/`*`/`**` token, combined-recursive, and filter-delimiter spans
+  retain precise authored provenance without downstream source scanning. Qualified package,
+  library-package, and namespace declaration names use a distinct `QualifiedDeclarationName`
+  role wrapper over the same packed storage, preserving their scope, segments, separators, and
+  spans without misclassifying simple declaration labels as references. State `entry`, `do`, and
+  `exit` action targets are likewise arena-backed references, including qualified, dotted, quoted,
+  and absolute paths; declaration labels remain a separate identity role. Actor redefinition
+  assignment values are spanned `Expression` nodes, and reference redefinition bodies are nested,
+  spanned `UseCaseDefBody` trees, replacing both former opaque `String` fields.
+  The former `RelationshipTarget` and `FeatureChain` representations and legacy string/display
+  accessors were removed rather than retained as compatibility layers. Serde now operates on the
+  atomic parsed-document envelope and validates arena ranges and every AST identity when reading
+  or writing. `PARSE_AST_VERSION` is now 80 for this breaking schema/API migration.
+
 ### Fixed
 
 - **`AttributeUsage` emit duplicated the name for `::>`/`:>`/`:>>`-name-standing-in-prefix

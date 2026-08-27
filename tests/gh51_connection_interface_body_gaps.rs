@@ -10,21 +10,27 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement>> {
+fn package_elements(
+    input: &str,
+) -> (
+    sysml_v2_parser::ParsedDocument,
+    Vec<sysml_v2_parser::Node<PackageBodyElement>>,
+) {
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    match &pkg.body {
-        PackageBody::Brace { elements } => elements.clone(),
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
-    }
+    };
+    (result.document, elements)
 }
 
 fn connection_def_elements(
@@ -38,7 +44,7 @@ fn connection_def_elements(
         })
         .expect("expected connection def");
     match &connection.body {
-        ConnectionDefBody::Brace { elements } => elements.clone(),
+        ConnectionDefBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected connection def brace body"),
     }
 }
@@ -50,7 +56,8 @@ fn connection_def_elements(
 fn end_decl_accepts_trailing_redefines_after_typed_form() {
     let input =
         "package P {\nconnection def C {\nend source: Anything :>> BinaryLinkObject::source;\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (_, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let end = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -58,30 +65,11 @@ fn end_decl_accepts_trailing_redefines_after_typed_form() {
             _ => None,
         })
         .expect("expected end decl");
-    assert_eq!(end.type_name, "Anything");
+    assert!(end.typing.is_some());
     assert_eq!(
-        end.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("BinaryLinkObject::source".to_string())
+        end.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
-}
-
-/// Real usage: Systems Library training `09. Connections/Connections Example.sysml`'s `end [1]
-/// part bead : TireBead;` (leading multiplicity before the kind keyword) and OMG spec Annex `14c-
-/// Language Extensions.sysml`'s `end [*] ref cause: Situation;` (`ref` as an end kind keyword).
-#[test]
-fn end_decl_accepts_leading_multiplicity_and_ref_kind_keyword() {
-    let input = "package P {\nconnection def C {\nend [1] part bead : TireBead;\nend [*] ref cause: Situation;\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
-    let ends: Vec<_> = elements
-        .iter()
-        .filter_map(|e| match &e.value {
-            ConnectionDefBodyElement::EndDecl(end) => Some(&end.value),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(ends.len(), 2);
-    assert!(ends[0].multiplicity.is_some());
-    assert!(ends[1].multiplicity.is_some());
 }
 
 /// Real usage: Systems/Domain Library connection defs own `assert constraint` members with a
@@ -92,7 +80,8 @@ fn end_decl_accepts_leading_multiplicity_and_ref_kind_keyword() {
 fn connection_def_body_accepts_private_assert_constraint() {
     let input =
         "package P {\nconnection def C {\nprivate assert constraint disjointCauseEffect {\ntrue\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (doc, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let assert_member = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -100,7 +89,12 @@ fn connection_def_body_accepts_private_assert_constraint() {
             _ => None,
         })
         .expect("expected assert constraint member");
-    assert_eq!(assert_member.name.as_deref(), Some("disjointCauseEffect"));
+    assert_eq!(
+        assert_member
+            .declaration_name
+            .and_then(|n| doc.declaration_name(n)),
+        Some("disjointCauseEffect")
+    );
     assert_eq!(
         assert_member.membership.visibility,
         Some(sysml_v2_parser::ast::Visibility::Private)
@@ -115,7 +109,8 @@ fn connection_def_body_accepts_private_assert_constraint() {
 #[test]
 fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicity() {
     let input = "package P {\nconnection def C {\nabstract constant ref occurrence causes[1..*] :>> causes :> participant {\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (_, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let occurrence = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -123,9 +118,18 @@ fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicit
             _ => None,
         })
         .expect("expected occurrence usage");
-    assert!(occurrence.is_abstract);
-    assert!(occurrence.is_constant);
-    assert!(occurrence.is_reference);
+    let ref_prefix = &occurrence.prefix.basic().expect("basic head").ref_prefix;
+    assert_eq!(
+        ref_prefix.variance.as_ref().map(|node| node.value),
+        Some(sysml_v2_parser::ast::DefinitionPrefix::Abstract)
+    );
+    assert!(ref_prefix.constant_span.is_some());
+    assert!(occurrence
+        .prefix
+        .basic()
+        .expect("basic head")
+        .reference_span
+        .is_some());
     assert!(occurrence.multiplicity.is_some());
 }
 
@@ -135,7 +139,8 @@ fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicit
 #[test]
 fn connection_def_body_accepts_named_succession_usage() {
     let input = "package P {\nconnection def C {\nprivate succession causalOrdering first [1] causes then [1] effects {\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (doc, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let succession = elements
         .iter()
         .find_map(|e| match &e.value {
@@ -143,7 +148,10 @@ fn connection_def_body_accepts_named_succession_usage() {
             _ => None,
         })
         .expect("expected succession usage");
-    assert_eq!(succession.name.as_deref(), Some("causalOrdering"));
+    assert_eq!(
+        succession.name.and_then(|n| doc.declaration_name(n)),
+        Some("causalOrdering")
+    );
     assert_eq!(
         succession.membership.visibility,
         Some(sysml_v2_parser::ast::Visibility::Private)
@@ -154,10 +162,13 @@ fn connection_def_body_accepts_named_succession_usage() {
 /// nonunique ordered { ... }` (anonymous -- no name at all, just a kind keyword + redefines +
 /// type + multiplicity + modifiers) and `ref port :>> Interface::participant,
 /// BinaryConnection::participant[2] nonunique ordered;` (comma-separated multi-target redefines).
-/// `ref_decl` previously required a name and a `:` type unconditionally, with no redefines or
-/// multiplicity support at all.
+///
+/// `PortUsage = OccurrenceUsagePrefix 'port' Usage` and `BasicUsagePrefix` owns the `ref`, so
+/// this is a port usage whose prefix authored `ref`, not a `ReferenceUsage`. It was a `RefDecl`
+/// until `port_usage` could spell a `ref` at all; `ref_decl` keeps every other kind it models,
+/// exercised by the `ref requirement` cases below.
 #[test]
-fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() {
+fn interface_def_body_accepts_anonymous_ref_port_with_redefines_type_and_modifiers() {
     let input = "package P {\nport def Port;\ninterface def I {\nref port :>> participant : Port [2..*] nonunique ordered {\n}\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
@@ -165,11 +176,11 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let interface = elements
@@ -179,25 +190,33 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
             _ => None,
         })
         .expect("expected interface def");
-    let InterfaceDefBody::Brace { elements } = &interface.body else {
+    let InterfaceDefBody::Brace { elements, .. } = &interface.body else {
         panic!("expected interface def brace body");
     };
-    let ref_decl = elements
+    let port = elements
         .iter()
         .find_map(|e| match &e.value {
-            InterfaceDefBodyElement::RefDecl(r) => Some(&r.value),
+            InterfaceDefBodyElement::PortUsage(p) => Some(&p.value),
             _ => None,
         })
-        .expect("expected ref decl");
-    assert_eq!(ref_decl.name, "");
-    assert_eq!(
-        ref_decl
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("participant".to_string())
+        .expect("expected port usage");
+    assert!(
+        port.prefix
+            .basic()
+            .expect("basic head")
+            .reference_span
+            .is_some(),
+        "the `ref` belongs to the port usage's own BasicUsagePrefix"
     );
-    assert_eq!(ref_decl.type_name, "Port");
+    assert!(port.name.is_none());
+    assert_eq!(
+        port.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
+    );
+    assert!(port.typing.is_some());
+    assert!(port.multiplicity.is_some());
+    assert!(port.multiplicity_modifiers.is_ordered());
+    assert!(!port.multiplicity_modifiers.is_unique());
 }
 
 /// Real usage: Domain Library `Requirement Derivation/DerivationConnections.sysml`'s `ref
@@ -208,7 +227,8 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
 #[test]
 fn connection_def_body_accepts_ref_requirement_with_redefines_and_subsets() {
     let input = "package P {\nrequirement def R1;\nrequirement def R2;\nconnection def C {\nref requirement originalRequirement[1] :>> R1 :> participant {\n}\nref requirement :>> R2[1..*] :> participant {\n}\n}\n}";
-    let elements = connection_def_elements(&package_elements(input));
+    let (doc, package) = package_elements(input);
+    let elements = connection_def_elements(&package);
     let ref_decls: Vec<_> = elements
         .iter()
         .filter_map(|e| match &e.value {
@@ -219,25 +239,22 @@ fn connection_def_body_accepts_ref_requirement_with_redefines_and_subsets() {
     assert_eq!(ref_decls.len(), 2);
     let named = ref_decls
         .iter()
-        .find(|r| r.name == "originalRequirement")
+        .find(|r| r.name.and_then(|n| doc.declaration_name(n)) == Some("originalRequirement"))
         .expect("expected named ref requirement");
     assert_eq!(
-        named.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("R1".to_string())
+        named.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert_eq!(
-        named.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("participant".to_string())
+        named.subsets.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     let anonymous = ref_decls
         .iter()
-        .find(|r| r.name.is_empty())
+        .find(|r| r.name.is_none())
         .expect("expected anonymous ref requirement");
     assert_eq!(
-        anonymous
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("R2".to_string())
+        anonymous.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }

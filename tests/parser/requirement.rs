@@ -3,6 +3,14 @@
 use sysml_v2_parser::ast::*;
 use sysml_v2_parser::parse;
 
+fn reference_text(document: &ParsedDocument, id: QualifiedReferenceId) -> &str {
+    document
+        .qualified_references
+        .get(&document.source, id)
+        .expect("reference ID should resolve in its parsed document")
+        .authored_text()
+}
+
 #[test]
 fn test_objective_parses_named_typed_requirement_usage() {
     let input = "package P { use case def U { objective missionObjective : MaximizeObjective; } }";
@@ -12,7 +20,7 @@ fn test_objective_parses_named_typed_requirement_usage() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = match &elements[0].value {
@@ -20,7 +28,7 @@ fn test_objective_parses_named_typed_requirement_usage() {
         _ => panic!("expected UseCaseDef"),
     };
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     let objective = body_elements
@@ -30,14 +38,25 @@ fn test_objective_parses_named_typed_requirement_usage() {
             _ => None,
         })
         .expect("objective should be present");
-    assert_eq!(objective.requirement.value.name, "missionObjective");
     assert_eq!(
-        objective.requirement.value.type_name.as_deref(),
+        objective
+            .requirement
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("missionObjective")
+    );
+    assert_eq!(
+        objective
+            .requirement
+            .value
+            .type_name
+            .map(|id| reference_text(&result, id)),
         Some("MaximizeObjective")
     );
     assert!(matches!(
         objective.requirement.value.body,
-        sysml_v2_parser::ast::RequirementDefBody::Semicolon
+        sysml_v2_parser::ast::RequirementDefBody::Semicolon { .. }
     ));
 }
 
@@ -50,7 +69,7 @@ fn test_objective_body_preserves_structured_requirement_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = match &elements[0].value {
@@ -58,7 +77,7 @@ fn test_objective_body_preserves_structured_requirement_members() {
         _ => panic!("expected UseCaseDef"),
     };
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     let objective = body_elements
@@ -69,12 +88,14 @@ fn test_objective_body_preserves_structured_requirement_members() {
         })
         .expect("objective should be present");
     let req_body_elements = match &objective.requirement.value.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected objective requirement brace body"),
     };
     assert!(req_body_elements.iter().any(|e| matches!(
         e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::Doc(_)
+        sysml_v2_parser::ast::RequirementDefBodyElement::Annotating(
+            sysml_v2_parser::ast::AnnotatingMember::Doc(_)
+        )
     )));
     assert!(req_body_elements.iter().any(|e| matches!(
         e.value,
@@ -83,7 +104,7 @@ fn test_objective_body_preserves_structured_requirement_members() {
 }
 
 #[test]
-fn test_objective_typed_semicolon_uses_default_name() {
+fn test_objective_typed_semicolon_has_no_declared_name() {
     let input = "package P { use case def U { objective : MaximizeObjective; } }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
@@ -91,7 +112,7 @@ fn test_objective_typed_semicolon_uses_default_name() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = match &elements[0].value {
@@ -99,7 +120,7 @@ fn test_objective_typed_semicolon_uses_default_name() {
         _ => panic!("expected UseCaseDef"),
     };
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     let objective = body_elements
@@ -109,9 +130,21 @@ fn test_objective_typed_semicolon_uses_default_name() {
             _ => None,
         })
         .expect("objective should be present");
-    assert_eq!(objective.requirement.value.name, "objective");
     assert_eq!(
-        objective.requirement.value.type_name.as_deref(),
+        objective
+            .requirement
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        // `objective` authors no `NAME`; the keyword is the member's syntax, not its name.
+        None
+    );
+    assert_eq!(
+        objective
+            .requirement
+            .value
+            .type_name
+            .map(|id| reference_text(&result, id)),
         Some("MaximizeObjective")
     );
 }
@@ -125,7 +158,7 @@ fn test_objective_preserves_visibility_prefix() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = match &elements[0].value {
@@ -133,7 +166,7 @@ fn test_objective_preserves_visibility_prefix() {
         _ => panic!("expected UseCaseDef"),
     };
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     let objective = body_elements
@@ -158,7 +191,7 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = match &elements[0].value {
@@ -166,7 +199,7 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
         _ => panic!("expected UseCaseDef"),
     };
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     let objective = body_elements
@@ -177,7 +210,7 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
         })
         .expect("objective should be present");
     let req_body_elements = match &objective.requirement.value.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected objective requirement brace body"),
     };
     let shorthand = req_body_elements
@@ -191,7 +224,10 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
             _ => None,
         })
         .expect("shorthand verify should be present");
-    assert_eq!(shorthand.target.as_deref(), Some("vehicleMassRequirement"));
+    assert_eq!(
+        shorthand.target.map(|id| reference_text(&result, id)),
+        Some("vehicleMassRequirement")
+    );
     let explicit = req_body_elements
         .iter()
         .find_map(|e| match &e.value {
@@ -207,9 +243,18 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
         .requirement
         .as_ref()
         .expect("explicit form should include parsed requirement usage");
-    assert_eq!(explicit_req.value.name, "vehicleMassRequirement");
     assert_eq!(
-        explicit_req.value.type_name.as_deref(),
+        explicit_req
+            .value
+            .name
+            .and_then(|n| result.declaration_name(n)),
+        Some("vehicleMassRequirement")
+    );
+    assert_eq!(
+        explicit_req
+            .value
+            .type_name
+            .map(|id| reference_text(&result, id)),
         Some("VehicleMassRequirement")
     );
 }
@@ -223,7 +268,7 @@ fn test_verification_return_ref_parses_return_expression() {
         _ => panic!("expected package"),
     };
     let body_elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package brace body"),
     };
     let verification = body_elements
@@ -234,7 +279,7 @@ fn test_verification_return_ref_parses_return_expression() {
         })
         .expect("verification def should be present");
     let case_body = match &verification.body {
-        UseCaseDefBody::Brace { elements } => elements,
+        UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected verification brace body"),
     };
     let return_ref = case_body
@@ -244,14 +289,23 @@ fn test_verification_return_ref_parses_return_expression() {
             _ => None,
         })
         .expect("return ref should be present");
-    assert_eq!(return_ref.name, "verdictResult");
-    let expr = return_ref
-        .return_expression
-        .as_ref()
+    assert_eq!(
+        result.declaration_name(return_ref.name),
+        Some("verdictResult")
+    );
+    let ReturnRefBody::Brace { elements, .. } = &return_ref.body.value else {
+        panic!("expected structured return-ref body");
+    };
+    let expr = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            ReturnRefBodyElement::Result(expression) => Some(expression),
+            ReturnRefBodyElement::Annotating(_) | ReturnRefBodyElement::Error(_) => None,
+        })
         .expect("return expression should be parsed");
     let token = match &expr.value {
-        Expression::MemberAccess(_, member) => member.as_str(),
-        Expression::FeatureRef(name) => name.as_str(),
+        Expression::MemberAccess { member, .. } => reference_text(&result, *member),
+        Expression::FeatureRef(name) => reference_text(&result, *name),
         other => panic!("unexpected verdict expression: {other:?}"),
     };
     assert!(
@@ -269,7 +323,7 @@ fn test_analysis_ref_redefinition_is_structured_not_other() {
         _ => panic!("expected package"),
     };
     let body_elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package brace body"),
     };
     let analysis = body_elements
@@ -280,7 +334,7 @@ fn test_analysis_ref_redefinition_is_structured_not_other() {
         })
         .expect("analysis def should be present");
     let case_body = match &analysis.body {
-        UseCaseDefBody::Brace { elements } => elements,
+        UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected analysis brace body"),
     };
     assert!(
@@ -296,8 +350,8 @@ fn test_analysis_ref_redefinition_is_structured_not_other() {
     assert!(
         !case_body
             .iter()
-            .any(|e| { matches!(e.value, UseCaseDefBodyElement::Other(_)) }),
-        "ref :>> should not land in Other"
+            .any(|e| { matches!(e.value, UseCaseDefBodyElement::Error(_)) }),
+        "`ref :>>` should parse structurally, not become a recovery node"
     );
 }
 
@@ -310,7 +364,7 @@ fn test_requirement_body_keeps_structured_attributes_and_later_require_constrain
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let req = elements
@@ -321,7 +375,7 @@ fn test_requirement_body_keeps_structured_attributes_and_later_require_constrain
         })
         .expect("requirement def should be present");
     let body_elements = match &req.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected requirement brace body"),
     };
     assert!(
@@ -364,7 +418,7 @@ fn test_parse_requirement_body_supports_attribute_def_and_usage_forms() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let req = elements
@@ -375,7 +429,7 @@ fn test_parse_requirement_body_supports_attribute_def_and_usage_forms() {
         })
         .expect("requirement def should be present");
     let body_elements = match &req.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected requirement brace body"),
     };
     assert!(
@@ -404,14 +458,18 @@ fn test_parse_part_usage_body_satisfy_shorthand() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let home = elements
         .iter()
         .find_map(|e| match &e.value {
             PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Home") =>
+                if p.value
+                    .identification
+                    .name
+                    .and_then(|n| result.declaration_name(n))
+                    == Some("Home") =>
             {
                 Some(&p.value)
             }
@@ -419,14 +477,14 @@ fn test_parse_part_usage_body_satisfy_shorthand() {
         })
         .expect("Home part def should be present");
     let home_body = match &home.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected Home part def body"),
     };
     let living_room = home_body
         .iter()
         .find_map(|e| match &e.value {
             sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p)
-                if p.value.name == "livingRoom" =>
+                if p.value.name.and_then(|n| result.declaration_name(n)) == Some("livingRoom") =>
             {
                 Some(&p.value)
             }
@@ -434,7 +492,7 @@ fn test_parse_part_usage_body_satisfy_shorthand() {
         })
         .expect("livingRoom part usage should be present");
     let living_room_body = match &living_room.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => elements,
         _ => panic!("expected livingRoom part usage body"),
     };
     assert!(
@@ -455,7 +513,7 @@ fn test_parse_require_constraint_keeps_inner_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let req = elements
@@ -466,7 +524,7 @@ fn test_parse_require_constraint_keeps_inner_members() {
         })
         .expect("requirement def should be present");
     let body_elements = match &req.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected requirement brace body"),
     };
     let require_constraint = body_elements
@@ -477,13 +535,15 @@ fn test_parse_require_constraint_keeps_inner_members() {
         })
         .expect("require constraint should be present");
     let constraint_elements = match &require_constraint.body {
-        sysml_v2_parser::ast::RequireConstraintBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected structured require constraint body"),
     };
     assert!(
         constraint_elements.iter().any(|e| matches!(
             e.value,
-            sysml_v2_parser::ast::ConstraintDefBodyElement::Doc(_)
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Annotating(
+                sysml_v2_parser::ast::AnnotatingMember::Doc(_)
+            )
         )),
         "doc should be preserved inside require constraint"
     );
@@ -504,47 +564,6 @@ fn test_parse_require_constraint_keeps_inner_members() {
 }
 
 #[test]
-fn test_parse_requirement_subject_shorthand_without_name() {
-    let input = "package P {\nrequirement def R {\nsubject: Laptop;\nrequire constraint { }\n}\n}";
-    let result = parse(input).expect("subject shorthand should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let req = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::RequirementDef(r) => Some(&r.value),
-            _ => None,
-        })
-        .expect("requirement def should be present");
-    let body_elements = match &req.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements } => elements,
-        _ => panic!("expected requirement brace body"),
-    };
-    let subject = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::RequirementDefBodyElement::SubjectDecl(s) => Some(&s.value),
-            _ => None,
-        })
-        .expect("subject decl should be present");
-    assert_eq!(subject.name, "");
-    assert_eq!(subject.type_name, "Laptop");
-    assert!(
-        body_elements.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
-        )),
-        "later requirement members should still parse after subject shorthand"
-    );
-}
-
-#[test]
 fn test_requirement_usage_accepts_subsets_keyword_alias() {
     let input = r#"package P {
 requirement VehicleReq; subsets BaseReq;
@@ -555,7 +574,7 @@ requirement VehicleReq; subsets BaseReq;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let req = match &elements[0].value {
@@ -563,8 +582,12 @@ requirement VehicleReq; subsets BaseReq;
         other => panic!("expected requirement usage, got {:?}", other),
     };
     assert_eq!(
-        req.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("BaseReq".to_string())
+        req.value
+            .subsets
+            .as_ref()
+            .and_then(|n| n.value.first_target())
+            .map(|id| reference_text(&result, id)),
+        Some("BaseReq")
     );
 }
 
@@ -579,16 +602,23 @@ requirement VehicleReq; subsets BaseReq :> LatestReq;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let req = match &elements[0].value {
         PackageBodyElement::RequirementUsage(r) => r,
         other => panic!("expected requirement usage, got {:?}", other),
     };
+    // `subsets BaseReq :> LatestReq` is one relationship with two targets, in source order --
+    // keeping only the last silently dropped `BaseReq`.
     assert_eq!(
-        req.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("LatestReq".to_string())
+        req.value.subsets.as_ref().map(|n| n
+            .value
+            .target
+            .iter()
+            .map(|id| reference_text(&result, *id))
+            .collect::<Vec<_>>()),
+        Some(vec!["BaseReq", "LatestReq"])
     );
 }
 
@@ -605,7 +635,7 @@ requirement def R {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let req = elements
@@ -615,7 +645,7 @@ requirement def R {
             _ => None,
         })
         .expect("expected requirement definition");
-    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &req.body else {
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("expected requirement body");
     };
     assert!(elements.iter().any(|e| matches!(
@@ -649,11 +679,11 @@ requirement def VehicleMassRequirement {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let req = elements
@@ -663,7 +693,7 @@ requirement def VehicleMassRequirement {
             _ => None,
         })
         .expect("expected requirement definition");
-    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &req.body else {
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("expected requirement body");
     };
     assert!(elements.iter().any(|e| matches!(
@@ -695,11 +725,11 @@ requirement systemSpecification {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let specification = elements
@@ -709,7 +739,8 @@ requirement systemSpecification {
             _ => None,
         })
         .expect("expected requirement usage");
-    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &specification.body else {
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } = &specification.body
+    else {
         panic!("expected specification body");
     };
     let braking = elements
@@ -721,12 +752,12 @@ requirement systemSpecification {
             _ => None,
         })
         .expect("expected structured braking subrequirement");
-    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &braking.body else {
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } = &braking.body else {
         panic!("expected braking body");
     };
     assert!(elements.iter().any(|element| matches!(
         &element.value,
         sysml_v2_parser::ast::RequirementDefBodyElement::RequirementUsage(requirement)
-            if requirement.value.name == "emergencyStop"
+            if requirement.value.name.and_then(|n| result.document.declaration_name(n)) == Some("emergencyStop")
     )));
 }

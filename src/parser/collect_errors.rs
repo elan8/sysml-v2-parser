@@ -1,27 +1,33 @@
-//! Collect ParseError diagnostics from recovery nodes embedded in the AST.
+//! Collect `ParseError` diagnostics from recovery and fallback nodes embedded in the AST.
+//!
+//! Recovery diagnostics are a property of the node kind, not of the scope that happens to own
+//! it: a malformed member reports the same way inside a package body, a part definition body, or
+//! an action body. This consumer therefore states each rule once against the owning traversal
+//! boundary ([`crate::ast::visit`]) instead of re-deriving the tree shape, so a new body scope
+//! or a new place an existing member can appear reports diagnostics without further edits here.
+//!
+//! Diagnostics come out in traversal order -- depth first, source order within a body -- which is
+//! the order [`crate::parser::parse`] expects before it deduplicates and suppresses cascades.
 
-use super::diagnostics::trim_ascii_start;
 use super::recovery::parse_error_from_recovery_node;
+use crate::ast::visit::{
+    walk_classifier_decl, walk_extended_library_decl, walk_feature_decl, walk_kerml_feature_decl,
+    walk_kerml_semantic_decl, walk_parse_error_node, walk_textual_representation,
+    walk_unsupported_grammar_node, Visitor,
+};
 use crate::ast::{
-    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AliasBody,
-    AttributeBody, AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
-    ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
-    DefinitionBodyElement, InterfaceDefBody, InterfaceDefBodyElement, OccurrenceBodyElement,
-    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
-    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody, RefBodyElement,
-    RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement, RequirementDefBody,
-    RequirementDefBodyElement, RootNamespace, StateDefBody, StateDefBodyElement,
-    TextualRepresentation, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
-    ViewDefBody, ViewDefBodyElement,
+    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlFeatureDecl, KermlSemanticDecl, Node,
+    ParseErrorNode, RootNamespace, Span, TextualRepresentation, UnsupportedGrammarNode,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 fn textual_rep_language_diagnostic(
-    node_span: &crate::ast::Span,
+    source: &str,
+    node_span: &Span,
     rep: &TextualRepresentation,
 ) -> Option<ParseError> {
     use crate::parser::diagnostic_catalog;
-    if rep.language_span.is_none() {
+    let Some(language) = rep.language else {
         return Some(
             ParseError::new("rep body is missing the required 'language' keyword and string value")
                 .with_location(node_span.offset, node_span.line, node_span.column)
@@ -30,9 +36,12 @@ fn textual_rep_language_diagnostic(
                 .with_severity(DiagnosticSeverity::Error)
                 .with_category(DiagnosticCategory::ParseError),
         );
-    }
-    if rep.language.trim().is_empty() {
-        let ls = rep.language_span.as_ref()?;
+    };
+    let authored =
+        source.get(language.span().offset..language.span().offset + language.span().len)?;
+    let spelling = crate::ast::decode_string_literal(authored)?;
+    if spelling.trim().is_empty() {
+        let ls = language.span();
         return Some(
             ParseError::new("rep language value must be a non-empty string")
                 .with_location(ls.offset, ls.line, ls.column)
@@ -45,659 +54,126 @@ fn textual_rep_language_diagnostic(
     None
 }
 
-fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<ParseError>) {
-    if let RequirementDefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                RequirementDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                RequirementDefBodyElement::Frame(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                RequirementDefBodyElement::RequirementUsage(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                RequirementDefBodyElement::TextualRep(n) => {
-                    if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
-                        errors.push(diag);
-                    }
-                }
-                RequirementDefBodyElement::Constraint(n) => {
-                    collect_constraint_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
+fn unsupported_fallback_diagnostic(span: &Span, production: &str) -> ParseError {
+    ParseError::new(format!(
+        "the spec-valid {production} production is retained but not structurally implemented"
+    ))
+    .with_location(span.offset, span.line, span.column)
+    .with_length(span.len.max(1))
+    .with_code("unsupported_grammar_form")
+    .with_severity(DiagnosticSeverity::Warning)
+    .with_category(DiagnosticCategory::UnsupportedGrammarForm)
 }
 
-fn collect_action_def_body_errors(body: &ActionDefBody, errors: &mut Vec<ParseError>) {
-    if let ActionDefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                ActionDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                ActionDefBodyElement::RefDecl(n) => {
-                    collect_ref_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::OccurrenceUsage(n) => {
-                    collect_occurrence_usage_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::AssertConstraint(n) => {
-                    collect_constraint_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::ActionUsage(n) => {
-                    collect_action_usage_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::ForLoop(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::WhileStmt(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::LoopStmt(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors);
-                }
-                ActionDefBodyElement::IfStmt(n) => {
-                    collect_action_def_body_errors(&n.value.then_body, errors);
-                    if let Some(else_body) = &n.value.else_body {
-                        collect_action_def_body_errors(else_body, errors);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
+struct RecoveryErrorCollector<'source> {
+    /// The document text the tree's spans index; the tree does not carry it, and the document
+    /// envelope that will is not built until after diagnostics are collected.
+    source: &'source str,
+    errors: Vec<ParseError>,
 }
 
-fn collect_ref_body_errors(body: &RefBody, errors: &mut Vec<ParseError>) {
-    if let RefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                RefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                RefBodyElement::Action(n) => {
-                    if let ActionDefBodyElement::Error(inner) = &n.value {
-                        errors.push(parse_error_from_recovery_node(&n.span, &inner.value));
-                    }
-                }
-                RefBodyElement::PartUsage(n) => {
-                    if let PartUsageBodyElement::Error(inner) = &n.value {
-                        errors.push(parse_error_from_recovery_node(&n.span, &inner.value));
-                    }
-                }
-                RefBodyElement::State(n) => {
-                    if let StateDefBodyElement::Error(inner) = &n.value {
-                        errors.push(parse_error_from_recovery_node(&n.span, &inner.value));
-                    }
-                }
-                _ => {}
-            }
-        }
+impl Visitor for RecoveryErrorCollector<'_> {
+    /// Text the parser could not recognize, kept in place with its authored span.
+    fn visit_parse_error_node(&mut self, node: &Node<ParseErrorNode>) {
+        self.errors
+            .push(parse_error_from_recovery_node(&node.span, &node.value));
+        walk_parse_error_node(self, node);
     }
-}
 
-fn collect_constraint_body_element_errors(
-    elements: &[crate::ast::Node<ConstraintDefBodyElement>],
-    errors: &mut Vec<ParseError>,
-) {
-    for element in elements {
-        if let ConstraintDefBodyElement::Error(n) = &element.value {
-            errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-        }
+    /// A spec production that parses but has no structural representation yet; it carries the
+    /// diagnostic the parser already classified.
+    fn visit_unsupported_grammar_node(&mut self, node: &Node<UnsupportedGrammarNode>) {
+        self.errors.push(parse_error_from_recovery_node(
+            &node.span,
+            &node.value.diagnostic,
+        ));
+        walk_unsupported_grammar_node(self, node);
     }
-}
 
-fn collect_relationship_body_element_errors(
-    elements: &[crate::ast::Node<RelationshipBodyElement>],
-    errors: &mut Vec<ParseError>,
-) {
-    for element in elements {
-        if let RelationshipBodyElement::Error(n) = &element.value {
-            errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+    /// A `rep` body must name its language; both the missing and the empty spelling are errors.
+    fn visit_textual_representation(&mut self, node: &Node<TextualRepresentation>) {
+        if let Some(diagnostic) =
+            textual_rep_language_diagnostic(self.source, &node.span, &node.value)
+        {
+            self.errors.push(diagnostic);
         }
+        walk_textual_representation(self, node);
     }
-}
 
-fn collect_action_usage_body_errors(body: &ActionUsageBody, errors: &mut Vec<ParseError>) {
-    if let ActionUsageBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                ActionUsageBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                ActionUsageBodyElement::ActionUsage(n) => {
-                    collect_action_usage_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::OccurrenceUsage(n) => {
-                    collect_occurrence_usage_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::AssertConstraint(n) => {
-                    collect_constraint_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::ForLoop(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::WhileStmt(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::LoopStmt(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors);
-                }
-                ActionUsageBodyElement::IfStmt(n) => {
-                    collect_action_def_body_errors(&n.value.then_body, errors);
-                    if let Some(else_body) = &n.value.else_body {
-                        collect_action_def_body_errors(else_body, errors);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_state_body_errors(body: &StateDefBody, errors: &mut Vec<ParseError>) {
-    if let StateDefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                StateDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                StateDefBodyElement::Entry(n) => collect_state_body_errors(&n.value.body, errors),
-                StateDefBodyElement::Do(n) => collect_state_body_errors(&n.value.body, errors),
-                StateDefBodyElement::Exit(n) => collect_state_body_errors(&n.value.body, errors),
-                StateDefBodyElement::RequirementUsage(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                StateDefBodyElement::StateUsage(n) => {
-                    collect_state_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_use_case_body_errors(body: &UseCaseDefBody, errors: &mut Vec<ParseError>) {
-    if let UseCaseDefBody::Brace { elements } = body {
-        for element in elements {
-            if let UseCaseDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_constraint_body_errors(body: &ConstraintDefBody, errors: &mut Vec<ParseError>) {
-    if let ConstraintDefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                ConstraintDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                ConstraintDefBodyElement::Constraint(n) => {
-                    collect_constraint_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_calc_body_errors(body: &CalcDefBody, errors: &mut Vec<ParseError>) {
-    if let CalcDefBody::Brace { elements } = body {
-        for element in elements {
-            if let CalcDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_view_def_body_errors(body: &ViewDefBody, errors: &mut Vec<ParseError>) {
-    if let ViewDefBody::Brace { elements } = body {
-        for element in elements {
-            if let ViewDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_view_body_errors(body: &ViewBody, errors: &mut Vec<ParseError>) {
-    if let ViewBody::Brace { elements } = body {
-        for element in elements {
-            if let ViewBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseError>) {
-    if let AttributeBody::Brace { elements } = body {
-        for element in elements {
-            if let AttributeBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_port_def_body_errors(body: &PortDefBody, errors: &mut Vec<ParseError>) {
-    if let PortDefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                PortDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                PortDefBodyElement::AttributeDef(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PortDefBodyElement::AttributeUsage(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_rendering_def_body_errors(body: &RenderingDefBody, errors: &mut Vec<ParseError>) {
-    if let RenderingDefBody::Brace { elements } = body {
-        for element in elements {
-            if let RenderingDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_occurrence_usage_body_errors(body: &OccurrenceUsageBody, errors: &mut Vec<ParseError>) {
-    if let OccurrenceUsageBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                OccurrenceBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                OccurrenceBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors)
-                }
-                OccurrenceBodyElement::OccurrenceUsage(n) => {
-                    collect_occurrence_usage_body_errors(&n.value.body, errors)
-                }
-                OccurrenceBodyElement::StateUsage(n) => {
-                    collect_state_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_definition_body_errors(body: &DefinitionBody, errors: &mut Vec<ParseError>) {
-    if let DefinitionBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                DefinitionBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                DefinitionBodyElement::OccurrenceMember(n) => match &n.value {
-                    OccurrenceBodyElement::Error(err) => {
-                        errors.push(parse_error_from_recovery_node(&n.span, &err.value));
-                    }
-                    OccurrenceBodyElement::PartUsage(p) => {
-                        collect_part_usage_body_errors(&p.value.body, errors)
-                    }
-                    OccurrenceBodyElement::OccurrenceUsage(o) => {
-                        collect_occurrence_usage_body_errors(&o.value.body, errors)
-                    }
-                    OccurrenceBodyElement::StateUsage(s) => {
-                        collect_state_body_errors(&s.value.body, errors)
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>) {
-    if let PartDefBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                PartDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                PartDefBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::PartDef(n) => {
-                    collect_part_def_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::Perform(n) => {
-                    collect_perform_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::AttributeDef(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::AttributeUsage(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::RequirementUsage(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::ExhibitState(n) => {
-                    collect_state_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::OccurrenceUsage(n) => {
-                    collect_occurrence_usage_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::ConnectionDef(n) => {
-                    collect_connection_def_body_errors(&n.value.body, errors)
-                }
-                PartDefBodyElement::InterfaceDef(n) => {
-                    collect_interface_def_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_perform_body_errors(body: &crate::ast::PerformBody, errors: &mut Vec<ParseError>) {
-    if let crate::ast::PerformBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                crate::ast::PerformBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors)
-                }
-                crate::ast::PerformBodyElement::AttributeUsage(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                crate::ast::PerformBodyElement::Action(n) => {
-                    if let crate::ast::ActionUsageBodyElement::ActionUsage(a) = &n.value {
-                        collect_action_usage_body_errors(&a.value.body, errors)
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn collect_part_usage_body_errors(body: &PartUsageBody, errors: &mut Vec<ParseError>) {
-    if let PartUsageBody::Brace { elements } = body {
-        for element in elements {
-            match &element.value {
-                PartUsageBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                PartUsageBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors)
-                }
-                PartUsageBodyElement::Perform(n) => {
-                    collect_perform_body_errors(&n.value.body, errors)
-                }
-                PartUsageBodyElement::StateUsage(n) => {
-                    collect_state_body_errors(&n.value.body, errors)
-                }
-                PartUsageBodyElement::AttributeUsage(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PartUsageBodyElement::OccurrenceUsage(n) => {
-                    collect_occurrence_usage_body_errors(&n.value.body, errors)
-                }
-                PartUsageBodyElement::Satisfy(n) => {
-                    if let Some(elems) = &n.value.body_elements {
-                        collect_constraint_body_element_errors(elems, errors);
-                    }
-                }
-                PartUsageBodyElement::ConnectionDef(n) => {
-                    collect_connection_def_body_errors(&n.value.body, errors)
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-/// GH-51: `ConnectionDef`/`InterfaceDef` bodies previously had no dispatch arm anywhere in this
-/// file, so their `Error` recovery nodes -- even `ConnectionDefBodyElement::Error`, which already
-/// existed -- were never collected into `parse_with_diagnostics`'s `result.errors`, regardless of
-/// nesting context. Fixing `interface_def_body`'s own recovery loop alone wasn't sufficient
-/// without this.
-fn collect_connection_def_body_errors(body: &ConnectionDefBody, errors: &mut Vec<ParseError>) {
-    if let ConnectionDefBody::Brace { elements } = body {
-        for element in elements {
-            if let ConnectionDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-/// See [`collect_connection_def_body_errors`].
-fn collect_interface_def_body_errors(body: &InterfaceDefBody, errors: &mut Vec<ParseError>) {
-    if let InterfaceDefBody::Brace { elements } = body {
-        for element in elements {
-            if let InterfaceDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-            }
-        }
-    }
-}
-
-fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>) {
-    if let PackageBody::Brace { elements } = body {
-        for element in elements {
-            collect_package_body_element_errors(element, errors);
-        }
-    }
-}
-
-fn collect_package_body_element_errors(
-    element: &crate::ast::Node<PackageBodyElement>,
-    errors: &mut Vec<ParseError>,
-) {
-    match &element.value {
-        PackageBodyElement::Error(n) => {
-            errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-        }
-        PackageBodyElement::Package(n) => collect_package_body_errors(&n.value.body, errors),
-        PackageBodyElement::LibraryPackage(n) => collect_package_body_errors(&n.value.body, errors),
-        PackageBodyElement::PartDef(n) => collect_part_def_body_errors(&n.value.body, errors),
-        PackageBodyElement::PartUsage(n) => collect_part_usage_body_errors(&n.value.body, errors),
-        PackageBodyElement::PortDef(n) => collect_port_def_body_errors(&n.value.body, errors),
-        PackageBodyElement::ConnectionDef(n) => {
-            collect_connection_def_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::InterfaceDef(n) => {
-            collect_interface_def_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::AttributeDef(n) => collect_attribute_body_errors(&n.value.body, errors),
-        PackageBodyElement::ActionDef(n) => collect_action_def_body_errors(&n.value.body, errors),
-        PackageBodyElement::ActionUsage(n) => {
-            collect_action_usage_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::RequirementDef(n) => {
-            collect_requirement_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::RequirementUsage(n) => {
-            collect_requirement_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::UseCaseDef(n) => collect_use_case_body_errors(&n.value.body, errors),
-        PackageBodyElement::UseCaseUsage(n) => collect_use_case_body_errors(&n.value.body, errors),
-        PackageBodyElement::CaseDef(n) => collect_use_case_body_errors(&n.value.body, errors),
-        PackageBodyElement::CaseUsage(n) => collect_use_case_body_errors(&n.value.body, errors),
-        PackageBodyElement::AnalysisCaseDef(n) => {
-            collect_use_case_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::AnalysisCaseUsage(n) => {
-            collect_use_case_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::VerificationCaseDef(n) => {
-            collect_use_case_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::VerificationCaseUsage(n) => {
-            collect_use_case_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::ConcernUsage(n) => {
-            collect_requirement_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::ViewpointDef(n) => {
-            collect_requirement_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::ViewpointUsage(n) => {
-            collect_requirement_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::StateDef(n) => collect_state_body_errors(&n.value.body, errors),
-        PackageBodyElement::StateUsage(n) => collect_state_body_errors(&n.value.body, errors),
-        PackageBodyElement::ConstraintDef(n) => {
-            collect_constraint_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::ConstraintUsage(n) => {
-            collect_constraint_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
-        PackageBodyElement::ViewDef(n) => collect_view_def_body_errors(&n.value.body, errors),
-        PackageBodyElement::ViewUsage(n) => collect_view_body_errors(&n.value.body, errors),
-        PackageBodyElement::RenderingDef(n) => {
-            collect_rendering_def_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::MetadataDef(n) => collect_attribute_body_errors(&n.value.body, errors),
-        PackageBodyElement::MetadataUsage(n) => {
-            collect_attribute_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::ItemDef(n) => collect_attribute_body_errors(&n.value.body, errors),
-        PackageBodyElement::IndividualDef(n) => {
-            collect_attribute_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::OccurrenceDef(n) => {
-            collect_definition_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::OccurrenceUsage(n) => {
-            collect_occurrence_usage_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::AllocationDef(n) => {
-            collect_definition_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::AllocationUsage(n) => {
-            collect_definition_body_errors(&n.value.body, errors)
-        }
-        PackageBodyElement::FlowDef(n) => collect_definition_body_errors(&n.value.body, errors),
-        PackageBodyElement::FlowUsage(n) => collect_definition_body_errors(&n.value.body, errors),
-        PackageBodyElement::Satisfy(n) => {
-            if let Some(elems) = &n.value.body_elements {
-                collect_constraint_body_element_errors(elems, errors);
-            }
-        }
-        PackageBodyElement::AliasDef(n) => {
-            if let AliasBody::Brace { elements } = &n.value.body {
-                collect_relationship_body_element_errors(elements, errors);
-            }
-        }
-        PackageBodyElement::Dependency(n) => {
-            if let Some(elems) = &n.value.body_elements {
-                collect_relationship_body_element_errors(elems, errors);
-            }
-        }
-        PackageBodyElement::TextualRep(n) => {
-            if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
-                errors.push(diag);
-            }
-        }
-        _ => {}
-    }
-}
-
-pub(crate) fn collect_requirement_id_dialect_diagnostics(bytes: &[u8]) -> Vec<ParseError> {
-    let pattern = b"requirement def id ";
-    let mut errors = Vec::new();
-    let mut search_from = 0usize;
-    while search_from < bytes.len() {
-        let Some(rel) = bytes[search_from..]
-            .windows(pattern.len())
-            .position(|window| window == pattern)
-        else {
-            break;
-        };
-        let offset = search_from + rel;
-        let after = trim_ascii_start(&bytes[offset + pattern.len()..]);
-        if after.first() != Some(&b'\'') && after.first() != Some(&b'"') {
-            search_from = offset + 1;
-            continue;
-        }
-        let quote = after[0];
-        let Some(close) = after[1..].iter().position(|&b| b == quote) else {
-            search_from = offset + 1;
-            continue;
-        };
-        let req_id = String::from_utf8_lossy(&after[1..1 + close]);
-        let (line, column) = offset_to_line_column(bytes, offset);
-        errors.push(
-            ParseError::new(format!(
-                "requirement definition uses non-standard `id '{req_id}'` syntax; use a short name in angle brackets"
-            ))
-            .with_location(offset, line, column)
-            .with_length(pattern.len().max(1))
-            .with_code("invalid_requirement_short_name_syntax")
-            .with_expected("short name in angle brackets after `requirement def`".to_string())
-            .with_suggestion(format!(
-                "Use `requirement def <'{req_id}'> ...` instead of `requirement def id '{req_id}' ...`."
-            ))
-            .with_category(DiagnosticCategory::ParseError),
-        );
-        search_from = offset + pattern.len();
-    }
-    errors
-}
-
-fn offset_to_line_column(bytes: &[u8], offset: usize) -> (u32, usize) {
-    let mut line = 1u32;
-    let mut column = 1usize;
-    for (idx, &b) in bytes.iter().enumerate() {
-        if idx >= offset {
-            break;
-        }
-        if b == b'\n' {
-            line += 1;
-            column = 1;
+    /// An extended-library fallback keeps the declaration the grammar could not model. Some of
+    /// those declarations are recognizable dialect forms with specific guidance to offer, so
+    /// classify the node's own text here: the alternative -- searching the whole document for the
+    /// dialect's spelling -- cannot tell a declaration from the same words inside a comment or a
+    /// string literal.
+    fn visit_extended_library_decl(&mut self, node: &Node<ExtendedLibraryDecl>) {
+        if let Some((code, message, expected, suggestion)) = self
+            .source
+            .get(
+                node.value.text.span().offset
+                    ..node.value.text.span().offset + node.value.text.span().len,
+            )
+            .and_then(|text| {
+                crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
+                    text.as_bytes(),
+                )
+            })
+        {
+            self.errors.push(
+                ParseError::new(message)
+                    .with_location(node.span.offset, node.span.line, node.span.column)
+                    .with_length(node.span.len)
+                    .with_code(code)
+                    .with_expected(expected)
+                    .with_suggestion(suggestion)
+                    .with_category(DiagnosticCategory::ParseError),
+            );
         } else {
-            column += 1;
+            self.errors.push(unsupported_fallback_diagnostic(
+                &node.span,
+                "extended-library declaration",
+            ));
         }
+        walk_extended_library_decl(self, node);
     }
-    (line, column)
+
+    fn visit_feature_decl(&mut self, node: &Node<FeatureDecl>) {
+        self.errors.push(unsupported_fallback_diagnostic(
+            &node.span,
+            "KerML feature declaration",
+        ));
+        walk_feature_decl(self, node);
+    }
+
+    fn visit_classifier_decl(&mut self, node: &Node<ClassifierDecl>) {
+        self.errors.push(unsupported_fallback_diagnostic(
+            &node.span,
+            "KerML classifier declaration",
+        ));
+        walk_classifier_decl(self, node);
+    }
+
+    fn visit_kerml_semantic_decl(&mut self, node: &Node<KermlSemanticDecl>) {
+        self.errors.push(unsupported_fallback_diagnostic(
+            &node.span,
+            "KerML semantic declaration",
+        ));
+        walk_kerml_semantic_decl(self, node);
+    }
+
+    fn visit_kerml_feature_decl(&mut self, node: &Node<KermlFeatureDecl>) {
+        self.errors.push(unsupported_fallback_diagnostic(
+            &node.span,
+            "KerML feature form",
+        ));
+        walk_kerml_feature_decl(self, node);
+    }
 }
 
-pub(crate) fn collect_recovery_errors(root: &RootNamespace) -> Vec<ParseError> {
-    let mut errors = Vec::new();
-    for element in &root.elements {
-        match &element.value {
-            crate::ast::RootElement::Package(n) => {
-                collect_package_body_errors(&n.value.body, &mut errors)
-            }
-            crate::ast::RootElement::LibraryPackage(n) => {
-                collect_package_body_errors(&n.value.body, &mut errors)
-            }
-            crate::ast::RootElement::Namespace(n) => {
-                collect_package_body_errors(&n.value.body, &mut errors)
-            }
-            crate::ast::RootElement::Import(_) => {}
-            crate::ast::RootElement::Member(n) => {
-                collect_package_body_element_errors(n, &mut errors)
-            }
-        }
-    }
-    errors
+pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec<ParseError> {
+    let mut collector = RecoveryErrorCollector {
+        source,
+        errors: Vec::new(),
+    };
+    collector.visit_root_namespace(root);
+    collector.errors
 }

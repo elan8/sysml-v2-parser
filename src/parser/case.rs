@@ -3,9 +3,8 @@ use crate::ast::{
     VerificationCaseUsage,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
+use crate::parser::lex::{name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::usage::usage_header;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -19,6 +18,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
         input,
         DefinitionPrefixOptions::new(b"case")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = loose_use_case_body(input)?;
@@ -28,9 +28,10 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
             start,
             input,
             CaseDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,
@@ -74,7 +75,7 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
             AnalysisCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 body,
                 membership: crate::ast::Membership::owning(
@@ -87,19 +88,33 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
 }
 
 pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseUsage>> {
+    // `OccurrenceUsagePrefix` can allocate a metadata-keyword reference before the following
+    // `analysis` head proves this production applies, so a refused speculative parse must leave
+    // no arena entries behind.
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"analysis") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, analysis_case_usage_inner)
+}
+
+fn analysis_case_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
-    // analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (Individuals Examples/
-    // AnalysisIndividualExample.sysml:79).
-    let (input, individual_kw) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"analysis"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // `AnalysisCaseUsage = OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody`
+    // (SysML textual BNF 1533-1535; pinned Pilot `SysML.xtext` 2236). The entire prefix is
+    // parsed before the kind head, so `ref analysis` is claimed as one usage rather than letting
+    // the body expression fallback consume `ref` and shred the declaration.
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    let (input, _) = crate::parser::occurrence_prefix::keyword_token(input, b"analysis")?;
     let (input, usage) = case_like_usage_body(
         input,
-        abstract_kw.is_some(),
+        false,
         crate::ast::Membership::feature(visibility, visibility_span),
     )?;
     Ok((
@@ -108,10 +123,11 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
             start,
             input,
             AnalysisCaseUsage {
+                prefix,
                 name: usage.name,
                 type_name: usage.type_name,
-                is_abstract: usage.is_abstract,
-                is_individual: individual_kw.is_some(),
+                subsets: usage.subsets,
+                redefines: usage.redefines,
                 body: usage.body,
                 membership: usage.membership,
             },
@@ -127,6 +143,7 @@ pub(crate) fn verification_case_def(
         input,
         DefinitionPrefixOptions::new(b"verification")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = loose_use_case_body(input)?;
@@ -136,9 +153,10 @@ pub(crate) fn verification_case_def(
             start,
             input,
             VerificationCaseDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                definition_prefix: prefix.basic_prefix,
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,
@@ -171,6 +189,9 @@ pub(crate) fn verification_case_usage(
             VerificationCaseUsage {
                 name: usage.name,
                 type_name: usage.type_name,
+                multiplicity: usage.multiplicity,
+                subsets: usage.subsets,
+                redefines: usage.redefines,
                 is_abstract: usage.is_abstract,
                 body: usage.body,
                 membership: usage.membership,
@@ -185,14 +206,20 @@ fn case_like_usage_body(
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, CaseUsage> {
     let (input, name) = name(input)?;
-    let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    // `parse_feature_usage_header` rather than `usage_header` + `take_until_terminator`: the
+    // latter skipped whatever stood between the typing and the body, so the multiplicity in
+    // `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (Systems Library
+    // `Cases.sysml:56`) was dropped without a diagnostic.
+    let (input, header) = crate::parser::definition_header::parse_feature_usage_header(input)?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
         CaseUsage {
             name,
-            type_name: header.type_name,
+            type_name: header.type_reference,
+            multiplicity: header.multiplicity,
+            subsets: header.subsets,
+            redefines: header.redefines,
             is_abstract,
             body,
             membership,
@@ -207,10 +234,9 @@ fn loose_use_case_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::UseCa
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on Case/AnalysisCase/VerificationCase families ---
@@ -304,6 +330,48 @@ mod membership_tests {
         assert_eq!(
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+}
+
+#[cfg(test)]
+mod redefines_field_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Review comment 3: `VerificationCaseUsage` had no `redefines` field, so `header.redefines`
+    /// (already parsed by the shared `case_like_usage_body`/`parse_feature_usage_header`) was
+    /// computed and then dropped when the struct was built.
+    #[test]
+    fn verification_case_usage_keeps_its_redefines_clause() {
+        let (rest, node) =
+            verification_case_usage(input("verification v :>> BaseV;")).expect("verification v");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            node.value.redefines.is_some(),
+            "the :>> redefines clause must not be discarded"
+        );
+    }
+
+    /// The full defect the review comment reported: `verification v :>> BaseV;` used to
+    /// re-emit as `verification v;`, silently losing the redefinition on a parse/emit round
+    /// trip. `CaseUsage`/`AnalysisCaseUsage` already keep this; `VerificationCaseUsage` must
+    /// match, since `CaseUsage`, `VerificationCaseUsage` and `UseCaseUsage` all derive from the
+    /// same `ConstraintUsageDeclaration` -> `UsageDeclaration` -> `FeatureSpecializationPart`
+    /// BNF chain (`FeatureSpecialization = Typings | Subsettings | References | Crosses |
+    /// Redefinitions`, SysML v2.0 Part 1 8.2.2.6.2 / KerML v1.0), so all three are grammatically
+    /// required to admit a `:>>` clause identically.
+    #[test]
+    fn verification_case_usage_round_trips_its_redefines_clause() {
+        let source = "verification def V {\n\tverification v :>> BaseV;\n}\n";
+        let document = crate::parse(source).expect("parse verification def");
+        let emitted = crate::emit_sysml(&document).expect("emit verification def");
+        assert!(
+            emitted.contains(":>> BaseV"),
+            "redefines clause lost on round trip, emitted:\n{emitted}"
         );
     }
 }

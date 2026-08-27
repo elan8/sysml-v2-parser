@@ -6,12 +6,15 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub mod kebnf;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceTarget {
     pub release_tag: String,
     pub release_repo: String,
     pub sysml_bnf_productions: usize,
     pub kerml_bnf_productions: usize,
+    pub grammar_content_hash: String,
 }
 
 pub fn manifest_dir() -> PathBuf {
@@ -48,6 +51,7 @@ pub fn load_conformance_target_from(path: &Path) -> ConformanceTarget {
     let mut release_repo = None;
     let mut sysml_bnf_productions = None;
     let mut kerml_bnf_productions = None;
+    let mut grammar_content_hash = None;
 
     for (idx, line) in text.lines().enumerate() {
         let line_no = idx + 1;
@@ -66,6 +70,7 @@ pub fn load_conformance_target_from(path: &Path) -> ConformanceTarget {
         match key {
             "release_tag" => release_tag = Some(value.to_string()),
             "release_repo" => release_repo = Some(value.to_string()),
+            "grammar_content_hash" => grammar_content_hash = Some(value.to_string()),
             "sysml_bnf_productions" => {
                 sysml_bnf_productions = Some(value.parse::<usize>().unwrap_or_else(|_| {
                     panic!("invalid sysml_bnf_productions at {line_no}: {value}");
@@ -102,6 +107,12 @@ pub fn load_conformance_target_from(path: &Path) -> ConformanceTarget {
         kerml_bnf_productions: kerml_bnf_productions.unwrap_or_else(|| {
             panic!(
                 "conformance-target missing kerml_bnf_productions: {}",
+                path.display()
+            )
+        }),
+        grammar_content_hash: grammar_content_hash.unwrap_or_else(|| {
+            panic!(
+                "conformance-target missing grammar_content_hash: {}",
                 path.display()
             )
         }),
