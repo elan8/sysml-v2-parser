@@ -383,6 +383,9 @@ fn emit_part_def_body_element(
         PartDefBodyElement::ConstraintUsage(c) => {
             super::view::emit_constraint_usage(w, path, &c.value)
         }
+        PartDefBodyElement::RequireConstraint(c) => {
+            super::requirement::emit_require_constraint(w, path, &c.value)
+        }
         PartDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
@@ -427,6 +430,10 @@ fn emit_part_def_body_element(
         PartDefBodyElement::RenderingDef(n) => super::view::emit_rendering_def(w, path, &n.value),
         PartDefBodyElement::RenderingUsage(n) => {
             super::view::emit_rendering_usage(w, path, &n.value)
+        }
+        PartDefBodyElement::ViewRendering(n) => super::view::emit_view_rendering(w, path, &n.value),
+        PartDefBodyElement::VerifyRequirement(n) => {
+            super::requirement::emit_verify_requirement(w, path, &n.value)
         }
         other @ (PartDefBodyElement::OccurrenceDef(_)
         | PartDefBodyElement::CaseDef(_)

@@ -949,22 +949,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         RequirementDefBodyElement::VerifyRequirement(verify) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(verify (target ")?;
-                            if let Some(reference) = verify.value.target {
-                                self.write_reference(reference)?;
-                            } else {
-                                self.writer.write_str("none")?;
-                            }
-                            self.writer.write_str(") (redefines ")?;
-                            if let Some(reference) = verify.value.redefines {
-                                self.write_reference(reference)?;
-                            } else {
-                                self.writer.write_str("none")?;
-                            }
-                            self.writer.write_str("))")?;
+                            self.write_verify_requirement(&verify.value)?;
                         }
-                        RequirementDefBodyElement::RequireConstraint(_constraint) => {
-                            self.write_marker(&mut first, "require-constraint")?;
+                        RequirementDefBodyElement::RequireConstraint(constraint) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_require_constraint(&constraint.value)?;
                         }
                         RequirementDefBodyElement::Constraint(_constraint) => {
                             self.write_marker(&mut first, "constraint")?;
@@ -1076,8 +1065,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ViewBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
                         }
-                        ViewBodyElement::ViewRendering(_rendering) => {
-                            self.write_marker(&mut first, "view-rendering")?;
+                        ViewBodyElement::ViewRendering(rendering) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_rendering(&rendering.value)?;
                         }
                         ViewBodyElement::RenderingUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1771,6 +1761,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_constraint_usage(&usage.value)?;
                         }
+                        PartDefBodyElement::RequireConstraint(constraint) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_require_constraint(&constraint.value)?;
+                        }
                         PartDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(import ")?;
@@ -1874,6 +1868,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         PartDefBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
+                        }
+                        PartDefBodyElement::ViewRendering(rendering) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_rendering(&rendering.value)?;
+                        }
+                        PartDefBodyElement::VerifyRequirement(verify) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_verify_requirement(&verify.value)?;
                         }
                         PartDefBodyElement::CaseDef(definition) => {
                             self.write_definition_prefix_marker(
@@ -2540,23 +2542,50 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             feature.is_member, feature.is_all
         )?;
         self.write_usage_declaration_name(feature.name)?;
-        self.writer.write_str(") (typing ")?;
-        match &feature.typing {
-            Some(typing) => self.write_typing(&typing.value)?,
-            None => self.writer.write_str("none")?,
+        self.writer.write_str(") (specializations")?;
+        for specialization in &feature.specializations {
+            self.writer.write_char(' ')?;
+            match specialization {
+                super::FeatureSpecialization::Typing(typing) => {
+                    self.writer.write_str("(typing ")?;
+                    self.write_typing(&typing.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Subsetting {
+                    relationship,
+                    value,
+                } => {
+                    self.writer.write_str("(subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_str(" (value ")?;
+                    if let Some(value) = value {
+                        self.write_expression(value)?;
+                    } else {
+                        self.writer.write_str("none")?;
+                    }
+                    self.writer.write_str("))")?;
+                }
+                super::FeatureSpecialization::ReferenceSubsetting(relationship) => {
+                    self.writer.write_str("(reference-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::CrossSubsetting(relationship) => {
+                    self.writer.write_str("(cross-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Redefinition(relationship) => {
+                    self.writer.write_str("(redefinition ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+            }
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("subsets", feature.subsets.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("redefines", feature.redefines.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("references", feature.references.as_ref())?;
-        self.writer.write_char(' ')?;
-        self.write_optional_subsetting("crosses", feature.crosses.as_ref())?;
         self.writer.write_str(" (relationships")?;
         for part in &feature.relationship_parts {
             self.writer.write_char(' ')?;
@@ -2716,6 +2745,35 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
         }
+    }
+
+    fn write_require_constraint(
+        &mut self,
+        constraint: &super::RequireConstraint,
+    ) -> io::Result<()> {
+        self.writer.write_str("(require-constraint (kind ")?;
+        self.writer.write_str(if constraint.is_assume {
+            "assume"
+        } else {
+            "require"
+        })?;
+        self.writer.write_str(") (constraint-keyword ")?;
+        write!(self.writer, "{}", constraint.has_constraint_keyword)?;
+        self.writer.write_str(") (name ")?;
+        self.write_optional_name(constraint.name)?;
+        self.writer.write_str(") (target ")?;
+        match constraint.target {
+            Some(target) => self.write_reference(target)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (typing ")?;
+        match &constraint.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_constraint_def_body(&constraint.body)?;
+        self.writer.write_char(')')
     }
 
     /// `ConstraintDefinition = … DefinitionDeclaration CalculationBody` (SysML BNF 1379).
@@ -2947,6 +3005,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     InOut::Out => self.writer.write_str("out")?,
                     InOut::InOut => self.writer.write_str("inout")?,
                 }
+                self.writer.write_str(") (kind ")?;
+                match &declaration.value.kind {
+                    Some(kind) => match kind.value {
+                        crate::ast::InOutDeclKind::Action => {
+                            self.writer.write_str("(action ")?;
+                            write_span(self.writer, &kind.span)?;
+                            self.writer.write_char(')')?;
+                        }
+                    },
+                    None => self.writer.write_str("none")?,
+                }
                 self.writer.write_str(") (reference ")?;
                 self.writer.write_str(if declaration.value.is_reference {
                     "true"
@@ -3058,6 +3127,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 loop_stmt.value.until.as_ref(),
             ),
             ActionDefBodyElement::IfStmt(if_stmt) => self.write_if_stmt(&if_stmt.value),
+            ActionDefBodyElement::Transition(transition) => {
+                self.write_transition(&transition.value)
+            }
             ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
             ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
             ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
@@ -3100,7 +3172,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::FlowDeclaration::Declared {
                 declaration,
                 value,
-                payload,
+                payloads,
                 endpoints,
             } => {
                 let d = &declaration.value;
@@ -3145,11 +3217,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 } else {
                     self.writer.write_str("none")?;
                 }
-                self.writer.write_str(") (payload ")?;
-                if let Some(payload) = payload {
-                    self.write_payload_feature(&payload.value)?;
-                } else {
-                    self.writer.write_str("none")?;
+                self.writer.write_str(") (payloads")?;
+                for payload in payloads {
+                    self.writer.write_str(" (payload (of ")?;
+                    write_span(self.writer, &payload.value.of_span)?;
+                    self.writer.write_str(") (feature ")?;
+                    self.write_payload_feature(&payload.value.feature.value)?;
+                    self.writer.write_str("))")?;
                 }
                 self.writer.write_str(") (endpoints ")?;
                 if let Some(endpoints) = &**endpoints {
@@ -3849,6 +3923,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::IfStmt(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_if_stmt(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::Transition(transition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_transition(&transition.value)?;
                         }
                         super::ActionUsageBodyElement::StateUsage(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -4912,8 +4990,32 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// A KerML `binding` member owns a `TypeBody`; project it rather than reducing the member to
     /// a marker so nested annotating members remain observable.
     fn write_bind(&mut self, bind: &super::KermlBindingMember) -> io::Result<()> {
-        self.writer.write_str("(binding (name ")?;
+        self.writer.write_str("(binding (all ")?;
+        self.writer.write_str(if bind.all_span.is_some() {
+            "true"
+        } else {
+            "false"
+        })?;
+        self.writer.write_str(") (name ")?;
         self.write_optional_name(bind.name)?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(bind.multiplicity.as_ref())?;
+        self.writer.write_str(") (inline-ends ")?;
+        if let Some(pair) = &bind.inline_ends {
+            self.writer.write_str("(pair (of ")?;
+            self.writer.write_str(if pair.value.of_span.is_some() {
+                "true"
+            } else {
+                "false"
+            })?;
+            self.writer.write_str(") (left ")?;
+            self.write_kerml_connector_end(&pair.value.left.value)?;
+            self.writer.write_str(") (right ")?;
+            self.write_kerml_connector_end(&pair.value.right.value)?;
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&bind.body)?;
         self.writer.write_char(')')
@@ -5398,8 +5500,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ViewDefBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
                         }
-                        super::ViewDefBodyElement::ViewRendering(_rendering) => {
-                            self.write_marker(&mut first, "view-rendering")?;
+                        super::ViewDefBodyElement::ViewRendering(rendering) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_rendering(&rendering.value)?;
                         }
                         super::ViewDefBodyElement::RenderingUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -5471,6 +5574,58 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_rendering_usage_body(&usage.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_view_rendering(&mut self, usage: &super::ViewRenderingUsage) -> io::Result<()> {
+        self.writer.write_str("(view-rendering (name ")?;
+        self.write_name(usage.name)?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = usage.type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_rendering_usage_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_verify_requirement(
+        &mut self,
+        member: &super::VerifyRequirementMember,
+    ) -> io::Result<()> {
+        write!(
+            self.writer,
+            "(verify (explicit-requirement {}) (requirement ",
+            member.explicit_requirement_keyword
+        )?;
+        if let Some(requirement) = &member.requirement {
+            self.writer.write_str("(name ")?;
+            self.write_optional_name(requirement.value.name)?;
+            self.writer.write_str(") (type ")?;
+            if let Some(reference) = requirement.value.type_name {
+                self.write_reference(reference)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") ")?;
+            self.write_requirement_body(&requirement.value.body)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (target ")?;
+        if let Some(reference) = member.target {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (redefines ")?;
+        if let Some(reference) = member.redefines {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
     }
 
     fn write_rendering_usage_body(&mut self, body: &super::RenderingUsageBody) -> io::Result<()> {
@@ -6258,6 +6413,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::RenderingUsage(_usage) => {
                 self.write_marker(first, "rendering-usage")
+            }
+            PackageBodyElement::Expose(expose) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(expose ")?;
+                self.write_import_target(&expose.value.target)?;
+                self.writer.write_char(' ')?;
+                self.write_relationship_body(&expose.value.body)?;
+                self.writer.write_char(')')
             }
             PackageBodyElement::ConnectionDef(definition) => {
                 self.write_item_prefix(first)?;

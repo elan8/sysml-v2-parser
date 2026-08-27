@@ -31,7 +31,7 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::preceded;
+use nom::sequence::{preceded, terminated};
 use nom::IResult;
 use nom::Parser;
 
@@ -72,6 +72,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"while",
     b"loop",
     b"if",
+    b"transition",
     b"@",
     b"#",
     // The rest of FIRST(`OccurrenceUsagePrefix`) on the item and part usages this scope
@@ -316,6 +317,7 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::WhileStmt(_)
         | ActionDefBodyElement::LoopStmt(_)
         | ActionDefBodyElement::IfStmt(_)
+        | ActionDefBodyElement::Transition(_)
         | ActionDefBodyElement::StateUsage(_)
         | ActionDefBodyElement::ActionUsage(_)
         | ActionDefBodyElement::PartUsage(_)
@@ -408,6 +410,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 input,
                 InOutDecl {
                     direction,
+                    kind: None,
                     is_reference: false,
                     is_var: false,
                     name: None,
@@ -423,8 +426,14 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         ));
     }
     let parsed = (|| {
-        // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
-        let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
+        // `ActionBodyParameter = ('action' UsageDeclaration?)? '{' ActionBodyItem* '}'`.
+        // Retain the keyword and its exact source span: it is a usage kind, not a fabricated
+        // typing for the following declaration name.
+        let (input, action_kind) = opt(map(
+            terminated(with_span(tag(&b"action"[..])), ws1),
+            |(span, _)| Node::new(span, crate::ast::InOutDeclKind::Action),
+        ))
+        .parse(input)?;
         let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
         // `out var y1;` (KerML `var` time-varying prefix on a directed parameter).
         let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
@@ -518,8 +527,6 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             } else {
                 (input, trailing_multiplicity)
             };
-        let _ = action_typed_name;
-
         // Optional value clause: `= expr` / `:= expr` / `default (=|:=)? expr`, e.g.
         // `in a : Real = 0.0;` or `in target : Occurrence[1] default that as Occurrence`
         // (Systems Library `Actions.sysml`). `feature_value_part` also covers the
@@ -543,6 +550,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             input,
             InOutDecl {
                 direction,
+                kind: action_kind,
                 is_reference: is_reference.is_some(),
                 is_var: is_var.is_some(),
                 name: param_name,
@@ -977,6 +985,9 @@ fn action_def_body_behavior_element(input: Input<'_>) -> IResult<Input<'_>, Acti
         map(decision_stmt, ActionDefBodyElement::DecisionStmt),
         map(join_stmt, ActionDefBodyElement::JoinStmt),
         map(fork_stmt, ActionDefBodyElement::ForkStmt),
+        map(crate::parser::state::transition, |transition| {
+            ActionDefBodyElement::Transition(Box::new(transition))
+        }),
         map(state_usage, ActionDefBodyElement::StateUsage),
     ))
     .parse(input)
@@ -1874,6 +1885,9 @@ fn action_usage_body_behavior_element(
         map(decision_stmt, ActionUsageBodyElement::DecisionStmt),
         map(join_stmt, ActionUsageBodyElement::JoinStmt),
         map(fork_stmt, ActionUsageBodyElement::ForkStmt),
+        map(crate::parser::state::transition, |transition| {
+            ActionUsageBodyElement::Transition(Box::new(transition))
+        }),
         map(
             crate::parser::state::state_usage,
             ActionUsageBodyElement::StateUsage,

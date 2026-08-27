@@ -418,25 +418,32 @@ pub(crate) fn emit_kerml_feature(
         }
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(typing) = &feature.typing {
-        emit_typing_clause(w, &typing.value)?;
+    for specialization in &feature.specializations {
+        match specialization {
+            crate::ast::FeatureSpecialization::Typing(typing) => {
+                emit_typing_clause(w, &typing.value)?
+            }
+            crate::ast::FeatureSpecialization::Subsetting {
+                relationship,
+                value,
+            } => {
+                emit_subsetting_clause(w, &relationship.value)?;
+                if let Some(value) = value {
+                    w.push_str(" = ");
+                    emit_expression(w, &value.value)?;
+                }
+            }
+            crate::ast::FeatureSpecialization::ReferenceSubsetting(relationship)
+            | crate::ast::FeatureSpecialization::CrossSubsetting(relationship)
+            | crate::ast::FeatureSpecialization::Redefinition(relationship) => {
+                emit_subsetting_clause(w, &relationship.value)?
+            }
+        }
     }
     if let Some(multiplicity) = &feature.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
     emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
-    if let Some(redefines) = &feature.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
-    }
-    if let Some(subsets) = &feature.subsets {
-        emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(references) = &feature.references {
-        emit_subsetting_clause(w, &references.value)?;
-    }
-    if let Some(crosses) = &feature.crosses {
-        emit_subsetting_clause(w, &crosses.value)?;
-    }
     for (index, part) in feature.relationship_parts.iter().enumerate() {
         emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
     }
@@ -563,14 +570,34 @@ pub(crate) fn emit_kerml_binding_member(
     binding: &crate::ast::KermlBindingMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, binding.membership.visibility);
-    w.push_str("binding ");
-    if let Some(name) = binding.name {
-        w.push_declaration_name(&format!("{path}/name"), name)?;
-        w.push_str(" of ");
+    w.push_str("binding");
+    if binding.all_span.is_some() {
+        w.push_str(" all");
     }
-    emit_kerml_connector_end(w, &format!("{path}/left"), &binding.left.value)?;
-    w.push_str(" = ");
-    emit_kerml_connector_end(w, &format!("{path}/right"), &binding.right.value)?;
+    if let Some(name) = binding.name {
+        w.push_char(' ');
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+        if let Some(multiplicity) = &binding.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+    }
+    if let Some(pair) = &binding.inline_ends {
+        w.push_char(' ');
+        if pair.value.of_span.is_some() {
+            w.push_str("of ");
+        }
+        emit_kerml_connector_end(
+            w,
+            &format!("{path}/inline-ends/left"),
+            &pair.value.left.value,
+        )?;
+        w.push_str(" = ");
+        emit_kerml_connector_end(
+            w,
+            &format!("{path}/inline-ends/right"),
+            &pair.value.right.value,
+        )?;
+    }
     emit_calc_body(w, path, &binding.body)
 }
 
@@ -837,7 +864,7 @@ fn emit_typing_clause_as_subset(
     super::structure::emit_subsetting_clause(w, rel)
 }
 
-fn emit_view_rendering(
+pub(crate) fn emit_view_rendering(
     w: &mut EmitWriter<'_>,
     path: &str,
     r: &crate::ast::ViewRenderingUsage,
@@ -883,6 +910,16 @@ fn emit_view_rendering(
             Ok(())
         }
     }
+}
+
+pub(crate) fn emit_expose(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    expose: &crate::ast::ExposeMember,
+) -> Result<(), EmitError> {
+    w.push_str("expose ");
+    super::root::emit_import_target(w, &format!("{path}/expose/target"), &expose.target)?;
+    super::structure::emit_relationship_body(w, path, &expose.body)
 }
 
 pub(crate) fn emit_viewpoint_def(

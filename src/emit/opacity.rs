@@ -162,6 +162,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::RenderingUsage(r) => {
             walk_rendering_usage_body(report, path, &r.value.body)
         }
+        PackageBodyElement::Expose(e) => walk_relationship_body(report, path, &e.value.body),
         PackageBodyElement::Connect(c) => walk_ref_body(report, path, &c.value.body),
         PackageBodyElement::ItemDef(i) => walk_attribute_body(report, path, &i.value.body),
         PackageBodyElement::ItemUsage(i) => walk_attribute_body(report, path, &i.value.body),
@@ -551,6 +552,9 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::ConstraintUsage(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
+            PartDefBodyElement::RequireConstraint(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             PartDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             PartDefBodyElement::EnumerationUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -590,6 +594,10 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::RenderingUsage(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
+            PartDefBodyElement::ViewRendering(n) => {
+                walk_rendering_usage_body(report, &p, &n.value.body)
+            }
+            PartDefBodyElement::VerifyRequirement(_) => {}
             PartDefBodyElement::CaseDef(n) => walk_use_case_def_body(report, &p, &n.value.body),
             PartDefBodyElement::CaseUsage(n) => walk_use_case_def_body(report, &p, &n.value.body),
             PartDefBodyElement::UseCaseDef(n) => walk_use_case_def_body(report, &p, &n.value.body),
@@ -1061,6 +1069,12 @@ fn walk_action_def_body_elements(
                     walk_action_branch_body(report, &format!("{p}/else"), body);
                 }
             }
+            ActionDefBodyElement::Transition(n) => {
+                walk_action_def_body(report, &p, &n.value.body);
+                if let Some(effect) = &n.value.effect {
+                    walk_transition_effect(report, &format!("{p}/effect"), effect);
+                }
+            }
             ActionDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)
@@ -1173,6 +1187,12 @@ fn walk_action_usage_body_elements(
                 walk_action_branch_body(report, &format!("{p}/then"), &n.value.then_body);
                 if let Some(body) = &n.value.else_body {
                     walk_action_branch_body(report, &format!("{p}/else"), body);
+                }
+            }
+            ActionUsageBodyElement::Transition(n) => {
+                walk_action_def_body(report, &p, &n.value.body);
+                if let Some(effect) = &n.value.effect {
+                    walk_transition_effect(report, &format!("{p}/effect"), effect);
                 }
             }
             ActionUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),

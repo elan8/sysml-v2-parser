@@ -85,6 +85,12 @@ pub enum ActionDefBodyElement {
     /// `loop { ... }` (§6 G14).
     LoopStmt(Node<LoopStmt>),
     IfStmt(Node<IfStmt>),
+    /// A transition retained in an action body so semantic validation can diagnose that its
+    /// source is not a state usage. The concrete `ActionBodyItem` grammar does not normally
+    /// admit this owner, but SysML 8.3.18.9 defines the invalid-owner condition over authored
+    /// transition trigger actions; preserving the existing typed [`Transition`] is preferable
+    /// to replacing that semantic error with `unexpected_keyword_in_scope`.
+    Transition(Box<Node<Transition>>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
@@ -221,6 +227,10 @@ pub enum ThenTarget {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InOutDecl {
     pub direction: InOut,
+    /// Optional usage-kind keyword on the directed parameter. The pinned
+    /// `ActionBodyParameter` production permits `action` before its optional declaration; keep
+    /// that authored distinction instead of collapsing `in action body {}` into `in body {}`.
+    pub kind: Option<Node<InOutDeclKind>>,
     /// Whether the declaration used the `ref` feature prefix (`in ref name : Type`).
     pub is_reference: bool,
     /// Whether the declaration used the KerML `var` time-varying prefix (`out var y1;`).
@@ -253,6 +263,13 @@ pub struct InOutDecl {
     /// `;`-terminated form. Parameter bodies share the action-body member grammar, matching the
     /// parser, which always dispatched brace terminators through the action-body machinery.
     pub body: Option<Vec<Node<ActionDefBodyElement>>>,
+}
+
+/// Usage kind explicitly authored on a direction-prefixed parameter declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InOutDeclKind {
+    Action,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -498,6 +515,8 @@ pub enum ActionUsageBodyElement {
     /// `loop { ... }` (§6 G14).
     LoopStmt(Node<LoopStmt>),
     IfStmt(Node<IfStmt>),
+    /// See [`ActionDefBodyElement::Transition`].
+    Transition(Box<Node<Transition>>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
@@ -564,9 +583,21 @@ pub struct PayloadFeature {
     pub multiplicity: Option<Node<Multiplicity>>,
 }
 
+/// One authored `of PayloadFeature` clause on a flow declaration.
+///
+/// The concrete grammar admits at most one clause, while KerML's validation rule is stated over
+/// the number of owned payload features. Keeping the ordered clauses and their introducer spans
+/// lets validators observe an authored repeat without reconstructing clause boundaries from text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FlowPayloadClause {
+    pub of_span: Span,
+    pub feature: Node<PayloadFeature>,
+}
+
 /// The two grammar-owned alternatives of `FlowDeclaration` / `MessageDeclaration`.
 ///
-/// The declaration-led form owns a `UsageDeclaration`, optional `FeatureValue`, optional payload,
+/// The declaration-led form owns a `UsageDeclaration`, optional `FeatureValue`, payload clauses,
 /// and optional endpoint pair. The endpoint-only form owns the required pair directly. Keeping
 /// these alternatives distinct makes it impossible to fabricate an empty declaration for
 /// `flow source to target;`.
@@ -579,7 +610,7 @@ pub enum FlowDeclaration {
         /// `UsageDeclaration` rather than an allocation detail.
         declaration: Box<Node<UsageDeclaration>>,
         value: Option<Node<FeatureValue>>,
-        payload: Option<Node<PayloadFeature>>,
+        payloads: Vec<Node<FlowPayloadClause>>,
         /// Optional endpoints belong only to the declaration-led grammar alternative.
         /// Boxing this optional pair keeps the enum's endpoint-only alternative compact without
         /// changing its serialized representation.

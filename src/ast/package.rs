@@ -22,8 +22,8 @@ use super::structure::{
     OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
-    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
-    ViewpointDef, ViewpointUsage,
+    CalcDef, ConstraintDef, ConstraintUsage, ExposeMember, RenderingDef, RenderingUsage, ViewDef,
+    ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::ast::core::Node;
 use crate::ast::QualifiedReferenceId;
@@ -148,6 +148,9 @@ pub enum PackageBodyElement {
     ViewUsage(Node<ViewUsage>),
     ViewpointUsage(Node<ViewpointUsage>),
     RenderingUsage(Node<RenderingUsage>),
+    /// An `expose` membership retained in a non-view namespace so the semantic owning-namespace
+    /// validation rule can report its invalid owner without losing the typed target.
+    Expose(Node<ExposeMember>),
     ConnectionDef(Node<ConnectionDef>),
     MetadataDef(Node<MetadataDef>),
     MetadataUsage(Node<MetadataUsage>),

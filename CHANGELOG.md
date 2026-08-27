@@ -9,6 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Expose, verification, and view-rendering memberships retain invalid owners for semantic
+  validation.** Package bodies now carry typed `ExposeMember`s, while part-definition bodies carry
+  typed `VerifyRequirementMember` and `ViewRenderingUsage` nodes, allowing the corresponding SysML
+  owning-namespace/owning-type rules to diagnose invalid owners instead of receiving parser
+  recovery nodes. The legal Pilot productions remain represented in their view and requirement
+  bodies (`SysML.xtext` 2039-2045, 2262-2270, 2328-2377); the added variants are narrow semantic
+  validation boundaries and keep view-specific `render` distinct from generic `rendering` usage.
+  Semantic snapshots now expose render typings and inline verified-requirement typings, and
+  recovery tests prove malformed speculative references do not leak. **AST version 248.**
+
+- **Action bodies retain transitions for invalid-owner semantic validation.** Action definition
+  and usage bodies now carry an otherwise fully typed `Transition` member, including source,
+  trigger, guard, effect, target, and body, so SysML 8.3.18.9 can diagnose a triggered transition
+  whose source is an action rather than receiving `unexpected_keyword_in_scope`. Recovery treats
+  `transition` as a body-member boundary and does not leak references from malformed attempts;
+  emission, semantic snapshots, traversal, opacity inspection, and serialization are exhaustive
+  over both new variants. **AST version 247.**
+
+- **Requirement-constraint memberships retain invalid part-definition owners for semantic
+  validation.** `PartDefBodyElement::RequireConstraint` carries the same typed declaration,
+  target, typing, and body used in requirement-shaped owners, allowing SysML 8.3.21.7
+  `validateRequirementConstraintMembershipOwningType` to diagnose the authored owner instead of
+  receiving `unexpected_keyword_in_scope`. Source emission, semantic snapshots, traversal,
+  opacity inspection, recovery, and validated serialization consume the new variant. **AST
+  version 246.**
+
+- **KerML binding connectors may own connector ends in their type body.**
+  `KermlBindingMember` now represents the grammar's optional declaration-level binary end pair
+  as one `KermlBindingEndPair`, rather than requiring detached `left` and `right` fields. A
+  declaration-only connector such as `binding tern { end feature e1; ... }` therefore retains all
+  body-owned end features, while inline `of a = b` remains structurally paired. Authored `all`,
+  `of`, and `=` spans are preserved and validated during deserialization. **AST version 245.**
+
+- **KerML feature specializations preserve authored clause boundaries and order.**
+  `KermlFeature::specializations: Vec<FeatureSpecialization>` replaces the five optional
+  typing/subsetting/redefinition/reference/cross mirrors for this grammar family. Repeated
+  `references` and `crosses` clauses now remain distinct from one comma-separated clause, and
+  interleaved alternatives retain their source order and exact relationship spelling through
+  emission, semantic snapshots, traversal, and validated serialization. **AST version 244.**
+
+- **Flow payload clauses are ordered, source-backed syntax.** The declaration-led
+  `FlowDeclaration` now carries `payloads: Vec<Node<FlowPayloadClause>>` instead of one
+  `Option<Node<PayloadFeature>>`. Each clause retains its exact `of` span and typed payload
+  feature, so `flow of Thing of Other from source to target;` exposes two authored clauses to
+  KerML `validateFlowPayloadFeature` rather than becoming generic calc-body recovery. Emission,
+  traversal, semantic snapshots, and deserialization validation consume the new owning shape;
+  malformed repeated clauses still recover atomically without leaking speculative references.
+  **AST version 243.**
+
 - **99.3% fewer speculative arena rollbacks on the snapshot corpus** (133,240 -> 944 per pass;
   attempts 159k -> 29.8k; ~+4.5% throughput). Instead of trying each transaction-wrapped parser
   and rolling back, member dispatch now decides up front wherever a bounded lookahead can be
@@ -66,6 +115,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   observable parser behaviour changes; every snapshot checksum is identical.
 
 ### Fixed
+
+- **Directed action parameters retain their usage-kind keyword.** The pinned
+  `ActionBodyParameter` spelling `in action body { ... }` previously consumed and discarded
+  `action`, making it indistinguishable from `in body { ... }` and causing downstream lowering to
+  treat the declared action as a plain parameter. `InOutDecl::kind` now records the exhaustive
+  `InOutDeclKind::Action` alternative with its exact keyword span; typed emission and the semantic
+  snapshot projection preserve the distinction. **AST version 242.**
 
 - **Explicit KerML relationship declarations remain structured inside type bodies.**
   `TypeBodyElement -> NonFeatureMember` now dispatches `Subsetting`, `Redefinition`,

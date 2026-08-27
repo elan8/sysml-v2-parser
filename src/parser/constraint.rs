@@ -875,8 +875,73 @@ fn kerml_connector_member_inner(
     ))
 }
 
-/// KerML binding connector member: `binding` (name `of`)? end `=` end `;`
-/// (`binding [1] startShot = [1] endShot;`, `binding oSelf of a.b = c.d;`).
+/// A declared binding head is accepted only when its following token proves that interpretation.
+/// This transaction matters for `binding left = right;`: a multiplicity parsed while probing a
+/// declaration may allocate reference identities, so falling back to the anonymous end pair must
+/// roll those entries back before parsing the end for real.
+fn kerml_binding_decl_head(
+    input: Input<'_>,
+) -> IResult<
+    Input<'_>,
+    (
+        crate::ast::DeclarationName,
+        Option<Node<crate::ast::Multiplicity>>,
+    ),
+> {
+    let (input, declared_name) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (next, _) = ws_and_comments(input)?;
+    if !(starts_with_keyword(next.fragment(), b"of")
+        || next.fragment().starts_with(b"{")
+        || next.fragment().starts_with(b";"))
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((input, (declared_name, multiplicity)))
+}
+
+fn kerml_binding_end_pair(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlBindingEndPair>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let of_start = input;
+    let (input, of_span) = if starts_with_keyword(input.fragment(), b"of") {
+        let (rest, _) = tag(&b"of"[..]).parse(input)?;
+        (rest, Some(crate::parser::span_from_to(of_start, rest)))
+    } else {
+        (input, None)
+    };
+    let (input, left) = kerml_connector_end(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let equals_start = input;
+    let (input, _) = tag(&b"="[..]).parse(input)?;
+    let equals_span = crate::parser::span_from_to(equals_start, input);
+    let (input, right) = kerml_connector_end(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlBindingEndPair {
+                of_span,
+                left,
+                equals_span,
+                right,
+            },
+        ),
+    ))
+}
+
+/// KerML binding connector member: a declared feature with an optional inline binary pair, or an
+/// optional `all` plus an optional anonymous pair, followed by a type body (KerML BNF 875-881).
 pub(crate) fn kerml_binding_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBindingMember>> {
@@ -891,28 +956,40 @@ fn kerml_binding_member_inner(
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"binding"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    // A declared name is only present with the `of` form -- without `of`, the leading
-    // identifier is the left end's feature chain.
-    let (input, named) = opt(map(
-        (
-            preceded(ws_and_comments, name),
-            opt(preceded(
-                ws_and_comments,
-                crate::parser::usage::multiplicity_node,
-            )),
-            preceded(ws_and_comments, tag(&b"of"[..])),
-            ws1,
-        ),
-        |(n, m, _, _)| (n, m),
-    ))
-    .parse(input)?;
-    let (name_str, decl_multiplicity) = match named {
-        Some((n, m)) => (Some(n), m),
+    let (after_ws, _) = ws_and_comments(input)?;
+    let all_start = after_ws;
+    let (input, all_span) = if starts_with_keyword(after_ws.fragment(), b"all") {
+        let (rest, _) = tag(&b"all"[..]).parse(after_ws)?;
+        (rest, Some(crate::parser::span_from_to(all_start, rest)))
+    } else {
+        (after_ws, None)
+    };
+    let (input, declared) = if all_span.is_none() {
+        match crate::parser::span::reference_transaction(input, kerml_binding_decl_head) {
+            Ok((rest, declared)) => (rest, Some(declared)),
+            Err(_) => (input, None),
+        }
+    } else {
+        (input, None)
+    };
+    let (name_str, decl_multiplicity) = match declared {
+        Some((declared_name, multiplicity)) => (Some(declared_name), multiplicity),
         None => (None, None),
     };
-    let (input, left) = kerml_connector_end(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
-    let (input, right) = kerml_connector_end(input)?;
+    let (next, _) = ws_and_comments(input)?;
+    let body_next = next.fragment().starts_with(b"{") || next.fragment().starts_with(b";");
+    let (input, inline_ends) = if body_next {
+        (input, None)
+    } else {
+        let (input, pair) = kerml_binding_end_pair(input)?;
+        if name_str.is_some() && pair.value.of_span.is_none() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        (input, Some(pair))
+    };
     let (input, body) = calc_def_body(input)?;
     Ok((
         input,
@@ -920,10 +997,10 @@ fn kerml_binding_member_inner(
             start,
             input,
             crate::ast::KermlBindingMember {
+                all_span,
                 name: name_str,
                 multiplicity: decl_multiplicity,
-                left,
-                right,
+                inline_ends,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -1473,20 +1550,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
-        crate::ast::Node::new(
-            span,
-            crate::ast::TypingRelationship {
-                target: targets,
-                kind: crate::ast::TypingKind::Typing,
-                span,
-                is_conjugated,
-                is_implied: false,
-                spelling,
-            },
-        )
-    });
+    let (input, early_specializations) = crate::parser::usage::feature_specializations(input)?;
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
             ws_and_comments,
@@ -1497,7 +1561,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         (input, None)
     };
     let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
-    let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, trailing_specializations) = crate::parser::usage::feature_specializations(input)?;
     // `FeatureSpecializationPart` offers a second multiplicity position, after the specialization
     // clauses: `inout feature replacementValues : Anything redefines values [*] nonunique;`
     // (Kernel Semantic Library `FeatureReferencingPerformances.kerml:89`). Only the directed node
@@ -1518,11 +1582,19 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // whichever position lost.
     let (input, modifiers) =
         crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
-    let subsets = clauses.subsets.map(|(target, _value)| target);
-    let redefines = leading_redefines.or(clauses.redefines);
-    let references = clauses.references;
-    let crosses = clauses.crosses;
-    let (input, relationship_parts) = kerml_feature_relationship_parts(input, clauses.intersects)?;
+    let mut specializations = Vec::with_capacity(
+        usize::from(leading_redefines.is_some())
+            + early_specializations.len()
+            + trailing_specializations.len(),
+    );
+    if let Some(relationship) = leading_redefines {
+        specializations.push(crate::ast::FeatureSpecialization::Redefinition(
+            relationship,
+        ));
+    }
+    specializations.extend(early_specializations);
+    specializations.extend(trailing_specializations);
+    let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -1536,15 +1608,11 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 kind,
                 is_all: is_all.is_some(),
                 name: name_str,
-                typing,
+                specializations,
                 multiplicity: leading_multiplicity
                     .or(trailing_multiplicity)
                     .or(post_specialization_multiplicity),
                 multiplicity_modifiers: modifiers,
-                subsets,
-                redefines,
-                references,
-                crosses,
                 relationship_parts,
                 value,
                 body,

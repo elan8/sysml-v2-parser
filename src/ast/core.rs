@@ -833,10 +833,10 @@ pub enum SubsettingKind {
 /// A subsetting-family relationship target: subsetting, reference subsetting, redefinition, or
 /// cross subsetting, e.g. the `rearWheel` in `subsets wheel = rearWheel[1]` (PAR-004 item 2).
 ///
-/// Kept as a separate `Option<Node<SubsettingRelationship>>` field per clause kind on each owning
-/// struct (not collapsed into one field) because not every struct supports all four clause kinds
-/// (e.g. `ExhibitState` only has `redefines`), and a struct can have more than one of these
-/// clauses present at once (e.g. both `subsets` and `redefines`).
+/// Owners represent the grammar production they accept: fixed-cardinality usage headers keep
+/// distinct typed slots, while repeatable KerML feature specializations keep ordered enum
+/// alternatives. The relationship itself therefore carries targets and spelling, never the
+/// owning header's clause cardinality or order.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubsettingRelationship {

@@ -21,6 +21,11 @@ pub(crate) fn emit_inout_decl(
     decl: &InOutDecl,
 ) -> Result<(), EmitError> {
     emit_direction(w, decl.direction);
+    if let Some(kind) = &decl.kind {
+        match kind.value {
+            crate::ast::InOutDeclKind::Action => w.push_str("action "),
+        }
+    }
     if decl.is_reference {
         w.push_str("ref ");
     }
@@ -486,6 +491,7 @@ pub(crate) fn emit_action_def_body_element(
             }
             Ok(())
         }
+        ActionDefBodyElement::Transition(transition) => emit_transition(w, path, &transition.value),
         ActionDefBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         ActionDefBodyElement::MetadataKeywordUsage(m) => {
@@ -588,6 +594,9 @@ pub(crate) fn emit_action_usage_body_element(
                 emit_action_branch_body(w, path, else_body)?;
             }
             Ok(())
+        }
+        ActionUsageBodyElement::Transition(transition) => {
+            emit_transition(w, path, &transition.value)
         }
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionUsageBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
@@ -1222,7 +1231,7 @@ pub(crate) fn emit_flow_usage(
         crate::ast::FlowDeclaration::Declared {
             declaration,
             value,
-            payload,
+            payloads,
             endpoints,
         } => {
             let declaration = &declaration.value;
@@ -1261,21 +1270,22 @@ pub(crate) fn emit_flow_usage(
             if let Some(value) = value {
                 emit_feature_value(w, value)?;
             }
-            if let Some(payload) = payload {
+            for (index, payload) in payloads.iter().enumerate() {
                 w.push_str(" of ");
-                if let Some(n) = payload.value.name {
-                    w.push_declaration_name(&format!("{path}/payload"), n)?;
-                    if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
+                let feature = &payload.value.feature.value;
+                if let Some(n) = feature.name {
+                    w.push_declaration_name(&format!("{path}/payload[{index}]"), n)?;
+                    if feature.type_name.is_some() || feature.multiplicity.is_some() {
                         w.push_str(" : ");
                     }
                 }
-                if let Some(ty) = payload.value.type_name {
-                    if payload.value.type_is_conjugated {
+                if let Some(ty) = feature.type_name {
+                    if feature.type_is_conjugated {
                         w.push_char('~');
                     }
                     w.push_qualified_reference(path, ty)?;
                 }
-                if let Some(mult) = &payload.value.multiplicity {
+                if let Some(mult) = &feature.multiplicity {
                     emit_multiplicity(w, &mult.value)?;
                 }
             }

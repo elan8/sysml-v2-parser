@@ -1,6 +1,6 @@
 use crate::ast::{
-    FlowDeclaration, FlowDef, FlowEndpoints, FlowUsage, FlowUsageKind, Membership, Node,
-    PayloadFeature,
+    FlowDeclaration, FlowDef, FlowEndpoints, FlowPayloadClause, FlowUsage, FlowUsageKind,
+    Membership, Node, PayloadFeature,
 };
 
 type ParsedFlowEndpoints<'a> = nom::IResult<
@@ -22,6 +22,7 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
+use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -65,15 +66,17 @@ fn flow_usage_keyword(input: Input<'_>) -> IResult<Input<'_>, FlowUsageKind> {
     .parse(input)
 }
 
-fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<PayloadFeature>>> {
-    let (peek, _) = ws_and_comments(input)?;
-    if starts_with_keyword(peek.fragment(), b"of") {
-        let (input, _) = preceded(ws_and_comments, tag(&b"of"[..])).parse(input)?;
-        let (input, payload) = preceded(ws1, payload_feature).parse(input)?;
-        Ok((input, Some(payload)))
-    } else {
-        Ok((input, None))
-    }
+fn payload_clause(input: Input<'_>) -> IResult<Input<'_>, Node<FlowPayloadClause>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let of_start = input;
+    let (input, _) = tag(&b"of"[..]).parse(input)?;
+    let of_span = crate::parser::span_from_to(of_start, input);
+    let (input, feature) = preceded(ws1, payload_feature).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, FlowPayloadClause { of_span, feature }),
+    ))
 }
 
 /// SysML v2 §8.2.2.16 `PayloadFeature`: an optionally-named feature typed by (and/or given a
@@ -180,7 +183,11 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
-    let (input, payload) = optional_payload(input)?;
+    // Retain every authored clause. The pinned grammar admits one optional clause, but KerML's
+    // `validateFlowPayloadFeature` is an at-most-one rule; preserving a repeated clause gives the
+    // validation layer an authorable violating side instead of collapsing it into generic body
+    // recovery (spec42 Gap 62).
+    let (input, payloads) = many0(payload_clause).parse(input)?;
     let (input, (from, to)) = flow_endpoints(input)?;
     let endpoints = match (from, to) {
         (None, None) => None,
@@ -198,7 +205,7 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
             declaration: FlowDeclaration::Declared {
                 declaration: Box::new(declaration),
                 value,
-                payload,
+                payloads,
                 endpoints: Box::new(endpoints),
             },
             body,

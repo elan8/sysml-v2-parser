@@ -934,6 +934,11 @@ macro_rules! ast_traversal {
                 walk_payload_feature(self, node)
             }
 
+            /// Visits [`FlowPayloadClause`]; the default implementation walks its children.
+            fn visit_flow_payload_clause(&mut self, node: &$($mutability)? Node<FlowPayloadClause>) {
+                walk_flow_payload_clause(self, node)
+            }
+
             /// Visits [`FlowUsage`]; the default implementation walks its children.
             fn visit_flow_usage(&mut self, node: &$($mutability)? Node<FlowUsage>) {
                 walk_flow_usage(self, node)
@@ -1528,6 +1533,11 @@ macro_rules! ast_traversal {
                 walk_kerml_feature(self, node)
             }
 
+            /// Visits one ordered KerML [`FeatureSpecialization`] alternative.
+            fn visit_feature_specialization(&mut self, node: &$($mutability)? FeatureSpecialization) {
+                walk_feature_specialization(self, node)
+            }
+
             /// Visits [`KermlFeatureKind`]; the default implementation walks its children.
             fn visit_kerml_feature_kind(&mut self, node: &$($mutability)? Node<KermlFeatureKind>) {
                 walk_kerml_feature_kind(self, node)
@@ -1556,6 +1566,11 @@ macro_rules! ast_traversal {
             /// Visits [`KermlBindingMember`]; the default implementation walks its children.
             fn visit_kerml_binding_member(&mut self, node: &$($mutability)? Node<KermlBindingMember>) {
                 walk_kerml_binding_member(self, node)
+            }
+
+            /// Visits [`KermlBindingEndPair`]; the default implementation walks its children.
+            fn visit_kerml_binding_end_pair(&mut self, node: &$($mutability)? Node<KermlBindingEndPair>) {
+                walk_kerml_binding_end_pair(self, node)
             }
 
             /// Visits [`KermlSuccessionMember`]; the default implementation walks its children.
@@ -2393,6 +2408,9 @@ macro_rules! ast_traversal {
                 PackageBodyElement::RenderingUsage(field_0) => {
                     visitor.visit_rendering_usage(field_0);
                 }
+                PackageBodyElement::Expose(field_0) => {
+                    visitor.visit_expose_member(field_0);
+                }
                 PackageBodyElement::ConnectionDef(field_0) => {
                     visitor.visit_connection_def(field_0);
                 }
@@ -2726,6 +2744,9 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(field_0);
                 }
+                PartDefBodyElement::RequireConstraint(field_0) => {
+                    visitor.visit_require_constraint(field_0);
+                }
                 PartDefBodyElement::Import(field_0) => {
                     visitor.visit_import(field_0);
                 }
@@ -2803,6 +2824,12 @@ macro_rules! ast_traversal {
                 }
                 PartDefBodyElement::RenderingUsage(field_0) => {
                     visitor.visit_rendering_usage(field_0);
+                }
+                PartDefBodyElement::ViewRendering(field_0) => {
+                    visitor.visit_view_rendering_usage(field_0);
+                }
+                PartDefBodyElement::VerifyRequirement(field_0) => {
+                    visitor.visit_verify_requirement_member(field_0);
                 }
                 PartDefBodyElement::KermlClassifier(field_0) => {
                     visitor.visit_kerml_classifier_decl(&$($mutability)? **field_0);
@@ -5080,6 +5107,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::IfStmt(field_0) => {
                     visitor.visit_if_stmt(field_0);
                 }
+                ActionDefBodyElement::Transition(field_0) => {
+                    visitor.visit_transition(&$($mutability)? **field_0);
+                }
                 ActionDefBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
                 }
@@ -5203,8 +5233,14 @@ macro_rules! ast_traversal {
         pub fn walk_in_out_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InOutDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let InOutDecl { direction, is_reference, is_var, name, subsets, type_name, multiplicity, multiplicity_modifiers, redefines, value, body } = &$($mutability)? node.value;
+            let InOutDecl { direction, kind, is_reference, is_var, name, subsets, type_name, multiplicity, multiplicity_modifiers, redefines, value, body } = &$($mutability)? node.value;
             visitor.visit_in_out_value(direction);
+            if let Some(inner) = kind {
+                visitor.visit_span(&$($mutability)? inner.span);
+                match inner.value {
+                    InOutDeclKind::Action => {}
+                }
+            }
             let _ = is_reference;
             let _ = is_var;
             if let Some(inner) = name {
@@ -5492,6 +5528,9 @@ macro_rules! ast_traversal {
                 ActionUsageBodyElement::IfStmt(field_0) => {
                     visitor.visit_if_stmt(field_0);
                 }
+                ActionUsageBodyElement::Transition(field_0) => {
+                    visitor.visit_transition(&$($mutability)? **field_0);
+                }
                 ActionUsageBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
                 }
@@ -5576,16 +5615,25 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_flow_payload_clause<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FlowPayloadClause>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let FlowPayloadClause { of_span, feature } = &$($mutability)? node.value;
+            visitor.visit_span(of_span);
+            visitor.visit_payload_feature(feature);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
         pub fn walk_flow_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FlowUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             let FlowUsage { kind, declaration, body, membership } = &$($mutability)? node.value;
             visitor.visit_flow_usage_kind(kind);
             match declaration {
-                FlowDeclaration::Declared { declaration, value, payload, endpoints } => {
+                FlowDeclaration::Declared { declaration, value, payloads, endpoints } => {
                     visitor.visit_usage_declaration(declaration);
                     if let Some(inner) = value { visitor.visit_feature_value(inner); }
-                    if let Some(inner) = payload { visitor.visit_payload_feature(inner); }
+                    for inner in payloads { visitor.visit_flow_payload_clause(inner); }
                     if let Some(endpoints) = &$($mutability)? **endpoints {
                         visitor.visit_kerml_connector_end(&$($mutability)? endpoints.from);
                         visitor.visit_kerml_connector_end(&$($mutability)? endpoints.to);
@@ -7987,7 +8035,7 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, relationship_parts, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, name, specializations, multiplicity, multiplicity_modifiers, relationship_parts, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {
@@ -7997,25 +8045,13 @@ macro_rules! ast_traversal {
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
+            for inner in specializations {
+                visitor.visit_feature_specialization(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = references {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = crosses {
-                visitor.visit_subsetting_relationship(inner);
-            }
             for inner in relationship_parts {
                 visitor.visit_feature_relationship_part(inner);
             }
@@ -8025,6 +8061,19 @@ macro_rules! ast_traversal {
             visitor.visit_calc_def_body(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_feature_specialization<V: $Visitor>(visitor: &mut V, node: &$($mutability)? FeatureSpecialization) {
+            match node {
+                FeatureSpecialization::Typing(inner) => visitor.visit_typing_relationship(inner),
+                FeatureSpecialization::Subsetting { relationship, value } => {
+                    visitor.visit_subsetting_relationship(relationship);
+                    if let Some(value) = value { visitor.visit_expression(value); }
+                }
+                FeatureSpecialization::ReferenceSubsetting(inner)
+                | FeatureSpecialization::CrossSubsetting(inner)
+                | FeatureSpecialization::Redefinition(inner) => visitor.visit_subsetting_relationship(inner),
+            }
         }
 
         pub fn walk_kerml_feature_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureKind>) {
@@ -8098,17 +8147,34 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_binding_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlBindingMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlBindingMember { name, multiplicity, left, right, body, membership } = &$($mutability)? node.value;
+            let KermlBindingMember { all_span, name, multiplicity, inline_ends, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = all_span {
+                visitor.visit_span(inner);
+            }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            visitor.visit_kerml_connector_end(left);
-            visitor.visit_kerml_connector_end(right);
+            if let Some(inner) = inline_ends {
+                visitor.visit_kerml_binding_end_pair(inner);
+            }
             visitor.visit_calc_def_body(body);
             visitor.visit_membership(membership);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_kerml_binding_end_pair<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlBindingEndPair>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let KermlBindingEndPair { of_span, left, equals_span, right } = &$($mutability)? node.value;
+            if let Some(inner) = of_span {
+                visitor.visit_span(inner);
+            }
+            visitor.visit_kerml_connector_end(left);
+            visitor.visit_span(equals_span);
+            visitor.visit_kerml_connector_end(right);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

@@ -156,6 +156,13 @@ pub enum PartDefBodyElement {
     /// `constraint <name>[: Type] { ... }` usage inside a part definition body. See
     /// [`PartDefBodyElement::ConstraintDef`].
     ConstraintUsage(Node<ConstraintUsage>),
+    /// A requirement-constraint membership admitted in a non-requirement owner so the semantic
+    /// `validateRequirementConstraintMembershipOwningType` rule can observe and reject that
+    /// owner. Pilot's concrete grammar places this production in `RequirementBodyItem`, while
+    /// SysML 8.3.21.7 separately constrains its abstract-syntax owner; retaining the same typed
+    /// member here preserves the invalid model instead of replacing semantic validation with an
+    /// `unexpected_keyword_in_scope` parse error.
+    RequireConstraint(Box<Node<crate::ast::RequireConstraint>>),
     /// `(private|public|protected)? import <qualified-name>;` inside a part definition body
     /// (§6 G16). See [`PartUsageBodyElement::Import`].
     Import(Node<crate::ast::Import>),
@@ -216,6 +223,12 @@ pub enum PartDefBodyElement {
     ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
     RenderingDef(Node<crate::ast::view::RenderingDef>),
     RenderingUsage(Node<crate::ast::view::RenderingUsage>),
+    /// A view-specific `render` membership retained in a non-view definition so semantic owner
+    /// validation can distinguish it from the legal generic `rendering` usage above.
+    ViewRendering(Node<crate::ast::view::ViewRenderingUsage>),
+    /// A requirement-verification membership retained outside a requirement body for semantic
+    /// owning-type validation.
+    VerifyRequirement(Node<crate::ast::requirement::VerifyRequirementMember>),
     /// Nested KerML classifier declaration (`struct`, `classifier`, `datatype`, `assoc`,
     /// `behavior`, ...) inside a part definition body (spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].
