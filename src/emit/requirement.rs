@@ -285,7 +285,7 @@ pub(crate) fn emit_redefinition_attribute_binding(
     emit_attribute_body(w, path, &usage.body)
 }
 
-fn emit_verify_requirement(
+pub(crate) fn emit_verify_requirement(
     w: &mut EmitWriter<'_>,
     path: &str,
     v: &crate::ast::VerifyRequirementMember,

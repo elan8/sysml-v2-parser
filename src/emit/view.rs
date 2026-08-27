@@ -864,7 +864,7 @@ fn emit_typing_clause_as_subset(
     super::structure::emit_subsetting_clause(w, rel)
 }
 
-fn emit_view_rendering(
+pub(crate) fn emit_view_rendering(
     w: &mut EmitWriter<'_>,
     path: &str,
     r: &crate::ast::ViewRenderingUsage,
@@ -910,6 +910,16 @@ fn emit_view_rendering(
             Ok(())
         }
     }
+}
+
+pub(crate) fn emit_expose(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    expose: &crate::ast::ExposeMember,
+) -> Result<(), EmitError> {
+    w.push_str("expose ");
+    super::root::emit_import_target(w, &format!("{path}/expose/target"), &expose.target)?;
+    super::structure::emit_relationship_body(w, path, &expose.body)
 }
 
 pub(crate) fn emit_viewpoint_def(

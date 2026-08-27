@@ -351,6 +351,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::ViewpointUsage(v) => view::emit_viewpoint_usage(w, path, &v.value),
         PackageBodyElement::RenderingDef(r) => view::emit_rendering_def(w, path, &r.value),
         PackageBodyElement::RenderingUsage(r) => view::emit_rendering_usage(w, path, &r.value),
+        PackageBodyElement::Expose(e) => view::emit_expose(w, path, &e.value),
         PackageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Expose, verification, and view-rendering memberships retain invalid owners for semantic
+  validation.** Package bodies now carry typed `ExposeMember`s, while part-definition bodies carry
+  typed `VerifyRequirementMember` and `ViewRenderingUsage` nodes, allowing the corresponding SysML
+  owning-namespace/owning-type rules to diagnose invalid owners instead of receiving parser
+  recovery nodes. The legal Pilot productions remain represented in their view and requirement
+  bodies (`SysML.xtext` 2039-2045, 2262-2270, 2328-2377); the added variants are narrow semantic
+  validation boundaries and keep view-specific `render` distinct from generic `rendering` usage.
+  Semantic snapshots now expose render typings and inline verified-requirement typings, and
+  recovery tests prove malformed speculative references do not leak. **AST version 248.**
+
 - **Action bodies retain transitions for invalid-owner semantic validation.** Action definition
   and usage bodies now carry an otherwise fully typed `Transition` member, including source,
   trigger, guard, effect, target, and body, so SysML 8.3.18.9 can diagnose a triggered transition

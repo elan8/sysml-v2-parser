@@ -949,19 +949,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         RequirementDefBodyElement::VerifyRequirement(verify) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(verify (target ")?;
-                            if let Some(reference) = verify.value.target {
-                                self.write_reference(reference)?;
-                            } else {
-                                self.writer.write_str("none")?;
-                            }
-                            self.writer.write_str(") (redefines ")?;
-                            if let Some(reference) = verify.value.redefines {
-                                self.write_reference(reference)?;
-                            } else {
-                                self.writer.write_str("none")?;
-                            }
-                            self.writer.write_str("))")?;
+                            self.write_verify_requirement(&verify.value)?;
                         }
                         RequirementDefBodyElement::RequireConstraint(constraint) => {
                             self.write_item_prefix(&mut first)?;
@@ -1077,8 +1065,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ViewBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
                         }
-                        ViewBodyElement::ViewRendering(_rendering) => {
-                            self.write_marker(&mut first, "view-rendering")?;
+                        ViewBodyElement::ViewRendering(rendering) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_rendering(&rendering.value)?;
                         }
                         ViewBodyElement::RenderingUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1879,6 +1868,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         PartDefBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
+                        }
+                        PartDefBodyElement::ViewRendering(rendering) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_rendering(&rendering.value)?;
+                        }
+                        PartDefBodyElement::VerifyRequirement(verify) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_verify_requirement(&verify.value)?;
                         }
                         PartDefBodyElement::CaseDef(definition) => {
                             self.write_definition_prefix_marker(
@@ -5503,8 +5500,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ViewDefBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
                         }
-                        super::ViewDefBodyElement::ViewRendering(_rendering) => {
-                            self.write_marker(&mut first, "view-rendering")?;
+                        super::ViewDefBodyElement::ViewRendering(rendering) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_rendering(&rendering.value)?;
                         }
                         super::ViewDefBodyElement::RenderingUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -5576,6 +5574,58 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_rendering_usage_body(&usage.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_view_rendering(&mut self, usage: &super::ViewRenderingUsage) -> io::Result<()> {
+        self.writer.write_str("(view-rendering (name ")?;
+        self.write_name(usage.name)?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = usage.type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_rendering_usage_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_verify_requirement(
+        &mut self,
+        member: &super::VerifyRequirementMember,
+    ) -> io::Result<()> {
+        write!(
+            self.writer,
+            "(verify (explicit-requirement {}) (requirement ",
+            member.explicit_requirement_keyword
+        )?;
+        if let Some(requirement) = &member.requirement {
+            self.writer.write_str("(name ")?;
+            self.write_optional_name(requirement.value.name)?;
+            self.writer.write_str(") (type ")?;
+            if let Some(reference) = requirement.value.type_name {
+                self.write_reference(reference)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") ")?;
+            self.write_requirement_body(&requirement.value.body)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (target ")?;
+        if let Some(reference) = member.target {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (redefines ")?;
+        if let Some(reference) = member.redefines {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
     }
 
     fn write_rendering_usage_body(&mut self, body: &super::RenderingUsageBody) -> io::Result<()> {
@@ -6363,6 +6413,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::RenderingUsage(_usage) => {
                 self.write_marker(first, "rendering-usage")
+            }
+            PackageBodyElement::Expose(expose) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(expose ")?;
+                self.write_import_target(&expose.value.target)?;
+                self.writer.write_char(' ')?;
+                self.write_relationship_body(&expose.value.body)?;
+                self.writer.write_char(')')
             }
             PackageBodyElement::ConnectionDef(definition) => {
                 self.write_item_prefix(first)?;

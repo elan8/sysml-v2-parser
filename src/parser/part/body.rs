@@ -389,6 +389,14 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(viewpoint_usage, PartDefBodyElement::ViewpointUsage),
             map(rendering_def, PartDefBodyElement::RenderingDef),
             map(rendering_usage, PartDefBodyElement::RenderingUsage),
+            map(
+                crate::parser::view::view_rendering_usage,
+                PartDefBodyElement::ViewRendering,
+            ),
+            map(
+                crate::parser::requirement::verify_requirement,
+                PartDefBodyElement::VerifyRequirement,
+            ),
             map(analysis_case_def, PartDefBodyElement::AnalysisCaseDef),
             map(analysis_case_usage, PartDefBodyElement::AnalysisCaseUsage),
             map(

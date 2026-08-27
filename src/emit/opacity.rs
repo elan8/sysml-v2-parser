@@ -162,6 +162,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::RenderingUsage(r) => {
             walk_rendering_usage_body(report, path, &r.value.body)
         }
+        PackageBodyElement::Expose(e) => walk_relationship_body(report, path, &e.value.body),
         PackageBodyElement::Connect(c) => walk_ref_body(report, path, &c.value.body),
         PackageBodyElement::ItemDef(i) => walk_attribute_body(report, path, &i.value.body),
         PackageBodyElement::ItemUsage(i) => walk_attribute_body(report, path, &i.value.body),
@@ -593,6 +594,10 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::RenderingUsage(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
+            PartDefBodyElement::ViewRendering(n) => {
+                walk_rendering_usage_body(report, &p, &n.value.body)
+            }
+            PartDefBodyElement::VerifyRequirement(_) => {}
             PartDefBodyElement::CaseDef(n) => walk_use_case_def_body(report, &p, &n.value.body),
             PartDefBodyElement::CaseUsage(n) => walk_use_case_def_body(report, &p, &n.value.body),
             PartDefBodyElement::UseCaseDef(n) => walk_use_case_def_body(report, &p, &n.value.body),

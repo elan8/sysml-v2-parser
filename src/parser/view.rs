@@ -165,7 +165,9 @@ fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBo
     Ok((input, members.into_body()))
 }
 
-fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
+pub(crate) fn view_rendering_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
@@ -412,7 +414,7 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
 /// expose (MembershipImport | NamespaceImport) RelationshipBody
 /// MembershipImport = QualifiedName (::**)?
 /// NamespaceImport = QualifiedName :: * (::**)?
-fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
+pub(crate) fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     crate::parser::span::reference_transaction(input, expose_member_inner)
 }
 

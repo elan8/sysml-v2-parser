@@ -410,7 +410,9 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract(
     ))
 }
 
-fn verify_requirement(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequirementMember>> {
+pub(crate) fn verify_requirement(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<VerifyRequirementMember>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {

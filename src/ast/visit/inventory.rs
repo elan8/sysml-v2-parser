@@ -2408,6 +2408,9 @@ macro_rules! ast_traversal {
                 PackageBodyElement::RenderingUsage(field_0) => {
                     visitor.visit_rendering_usage(field_0);
                 }
+                PackageBodyElement::Expose(field_0) => {
+                    visitor.visit_expose_member(field_0);
+                }
                 PackageBodyElement::ConnectionDef(field_0) => {
                     visitor.visit_connection_def(field_0);
                 }
@@ -2821,6 +2824,12 @@ macro_rules! ast_traversal {
                 }
                 PartDefBodyElement::RenderingUsage(field_0) => {
                     visitor.visit_rendering_usage(field_0);
+                }
+                PartDefBodyElement::ViewRendering(field_0) => {
+                    visitor.visit_view_rendering_usage(field_0);
+                }
+                PartDefBodyElement::VerifyRequirement(field_0) => {
+                    visitor.visit_verify_requirement_member(field_0);
                 }
                 PartDefBodyElement::KermlClassifier(field_0) => {
                     visitor.visit_kerml_classifier_decl(&$($mutability)? **field_0);

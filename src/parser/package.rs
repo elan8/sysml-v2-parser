@@ -44,7 +44,8 @@ use crate::parser::state::state_def;
 use crate::parser::state::state_usage;
 use crate::parser::usecase::{actor_decl, use_case_def, use_case_usage};
 use crate::parser::view::{
-    rendering_def, rendering_usage, view_def, view_usage, viewpoint_def, viewpoint_usage,
+    expose_member, rendering_def, rendering_usage, view_def, view_usage, viewpoint_def,
+    viewpoint_usage,
 };
 use crate::parser::Input;
 use nom::branch::alt;
@@ -276,6 +277,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ViewUsage(_)
         | PackageBodyElement::ViewpointUsage(_)
         | PackageBodyElement::RenderingUsage(_)
+        | PackageBodyElement::Expose(_)
         | PackageBodyElement::ConnectionDef(_)
         | PackageBodyElement::MetadataDef(_)
         | PackageBodyElement::MetadataUsage(_)
@@ -2224,6 +2226,14 @@ fn try_package_body_view<'a>(
         Rendering,
         rendering_usage,
         PackageBodyElement::RenderingUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Expose,
+        expose_member,
+        PackageBodyElement::Expose
     );
     // Bare `classifier`/`class` forward declarations (e.g. `classifier SpatialFrame;`, `class
     // B;`) are tried before the opaque `classifier_decl` fallback so this common shape gets a

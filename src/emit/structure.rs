@@ -431,6 +431,10 @@ fn emit_part_def_body_element(
         PartDefBodyElement::RenderingUsage(n) => {
             super::view::emit_rendering_usage(w, path, &n.value)
         }
+        PartDefBodyElement::ViewRendering(n) => super::view::emit_view_rendering(w, path, &n.value),
+        PartDefBodyElement::VerifyRequirement(n) => {
+            super::requirement::emit_verify_requirement(w, path, &n.value)
+        }
         other @ (PartDefBodyElement::OccurrenceDef(_)
         | PartDefBodyElement::CaseDef(_)
         | PartDefBodyElement::CaseUsage(_)

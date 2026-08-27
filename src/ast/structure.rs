@@ -223,6 +223,12 @@ pub enum PartDefBodyElement {
     ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
     RenderingDef(Node<crate::ast::view::RenderingDef>),
     RenderingUsage(Node<crate::ast::view::RenderingUsage>),
+    /// A view-specific `render` membership retained in a non-view definition so semantic owner
+    /// validation can distinguish it from the legal generic `rendering` usage above.
+    ViewRendering(Node<crate::ast::view::ViewRenderingUsage>),
+    /// A requirement-verification membership retained outside a requirement body for semantic
+    /// owning-type validation.
+    VerifyRequirement(Node<crate::ast::requirement::VerifyRequirementMember>),
     /// Nested KerML classifier declaration (`struct`, `classifier`, `datatype`, `assoc`,
     /// `behavior`, ...) inside a part definition body (spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].
