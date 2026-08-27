@@ -67,6 +67,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Directed action parameters retain their usage-kind keyword.** The pinned
+  `ActionBodyParameter` spelling `in action body { ... }` previously consumed and discarded
+  `action`, making it indistinguishable from `in body { ... }` and causing downstream lowering to
+  treat the declared action as a plain parameter. `InOutDecl::kind` now records the exhaustive
+  `InOutDeclKind::Action` alternative with its exact keyword span; typed emission and the semantic
+  snapshot projection preserve the distinction. **AST version 242.**
+
 - **Explicit KerML relationship declarations remain structured inside type bodies.**
   `TypeBodyElement -> NonFeatureMember` now dispatches `Subsetting`, `Redefinition`,
   `Disjoining`, `FeatureInverting`, `TypeFeaturing`, and the other already-supported explicit

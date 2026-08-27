@@ -21,6 +21,11 @@ pub(crate) fn emit_inout_decl(
     decl: &InOutDecl,
 ) -> Result<(), EmitError> {
     emit_direction(w, decl.direction);
+    if let Some(kind) = &decl.kind {
+        match kind.value {
+            crate::ast::InOutDeclKind::Action => w.push_str("action "),
+        }
+    }
     if decl.is_reference {
         w.push_str("ref ");
     }

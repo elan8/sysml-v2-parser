@@ -2947,6 +2947,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     InOut::Out => self.writer.write_str("out")?,
                     InOut::InOut => self.writer.write_str("inout")?,
                 }
+                self.writer.write_str(") (kind ")?;
+                match &declaration.value.kind {
+                    Some(kind) => match kind.value {
+                        crate::ast::InOutDeclKind::Action => {
+                            self.writer.write_str("(action ")?;
+                            write_span(self.writer, &kind.span)?;
+                            self.writer.write_char(')')?;
+                        }
+                    },
+                    None => self.writer.write_str("none")?,
+                }
                 self.writer.write_str(") (reference ")?;
                 self.writer.write_str(if declaration.value.is_reference {
                     "true"

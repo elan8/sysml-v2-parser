@@ -8,8 +8,8 @@
 //! traversal knows about it -- there is no separate list here to keep in step.
 
 use super::visit::{
-    walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_interface_end,
-    walk_interface_part, walk_metadata_annotation, walk_metadata_body_usage,
+    walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_in_out_decl,
+    walk_interface_end, walk_interface_part, walk_metadata_annotation, walk_metadata_body_usage,
     walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
     walk_usage_extension_keyword, Visitor,
 };
@@ -114,6 +114,22 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_in_out_decl(&mut self, node: &Node<InOutDecl>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Some(kind) = &node.value.kind {
+            let (token, role) = match kind.value {
+                InOutDeclKind::Action => ("action", "directed parameter `action` keyword"),
+            };
+            self.check(self.delimiter(&kind.span, token, role));
+            if self.error.is_none() {
+                self.check(sigil_within(&kind.span, &node.span, role));
+            }
+        }
+        walk_in_out_decl(self, node);
+    }
+
     /// An identity is meaningful only against the arena it was serialized with.
     fn visit_qualified_reference(&mut self, reference: &QualifiedReferenceId) {
         if self.error.is_some() {

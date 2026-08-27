@@ -5203,8 +5203,14 @@ macro_rules! ast_traversal {
         pub fn walk_in_out_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InOutDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let InOutDecl { direction, is_reference, is_var, name, subsets, type_name, multiplicity, multiplicity_modifiers, redefines, value, body } = &$($mutability)? node.value;
+            let InOutDecl { direction, kind, is_reference, is_var, name, subsets, type_name, multiplicity, multiplicity_modifiers, redefines, value, body } = &$($mutability)? node.value;
             visitor.visit_in_out_value(direction);
+            if let Some(inner) = kind {
+                visitor.visit_span(&$($mutability)? inner.span);
+                match inner.value {
+                    InOutDeclKind::Action => {}
+                }
+            }
             let _ = is_reference;
             let _ = is_var;
             if let Some(inner) = name {

@@ -221,6 +221,10 @@ pub enum ThenTarget {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InOutDecl {
     pub direction: InOut,
+    /// Optional usage-kind keyword on the directed parameter. The pinned
+    /// `ActionBodyParameter` production permits `action` before its optional declaration; keep
+    /// that authored distinction instead of collapsing `in action body {}` into `in body {}`.
+    pub kind: Option<Node<InOutDeclKind>>,
     /// Whether the declaration used the `ref` feature prefix (`in ref name : Type`).
     pub is_reference: bool,
     /// Whether the declaration used the KerML `var` time-varying prefix (`out var y1;`).
@@ -253,6 +257,13 @@ pub struct InOutDecl {
     /// `;`-terminated form. Parameter bodies share the action-body member grammar, matching the
     /// parser, which always dispatched brace terminators through the action-body machinery.
     pub body: Option<Vec<Node<ActionDefBodyElement>>>,
+}
+
+/// Usage kind explicitly authored on a direction-prefixed parameter declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum InOutDeclKind {
+    Action,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
