@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-08-27
+
 ### Changed
 
 - **Expose, verification, and view-rendering memberships retain invalid owners for semantic
@@ -2569,6 +2571,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `PartUsageBodyElement::SuccessionUsage` variant (stacks on #88's 76 -> 77 bump).
   - Promoted `Mass Roll-up Example/Vehicles.sysml` and `Vehicle Example/VehicleIndividuals.sysml`
     into `EXAMPLES_ROUNDTRIP_PASS`.
+
+`PARSE_AST_VERSION` bumped 71 → 248 across this release's accumulated changes. The AST is
+substantially reworked: typed source spans replace copied strings for declaration names, real and
+string literals, comment bodies and opaque declaration text; many new struct fields and enum
+variants across the definition/usage/connector/flow/metadata families; some fields and
+constructors removed (`*_span` mirrors, `format_name`, `BinaryOperator::Other` /
+`UnaryOperator::Other`, the five `KermlFeature` specialization mirrors); `ast::DeclarationName`
+renamed to `ast::NamespaceName`; `Span` is now `Copy`. Each entry above records its own bump and
+exact shape change. The serialized-AST wire envelope rejects any version mismatch on load, so
+consumers must re-parse against this schema rather than reuse a cached 0.54.0-era AST.
 
 ## [0.54.0] - 2026-08-07
 
