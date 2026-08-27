@@ -3111,7 +3111,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::FlowDeclaration::Declared {
                 declaration,
                 value,
-                payload,
+                payloads,
                 endpoints,
             } => {
                 let d = &declaration.value;
@@ -3156,11 +3156,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 } else {
                     self.writer.write_str("none")?;
                 }
-                self.writer.write_str(") (payload ")?;
-                if let Some(payload) = payload {
-                    self.write_payload_feature(&payload.value)?;
-                } else {
-                    self.writer.write_str("none")?;
+                self.writer.write_str(") (payloads")?;
+                for payload in payloads {
+                    self.writer.write_str(" (payload (of ")?;
+                    write_span(self.writer, &payload.value.of_span)?;
+                    self.writer.write_str(") (feature ")?;
+                    self.write_payload_feature(&payload.value.feature.value)?;
+                    self.writer.write_str("))")?;
                 }
                 self.writer.write_str(") (endpoints ")?;
                 if let Some(endpoints) = &**endpoints {

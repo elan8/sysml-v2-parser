@@ -1227,7 +1227,7 @@ pub(crate) fn emit_flow_usage(
         crate::ast::FlowDeclaration::Declared {
             declaration,
             value,
-            payload,
+            payloads,
             endpoints,
         } => {
             let declaration = &declaration.value;
@@ -1266,21 +1266,22 @@ pub(crate) fn emit_flow_usage(
             if let Some(value) = value {
                 emit_feature_value(w, value)?;
             }
-            if let Some(payload) = payload {
+            for (index, payload) in payloads.iter().enumerate() {
                 w.push_str(" of ");
-                if let Some(n) = payload.value.name {
-                    w.push_declaration_name(&format!("{path}/payload"), n)?;
-                    if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
+                let feature = &payload.value.feature.value;
+                if let Some(n) = feature.name {
+                    w.push_declaration_name(&format!("{path}/payload[{index}]"), n)?;
+                    if feature.type_name.is_some() || feature.multiplicity.is_some() {
                         w.push_str(" : ");
                     }
                 }
-                if let Some(ty) = payload.value.type_name {
-                    if payload.value.type_is_conjugated {
+                if let Some(ty) = feature.type_name {
+                    if feature.type_is_conjugated {
                         w.push_char('~');
                     }
                     w.push_qualified_reference(path, ty)?;
                 }
-                if let Some(mult) = &payload.value.multiplicity {
+                if let Some(mult) = &feature.multiplicity {
                     emit_multiplicity(w, &mult.value)?;
                 }
             }

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Flow payload clauses are ordered, source-backed syntax.** The declaration-led
+  `FlowDeclaration` now carries `payloads: Vec<Node<FlowPayloadClause>>` instead of one
+  `Option<Node<PayloadFeature>>`. Each clause retains its exact `of` span and typed payload
+  feature, so `flow of Thing of Other from source to target;` exposes two authored clauses to
+  KerML `validateFlowPayloadFeature` rather than becoming generic calc-body recovery. Emission,
+  traversal, semantic snapshots, and deserialization validation consume the new owning shape;
+  malformed repeated clauses still recover atomically without leaking speculative references.
+  **AST version 243.**
+
 - **99.3% fewer speculative arena rollbacks on the snapshot corpus** (133,240 -> 944 per pass;
   attempts 159k -> 29.8k; ~+4.5% throughput). Instead of trying each transaction-wrapped parser
   and rolling back, member dispatch now decides up front wherever a bounded lookahead can be

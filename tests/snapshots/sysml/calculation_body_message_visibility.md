@@ -29,6 +29,6 @@ package CalculationBodyMessageVisibility {
   (references
     (reference r0 (scope relative) (span (offset 89) (line 3) (column 30) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 89) (line 3) (column 30) (len 1)))))
   )
-  (root (package (name "CalculationBodyMessageVisibility") (body brace (calc-def (name "C") (modifiers) (body brace (flow-usage (kind message) (visibility private) (declaration (declared (name "m") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none)) (value none) (payload (name none) (type (ref r0)) (conjugated false) (multiplicity none)) (endpoints none))) (body (body semicolon))))))))
+  (root (package (name "CalculationBodyMessageVisibility") (body brace (calc-def (name "C") (modifiers) (body brace (flow-usage (kind message) (visibility private) (declaration (declared (name "m") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none)) (value none) (payloads (payload (of (span (offset 86) (line 3) (column 27) (len 2))) (feature (name none) (type (ref r0)) (conjugated false) (multiplicity none)))) (endpoints none))) (body (body semicolon))))))))
 )
 ~~~

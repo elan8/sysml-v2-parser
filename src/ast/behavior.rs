@@ -575,9 +575,21 @@ pub struct PayloadFeature {
     pub multiplicity: Option<Node<Multiplicity>>,
 }
 
+/// One authored `of PayloadFeature` clause on a flow declaration.
+///
+/// The concrete grammar admits at most one clause, while KerML's validation rule is stated over
+/// the number of owned payload features. Keeping the ordered clauses and their introducer spans
+/// lets validators observe an authored repeat without reconstructing clause boundaries from text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FlowPayloadClause {
+    pub of_span: Span,
+    pub feature: Node<PayloadFeature>,
+}
+
 /// The two grammar-owned alternatives of `FlowDeclaration` / `MessageDeclaration`.
 ///
-/// The declaration-led form owns a `UsageDeclaration`, optional `FeatureValue`, optional payload,
+/// The declaration-led form owns a `UsageDeclaration`, optional `FeatureValue`, payload clauses,
 /// and optional endpoint pair. The endpoint-only form owns the required pair directly. Keeping
 /// these alternatives distinct makes it impossible to fabricate an empty declaration for
 /// `flow source to target;`.
@@ -590,7 +602,7 @@ pub enum FlowDeclaration {
         /// `UsageDeclaration` rather than an allocation detail.
         declaration: Box<Node<UsageDeclaration>>,
         value: Option<Node<FeatureValue>>,
-        payload: Option<Node<PayloadFeature>>,
+        payloads: Vec<Node<FlowPayloadClause>>,
         /// Optional endpoints belong only to the declaration-led grammar alternative.
         /// Boxing this optional pair keeps the enum's endpoint-only alternative compact without
         /// changing its serialized representation.

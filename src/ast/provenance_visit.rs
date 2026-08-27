@@ -8,10 +8,10 @@
 //! traversal knows about it -- there is no separate list here to keep in step.
 
 use super::visit::{
-    walk_comment_annotation, walk_first_merge_body, walk_import_target, walk_in_out_decl,
-    walk_interface_end, walk_interface_part, walk_metadata_annotation, walk_metadata_body_usage,
-    walk_metadata_keyword_usage, walk_occurrence_usage_prefix, walk_satisfy_requirement_usage,
-    walk_usage_extension_keyword, Visitor,
+    walk_comment_annotation, walk_first_merge_body, walk_flow_payload_clause, walk_import_target,
+    walk_in_out_decl, walk_interface_end, walk_interface_part, walk_metadata_annotation,
+    walk_metadata_body_usage, walk_metadata_keyword_usage, walk_occurrence_usage_prefix,
+    walk_satisfy_requirement_usage, walk_usage_extension_keyword, Visitor,
 };
 use super::*;
 
@@ -114,6 +114,25 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_flow_payload_clause(&mut self, node: &Node<FlowPayloadClause>) {
+        if self.error.is_some() {
+            return;
+        }
+        self.check(self.delimiter(
+            &node.value.of_span,
+            "of",
+            "flow payload clause `of` keyword",
+        ));
+        if self.error.is_none() {
+            self.check(sigil_within(
+                &node.value.of_span,
+                &node.span,
+                "flow payload clause `of` keyword",
+            ));
+        }
+        walk_flow_payload_clause(self, node);
+    }
+
     fn visit_in_out_decl(&mut self, node: &Node<InOutDecl>) {
         if self.error.is_some() {
             return;

@@ -934,6 +934,11 @@ macro_rules! ast_traversal {
                 walk_payload_feature(self, node)
             }
 
+            /// Visits [`FlowPayloadClause`]; the default implementation walks its children.
+            fn visit_flow_payload_clause(&mut self, node: &$($mutability)? Node<FlowPayloadClause>) {
+                walk_flow_payload_clause(self, node)
+            }
+
             /// Visits [`FlowUsage`]; the default implementation walks its children.
             fn visit_flow_usage(&mut self, node: &$($mutability)? Node<FlowUsage>) {
                 walk_flow_usage(self, node)
@@ -5582,16 +5587,25 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_flow_payload_clause<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FlowPayloadClause>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let FlowPayloadClause { of_span, feature } = &$($mutability)? node.value;
+            visitor.visit_span(of_span);
+            visitor.visit_payload_feature(feature);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
         pub fn walk_flow_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FlowUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             let FlowUsage { kind, declaration, body, membership } = &$($mutability)? node.value;
             visitor.visit_flow_usage_kind(kind);
             match declaration {
-                FlowDeclaration::Declared { declaration, value, payload, endpoints } => {
+                FlowDeclaration::Declared { declaration, value, payloads, endpoints } => {
                     visitor.visit_usage_declaration(declaration);
                     if let Some(inner) = value { visitor.visit_feature_value(inner); }
-                    if let Some(inner) = payload { visitor.visit_payload_feature(inner); }
+                    for inner in payloads { visitor.visit_flow_payload_clause(inner); }
                     if let Some(endpoints) = &$($mutability)? **endpoints {
                         visitor.visit_kerml_connector_end(&$($mutability)? endpoints.from);
                         visitor.visit_kerml_connector_end(&$($mutability)? endpoints.to);
