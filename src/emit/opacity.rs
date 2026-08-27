@@ -551,6 +551,9 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::ConstraintUsage(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
+            PartDefBodyElement::RequireConstraint(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             PartDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             PartDefBodyElement::EnumerationUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)

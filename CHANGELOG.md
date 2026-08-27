@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Requirement-constraint memberships retain invalid part-definition owners for semantic
+  validation.** `PartDefBodyElement::RequireConstraint` carries the same typed declaration,
+  target, typing, and body used in requirement-shaped owners, allowing SysML 8.3.21.7
+  `validateRequirementConstraintMembershipOwningType` to diagnose the authored owner instead of
+  receiving `unexpected_keyword_in_scope`. Source emission, semantic snapshots, traversal,
+  opacity inspection, recovery, and validated serialization consume the new variant. **AST
+  version 246.**
+
 - **KerML binding connectors may own connector ends in their type body.**
   `KermlBindingMember` now represents the grammar's optional declaration-level binary end pair
   as one `KermlBindingEndPair`, rather than requiring detached `left` and `right` fields. A

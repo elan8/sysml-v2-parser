@@ -963,8 +963,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             }
                             self.writer.write_str("))")?;
                         }
-                        RequirementDefBodyElement::RequireConstraint(_constraint) => {
-                            self.write_marker(&mut first, "require-constraint")?;
+                        RequirementDefBodyElement::RequireConstraint(constraint) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_require_constraint(&constraint.value)?;
                         }
                         RequirementDefBodyElement::Constraint(_constraint) => {
                             self.write_marker(&mut first, "constraint")?;
@@ -1770,6 +1771,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::ConstraintUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_constraint_usage(&usage.value)?;
+                        }
+                        PartDefBodyElement::RequireConstraint(constraint) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_require_constraint(&constraint.value)?;
                         }
                         PartDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
@@ -2743,6 +2748,35 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
         }
+    }
+
+    fn write_require_constraint(
+        &mut self,
+        constraint: &super::RequireConstraint,
+    ) -> io::Result<()> {
+        self.writer.write_str("(require-constraint (kind ")?;
+        self.writer.write_str(if constraint.is_assume {
+            "assume"
+        } else {
+            "require"
+        })?;
+        self.writer.write_str(") (constraint-keyword ")?;
+        write!(self.writer, "{}", constraint.has_constraint_keyword)?;
+        self.writer.write_str(") (name ")?;
+        self.write_optional_name(constraint.name)?;
+        self.writer.write_str(") (target ")?;
+        match constraint.target {
+            Some(target) => self.write_reference(target)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (typing ")?;
+        match &constraint.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_constraint_def_body(&constraint.body)?;
+        self.writer.write_char(')')
     }
 
     /// `ConstraintDefinition = … DefinitionDeclaration CalculationBody` (SysML BNF 1379).

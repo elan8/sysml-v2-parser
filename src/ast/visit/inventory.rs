@@ -2741,6 +2741,9 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(field_0);
                 }
+                PartDefBodyElement::RequireConstraint(field_0) => {
+                    visitor.visit_require_constraint(field_0);
+                }
                 PartDefBodyElement::Import(field_0) => {
                     visitor.visit_import(field_0);
                 }

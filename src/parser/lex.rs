@@ -66,6 +66,11 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"protected",
     b"public",
     b"ref",
+    // Requirement-constraint memberships are admitted here so SysML 8.3.21.7's invalid-owner
+    // side reaches semantic validation. Both kind alternatives are member and recovery FIRST
+    // tokens; omitting them would let one malformed member consume a valid following sibling.
+    b"require",
+    b"assume",
     b"requirement",
     b"satisfy",
     b"state",

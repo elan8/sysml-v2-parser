@@ -156,6 +156,13 @@ pub enum PartDefBodyElement {
     /// `constraint <name>[: Type] { ... }` usage inside a part definition body. See
     /// [`PartDefBodyElement::ConstraintDef`].
     ConstraintUsage(Node<ConstraintUsage>),
+    /// A requirement-constraint membership admitted in a non-requirement owner so the semantic
+    /// `validateRequirementConstraintMembershipOwningType` rule can observe and reject that
+    /// owner. Pilot's concrete grammar places this production in `RequirementBodyItem`, while
+    /// SysML 8.3.21.7 separately constrains its abstract-syntax owner; retaining the same typed
+    /// member here preserves the invalid model instead of replacing semantic validation with an
+    /// `unexpected_keyword_in_scope` parse error.
+    RequireConstraint(Box<Node<crate::ast::RequireConstraint>>),
     /// `(private|public|protected)? import <qualified-name>;` inside a part definition body
     /// (§6 G16). See [`PartUsageBodyElement::Import`].
     Import(Node<crate::ast::Import>),

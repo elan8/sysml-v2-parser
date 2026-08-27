@@ -266,6 +266,9 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 map(calc_usage, PartDefBodyElement::CalcUsage),
                 map(constraint_def, PartDefBodyElement::ConstraintDef),
                 map(constraint_usage, PartDefBodyElement::ConstraintUsage),
+                map(crate::parser::requirement::require_constraint, |member| {
+                    PartDefBodyElement::RequireConstraint(Box::new(member))
+                }),
                 // §6 G16: a part body is a namespace, so it owns imports too.
                 map(crate::parser::import::import_, PartDefBodyElement::Import),
             )),
