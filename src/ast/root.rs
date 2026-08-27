@@ -271,7 +271,197 @@ fn validate_serialized_document(document: &ParsedDocument) -> Result<(), String>
 mod serde_tests {
     use super::*;
     use crate::ast::qualified_reference::{QualifiedReferenceArenaBuilder, ReferenceSegment};
-    use crate::ast::{Expression, FilterMember, PackageBodyElement, Span};
+    use crate::ast::visit::mutable::{walk_kerml_binding_member, VisitorMut};
+    use crate::ast::{
+        Expression, FeatureSpecialization, FilterMember, FlowPayloadClause, InOutDecl,
+        KermlBindingEndPair, KermlBindingMember, PackageBodyElement, Span, SubsettingKind,
+    };
+
+    fn serialize_unvalidated_wire(document: &ParsedDocument) -> serde_json::Value {
+        serde_json::to_value(ParsedDocumentWireRef {
+            ast_version: crate::PARSE_AST_VERSION,
+            source: &document.source,
+            qualified_references: &document.qualified_references,
+            root: &document.root,
+        })
+        .expect("the deliberately invalid wire document serializes")
+    }
+
+    fn assert_typed_corruption_is_rejected(source: &str, mutate: impl FnOnce(&mut ParsedDocument)) {
+        let mut document = crate::parse_for_editor(source).document;
+        mutate(&mut document);
+        let encoded = serialize_unvalidated_wire(&document);
+        serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("deserialization must reject the typed provenance corruption");
+    }
+
+    struct CorruptDirectedActionKind(bool);
+
+    impl VisitorMut for CorruptDirectedActionKind {
+        fn visit_in_out_decl(&mut self, node: &mut Node<InOutDecl>) {
+            if let Some(kind) = &mut node.value.kind {
+                kind.span.offset = 0;
+                self.0 = true;
+            }
+        }
+    }
+
+    struct CorruptFlowPayload(bool);
+
+    impl VisitorMut for CorruptFlowPayload {
+        fn visit_flow_payload_clause(&mut self, node: &mut Node<FlowPayloadClause>) {
+            node.value.of_span.offset = 0;
+            self.0 = true;
+        }
+    }
+
+    struct CorruptCrossSubsetting(bool);
+
+    impl VisitorMut for CorruptCrossSubsetting {
+        fn visit_feature_specialization(&mut self, node: &mut FeatureSpecialization) {
+            if let FeatureSpecialization::CrossSubsetting(relationship) = node {
+                relationship.value.kind = SubsettingKind::References;
+                self.0 = true;
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum BindingCorruption {
+        AllSpan,
+        OfSpan,
+        EqualsSpan,
+        RemoveDeclaredOf,
+    }
+
+    struct CorruptBinding {
+        corruption: BindingCorruption,
+        applied: bool,
+    }
+
+    impl VisitorMut for CorruptBinding {
+        fn visit_kerml_binding_member(&mut self, node: &mut Node<KermlBindingMember>) {
+            match self.corruption {
+                BindingCorruption::AllSpan => {
+                    if let Some(span) = &mut node.value.all_span {
+                        span.offset = 0;
+                        self.applied = true;
+                        return;
+                    }
+                }
+                BindingCorruption::RemoveDeclaredOf if node.value.name.is_some() => {
+                    if let Some(pair) = &mut node.value.inline_ends {
+                        pair.value.of_span = None;
+                        self.applied = true;
+                        return;
+                    }
+                }
+                BindingCorruption::OfSpan
+                | BindingCorruption::EqualsSpan
+                | BindingCorruption::RemoveDeclaredOf => {}
+            }
+            walk_kerml_binding_member(self, node);
+        }
+
+        fn visit_kerml_binding_end_pair(&mut self, node: &mut Node<KermlBindingEndPair>) {
+            match self.corruption {
+                BindingCorruption::OfSpan => {
+                    if let Some(span) = &mut node.value.of_span {
+                        span.offset = 0;
+                        self.applied = true;
+                    }
+                }
+                BindingCorruption::EqualsSpan => {
+                    node.value.equals_span.offset = 0;
+                    self.applied = true;
+                }
+                BindingCorruption::AllSpan | BindingCorruption::RemoveDeclaredOf => {}
+            }
+        }
+    }
+
+    fn apply_visitor(visitor: &mut impl VisitorMut, document: &mut ParsedDocument) {
+        visitor.visit_root_namespace(&mut document.root);
+    }
+
+    #[test]
+    fn rejects_a_directed_action_kind_span_covering_other_text() {
+        assert_typed_corruption_is_rejected("action def A { in action body {} }", |document| {
+            let mut corruption = CorruptDirectedActionKind(false);
+            apply_visitor(&mut corruption, document);
+            assert!(
+                corruption.0,
+                "the typed traversal must find the action kind"
+            );
+        });
+    }
+
+    #[test]
+    fn rejects_a_flow_payload_of_span_covering_other_text() {
+        assert_typed_corruption_is_rejected("flow of Thing from source to target;", |document| {
+            let mut corruption = CorruptFlowPayload(false);
+            apply_visitor(&mut corruption, document);
+            assert!(corruption.0, "the typed traversal must find the payload");
+        });
+    }
+
+    #[test]
+    fn rejects_a_cross_subsetting_with_the_wrong_relationship_kind() {
+        assert_typed_corruption_is_rejected("feature f crosses target;", |document| {
+            let mut corruption = CorruptCrossSubsetting(false);
+            apply_visitor(&mut corruption, document);
+            assert!(
+                corruption.0,
+                "the typed traversal must find the cross subsetting"
+            );
+        });
+    }
+
+    fn assert_binding_corruption_is_rejected(source: &str, kind: BindingCorruption) {
+        assert_typed_corruption_is_rejected(source, |document| {
+            let mut corruption = CorruptBinding {
+                corruption: kind,
+                applied: false,
+            };
+            apply_visitor(&mut corruption, document);
+            assert!(
+                corruption.applied,
+                "the typed traversal must find the binding syntax"
+            );
+        });
+    }
+
+    #[test]
+    fn rejects_a_binding_all_span_covering_other_text() {
+        assert_binding_corruption_is_rejected(
+            "classifier C { binding all; }",
+            BindingCorruption::AllSpan,
+        );
+    }
+
+    #[test]
+    fn rejects_an_inline_binding_of_span_covering_other_text() {
+        assert_binding_corruption_is_rejected(
+            "classifier C { binding named of left = right; }",
+            BindingCorruption::OfSpan,
+        );
+    }
+
+    #[test]
+    fn rejects_an_inline_binding_equals_span_covering_other_text() {
+        assert_binding_corruption_is_rejected(
+            "classifier C { binding of left = right; }",
+            BindingCorruption::EqualsSpan,
+        );
+    }
+
+    #[test]
+    fn rejects_declared_inline_binding_ends_without_of() {
+        assert_binding_corruption_is_rejected(
+            "classifier C { binding named of left = right; }",
+            BindingCorruption::RemoveDeclaredOf,
+        );
+    }
 
     fn source_span() -> Span {
         Span {
