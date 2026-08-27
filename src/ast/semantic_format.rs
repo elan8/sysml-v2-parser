@@ -2855,6 +2855,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_first_merge_member(&member.value, &member.span)?;
                         }
+                        super::CalcDefBodyElement::KermlRelationship(relationship) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_relationship(&relationship.value)?;
+                        }
                         super::CalcDefBodyElement::KermlFeature(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_kerml_feature(&member.value)?;
@@ -6095,6 +6099,23 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    fn write_kerml_relationship(
+        &mut self,
+        relationship: &super::KermlRelationshipDecl,
+    ) -> io::Result<()> {
+        self.writer.write_str("(kerml-relationship (keyword ")?;
+        self.writer.write_str(relationship.keyword.as_str())?;
+        write!(
+            self.writer,
+            ") (declaration-keyword {}) (source ",
+            relationship.declaration_keyword_span.is_some()
+        )?;
+        self.write_reference(relationship.source)?;
+        self.writer.write_str(") (target ")?;
+        self.write_reference(relationship.target)?;
+        self.writer.write_str("))")
+    }
+
     fn write_package_element(
         &mut self,
         element: &Node<PackageBodyElement>,
@@ -6328,17 +6349,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::KermlRelationship(relationship) => {
                 self.write_item_prefix(first)?;
-                self.writer.write_str("(kerml-relationship (keyword ")?;
-                self.writer.write_str(relationship.value.keyword.as_str())?;
-                write!(
-                    self.writer,
-                    ") (declaration-keyword {}) (source ",
-                    relationship.value.declaration_keyword_span.is_some()
-                )?;
-                self.write_reference(relationship.value.source)?;
-                self.writer.write_str(") (target ")?;
-                self.write_reference(relationship.value.target)?;
-                self.writer.write_str("))")
+                self.write_kerml_relationship(&relationship.value)
             }
             PackageBodyElement::KermlInvariant(invariant) => {
                 self.write_item_prefix(first)?;

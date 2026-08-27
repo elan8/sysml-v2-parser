@@ -716,7 +716,7 @@ fn kerml_bare_declaration(
 /// typed by b;`, `specialization? subset a subsets b;`, `specialization? redefinition a
 /// redefines b;`, `disjoining d? disjoint a from b;`, `inverting i? inverse a of b;`,
 /// `featuring (F of)? a by b;` -- each with an annotation-only `RelationshipBody`.
-fn kerml_relationship_decl(
+pub(crate) fn kerml_relationship_decl(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
     // Speculated at member starts it does not own; refuse unless one of the relationship

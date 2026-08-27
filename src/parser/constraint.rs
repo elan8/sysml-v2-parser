@@ -1678,6 +1678,28 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     {
         let (next, member) = calc_def_body_package_member(input)?;
         (next, member)
+    } else if crate::parser::lex::starts_with_any_keyword(
+        after_visibility,
+        &[
+            b"specialization",
+            b"subclassifier",
+            b"subtype",
+            b"subset",
+            b"redefinition",
+            b"typing",
+            b"conjugation",
+            b"conjugate",
+            b"disjoining",
+            b"disjoint",
+            b"inverting",
+            b"inverse",
+            b"featuring",
+        ],
+    ) {
+        map(crate::parser::package::kerml_relationship_decl, |node| {
+            CalcDefBodyElement::KermlRelationship(Box::new(node))
+        })
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"doc")
         || starts_with_keyword(input.fragment(), b"comment")
         || starts_with_keyword(input.fragment(), b"rep")

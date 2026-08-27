@@ -126,7 +126,7 @@ fn emit_package_body_node(
     emit_package_body_element(w, path, &node.value)
 }
 
-fn emit_kerml_relationship_decl(
+pub(crate) fn emit_kerml_relationship_decl(
     w: &mut EmitWriter<'_>,
     path: &str,
     decl: &crate::ast::KermlRelationshipDecl,

@@ -67,6 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Explicit KerML relationship declarations remain structured inside type bodies.**
+  `TypeBodyElement -> NonFeatureMember` now dispatches `Subsetting`, `Redefinition`,
+  `Disjoining`, `FeatureInverting`, `TypeFeaturing`, and the other already-supported explicit
+  relationship declarations through `KermlRelationshipDecl`, just as package scope does. They no
+  longer fall through to the expression parser and fabricate operand references to relationship
+  keywords such as `subset`, `subsets`, and `disjoint`. **AST version 241.**
 - **An integer literal that does not fit `i64` is refused instead of silently parsing as `0`.**
   The enclosing expression now recovers with a diagnostic, so an unrepresentable value can no
   longer masquerade as a successfully parsed literal.
