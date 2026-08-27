@@ -491,6 +491,7 @@ pub(crate) fn emit_action_def_body_element(
             }
             Ok(())
         }
+        ActionDefBodyElement::Transition(transition) => emit_transition(w, path, &transition.value),
         ActionDefBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         ActionDefBodyElement::MetadataKeywordUsage(m) => {
@@ -593,6 +594,9 @@ pub(crate) fn emit_action_usage_body_element(
                 emit_action_branch_body(w, path, else_body)?;
             }
             Ok(())
+        }
+        ActionUsageBodyElement::Transition(transition) => {
+            emit_transition(w, path, &transition.value)
         }
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionUsageBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),

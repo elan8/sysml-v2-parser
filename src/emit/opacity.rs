@@ -1064,6 +1064,12 @@ fn walk_action_def_body_elements(
                     walk_action_branch_body(report, &format!("{p}/else"), body);
                 }
             }
+            ActionDefBodyElement::Transition(n) => {
+                walk_action_def_body(report, &p, &n.value.body);
+                if let Some(effect) = &n.value.effect {
+                    walk_transition_effect(report, &format!("{p}/effect"), effect);
+                }
+            }
             ActionDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)
@@ -1176,6 +1182,12 @@ fn walk_action_usage_body_elements(
                 walk_action_branch_body(report, &format!("{p}/then"), &n.value.then_body);
                 if let Some(body) = &n.value.else_body {
                     walk_action_branch_body(report, &format!("{p}/else"), body);
+                }
+            }
+            ActionUsageBodyElement::Transition(n) => {
+                walk_action_def_body(report, &p, &n.value.body);
+                if let Some(effect) = &n.value.effect {
+                    walk_transition_effect(report, &format!("{p}/effect"), effect);
                 }
             }
             ActionUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),

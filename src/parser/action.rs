@@ -72,6 +72,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"while",
     b"loop",
     b"if",
+    b"transition",
     b"@",
     b"#",
     // The rest of FIRST(`OccurrenceUsagePrefix`) on the item and part usages this scope
@@ -316,6 +317,7 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::WhileStmt(_)
         | ActionDefBodyElement::LoopStmt(_)
         | ActionDefBodyElement::IfStmt(_)
+        | ActionDefBodyElement::Transition(_)
         | ActionDefBodyElement::StateUsage(_)
         | ActionDefBodyElement::ActionUsage(_)
         | ActionDefBodyElement::PartUsage(_)
@@ -983,6 +985,9 @@ fn action_def_body_behavior_element(input: Input<'_>) -> IResult<Input<'_>, Acti
         map(decision_stmt, ActionDefBodyElement::DecisionStmt),
         map(join_stmt, ActionDefBodyElement::JoinStmt),
         map(fork_stmt, ActionDefBodyElement::ForkStmt),
+        map(crate::parser::state::transition, |transition| {
+            ActionDefBodyElement::Transition(Box::new(transition))
+        }),
         map(state_usage, ActionDefBodyElement::StateUsage),
     ))
     .parse(input)
@@ -1880,6 +1885,9 @@ fn action_usage_body_behavior_element(
         map(decision_stmt, ActionUsageBodyElement::DecisionStmt),
         map(join_stmt, ActionUsageBodyElement::JoinStmt),
         map(fork_stmt, ActionUsageBodyElement::ForkStmt),
+        map(crate::parser::state::transition, |transition| {
+            ActionUsageBodyElement::Transition(Box::new(transition))
+        }),
         map(
             crate::parser::state::state_usage,
             ActionUsageBodyElement::StateUsage,

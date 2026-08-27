@@ -3130,6 +3130,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 loop_stmt.value.until.as_ref(),
             ),
             ActionDefBodyElement::IfStmt(if_stmt) => self.write_if_stmt(&if_stmt.value),
+            ActionDefBodyElement::Transition(transition) => {
+                self.write_transition(&transition.value)
+            }
             ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
             ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
             ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
@@ -3923,6 +3926,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::IfStmt(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_if_stmt(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::Transition(transition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_transition(&transition.value)?;
                         }
                         super::ActionUsageBodyElement::StateUsage(member) => {
                             self.write_item_prefix(&mut first)?;

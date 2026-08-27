@@ -85,6 +85,12 @@ pub enum ActionDefBodyElement {
     /// `loop { ... }` (§6 G14).
     LoopStmt(Node<LoopStmt>),
     IfStmt(Node<IfStmt>),
+    /// A transition retained in an action body so semantic validation can diagnose that its
+    /// source is not a state usage. The concrete `ActionBodyItem` grammar does not normally
+    /// admit this owner, but SysML 8.3.18.9 defines the invalid-owner condition over authored
+    /// transition trigger actions; preserving the existing typed [`Transition`] is preferable
+    /// to replacing that semantic error with `unexpected_keyword_in_scope`.
+    Transition(Box<Node<Transition>>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
@@ -509,6 +515,8 @@ pub enum ActionUsageBodyElement {
     /// `loop { ... }` (§6 G14).
     LoopStmt(Node<LoopStmt>),
     IfStmt(Node<IfStmt>),
+    /// See [`ActionDefBodyElement::Transition`].
+    Transition(Box<Node<Transition>>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).

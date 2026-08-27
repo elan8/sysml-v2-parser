@@ -5098,6 +5098,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::IfStmt(field_0) => {
                     visitor.visit_if_stmt(field_0);
                 }
+                ActionDefBodyElement::Transition(field_0) => {
+                    visitor.visit_transition(&$($mutability)? **field_0);
+                }
                 ActionDefBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
                 }
@@ -5515,6 +5518,9 @@ macro_rules! ast_traversal {
                 }
                 ActionUsageBodyElement::IfStmt(field_0) => {
                     visitor.visit_if_stmt(field_0);
+                }
+                ActionUsageBodyElement::Transition(field_0) => {
+                    visitor.visit_transition(&$($mutability)? **field_0);
                 }
                 ActionUsageBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);

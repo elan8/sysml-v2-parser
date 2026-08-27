@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Action bodies retain transitions for invalid-owner semantic validation.** Action definition
+  and usage bodies now carry an otherwise fully typed `Transition` member, including source,
+  trigger, guard, effect, target, and body, so SysML 8.3.18.9 can diagnose a triggered transition
+  whose source is an action rather than receiving `unexpected_keyword_in_scope`. Recovery treats
+  `transition` as a body-member boundary and does not leak references from malformed attempts;
+  emission, semantic snapshots, traversal, opacity inspection, and serialization are exhaustive
+  over both new variants. **AST version 247.**
+
 - **Requirement-constraint memberships retain invalid part-definition owners for semantic
   validation.** `PartDefBodyElement::RequireConstraint` carries the same typed declaration,
   target, typing, and body used in requirement-shaped owners, allowing SysML 8.3.21.7
