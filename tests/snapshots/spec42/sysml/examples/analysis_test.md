@@ -65,14 +65,14 @@ package AnalysisTest {
     }
     analysis def AnalysisCase {
         subject v : V;
-        objective obj : AnalysisObjective  {
+        objective obj : AnalysisObjective {
             subject = result;
         }
         v.m;
     }
     analysis def AnalysisPlan {
         subject v : V;
-        objective  {
+        objective {
             doc
             /* ... */
         }

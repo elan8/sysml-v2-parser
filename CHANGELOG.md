@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keyword span preserves authored provenance, malformed members recover before later valid
   siblings, and parser snapshots cover accepted and recovery paths. **AST version 249.**
 
+### Fixed
+
+- **`verify` accepts a feature-chain target.** `RequirementVerificationUsage`'s
+  `OwnedReferenceSubsetting` alternative is `[QualifiedName] | OwnedFeatureChain`, so
+  `verify rss.recoverFromStall;` inside an objective body is a typed member rather than
+  `recovered_requirement_body_element`. The optional `:>>` redefinition target uses the same
+  source-backed path. Semantic snapshots now walk `objective` requirement bodies so those
+  verify members and their typed `.` separators are visible. Unnamed `objective {` emission
+  no longer inserts a doubled space before the brace.
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

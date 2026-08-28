@@ -829,6 +829,9 @@ fn emit_use_case_body_element(
             if let Some(references) = &req.references {
                 emit_subsetting_clause(w, &references.value)?;
             }
+            // `emit_requirement_body` already prefixes `{` with a space; a second space after
+            // `objective` / the name made unnamed objectives emit `objective  {`.
+            w.trim_trailing_space();
             emit_requirement_body(w, path, &req.body)
         }
         UseCaseDefBodyElement::AttributeDef(a) => structure::emit_attribute_def(w, path, &a.value),

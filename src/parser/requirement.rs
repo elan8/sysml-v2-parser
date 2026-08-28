@@ -445,11 +445,16 @@ fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyR
             },
         )
     } else {
-        let (input, target) = qualified_reference(input)?;
+        // `OwnedReferenceSubsetting = [QualifiedName] | OwnedFeatureChain` (SysML textual BNF
+        // `RequirementVerificationUsage`): a reference with typed `::` and `.` separators, not
+        // an expression. `qualified_reference` refuses `.`, so `verify rss.recoverFromStall;`
+        // used to fall through to `recovered_requirement_body_element`.
+        let (input, target) = crate::parser::lex::reference_path(input)?;
         let (input, _) = ws_and_comments(input)?;
         if input.fragment().starts_with(b":>>") {
             let (input, _) = tag(&b":>>"[..]).parse(input)?;
-            let (input, redefines) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let (input, redefines) =
+                preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
             let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
             (
                 input,
@@ -1401,6 +1406,42 @@ mod typed_reference_tests {
         assert_eq!(
             reference.segments[1].separator_before,
             Some(ReferenceSeparator::ColonColon)
+        );
+    }
+
+    #[test]
+    fn verify_owned_reference_subsetting_accepts_feature_chains() {
+        let (verify, source, arena) = parse_node(
+            "verify Pkg::rss.recoverFromStall :>> outer.inner;",
+            verify_requirement,
+        );
+        let target = arena
+            .get(&source, verify.value.target.expect("verify target"))
+            .expect("target reference");
+        assert_eq!(target.authored_text(), "Pkg::rss.recoverFromStall");
+        assert!(!target.metadata.is_absolute);
+        assert_eq!(target.segments.len(), 3);
+        assert_eq!(target.segments[0].separator_before, None);
+        assert_eq!(
+            target.segments[1].separator_before,
+            Some(ReferenceSeparator::ColonColon)
+        );
+        assert_eq!(
+            target.segments[2].separator_before,
+            Some(ReferenceSeparator::Dot)
+        );
+        let redefines = arena
+            .get(
+                &source,
+                verify.value.redefines.expect("verify redefinition"),
+            )
+            .expect("redefinition reference");
+        assert_eq!(redefines.authored_text(), "outer.inner");
+        assert_eq!(redefines.segments.len(), 2);
+        assert_eq!(redefines.segments[0].separator_before, None);
+        assert_eq!(
+            redefines.segments[1].separator_before,
+            Some(ReferenceSeparator::Dot)
         );
     }
 

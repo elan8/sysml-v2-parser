@@ -115,7 +115,7 @@ package '18-Use Case' {
         actor driver : Person;
         actor passengers : Person[0..4];
         actor environment : Environment;
-        objective  {
+        objective {
             doc
             /* Satisfy mission requirements to transport driver and passengers 
 			 * from starting location to ending location in conformance with 

@@ -252,8 +252,21 @@ pub struct RequireConstraint {
     pub body: ConstraintDefBody,
 }
 
-/// Requirement verification usage in requirement/objective bodies:
-/// `verify requirement <...>` or shorthand `verify <qualified_name>;`.
+/// Requirement verification usage in requirement/objective bodies.
+///
+/// `RequirementVerificationUsage` (SysML textual BNF 8.2.2.24):
+///
+/// ```text
+/// RequirementVerificationUsage : RequirementUsage =
+///     ownedRelationship += OwnedReferenceSubsetting
+///     FeatureSpecialization* RequirementBody
+///   | ( UsageExtensionKeyword* 'requirement'
+///     | UsageExtensionKeyword+ )
+///     ConstraintUsageDeclaration RequirementBody
+/// ```
+///
+/// The shorthand is `OwnedReferenceSubsetting` — `[QualifiedName] | OwnedFeatureChain` — so
+/// `verify rss.recoverFromStall;` is the same alternative as `verify rss;` and `verify P::rr;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerifyRequirementMember {
@@ -261,7 +274,7 @@ pub struct VerifyRequirementMember {
     pub explicit_requirement_keyword: bool,
     /// Parsed requirement usage when explicit form is used.
     pub requirement: Option<Node<RequirementUsage>>,
-    /// Shorthand verified requirement reference (`verify QualifiedName;`).
+    /// Shorthand verified requirement (`OwnedReferenceSubsetting`: qualified name or feature chain).
     pub target: Option<QualifiedReferenceId>,
     /// Redefinition target after `:>>` (`verify vehicleMassRequirement :>> massRequirement;`).
     pub redefines: Option<QualifiedReferenceId>,
