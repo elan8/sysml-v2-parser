@@ -805,6 +805,7 @@ fn walk_attribute_body_element(report: &mut OpacityReport, p: &str, el: &Attribu
         AttributeBodyElement::OccurrenceUsage(n) => {
             walk_occurrence_usage_body(report, p, &n.value.body)
         }
+        AttributeBodyElement::SuccessionUsage(n) => walk_ref_body(report, p, &n.value.body),
         AttributeBodyElement::MetadataKeywordUsage(n) => {
             walk_optional_attribute_body(report, p, &n.value.body)
         }

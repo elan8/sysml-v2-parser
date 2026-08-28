@@ -662,6 +662,9 @@ fn emit_attribute_body_element(
         AttributeBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
+        AttributeBodyElement::SuccessionUsage(s) => {
+            super::behavior::emit_succession_usage(w, path, &s.value)
+        }
         AttributeBodyElement::Connect(c) => emit_connect(w, path, &c.value),
         AttributeBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)

@@ -4368,6 +4368,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_occurrence(&member.value)?;
             }
+            super::AttributeBodyElement::SuccessionUsage(member) => {
+                self.write_succession_usage(first, &member.value)?;
+            }
             super::AttributeBodyElement::RefDecl(declaration) => {
                 self.write_item_prefix(first)?;
                 self.write_ref_declaration(&declaration.value)?;
@@ -5327,8 +5330,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_flow_usage(&usage.value)
             }
             super::OccurrenceBodyElement::Bind(_) => self.write_marker(first, "bind"),
-            super::OccurrenceBodyElement::SuccessionUsage(_) => {
-                self.write_marker(first, "succession-usage")
+            super::OccurrenceBodyElement::SuccessionUsage(member) => {
+                self.write_succession_usage(first, &member.value)
             }
             super::OccurrenceBodyElement::Allocate(_) => self.write_marker(first, "allocate"),
             super::OccurrenceBodyElement::StateUsage(_) => self.write_marker(first, "state-usage"),
@@ -5336,6 +5339,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_marker(first, "connection-usage")
             }
         }
+    }
+
+    fn write_succession_usage(
+        &mut self,
+        first: &mut bool,
+        usage: &super::SuccessionUsage,
+    ) -> io::Result<()> {
+        self.write_item_prefix(first)?;
+        write!(
+            self.writer,
+            "(succession-usage (keyword {}) (name ",
+            usage.succession_keyword_span.is_some()
+        )?;
+        self.write_optional_name(usage.name)?;
+        self.writer.write_str("))")
     }
 
     fn write_definition_body(&mut self, body: &super::DefinitionBody) -> io::Result<()> {

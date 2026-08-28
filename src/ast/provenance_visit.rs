@@ -12,8 +12,8 @@ use super::visit::{
     walk_flow_payload_clause, walk_import_target, walk_in_out_decl, walk_interface_end,
     walk_interface_part, walk_kerml_binding_end_pair, walk_kerml_binding_member,
     walk_metadata_annotation, walk_metadata_body_usage, walk_metadata_keyword_usage,
-    walk_occurrence_usage_prefix, walk_satisfy_requirement_usage, walk_usage_extension_keyword,
-    Visitor,
+    walk_occurrence_usage_prefix, walk_satisfy_requirement_usage, walk_succession_usage,
+    walk_usage_extension_keyword, Visitor,
 };
 use super::*;
 
@@ -116,6 +116,18 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_succession_usage(&mut self, node: &Node<SuccessionUsage>) {
+        if let Some(span) = &node.value.succession_keyword_span {
+            self.check(self.delimiter(span, "succession", "succession usage keyword"));
+            if self.error.is_none() {
+                self.check(sigil_within(span, &node.span, "succession usage keyword"));
+            }
+        }
+        if self.error.is_none() {
+            walk_succession_usage(self, node);
+        }
+    }
+
     fn visit_kerml_binding_member(&mut self, node: &Node<KermlBindingMember>) {
         if self.error.is_some() {
             return;

@@ -333,6 +333,10 @@ pub(crate) fn attribute_body_element(
         map(crate::parser::occurrence_body::occurrence_usage, |n| {
             AttributeBodyElement::OccurrenceUsage(Box::new(n))
         }),
+        map(
+            crate::parser::occurrence_body::succession_usage,
+            AttributeBodyElement::SuccessionUsage,
+        ),
         // This body is also shared with `item def`/`item` usage bodies, which legally own
         // connector members (`connect a to b;`) and metadata tags (`#keyword`, bare or
         // prefixing the next member) -- see the OMG spec Annex `14c-Language Extensions.sysml`
