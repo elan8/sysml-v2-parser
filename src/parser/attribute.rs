@@ -44,6 +44,12 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"connection",
     b"value",
     b"occurrence",
+    // This body is shared with `item def` / `item` usage bodies, which own standalone
+    // `SuccessionAsUsage` members -- `succession s first a then b;` and the bare
+    // `first a then b;` spelling (`succession_usage` in `attribute_body_element`). Both have to
+    // be recovery boundaries so a malformed sibling before one does not swallow it.
+    b"first",
+    b"succession",
     b"feature",
     b"member",
     b"var",
