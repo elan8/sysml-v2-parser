@@ -463,6 +463,10 @@ pub enum AttributeBodyElement {
     /// 237-252; pinned Pilot `SysML.xtext` 518-531). `AttributeBody` is shared by attribute,
     /// item, and type bodies, so this owns the member once at that grammar boundary.
     VariantUsage(Node<VariantUsage>),
+    /// `SuccessionAsUsage` in the shared definition body used by item definitions/usages.
+    /// The leading `succession` declaration is optional, so this includes bare
+    /// `first source then target;` members.
+    SuccessionUsage(Node<SuccessionUsage>),
 }
 
 /// Item definition: `item def` Identification body (for events, etc.).
@@ -2023,6 +2027,9 @@ pub enum OccurrenceBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SuccessionUsage {
+    /// Exact span of the optional `succession` keyword. `None` preserves the keyword-less
+    /// `first source then target;` spelling without fabricating an authored declaration.
+    pub succession_keyword_span: Option<Span>,
     /// Name of the succession usage itself, e.g. `causalOrdering` in `succession causalOrdering
     /// first a then b;` (BNF `SuccessionAsUsage`'s optional `'succession' UsageDeclaration`
     /// prefix, mirrored by `action::succession_prefix` for the `first`-embedded form). GH-51:

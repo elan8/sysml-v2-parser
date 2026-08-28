@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Bare `first … then …` succession usages are accepted in occurrence and item definition
+  bodies.** Both spellings use the existing typed `SuccessionUsage`; its optional `succession`
+  keyword span preserves authored provenance, malformed members recover before later valid
+  siblings, and parser snapshots cover accepted and recovery paths. **AST version 249.**
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

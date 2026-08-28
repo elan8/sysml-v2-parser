@@ -50,6 +50,7 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b":>",
     b"redefines",
     b"flow",
+    b"first",
     b"message",
     b"succession",
     b"part",
@@ -582,9 +583,15 @@ pub(crate) fn occurrence_body_element(
 /// only valid inside an action body). Real usage from the SysML Systems Library
 /// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
 pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
-    // Speculated at member starts it does not own; refuse by lookahead before entering an
-    // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
-    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"succession") {
+    let Ok((peek, _)) = ws_and_comments(input) else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    };
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"succession")
+        && !starts_with_keyword(peek.fragment(), b"first")
+    {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -597,8 +604,7 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = tag(&b"succession"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, succession_keyword_span) = optional_keyword_token(input, b"succession")?;
     // GH-51: optional name for the succession usage itself (BNF `SuccessionAsUsage`'s
     // `('succession' UsageDeclaration)?` prefix), e.g. `succession causalOrdering first a then
     // b;` (real usage: Systems Library `Domain Libraries/Cause and Effect/
@@ -606,7 +612,9 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     // check for the sibling `first`-embedded form. `flow` is excluded so a malformed `succession
     // flow ...` that reaches this parser (normally claimed first by `flow_usage_member`) doesn't
     // misread the keyword as a name.
-    let (input, name) = {
+    let (input, name) = if succession_keyword_span.is_none() {
+        (input, None)
+    } else {
         let (peek, _) = ws_and_comments(input)?;
         let frag = peek.fragment();
         // GH-92.3: a bare `:` (type clause with no name) also means "no name" here, e.g.
@@ -628,7 +636,9 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     // GH-92.3: optional `: Type` clause on the succession usage itself, mirroring
     // `action::succession_prefix`'s identical `succession_type` handling for the sibling
     // action-body `first`-embedded form.
-    let (input, type_name) = {
+    let (input, type_name) = if succession_keyword_span.is_none() {
+        (input, None)
+    } else {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
@@ -655,6 +665,7 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
             start,
             input,
             SuccessionUsage {
+                succession_keyword_span,
                 name,
                 type_name,
                 multiplicity,
