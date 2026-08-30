@@ -1221,6 +1221,11 @@ pub enum PortDefBodyElement {
     /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
     /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// Alias membership nested in a port definition body. `PortDefinition` uses the ordinary
+    /// `DefinitionBody`, whose `DefinitionBodyItem` alternatives include `AliasMember` (pinned
+    /// SysML textual BNF 235-268). The official `Simple Tests/PartTest.sysml` fixture declares
+    /// `alias z1 for y;` and `alias z2 for y;` immediately after a directed reference usage.
+    AliasDef(Node<AliasDef>),
     /// `ref`-prefixed feature declaration, e.g. `abstract ref port interfacingPorts : Port[0..*]
     /// nonunique :> ports { ... }` and `ref self: Port :>> Object::self;` (Systems Library
     /// `Ports.sysml`). This scope accepted no `ref` member at all, so every one of them was

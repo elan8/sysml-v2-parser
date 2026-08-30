@@ -814,6 +814,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PortDefBodyElement::AliasDef(a) => emit_alias_def(w, path, &a.value),
         PortDefBodyElement::VariantUsage(v) => emit_variant_usage(w, path, &v.value),
     }
 }

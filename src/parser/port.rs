@@ -72,6 +72,15 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
             PortBodyElement::PartUsage(Box::new(usage))
         }),
         map(item_usage, PortBodyElement::ItemUsage),
+        // `UsageBody = DefinitionBody`, whose `NonOccurrenceUsageMember` alternative reaches
+        // `ReferenceUsage`. Give the complete named reference-usage parser first refusal before
+        // `in_out_decl`: both accept a leading direction, but only `part_ref_usage` retains the
+        // required `ref`, comma-separated typings, and nested usage body (`in ref y: A, B { ...
+        // }`). The shared full parser below still owns anonymous and kind-keyworded refs.
+        map(
+            crate::parser::part::part_ref_usage,
+            PortBodyElement::RefDecl,
+        ),
         // After `port_usage` so `ref port …` reaches the kind-keyword form, exactly as in
         // `port_def_body_element`. `ref_decl` owns the keyword-less `ref` members the Systems
         // Library writes inside a `ref port … { … }` body.
@@ -308,10 +317,24 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         }),
         map(item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
+        // `PortDefinition -> Definition -> DefinitionBody -> NonOccurrenceUsageMember ->
+        // ReferenceUsage` (pinned SysML textual BNF 628, 235-256, 332-347). This must precede
+        // `in_out_decl`: that narrower parser can successfully consume the `in ...` prefix of a
+        // directed reference and leave `, B { ... }` behind, turning one valid member into
+        // recovery. `part_ref_usage` owns the complete named reference form, including multiple
+        // typings and the shared full usage body.
+        map(
+            crate::parser::part::part_ref_usage,
+            PortDefBodyElement::RefDecl,
+        ),
         map(in_out_decl, PortDefBodyElement::InOutDecl),
         map(
             crate::parser::body::annotating_member,
             PortDefBodyElement::Annotating,
+        ),
+        map(
+            crate::parser::alias::alias_def,
+            PortDefBodyElement::AliasDef,
         ),
         map(attribute_def, PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),

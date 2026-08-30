@@ -3737,6 +3737,9 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                PortDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 PortDefBodyElement::VariantUsage(field_0) => {
                     visitor.visit_variant_usage(field_0);
                 }

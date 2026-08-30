@@ -6226,6 +6226,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
                         }
+                        PortDefBodyElement::AliasDef(alias) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_alias_definition(&alias.value)?;
+                        }
                         PortDefBodyElement::VariantUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_variant_usage(&usage.value)?;
