@@ -3017,6 +3017,9 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::OccurrenceUsage(field_0) => {
                     visitor.visit_occurrence_usage(&$($mutability)? **field_0);
                 }
+                AttributeBodyElement::SuccessionUsage(field_0) => {
+                    visitor.visit_succession_usage(field_0);
+                }
                 AttributeBodyElement::Connect(field_0) => {
                     visitor.visit_connect(field_0);
                 }
@@ -4729,7 +4732,10 @@ macro_rules! ast_traversal {
         pub fn walk_succession_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SuccessionUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let SuccessionUsage { name, type_name, multiplicity, source, source_multiplicity, target, target_multiplicity, body, membership } = &$($mutability)? node.value;
+            let SuccessionUsage { succession_keyword_span, name, type_name, multiplicity, source, source_multiplicity, target, target_multiplicity, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = succession_keyword_span {
+                visitor.visit_span(inner);
+            }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }

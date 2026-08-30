@@ -1809,7 +1809,9 @@ pub(crate) fn emit_succession_usage(
     succ: &crate::ast::SuccessionUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, succ.membership.visibility);
-    w.push_str("succession ");
+    if succ.succession_keyword_span.is_some() {
+        w.push_str("succession ");
+    }
     if let Some(mult) = &succ.multiplicity {
         emit_multiplicity(w, &mult.value)?;
         w.push_char(' ');

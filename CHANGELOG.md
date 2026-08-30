@@ -14,7 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and nested usage body instead of being partially consumed as an input/output declaration.
   Port-definition aliases are also represented by the typed `PortDefBodyElement::AliasDef`
   variant. The official `Simple Tests/PartTest.sysml` fixture now round-trips without diagnostics.
-  **`PARSE_AST_VERSION` is now 249.**
+  **`PARSE_AST_VERSION` is now 250.**
+
+- **Bare `first … then …` succession usages are accepted in occurrence and item definition
+  bodies.** Both spellings use the existing typed `SuccessionUsage`; its optional `succession`
+  keyword span preserves authored provenance, malformed members recover before later valid
+  siblings, and parser snapshots cover accepted and recovery paths. **AST version 249.**
 
 ## [0.55.0] - 2026-08-27
 
