@@ -174,7 +174,7 @@ package '10b-Trade-off Among Alternative Configurations' {
         }
         analysis engineTradeStudy : TradeStudy {
             subject : Engine[1..*] = all engineChoice;
-            objective : MaximizeObjective ;
+            objective : MaximizeObjective;
             calc :>> evaluationFunction {
                 in part anEngine : Engine :>> alternative;
                 calc powerRollup {

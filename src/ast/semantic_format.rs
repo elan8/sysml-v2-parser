@@ -1145,8 +1145,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_expression(&actor.value.value)?;
                             self.writer.write_str("))")?;
                         }
-                        UseCaseDefBodyElement::Objective(_objective) => {
-                            self.write_marker(&mut first, "objective")?;
+                        UseCaseDefBodyElement::Objective(objective) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_objective(&objective.value)?;
                         }
                         UseCaseDefBodyElement::FirstSuccession(first_succession) => {
                             self.write_item_prefix(&mut first)?;
@@ -5605,6 +5606,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") ")?;
         self.write_rendering_usage_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `ObjectiveRequirementUsage` owns a `RequirementBody`, so verify members and their
+    /// `OwnedReferenceSubsetting` targets are visible instead of a contentless `(objective)`
+    /// marker.
+    fn write_objective(&mut self, objective: &super::Objective) -> io::Result<()> {
+        self.writer.write_str("(objective (visibility ")?;
+        self.writer
+            .write_str(visibility_name(objective.visibility))?;
+        self.writer.write_str(") (name ")?;
+        self.write_optional_name(objective.requirement.value.name)?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = objective.requirement.value.type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_requirement_body(&objective.requirement.value.body)?;
         self.writer.write_char(')')
     }
 

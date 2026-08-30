@@ -252,7 +252,7 @@ package '10c-Fuel Economy Analysis' {
             in calc scenario : NominalScenario;
             in requirement fuelEconomyRequirement : FuelEconomyRequirement;
             return calculatedFuelEconomy : ScalarQuantityValue;
-            objective fuelEconomyAnalysisObjective  {
+            objective fuelEconomyAnalysisObjective {
                 doc
                 /*
 				     * The objective of this analysis is to determine whether the

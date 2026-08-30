@@ -125,14 +125,14 @@ package '10a-Analysis' {
         }
         analysis def MassAnalysisCase {
             subject vehicle : Vehicle;
-            objective : MassAnalysisObjective  {
+            objective : MassAnalysisObjective {
                 subject = MassAnalysisCase::result;
             }
             vehicle.mass;
         }
         analysis def AnalysisPlan {
             subject vehicle : Vehicle;
-            objective  {
+            objective {
                 doc
                 /* ... */
             }
