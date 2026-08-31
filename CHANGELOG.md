@@ -51,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ExtendedLibraryDecl` / `unsupported_grammar_form`. **AST version 252.** Part of
   elan8/sysml-v2-parser#132 (spec42#100).
 
+- **Use-case-family bodies (`analysis`, `use case`, `verification`, and their `def`s) accept a
+  keyword-less feature usage.** `launchVehicle : SaturnV = apollo11Mission…launchVehicle;` (Apollo
+  11 `analysis` body; official Vehicle Analysis Demo) now parses into the shared
+  `DefaultReferenceUsage` node -- exposed as `UseCaseDefBodyElement::DefaultReferenceUsage` -- when
+  it carries an explicit typing, redefinition, and/or value, instead of recovering as
+  `recovered_use_case_body_element`. A bare `name;` still parses as a result expression.
+  **AST version 253.** Part of elan8/sysml-v2-parser#132 (spec42#100).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

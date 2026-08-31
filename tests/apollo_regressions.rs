@@ -1,9 +1,9 @@
 use sysml_v2_parser::ast::{
-    ActionDefBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement,
+    ActionDefBody, AnnotatingMember, Body, ConnectionDefBody, ConnectionDefBodyElement,
     ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement,
     OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
     PartUsageBody, PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement,
-    RootElement, StateDefBody, StateDefBodyElement,
+    RootElement, StateDefBody, StateDefBodyElement, UseCaseDefBodyElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -977,6 +977,80 @@ fn abstract_connection_usage_multiplicity_before_missing_type_still_recovers() {
     assert!(
         !result.errors.is_empty(),
         "a dangling typing colon should still be diagnosed"
+    );
+}
+
+/// spec42#100 form 1 / parser#132. A keyword-less feature usage with an explicit typing and
+/// value (`launchVehicle : SaturnV = apollo11Mission…launchVehicle;`, Apollo 11 `analysis` body;
+/// official Vehicle Analysis Demo) previously recovered as `recovered_use_case_body_element`.
+#[test]
+fn analysis_body_accepts_bare_typed_valued_feature() {
+    let input = "package P {\nanalysis Apollo11MissionDeltaVBudgetAnalysis {\nlaunchVehicle : SaturnV = apollo11Mission.apollo11MissionSystem.launchVehicle;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let analysis = match &elements[0].value {
+        PackageBodyElement::AnalysisCaseUsage(node) => &node.value,
+        other => panic!("expected analysis case usage, got {other:?}"),
+    };
+    let Body::Brace { elements, .. } = &analysis.body else {
+        panic!("expected analysis body");
+    };
+    let usage = match &elements[0].value {
+        UseCaseDefBodyElement::DefaultReferenceUsage(node) => &node.value,
+        other => panic!("expected default reference usage, got {other:?}"),
+    };
+    assert_eq!(
+        usage.name.and_then(|n| result.document.declaration_name(n)),
+        Some("launchVehicle")
+    );
+    assert!(
+        usage.typing.is_some(),
+        "`: SaturnV` typing should be retained"
+    );
+    assert!(usage.value.is_some(), "the `= …` value should be retained");
+}
+
+/// Negative control: a bare `name;` in a use-case-family body stays a result expression, not a
+/// (nameless) feature usage.
+#[test]
+fn analysis_body_bare_name_is_still_an_expression() {
+    let input = "package P {\nanalysis A {\nvehicle;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let analysis = match &elements[0].value {
+        PackageBodyElement::AnalysisCaseUsage(node) => &node.value,
+        other => panic!("expected analysis case usage, got {other:?}"),
+    };
+    let Body::Brace { elements, .. } = &analysis.body else {
+        panic!("expected analysis body");
+    };
+    assert!(
+        matches!(elements[0].value, UseCaseDefBodyElement::Expression(_)),
+        "bare `vehicle;` should stay an expression, got {:?}",
+        elements[0].value
     );
 }
 

@@ -1402,6 +1402,9 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::SubjectDecl(subject) => {
                 walk_definition_body(report, &p, &subject.value.body)
             }
+            UseCaseDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
             UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
             | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)

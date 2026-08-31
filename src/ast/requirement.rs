@@ -975,6 +975,12 @@ pub enum UseCaseDefBodyElement {
     /// Bare result expression in analysis case bodies (validation `10a`: `vehicle.mass`).
     Expression(Node<Expression>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    /// Keyword-less feature usage with an explicit typing, redefinition, and/or value, e.g.
+    /// `launchVehicle : SaturnV = apollo11Mission.apollo11MissionSystem.launchVehicle;` in an
+    /// `analysis` body (Apollo 11; official Vehicle Analysis Demo). Shares the
+    /// `DefaultReferenceUsage` node the calc/constraint/part bodies already use for the same
+    /// `RefPrefix? Usage` shape. A bare `name;` stays on [`Self::Expression`].
+    DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
 }
 
 /// actor usage `actor pilot : Operator;` / `actor passengers : Person[0..4];`

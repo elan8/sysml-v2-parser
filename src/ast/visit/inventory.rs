@@ -7198,6 +7198,9 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::Expression(field_0) => {
                     visitor.visit_expression(field_0);
                 }
+                UseCaseDefBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
+                }
                 UseCaseDefBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }

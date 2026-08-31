@@ -1295,6 +1295,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_expression(expression)?;
                         }
+                        UseCaseDefBodyElement::DefaultReferenceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&member.value)?;
+                        }
                         UseCaseDefBodyElement::FlowUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&usage.value)?;
