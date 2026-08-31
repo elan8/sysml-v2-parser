@@ -45,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A plain `state` body still rejects them. **AST version 251.** Part of elan8/sysml-v2-parser#132
   (spec42#100).
 
+- **`def`-less `abstract connection` usages accept a multiplicity written before the typing.**
+  `abstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;` (Apollo 11) now parses
+  as a typed `ConnectionUsageMember` carrying an `is_abstract` flag instead of falling through to
+  `ExtendedLibraryDecl` / `unsupported_grammar_form`. **AST version 252.** Part of
+  elan8/sysml-v2-parser#132 (spec42#100).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

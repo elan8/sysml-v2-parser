@@ -929,6 +929,57 @@ fn plain_state_body_still_rejects_bare_first_statement() {
     );
 }
 
+/// spec42#100 form 5 / parser#132. A `def`-less `abstract connection` *usage* whose multiplicity
+/// precedes the typing (`abstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;`,
+/// Apollo 11) previously fell through to `ExtendedLibraryDecl` and surfaced as
+/// `unsupported_grammar_form`: `connection_def`'s header text-scan only accepts a typing that
+/// comes before the multiplicity, and `connection_usage_member` did not accept `abstract`. The
+/// usage parser now models the `abstract` prefix (`RefPrefix.isAbstract`).
+#[test]
+fn abstract_connection_usage_accepts_multiplicity_before_type() {
+    let input =
+        "package P {\nabstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let usage = match &elements[0].value {
+        PackageBodyElement::ConnectionUsage(usage) => &usage.value,
+        other => panic!("expected connection usage, got {other:?}"),
+    };
+    assert!(usage.is_abstract, "`abstract` prefix should be retained");
+    assert!(
+        usage.multiplicity.is_some(),
+        "multiplicity should be retained"
+    );
+    assert!(
+        usage.type_reference.is_some(),
+        "typing after multiplicity should be retained"
+    );
+}
+
+/// Negative control: an `abstract` multiplicity-first connection usage with a dangling typing
+/// colon is still malformed and must recover.
+#[test]
+fn abstract_connection_usage_multiplicity_before_missing_type_still_recovers() {
+    let input = "package P {\nabstract connection capabilityToGoals[*] : ;\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "a dangling typing colon should still be diagnosed"
+    );
+}
+
 #[test]
 fn rationale_and_refinement_annotations_stay_localized() {
     let input = "package P {\naction def PerformCrewIngress {\nout isCrewAboard: Boolean;\n@Rationale { }\n#refinement dependency PerformCrewIngress to OperationsPackage::TransferCrewToVehicle;\n}\nrequirement def R {\n@Rationale { }\n#refinement dependency 'HLR-R001' to CapabilitiesPackage::DeepSpaceHabitationAndLifeSupport;\n}\n}";

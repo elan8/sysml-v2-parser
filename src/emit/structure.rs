@@ -2134,6 +2134,9 @@ pub(crate) fn emit_connection_usage(
     usage: &crate::ast::ConnectionUsageMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
     if usage.by_reference {
         w.push_str("ref ");
     }

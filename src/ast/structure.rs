@@ -264,6 +264,11 @@ pub enum PartDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionUsageMember {
+    /// Leading `abstract` keyword (`RefPrefix.isAbstract`), e.g. the Apollo 11
+    /// `abstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;` def-less usage.
+    /// Widened here rather than on `ConnectionDef` because its header text-scan only accepts a
+    /// typing that precedes the multiplicity -- see `connection_def`'s doc comment.
+    pub is_abstract: bool,
     pub name: Option<DeclarationName>,
     pub type_reference: Option<QualifiedReferenceId>,
     /// Multiplicity after the type, e.g. `[0..1]` in `connection trailerHitch :
