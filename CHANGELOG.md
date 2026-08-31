@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verify members and their typed `.` separators are visible. Unnamed `objective {` emission
   no longer inserts a doubled space before the brace.
 
+- **Nested `action` usages accept a multiplicity written before the typing.** `action
+  subfunctions[*] : Function :>> subactions;` (Apollo 11 `abstract action def Function`) now lands
+  its typing, multiplicity, and `:>>` redefinition on the typed `ActionUsage` instead of recovering
+  as `recovered_action_body_element`, matching BNF `FeatureSpecializationPart`'s `MultiplicityPart
+  FeatureSpecialization*` alternative (SysML v2.0 §8.2.2.6.5). No AST shape change. Part of
+  elan8/sysml-v2-parser#132 (spec42#100).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

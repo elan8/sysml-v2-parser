@@ -798,6 +798,69 @@ fn part_usage_accepts_multiplicity_before_type() {
     assert!(suit.subsets.is_some());
 }
 
+/// spec42#100 form 3 / parser#132. BNF `FeatureSpecializationPart` also permits `MultiplicityPart
+/// FeatureSpecialization*`, so a nested `action` usage whose multiplicity precedes the typing
+/// (`action subfunctions[*] : Function :>> subactions;`, Apollo 11 `abstract action def Function`,
+/// SysML v2.0 §8.2.2.6.5) must land the typing, multiplicity, and redefinition on the typed
+/// `ActionUsage` rather than recovering as `recovered_action_body_element`.
+#[test]
+fn action_usage_accepts_multiplicity_before_type_and_redefinition() {
+    let input = "package P {\nabstract action def Function {\naction subfunctions[*] : Function :>> subactions;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let function = match &elements[0].value {
+        PackageBodyElement::ActionDef(def) => &def.value,
+        _ => panic!("expected action def"),
+    };
+    let ActionDefBody::Brace { elements, .. } = &function.body else {
+        panic!("expected action body");
+    };
+    let usage = match &elements[0].value {
+        sysml_v2_parser::ActionDefBodyElement::ActionUsage(usage) => &usage.value,
+        other => panic!("expected action usage, got {other:?}"),
+    };
+    assert_eq!(
+        usage.name.and_then(|n| result.document.declaration_name(n)),
+        Some("subfunctions")
+    );
+    assert!(
+        usage.multiplicity.is_some(),
+        "multiplicity should be retained"
+    );
+    assert!(
+        usage.typing.is_some(),
+        "typing after multiplicity should be retained"
+    );
+    assert!(
+        usage.redefines.is_some(),
+        "`:>>` redefinition should be retained"
+    );
+}
+
+/// Negative control for the form above: a multiplicity-first `action` usage with a dangling
+/// typing colon is still malformed and must recover, not be accepted as an empty typing.
+#[test]
+fn action_usage_multiplicity_before_missing_type_still_recovers() {
+    let input = "package P {\naction def Function {\naction subfunctions[*] : ;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "a dangling typing colon should still be diagnosed"
+    );
+}
+
 #[test]
 fn rationale_and_refinement_annotations_stay_localized() {
     let input = "package P {\naction def PerformCrewIngress {\nout isCrewAboard: Boolean;\n@Rationale { }\n#refinement dependency PerformCrewIngress to OperationsPackage::TransferCrewToVehicle;\n}\nrequirement def R {\n@Rationale { }\n#refinement dependency 'HLR-R001' to CapabilitiesPackage::DeepSpaceHabitationAndLifeSupport;\n}\n}";
