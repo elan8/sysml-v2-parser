@@ -1,9 +1,10 @@
 use sysml_v2_parser::ast::{
-    ActionDefBody, AnnotatingMember, Body, ConnectionDefBody, ConnectionDefBodyElement,
-    ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement,
-    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
-    PartUsageBody, PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement,
-    RootElement, StateDefBody, StateDefBodyElement, UseCaseDefBodyElement,
+    ActionDefBody, AnnotatingMember, Body, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
+    ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut,
+    OccurrenceBodyElement, OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody,
+    PartDefBodyElement, PartUsageBody, PartUsageBodyElement, RequirementDefBody,
+    RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    UseCaseDefBodyElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -1052,6 +1053,109 @@ fn analysis_body_bare_name_is_still_an_expression() {
         "bare `vehicle;` should stay an expression, got {:?}",
         elements[0].value
     );
+}
+
+/// spec42#100 form 2 / parser#132. `return :>>` in a calc/constraint body parsed its leading
+/// redefinition target with a single-identifier `name()`, truncating `ISQ::power` to `ISQ` and
+/// then failing (`recovered_calc_body_element`). The Apollo 11 form additionally chains
+/// `->select { … }->collect { … }->sum()` as the value.
+#[test]
+fn calc_return_redefine_accepts_qualified_target_and_chained_select_collect() {
+    let input = "package P {\ncalc def PowerBudget {\nreturn :>> ISQ::power = system.subparts->select { in sys : Part; sys istype PowerProvider }->collect { in sys : PowerProvider; sys.powerGenerated }->sum();\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let calc = match &elements[0].value {
+        PackageBodyElement::CalcDef(node) => &node.value,
+        other => panic!("expected calc def, got {other:?}"),
+    };
+    let CalcDefBody::Brace { elements, .. } = &calc.body else {
+        panic!("expected calc body");
+    };
+    let ret = match &elements[0].value {
+        CalcDefBodyElement::ReturnDecl(node) => &node.value,
+        other => panic!("expected return decl, got {other:?}"),
+    };
+    assert!(ret.is_redefine, "the `:>>` form should set is_redefine");
+    assert!(
+        ret.name.is_none(),
+        "the `:>>` target is not a declaration name"
+    );
+    let redefines = ret
+        .redefines
+        .as_ref()
+        .expect("redefinition target retained");
+    let target = result
+        .document
+        .qualified_reference(redefines.value.target[0])
+        .expect("target resolves");
+    assert_eq!(target.authored_text(), "ISQ::power");
+    assert!(
+        ret.value.is_some(),
+        "the chained select/collect value should be retained"
+    );
+}
+
+/// Negative control: `return :>>` with no target at all is still malformed.
+#[test]
+fn calc_return_redefine_without_target_still_recovers() {
+    let input = "package P {\ncalc def C {\nreturn :>> = x;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "`return :>> = x;` should still be diagnosed"
+    );
+}
+
+/// The single-identifier `return :>> <name>` spelling keeps working: the target moves from
+/// `ReturnDecl::name` to `ReturnDecl::redefines`, and the declaration still round-trips.
+#[test]
+fn calc_return_redefine_single_name_round_trips() {
+    let src = "package P { calc def C { return :>> result = computeResult(); } }";
+    let doc = parse(src).expect("parses");
+    let emitted = sysml_v2_parser::emit_sysml(&doc).expect("emits");
+    let reparsed = parse_with_diagnostics(&emitted);
+    assert!(
+        reparsed.errors.is_empty(),
+        "emitted `{emitted}` should re-parse cleanly: {:?}",
+        reparsed.errors
+    );
+
+    let pkg = match &doc.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let calc = match &elements[0].value {
+        PackageBodyElement::CalcDef(node) => &node.value,
+        other => panic!("expected calc def, got {other:?}"),
+    };
+    let CalcDefBody::Brace { elements, .. } = &calc.body else {
+        panic!("expected calc body");
+    };
+    let ret = match &elements[0].value {
+        CalcDefBodyElement::ReturnDecl(node) => &node.value,
+        other => panic!("expected return decl, got {other:?}"),
+    };
+    assert!(ret.is_redefine);
+    assert!(ret.name.is_none());
+    let target = doc
+        .qualified_reference(ret.redefines.as_ref().expect("redefines").value.target[0])
+        .expect("target resolves");
+    assert_eq!(target.authored_text(), "result");
 }
 
 #[test]

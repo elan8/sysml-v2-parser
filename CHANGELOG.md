@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `recovered_use_case_body_element`. A bare `name;` still parses as a result expression.
   **AST version 253.** Part of elan8/sysml-v2-parser#132 (spec42#100).
 
+- **`return :>>` accepts a `::`-qualified redefinition target in calc/constraint bodies.**
+  `return :>> ISQ::power = system.subparts->select { … }->collect { … }->sum();` (Apollo 11) no
+  longer recovers as `recovered_calc_body_element`: `return_decl` parsed the leading `:>>` target
+  with a single-identifier `name()` that truncated `ISQ::power` to `ISQ`. The target is now a
+  `qualified_reference` stored on `ReturnDecl::redefines` (with no declaration name), matching
+  `CaseReturnDecl`. **AST version 254.** Part of elan8/sysml-v2-parser#132 (spec42#100).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

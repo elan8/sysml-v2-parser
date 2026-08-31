@@ -635,14 +635,27 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         w.push_char(' ');
     }
     w.push_short_name_prefix("calc-return/short_name", ret.short_name)?;
+    let mut wrote_head = ret.short_name.is_some();
     if let Some(name) = ret.name {
         w.push_declaration_name("calc-return/name", name)?;
+        wrote_head = true;
+    }
+    // The leading `return :>> <target>` form carries its redefinition target on `redefines`
+    // (no declaration name); emit it in the same slot the name would occupy. Only the first
+    // target belongs to the `:>>` head -- any further ones came from a trailing `redefines`
+    // clause the caller merged in, and `return :>> a, b` is not valid syntax; matching the
+    // pre-existing behaviour, extra trailing redefinition targets are not re-emitted.
+    if ret.is_redefine {
+        if let Some(target) = ret.redefines.as_ref().and_then(|r| r.value.target.first()) {
+            w.push_qualified_reference("calc-return/redefines", *target)?;
+            wrote_head = true;
+        }
     }
     if let Some(type_name) = ret.type_name {
         if ret.is_subsetting {
-            w.push_str(if ret.name.is_none() { ":> " } else { " :> " });
+            w.push_str(if wrote_head { " :> " } else { ":> " });
         } else {
-            w.push_str(if ret.name.is_none() { ": " } else { " : " });
+            w.push_str(if wrote_head { " : " } else { ": " });
         }
         w.push_qualified_reference("calc-return/type", type_name)?;
     }

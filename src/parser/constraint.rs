@@ -2257,12 +2257,29 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     .parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
-    // Anonymous typed form: `return : Type [= expr];`
-    let (input, n) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-        (input, None)
+    // A leading `return :>> <target> ...` names a semantic redefinition target -- which may be
+    // `::`-qualified (`return :>> ISQ::power = ...;`, Apollo 11) -- not a new declaration, so it
+    // is parsed as a reference and stored on `redefines`, mirroring `case_return_decl_inner`.
+    // `name()` (a single identifier) previously truncated `ISQ::power` to `ISQ` and then failed.
+    let redefine_target_start = input;
+    let (input, n, leading_redefines) = if is_redefine {
+        let (input, target) = qualified_reference(input)?;
+        let span = crate::parser::span_from_to(redefine_target_start, input);
+        (
+            input,
+            None,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                vec![target],
+                crate::ast::SubsettingKind::Redefines,
+                span,
+            )),
+        )
+    } else if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
+        // Anonymous typed form: `return : Type [= expr];`
+        (input, None, None)
     } else {
         let (input, n) = name(input)?;
-        (input, Some(n))
+        (input, Some(n), None)
     };
     let (input, _) = ws_and_comments(input)?;
     // The typing is optional on named results: `return result [1..1];`, `return sampling =
@@ -2276,7 +2293,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             let (input, _) = tag(&b":"[..]).parse(input)?;
             let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, false, Some(target))
-        } else if n.is_none() {
+        } else if n.is_none() && leading_redefines.is_none() {
             // Nothing declared at all -- not a return declaration.
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -2296,7 +2313,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     // Trailing redefinitions; repeated clauses merge targets (`... redefines result redefines
     // values;`, `FeatureReferencingPerformances.kerml`).
     let mut input = input;
-    let mut redefines: Option<Node<crate::ast::SubsettingRelationship>> = None;
+    let mut redefines: Option<Node<crate::ast::SubsettingRelationship>> = leading_redefines;
     while let Ok((rest, clause)) = preceded(ws_and_comments, redefinition).parse(input) {
         match &mut redefines {
             None => redefines = Some(clause),
