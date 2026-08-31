@@ -861,6 +861,74 @@ fn action_usage_multiplicity_before_missing_type_still_recovers() {
     );
 }
 
+/// spec42#100 form 4 / parser#132. An `entry`/`do`/`exit` action body is a SysML `ActionBody`
+/// (`PerformActionUsage ... ActionBody`), so the action-flow statements `first <node>;` and
+/// `then <target>;` are legal in it -- as in Apollo 11's `state def PrepareForMissionPhase`'s
+/// `do action prepareForMissionPhaseOperations { first start; then action ...; then done; }`.
+/// They previously recovered as `recovered_state_body_element` because the body was parsed with
+/// the plain `state` body grammar.
+#[test]
+fn do_action_body_accepts_first_and_then_action_flow_statements() {
+    let input = "package P {\nstate def PrepareForMissionPhase :> Phase {\ndo action prepareForMissionPhaseOperations {\nfirst start;\nthen action loadConsumablesAndPropellants : LoadConsumablesAndPropellants;\nthen done;\n}\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let state = match &elements[0].value {
+        PackageBodyElement::StateDef(def) => &def.value,
+        _ => panic!("expected state def"),
+    };
+    let StateDefBody::Brace { elements, .. } = &state.body else {
+        panic!("expected state body");
+    };
+    let do_action = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            StateDefBodyElement::Do(node) => Some(&node.value),
+            _ => None,
+        })
+        .expect("do action should be present");
+    let StateDefBody::Brace { elements, .. } = &do_action.body else {
+        panic!("expected do action body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, StateDefBodyElement::FirstStmt(_))),
+        "`first start;` should lower to a FirstStmt member"
+    );
+    assert_eq!(
+        elements
+            .iter()
+            .filter(|e| matches!(e.value, StateDefBodyElement::ThenAction(_)))
+            .count(),
+        2,
+        "both `then` statements should lower to ThenAction members"
+    );
+}
+
+/// Negative control: `first <node>;` is *not* legal in a plain `state def` body (only in the
+/// entry/do/exit action bodies), so it must still recover there.
+#[test]
+fn plain_state_body_still_rejects_bare_first_statement() {
+    let input = "package P {\nstate def S {\nfirst start;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "`first start;` in a plain state body should still be diagnosed"
+    );
+}
+
 #[test]
 fn rationale_and_refinement_annotations_stay_localized() {
     let input = "package P {\naction def PerformCrewIngress {\nout isCrewAboard: Boolean;\n@Rationale { }\n#refinement dependency PerformCrewIngress to OperationsPackage::TransferCrewToVehicle;\n}\nrequirement def R {\n@Rationale { }\n#refinement dependency 'HLR-R001' to CapabilitiesPackage::DeepSpaceHabitationAndLifeSupport;\n}\n}";

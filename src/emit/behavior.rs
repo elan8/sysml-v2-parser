@@ -1012,6 +1012,8 @@ fn emit_state_def_body_element(
             w.push_char(';');
             Ok(())
         }
+        StateDefBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
+        StateDefBodyElement::ThenAction(t) => emit_then_action(w, path, &t.value),
         StateDefBodyElement::FinalState(f) => {
             w.push_str("final ");
             w.push_declaration_name(&format!("{path}/final-name"), f.value.state_name)?;

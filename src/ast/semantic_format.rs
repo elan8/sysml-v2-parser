@@ -1373,6 +1373,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_reference(then.value.state_reference)?;
                             self.writer.write_str("))")?;
                         }
+                        StateDefBodyElement::FirstStmt(first_stmt) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_statement(&first_stmt.value)?;
+                        }
+                        StateDefBodyElement::ThenAction(action) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_then_action(&action.value)?;
+                        }
                         StateDefBodyElement::FinalState(_state) => {
                             self.write_marker(&mut first, "final-state")?;
                         }

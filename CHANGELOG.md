@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   FeatureSpecialization*` alternative (SysML v2.0 §8.2.2.6.5). No AST shape change. Part of
   elan8/sysml-v2-parser#132 (spec42#100).
 
+- **`entry`/`do`/`exit` action bodies accept `first`/`then` action-flow statements.** These bodies
+  are SysML `ActionBody`s, so `do action ops { first start; then done; }` (Apollo 11 `state def
+  PrepareForMissionPhase`) now parses into new typed `StateDefBodyElement::FirstStmt` /
+  `StateDefBodyElement::ThenAction` members instead of recovering as `recovered_state_body_element`.
+  A plain `state` body still rejects them. **AST version 251.** Part of elan8/sysml-v2-parser#132
+  (spec42#100).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

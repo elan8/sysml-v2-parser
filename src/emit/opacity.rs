@@ -1463,6 +1463,10 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::ConstraintUsage(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
+            StateDefBodyElement::ThenAction(n) => walk_then_target(report, &p, &n.value.target),
+            StateDefBodyElement::FirstStmt(first) => {
+                walk_first_merge_body(report, &p, &first.value.body)
+            }
             StateDefBodyElement::Then(_) | StateDefBodyElement::FinalState(_) => {}
         }
     }

@@ -6005,6 +6005,12 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Then(field_0) => {
                     visitor.visit_then_stmt(field_0);
                 }
+                StateDefBodyElement::FirstStmt(field_0) => {
+                    visitor.visit_first_stmt(field_0);
+                }
+                StateDefBodyElement::ThenAction(field_0) => {
+                    visitor.visit_then_action(field_0);
+                }
                 StateDefBodyElement::FinalState(field_0) => {
                     visitor.visit_final_state(field_0);
                 }
