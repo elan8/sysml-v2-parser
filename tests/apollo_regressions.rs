@@ -1,9 +1,10 @@
 use sysml_v2_parser::ast::{
-    ActionDefBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement,
-    ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement,
-    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
-    PartUsageBody, PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement,
-    RootElement, StateDefBody, StateDefBodyElement,
+    ActionDefBody, AnnotatingMember, Body, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
+    ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut,
+    OccurrenceBodyElement, OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody,
+    PartDefBodyElement, PartUsageBody, PartUsageBodyElement, RequirementDefBody,
+    RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    UseCaseDefBodyElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -796,6 +797,365 @@ fn part_usage_accepts_multiplicity_before_type() {
     assert!(suit.multiplicity.is_some());
     assert!(suit.typing.is_some());
     assert!(suit.subsets.is_some());
+}
+
+/// spec42#100 form 3 / parser#132. BNF `FeatureSpecializationPart` also permits `MultiplicityPart
+/// FeatureSpecialization*`, so a nested `action` usage whose multiplicity precedes the typing
+/// (`action subfunctions[*] : Function :>> subactions;`, Apollo 11 `abstract action def Function`,
+/// SysML v2.0 §8.2.2.6.5) must land the typing, multiplicity, and redefinition on the typed
+/// `ActionUsage` rather than recovering as `recovered_action_body_element`.
+#[test]
+fn action_usage_accepts_multiplicity_before_type_and_redefinition() {
+    let input = "package P {\nabstract action def Function {\naction subfunctions[*] : Function :>> subactions;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let function = match &elements[0].value {
+        PackageBodyElement::ActionDef(def) => &def.value,
+        _ => panic!("expected action def"),
+    };
+    let ActionDefBody::Brace { elements, .. } = &function.body else {
+        panic!("expected action body");
+    };
+    let usage = match &elements[0].value {
+        sysml_v2_parser::ActionDefBodyElement::ActionUsage(usage) => &usage.value,
+        other => panic!("expected action usage, got {other:?}"),
+    };
+    assert_eq!(
+        usage.name.and_then(|n| result.document.declaration_name(n)),
+        Some("subfunctions")
+    );
+    assert!(
+        usage.multiplicity.is_some(),
+        "multiplicity should be retained"
+    );
+    assert!(
+        usage.typing.is_some(),
+        "typing after multiplicity should be retained"
+    );
+    assert!(
+        usage.redefines.is_some(),
+        "`:>>` redefinition should be retained"
+    );
+}
+
+/// Negative control for the form above: a multiplicity-first `action` usage with a dangling
+/// typing colon is still malformed and must recover, not be accepted as an empty typing.
+#[test]
+fn action_usage_multiplicity_before_missing_type_still_recovers() {
+    let input = "package P {\naction def Function {\naction subfunctions[*] : ;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "a dangling typing colon should still be diagnosed"
+    );
+}
+
+/// spec42#100 form 4 / parser#132. An `entry`/`do`/`exit` action body is a SysML `ActionBody`
+/// (`PerformActionUsage ... ActionBody`), so the action-flow statements `first <node>;` and
+/// `then <target>;` are legal in it -- as in Apollo 11's `state def PrepareForMissionPhase`'s
+/// `do action prepareForMissionPhaseOperations { first start; then action ...; then done; }`.
+/// They previously recovered as `recovered_state_body_element` because the body was parsed with
+/// the plain `state` body grammar.
+#[test]
+fn do_action_body_accepts_first_and_then_action_flow_statements() {
+    let input = "package P {\nstate def PrepareForMissionPhase :> Phase {\ndo action prepareForMissionPhaseOperations {\nfirst start;\nthen action loadConsumablesAndPropellants : LoadConsumablesAndPropellants;\nthen done;\n}\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let state = match &elements[0].value {
+        PackageBodyElement::StateDef(def) => &def.value,
+        _ => panic!("expected state def"),
+    };
+    let StateDefBody::Brace { elements, .. } = &state.body else {
+        panic!("expected state body");
+    };
+    let do_action = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            StateDefBodyElement::Do(node) => Some(&node.value),
+            _ => None,
+        })
+        .expect("do action should be present");
+    let StateDefBody::Brace { elements, .. } = &do_action.body else {
+        panic!("expected do action body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, StateDefBodyElement::FirstStmt(_))),
+        "`first start;` should lower to a FirstStmt member"
+    );
+    assert_eq!(
+        elements
+            .iter()
+            .filter(|e| matches!(e.value, StateDefBodyElement::ThenAction(_)))
+            .count(),
+        2,
+        "both `then` statements should lower to ThenAction members"
+    );
+}
+
+/// Negative control: `first <node>;` is *not* legal in a plain `state def` body (only in the
+/// entry/do/exit action bodies), so it must still recover there.
+#[test]
+fn plain_state_body_still_rejects_bare_first_statement() {
+    let input = "package P {\nstate def S {\nfirst start;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "`first start;` in a plain state body should still be diagnosed"
+    );
+}
+
+/// spec42#100 form 5 / parser#132. A `def`-less `abstract connection` *usage* whose multiplicity
+/// precedes the typing (`abstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;`,
+/// Apollo 11) previously fell through to `ExtendedLibraryDecl` and surfaced as
+/// `unsupported_grammar_form`: `connection_def`'s header text-scan only accepts a typing that
+/// comes before the multiplicity, and `connection_usage_member` did not accept `abstract`. The
+/// usage parser now models the `abstract` prefix (`RefPrefix.isAbstract`).
+#[test]
+fn abstract_connection_usage_accepts_multiplicity_before_type() {
+    let input =
+        "package P {\nabstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let usage = match &elements[0].value {
+        PackageBodyElement::ConnectionUsage(usage) => &usage.value,
+        other => panic!("expected connection usage, got {other:?}"),
+    };
+    assert!(usage.is_abstract, "`abstract` prefix should be retained");
+    assert!(
+        usage.multiplicity.is_some(),
+        "multiplicity should be retained"
+    );
+    assert!(
+        usage.type_reference.is_some(),
+        "typing after multiplicity should be retained"
+    );
+}
+
+/// Negative control: an `abstract` multiplicity-first connection usage with a dangling typing
+/// colon is still malformed and must recover.
+#[test]
+fn abstract_connection_usage_multiplicity_before_missing_type_still_recovers() {
+    let input = "package P {\nabstract connection capabilityToGoals[*] : ;\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "a dangling typing colon should still be diagnosed"
+    );
+}
+
+/// spec42#100 form 1 / parser#132. A keyword-less feature usage with an explicit typing and
+/// value (`launchVehicle : SaturnV = apollo11Mission…launchVehicle;`, Apollo 11 `analysis` body;
+/// official Vehicle Analysis Demo) previously recovered as `recovered_use_case_body_element`.
+#[test]
+fn analysis_body_accepts_bare_typed_valued_feature() {
+    let input = "package P {\nanalysis Apollo11MissionDeltaVBudgetAnalysis {\nlaunchVehicle : SaturnV = apollo11Mission.apollo11MissionSystem.launchVehicle;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let analysis = match &elements[0].value {
+        PackageBodyElement::AnalysisCaseUsage(node) => &node.value,
+        other => panic!("expected analysis case usage, got {other:?}"),
+    };
+    let Body::Brace { elements, .. } = &analysis.body else {
+        panic!("expected analysis body");
+    };
+    let usage = match &elements[0].value {
+        UseCaseDefBodyElement::DefaultReferenceUsage(node) => &node.value,
+        other => panic!("expected default reference usage, got {other:?}"),
+    };
+    assert_eq!(
+        usage.name.and_then(|n| result.document.declaration_name(n)),
+        Some("launchVehicle")
+    );
+    assert!(
+        usage.typing.is_some(),
+        "`: SaturnV` typing should be retained"
+    );
+    assert!(usage.value.is_some(), "the `= …` value should be retained");
+}
+
+/// Negative control: a bare `name;` in a use-case-family body stays a result expression, not a
+/// (nameless) feature usage.
+#[test]
+fn analysis_body_bare_name_is_still_an_expression() {
+    let input = "package P {\nanalysis A {\nvehicle;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let analysis = match &elements[0].value {
+        PackageBodyElement::AnalysisCaseUsage(node) => &node.value,
+        other => panic!("expected analysis case usage, got {other:?}"),
+    };
+    let Body::Brace { elements, .. } = &analysis.body else {
+        panic!("expected analysis body");
+    };
+    assert!(
+        matches!(elements[0].value, UseCaseDefBodyElement::Expression(_)),
+        "bare `vehicle;` should stay an expression, got {:?}",
+        elements[0].value
+    );
+}
+
+/// spec42#100 form 2 / parser#132. `return :>>` in a calc/constraint body parsed its leading
+/// redefinition target with a single-identifier `name()`, truncating `ISQ::power` to `ISQ` and
+/// then failing (`recovered_calc_body_element`). The Apollo 11 form additionally chains
+/// `->select { … }->collect { … }->sum()` as the value.
+#[test]
+fn calc_return_redefine_accepts_qualified_target_and_chained_select_collect() {
+    let input = "package P {\ncalc def PowerBudget {\nreturn :>> ISQ::power = system.subparts->select { in sys : Part; sys istype PowerProvider }->collect { in sys : PowerProvider; sys.powerGenerated }->sum();\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let calc = match &elements[0].value {
+        PackageBodyElement::CalcDef(node) => &node.value,
+        other => panic!("expected calc def, got {other:?}"),
+    };
+    let CalcDefBody::Brace { elements, .. } = &calc.body else {
+        panic!("expected calc body");
+    };
+    let ret = match &elements[0].value {
+        CalcDefBodyElement::ReturnDecl(node) => &node.value,
+        other => panic!("expected return decl, got {other:?}"),
+    };
+    assert!(ret.is_redefine, "the `:>>` form should set is_redefine");
+    assert!(
+        ret.name.is_none(),
+        "the `:>>` target is not a declaration name"
+    );
+    let redefines = ret
+        .redefines
+        .as_ref()
+        .expect("redefinition target retained");
+    let target = result
+        .document
+        .qualified_reference(redefines.value.target[0])
+        .expect("target resolves");
+    assert_eq!(target.authored_text(), "ISQ::power");
+    assert!(
+        ret.value.is_some(),
+        "the chained select/collect value should be retained"
+    );
+}
+
+/// Negative control: `return :>>` with no target at all is still malformed.
+#[test]
+fn calc_return_redefine_without_target_still_recovers() {
+    let input = "package P {\ncalc def C {\nreturn :>> = x;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "`return :>> = x;` should still be diagnosed"
+    );
+}
+
+/// The single-identifier `return :>> <name>` spelling keeps working: the target moves from
+/// `ReturnDecl::name` to `ReturnDecl::redefines`, and the declaration still round-trips.
+#[test]
+fn calc_return_redefine_single_name_round_trips() {
+    let src = "package P { calc def C { return :>> result = computeResult(); } }";
+    let doc = parse(src).expect("parses");
+    let emitted = sysml_v2_parser::emit_sysml(&doc).expect("emits");
+    let reparsed = parse_with_diagnostics(&emitted);
+    assert!(
+        reparsed.errors.is_empty(),
+        "emitted `{emitted}` should re-parse cleanly: {:?}",
+        reparsed.errors
+    );
+
+    let pkg = match &doc.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let calc = match &elements[0].value {
+        PackageBodyElement::CalcDef(node) => &node.value,
+        other => panic!("expected calc def, got {other:?}"),
+    };
+    let CalcDefBody::Brace { elements, .. } = &calc.body else {
+        panic!("expected calc body");
+    };
+    let ret = match &elements[0].value {
+        CalcDefBodyElement::ReturnDecl(node) => &node.value,
+        other => panic!("expected return decl, got {other:?}"),
+    };
+    assert!(ret.is_redefine);
+    assert!(ret.name.is_none());
+    let target = doc
+        .qualified_reference(ret.redefines.as_ref().expect("redefines").value.target[0])
+        .expect("target resolves");
+    assert_eq!(target.authored_text(), "result");
 }
 
 #[test]

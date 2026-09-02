@@ -459,6 +459,10 @@ fn connection_usage_member_inner(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // BNF `RefPrefix`: `( isAbstract ?= 'abstract' | isVariation ?= 'variation' )?` before `ref`.
+    // Only `abstract` is modelled here (the shape the Systems Library and Apollo 11 author); a
+    // def-less `variation connection` has no library precedent yet.
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -538,6 +542,7 @@ fn connection_usage_member_inner(
             start,
             input,
             ConnectionUsageMember {
+                is_abstract: is_abstract.is_some(),
                 name,
                 type_reference,
                 multiplicity,

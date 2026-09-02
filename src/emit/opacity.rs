@@ -1402,6 +1402,9 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::SubjectDecl(subject) => {
                 walk_definition_body(report, &p, &subject.value.body)
             }
+            UseCaseDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
             UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
             | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)
@@ -1462,6 +1465,10 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             StateDefBodyElement::ConstraintUsage(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
+            }
+            StateDefBodyElement::ThenAction(n) => walk_then_target(report, &p, &n.value.target),
+            StateDefBodyElement::FirstStmt(first) => {
+                walk_first_merge_body(report, &p, &first.value.body)
             }
             StateDefBodyElement::Then(_) | StateDefBodyElement::FinalState(_) => {}
         }

@@ -2070,11 +2070,21 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
     // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).
     let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (input, leading_type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =
         nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
     let (input, multiplicity_modifiers) = multiplicity_modifier_slots(input)?;
+    // BNF `FeatureSpecializationPart` also permits `MultiplicityPart FeatureSpecialization*`, so
+    // a typing written *after* the multiplicity (`action subfunctions[*] : Function :>> subs;`,
+    // Apollo 11 `abstract action def Function`) is still the feature's typing. Only attempt it
+    // when no leading typing was present, mirroring `feature_usage_header`.
+    let (input, trailing_type_result) = if leading_type_result.is_none() {
+        crate::parser::usage::optional_typings(input)?
+    } else {
+        (input, None)
+    };
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
+    let type_result = leading_type_result.or(trailing_type_result);
     let (type_ref_span, type_name, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
     let subsets = trailing

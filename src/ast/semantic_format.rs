@@ -1295,6 +1295,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_expression(expression)?;
                         }
+                        UseCaseDefBodyElement::DefaultReferenceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&member.value)?;
+                        }
                         UseCaseDefBodyElement::FlowUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&usage.value)?;
@@ -1372,6 +1376,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.writer.write_str("(then (state ")?;
                             self.write_reference(then.value.state_reference)?;
                             self.writer.write_str("))")?;
+                        }
+                        StateDefBodyElement::FirstStmt(first_stmt) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_statement(&first_stmt.value)?;
+                        }
+                        StateDefBodyElement::ThenAction(action) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_then_action(&action.value)?;
                         }
                         StateDefBodyElement::FinalState(_state) => {
                             self.write_marker(&mut first, "final-state")?;

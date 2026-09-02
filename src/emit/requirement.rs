@@ -861,6 +861,9 @@ fn emit_use_case_body_element(
             w.push_char(';');
             Ok(())
         }
+        UseCaseDefBodyElement::DefaultReferenceUsage(d) => {
+            super::structure::emit_default_reference_usage(w, path, &d.value)
+        }
         UseCaseDefBodyElement::CaseReturnDecl(c) => emit_case_return_decl(w, &c.value),
         UseCaseDefBodyElement::ReturnRef(return_ref) => emit_return_ref(w, path, &return_ref.value),
         UseCaseDefBodyElement::ActorRedefinitionAssignment(a) => {

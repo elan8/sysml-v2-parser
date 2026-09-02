@@ -2874,7 +2874,8 @@ macro_rules! ast_traversal {
         pub fn walk_connection_usage_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectionUsageMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectionUsageMember { name, type_reference, multiplicity, connect_from, connect_to, connect_extra_ends, body, subsets, redefines, membership, by_reference } = &$($mutability)? node.value;
+            let ConnectionUsageMember { is_abstract, name, type_reference, multiplicity, connect_from, connect_to, connect_extra_ends, body, subsets, redefines, membership, by_reference } = &$($mutability)? node.value;
+            let _ = is_abstract;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6005,6 +6006,12 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Then(field_0) => {
                     visitor.visit_then_stmt(field_0);
                 }
+                StateDefBodyElement::FirstStmt(field_0) => {
+                    visitor.visit_first_stmt(field_0);
+                }
+                StateDefBodyElement::ThenAction(field_0) => {
+                    visitor.visit_then_action(field_0);
+                }
                 StateDefBodyElement::FinalState(field_0) => {
                     visitor.visit_final_state(field_0);
                 }
@@ -7190,6 +7197,9 @@ macro_rules! ast_traversal {
                 }
                 UseCaseDefBodyElement::Expression(field_0) => {
                     visitor.visit_expression(field_0);
+                }
+                UseCaseDefBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
                 }
                 UseCaseDefBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);

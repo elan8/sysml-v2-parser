@@ -1074,6 +1074,13 @@ pub enum StateDefBodyElement {
     Exit(Node<ExitAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
+    /// `first <node>;` initial-node marker inside an `entry`/`do`/`exit` action body (SysML
+    /// `ActionBody`), e.g. `do action ops { first start; then done; }` (Apollo 11). Only produced
+    /// for the entry/do/exit action bodies, never a plain `state` body.
+    FirstStmt(Node<FirstStmt>),
+    /// `then <target>;` action succession inside an `entry`/`do`/`exit` action body -- the
+    /// action-flow `then`, distinct from [`Self::Then`]'s `then <state>;` initial-state marker.
+    ThenAction(Node<ThenAction>),
     /// `final` / `final state` name `;` - explicit final state.
     FinalState(Node<FinalState>),
     /// `ref` name `:` type body – reference binding in state.

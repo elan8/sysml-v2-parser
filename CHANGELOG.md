@@ -31,6 +31,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verify members and their typed `.` separators are visible. Unnamed `objective {` emission
   no longer inserts a doubled space before the brace.
 
+- **Nested `action` usages accept a multiplicity written before the typing.** `action
+  subfunctions[*] : Function :>> subactions;` (Apollo 11 `abstract action def Function`) now lands
+  its typing, multiplicity, and `:>>` redefinition on the typed `ActionUsage` instead of recovering
+  as `recovered_action_body_element`, matching BNF `FeatureSpecializationPart`'s `MultiplicityPart
+  FeatureSpecialization*` alternative (SysML v2.0 §8.2.2.6.5). No AST shape change. Part of
+  elan8/sysml-v2-parser#132 (spec42#100).
+
+- **`entry`/`do`/`exit` action bodies accept `first`/`then` action-flow statements.** These bodies
+  are SysML `ActionBody`s, so `do action ops { first start; then done; }` (Apollo 11 `state def
+  PrepareForMissionPhase`) now parses into new typed `StateDefBodyElement::FirstStmt` /
+  `StateDefBodyElement::ThenAction` members instead of recovering as `recovered_state_body_element`.
+  A plain `state` body still rejects them. **AST version 251.** Part of elan8/sysml-v2-parser#132
+  (spec42#100).
+
+- **`def`-less `abstract connection` usages accept a multiplicity written before the typing.**
+  `abstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;` (Apollo 11) now parses
+  as a typed `ConnectionUsageMember` carrying an `is_abstract` flag instead of falling through to
+  `ExtendedLibraryDecl` / `unsupported_grammar_form`. **AST version 252.** Part of
+  elan8/sysml-v2-parser#132 (spec42#100).
+
+- **Use-case-family bodies (`analysis`, `use case`, `verification`, and their `def`s) accept a
+  keyword-less feature usage.** `launchVehicle : SaturnV = apollo11Mission…launchVehicle;` (Apollo
+  11 `analysis` body; official Vehicle Analysis Demo) now parses into the shared
+  `DefaultReferenceUsage` node -- exposed as `UseCaseDefBodyElement::DefaultReferenceUsage` -- when
+  it carries an explicit typing, redefinition, and/or value, instead of recovering as
+  `recovered_use_case_body_element`. A bare `name;` still parses as a result expression.
+  **AST version 253.** Part of elan8/sysml-v2-parser#132 (spec42#100).
+
+- **`return :>>` accepts a `::`-qualified redefinition target in calc/constraint bodies.**
+  `return :>> ISQ::power = system.subparts->select { … }->collect { … }->sum();` (Apollo 11) no
+  longer recovers as `recovered_calc_body_element`: `return_decl` parsed the leading `:>>` target
+  with a single-identifier `name()` that truncated `ISQ::power` to `ISQ`. The target is now a
+  `qualified_reference` stored on `ReturnDecl::redefines` (with no declaration name), matching
+  `CaseReturnDecl`. **AST version 254.** Part of elan8/sysml-v2-parser#132 (spec42#100).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

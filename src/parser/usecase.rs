@@ -791,22 +791,33 @@ pub(crate) fn use_case_def_body_element(
                 crate::parser::flow::flow_usage_member,
                 UseCaseDefBodyElement::FlowUsage,
             ),
-            map(
-                |i| {
-                    let (i, _) = ws_and_comments(i)?;
-                    // Don't steal declaration keywords as FeatureRef expressions.
-                    if is_use_case_statement_keyword(i.fragment()) {
-                        return Err(nom::Err::Error(nom::error::Error::new(
-                            i,
-                            nom::error::ErrorKind::Tag,
-                        )));
-                    }
-                    let (i, expr) = expression(i)?;
-                    let (i, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(i)?;
-                    Ok((i, expr))
-                },
-                UseCaseDefBodyElement::Expression,
-            ),
+            // Nested in a sub-alt to stay under nom's 21-branch limit.
+            nom::branch::alt((
+                // Keyword-less feature usage with an explicit typing / redefinition / value
+                // (`launchVehicle : SaturnV = ...;`, Apollo 11 `analysis` body; official Vehicle
+                // Analysis Demo). `calc_named_binding` requires one of those, so a bare `name;`
+                // still falls through to the expression arm below. Ordered before it so the name
+                // is not consumed as a lone `FeatureRef` expression.
+                map(crate::parser::constraint::calc_named_binding, |n| {
+                    UseCaseDefBodyElement::DefaultReferenceUsage(Box::new(n))
+                }),
+                map(
+                    |i| {
+                        let (i, _) = ws_and_comments(i)?;
+                        // Don't steal declaration keywords as FeatureRef expressions.
+                        if is_use_case_statement_keyword(i.fragment()) {
+                            return Err(nom::Err::Error(nom::error::Error::new(
+                                i,
+                                nom::error::ErrorKind::Tag,
+                            )));
+                        }
+                        let (i, expr) = expression(i)?;
+                        let (i, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(i)?;
+                        Ok((i, expr))
+                    },
+                    UseCaseDefBodyElement::Expression,
+                ),
+            )),
             other_use_case_body_element,
         )),
     ))
