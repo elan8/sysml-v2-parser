@@ -248,20 +248,14 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
         let (peek, _) = ws_and_comments(i)?;
         let next_is_body = peek.fragment().starts_with(b"{");
         let next_is_semicolon = peek.fragment().starts_with(b";");
-        // A name with no typing / redefinition clause is a declaration only when the `action`
-        // keyword was written *and* an owned body follows (`do action ops { first start; }`).
-        // A bare `do action ops;` / `do ops;` stays a referenced action usage, and a nameless
-        // body was already handled above.
-        let bare_name_declaration = type_name.is_none()
-            && redefines.is_none()
-            && !(has_action_keyword && next_is_body);
-        if bare_name_declaration {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                i,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-        if !(next_is_semicolon || next_is_body) {
+        // The name introduces a declaration when a `: Type` / `:>>` clause follows it, or -- with
+        // no such clause -- when the `action` keyword was written *and* an owned body follows
+        // (`do action ops { first start; }`, Apollo 11). A bare `do action ops;` / `do ops;` /
+        // `do ops { ... }` stays a referenced action usage (a nameless body was handled above).
+        let is_declaration =
+            type_name.is_some() || redefines.is_some() || (has_action_keyword && next_is_body);
+        // Whichever form, the head must be terminated by `;` or an owned `{ ... }` body.
+        if !is_declaration || !(next_is_semicolon || next_is_body) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 i,
                 nom::error::ErrorKind::Tag,

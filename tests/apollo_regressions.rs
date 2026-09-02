@@ -1220,7 +1220,10 @@ fn calc_return_anonymous_subsetting_accepts_qualified_target_and_chained_select_
     };
     assert!(ret.is_subsetting, "the `:>` form should set is_subsetting");
     assert!(!ret.is_redefine);
-    assert!(ret.name.is_none(), "the `:>` target is not a declaration name");
+    assert!(
+        ret.name.is_none(),
+        "the `:>` target is not a declaration name"
+    );
     let target = result
         .document
         .qualified_reference(ret.type_name.expect("subsetting target retained"))
@@ -1258,6 +1261,17 @@ fn calc_return_redefine_without_target_still_recovers() {
     assert!(
         !result.errors.is_empty(),
         "`return :>> = x;` should still be diagnosed"
+    );
+}
+
+/// Negative control: anonymous `return :>` with no subsetting target is still malformed.
+#[test]
+fn calc_return_anonymous_subsetting_without_target_still_recovers() {
+    let input = "package P {\ncalc def C {\nreturn :> = x;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.errors.is_empty(),
+        "`return :> = x;` should still be diagnosed"
     );
 }
 
