@@ -918,6 +918,83 @@ fn do_action_body_accepts_first_and_then_action_flow_statements() {
     );
 }
 
+/// spec42#100 form 4 / parser#134. `do action <name> { <body> }` with a body but no `: Type` /
+/// `:>>` clause was parsed as an `action_reference` -- so `prepareForMissionPhaseOperations`
+/// looked unresolved and every feature chain through `.<name>.` cascaded. `state_behavior_action_
+/// target` now routes a name immediately followed by `{` to `declared_name` when the `action`
+/// keyword was written.
+#[test]
+fn do_action_with_body_declares_the_name_rather_than_referencing_it() {
+    let input = "package P {\nstate def PrepareForMissionPhase {\ndo action prepareForMissionPhaseOperations {\nfirst start;\nthen done;\n}\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let state = match &elements[0].value {
+        PackageBodyElement::StateDef(def) => &def.value,
+        _ => panic!("expected state def"),
+    };
+    let StateDefBody::Brace { elements, .. } = &state.body else {
+        panic!("expected state body");
+    };
+    let do_action = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            StateDefBodyElement::Do(node) => Some(&node.value),
+            _ => None,
+        })
+        .expect("do action should be present");
+    assert!(
+        do_action.action_reference.is_none(),
+        "a body-carrying `do action <name>` is not a reference"
+    );
+    assert_eq!(
+        do_action
+            .declared_name
+            .and_then(|n| result.document.declaration_name(n)),
+        Some("prepareForMissionPhaseOperations")
+    );
+}
+
+/// A bare `do action <name>;` (no body, no typing) stays a referenced action usage.
+#[test]
+fn bare_do_action_name_still_references() {
+    let input = "package P {\nstate def S {\ndo action existingAction;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(result.errors.is_empty(), "unexpected: {:?}", result.errors);
+    let RootElement::Package(p) = &result.document.root.elements[0].value else {
+        panic!("expected package");
+    };
+    let PackageBody::Brace { elements, .. } = &p.value.body else {
+        panic!("expected brace body");
+    };
+    let PackageBodyElement::StateDef(def) = &elements[0].value else {
+        panic!("expected state def");
+    };
+    let StateDefBody::Brace { elements, .. } = &def.value.body else {
+        panic!("expected state body");
+    };
+    let do_action = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            StateDefBodyElement::Do(node) => Some(&node.value),
+            _ => None,
+        })
+        .expect("do action present");
+    assert!(do_action.declared_name.is_none());
+    assert!(do_action.action_reference.is_some());
+}
+
 /// Negative control: `first <node>;` is *not* legal in a plain `state def` body (only in the
 /// entry/do/exit action bodies), so it must still recover there.
 #[test]
@@ -1104,6 +1181,72 @@ fn calc_return_redefine_accepts_qualified_target_and_chained_select_collect() {
     assert!(
         ret.value.is_some(),
         "the chained select/collect value should be retained"
+    );
+}
+
+/// spec42#100 form 2 / parser#134. The Apollo 11 `rollupPowerGeneration` calc uses the
+/// *anonymous subsetting* spelling `return :> ISQ::power = …`, not `:>>`. `return_decl`'s
+/// name/anonymous dispatch only excused a bare `:` from `name()`, so `return :>` fell through to
+/// `name()`, which failed to parse `:>` and recovered the whole body as
+/// `recovered_calc_body_element` -- with or without the chained `->select { … }->collect { … }`
+/// value.
+#[test]
+fn calc_return_anonymous_subsetting_accepts_qualified_target_and_chained_select_collect() {
+    let input = "package P {\ncalc def rollupPowerGeneration {\nin system : Anything;\nreturn :> ISQ::power = system.subparts->select { in sys : Part; sys istype PowerProvider }->collect { in sys : PowerProvider; sys.powerGenerated }->sum();\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.document.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let calc = match &elements[0].value {
+        PackageBodyElement::CalcDef(node) => &node.value,
+        other => panic!("expected calc def, got {other:?}"),
+    };
+    let CalcDefBody::Brace { elements, .. } = &calc.body else {
+        panic!("expected calc body");
+    };
+    let ret = match &elements[1].value {
+        CalcDefBodyElement::ReturnDecl(node) => &node.value,
+        other => panic!("expected return decl, got {other:?}"),
+    };
+    assert!(ret.is_subsetting, "the `:>` form should set is_subsetting");
+    assert!(!ret.is_redefine);
+    assert!(ret.name.is_none(), "the `:>` target is not a declaration name");
+    let target = result
+        .document
+        .qualified_reference(ret.type_name.expect("subsetting target retained"))
+        .expect("target resolves");
+    assert_eq!(target.authored_text(), "ISQ::power");
+    assert!(
+        ret.value.is_some(),
+        "the chained select/collect value should be retained"
+    );
+}
+
+/// The anonymous `:>` return declaration round-trips through emit.
+#[test]
+fn calc_return_anonymous_subsetting_round_trips() {
+    let src = "package P { calc def C { return :> ISQ::power = computePower(); } }";
+    let doc = parse(src).expect("parses");
+    let emitted = sysml_v2_parser::emit_sysml(&doc).expect("emits");
+    let reparsed = parse_with_diagnostics(&emitted);
+    assert!(
+        reparsed.errors.is_empty(),
+        "emitted `{emitted}` should re-parse cleanly: {:?}",
+        reparsed.errors
+    );
+    assert!(
+        emitted.contains("return :> ISQ::power"),
+        "emitted form keeps the `:>` spelling: {emitted}"
     );
 }
 
