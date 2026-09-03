@@ -66,6 +66,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `qualified_reference` stored on `ReturnDecl::redefines` (with no declaration name), matching
   `CaseReturnDecl`. **AST version 254.** Part of elan8/sysml-v2-parser#132 (spec42#100).
 
+- **Anonymous `return :>` (subsetting) accepts a `::`-qualified target.** `return :> ISQ::power =
+  system.subparts->select { … }->collect { … }->sum();` (Apollo 11 `rollupPowerGeneration`, the
+  spelling the model actually uses) recovered as `recovered_calc_body_element`: `return_decl`'s
+  name/anonymous dispatch only excused a bare `:` from `name()`, so `return :>` fell through to
+  `name()` and failed to parse `:>` as an identifier -- with or without the chained
+  `->select { … }->collect { … }` value. It is now handled by the same anonymous-form branch as
+  `return :`. No AST shape change. Part of elan8/sysml-v2-parser#134 (spec42#100 form 2).
+
+- **`do`/`entry`/`exit` `action <name> { <body> }` declares the name instead of referencing it.**
+  `do action prepareForMissionPhaseOperations { first start; then done; }` (Apollo 11 `state def
+  PrepareForMissionPhase`) parsed `prepareForMissionPhaseOperations` as `DoAction::action_reference`
+  because `state_behavior_action_target` only entered its declaration branch when a `: Type` or
+  `:>>` clause followed the name. A name written with the `action` keyword and immediately followed
+  by a body `{` is now routed to `declared_name`; a bare `do action <name>;` / `do <name> { … }`
+  (no `action` keyword) stays a reference. **AST version 255.** Part of elan8/sysml-v2-parser#134
+  (spec42#100 form 4).
+
 ## [0.55.0] - 2026-08-27
 
 ### Changed

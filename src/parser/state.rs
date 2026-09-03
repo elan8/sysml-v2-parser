@@ -225,8 +225,9 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
         return Ok((input, StateActionHead::empty(has_action_keyword)));
     }
     // New nested action declaration: `entry action entryAction :>> 'entry';`, `do action
-    // doAction : Action :>> 'do';` (Systems Library `States.sysml`; spec42 Gap 43). The leading
-    // token declares a name here, so it must not be interned as a reference.
+    // doAction : Action :>> 'do';` (Systems Library `States.sysml`; spec42 Gap 43), and
+    // `do action prepareForMissionPhaseOperations { first start; … }` (Apollo 11; spec42#100
+    // form 4). The leading token declares a name here, so it must not be interned as a reference.
     let declaration_attempt = (|| -> IResult<Input<'_>, StateActionHead> {
         let (i, declared_name) = preceded(ws_and_comments, name).parse(input)?;
         let (i, type_name) = {
@@ -244,14 +245,17 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
             crate::parser::usage::redefinition,
         ))
         .parse(i)?;
-        if type_name.is_none() && redefines.is_none() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                i,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
         let (peek, _) = ws_and_comments(i)?;
-        if !(peek.fragment().starts_with(b";") || peek.fragment().starts_with(b"{")) {
+        let next_is_body = peek.fragment().starts_with(b"{");
+        let next_is_semicolon = peek.fragment().starts_with(b";");
+        // The name introduces a declaration when a `: Type` / `:>>` clause follows it, or -- with
+        // no such clause -- when the `action` keyword was written *and* an owned body follows
+        // (`do action ops { first start; }`, Apollo 11). A bare `do action ops;` / `do ops;` /
+        // `do ops { ... }` stays a referenced action usage (a nameless body was handled above).
+        let is_declaration =
+            type_name.is_some() || redefines.is_some() || (has_action_keyword && next_is_body);
+        // Whichever form, the head must be terminated by `;` or an owned `{ ... }` body.
+        if !is_declaration || !(next_is_semicolon || next_is_body) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 i,
                 nom::error::ErrorKind::Tag,

@@ -2274,8 +2274,13 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
                 span,
             )),
         )
-    } else if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-        // Anonymous typed form: `return : Type [= expr];`
+    } else if input.fragment().starts_with(b":") {
+        // Anonymous typed/subsetted form: `return : Type [= expr];` or `return :> Feature
+        // [= expr];` (`return :> ISQ::power = system.subparts->select { ... };`, Apollo 11).
+        // `:>>` was already consumed by the `is_redefine` branch above, so a leading `:` here
+        // is either `:` or `:>`; both are handled by the `is_subsetting` block below, and
+        // neither declares a name -- falling through to `name()` would try to parse `:>` as an
+        // identifier and fail.
         (input, None, None)
     } else {
         let (input, n) = name(input)?;
