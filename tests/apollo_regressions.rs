@@ -1768,3 +1768,54 @@ fn part_def_body_item_usage_parses() {
     assert!(item.multiplicity.is_some());
     assert!(item.type_name.is_some());
 }
+
+/// spec42 #128 (`Purpose/StakeholderPackage.sysml`, 40 occurrences): `:>` trailing an item
+/// usage's brace body is that usage's own subsetting clause, not a separate anonymous member.
+/// Before this fix the whole package failed to parse as one document -- `item_usage` stopped at
+/// the closing `}` and left `:> concerns;` for the enclosing part body to read as an unrelated
+/// bare member, which is exactly the two-member split this regression guards against.
+#[test]
+fn item_usage_subsets_a_trailing_specialization_after_its_brace_body() {
+    let input = "package P {\npart def Stakeholder {\nitem concerns[*]: Concern;\n}\npart NASA : Stakeholder {\nitem concern1 : Concern {\ndoc /* Mission success. */\n} :> concerns;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let (doc, elements) = package_elements(input);
+    let nasa = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(usage) => Some(&usage.value),
+            _ => None,
+        })
+        .expect("part usage NASA");
+    let PartUsageBody::Brace { elements, .. } = &nasa.body else {
+        panic!("expected brace body");
+    };
+    // Exactly one member: the two-member split this regresses against would leave a second,
+    // anonymous body element here instead of folding into concern1's own clause.
+    assert_eq!(
+        elements.len(),
+        1,
+        "NASA's body should own exactly one member (concern1), not a synthetic sibling: {:?}",
+        elements
+    );
+    let concern1 = match &elements[0].value {
+        PartUsageBodyElement::ItemUsage(item) => &item.value,
+        other => panic!("expected an item usage, got {other:?}"),
+    };
+    assert_eq!(
+        concern1.name.and_then(|n| doc.declaration_name(n)),
+        Some("concern1")
+    );
+    let subsets = concern1
+        .subsets
+        .as_ref()
+        .expect("concern1 should carry the trailing `:> concerns` clause");
+    let target = doc
+        .qualified_reference(subsets.value.target[0])
+        .expect("subsetting target reference");
+    assert_eq!(target.authored_text(), "concerns");
+}

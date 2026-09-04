@@ -458,6 +458,42 @@ pub(crate) fn single_target_subsetting(
     subsetting_relationship_node(vec![target], kind, span)
 }
 
+/// A `:>` / `:>>` specialization trailing after a feature's own body, attached to that same
+/// feature rather than starting a new member: `item concern1 : Concern { doc /* ... */ } :>
+/// concerns;` (Apollo 11 `Purpose/StakeholderPackage.sysml`). Predates before-body specialization
+/// support for at least one usage kind -- `exhibit_state` (`part/body.rs`) has carried the
+/// `:>>`-only case for a while -- so this generalizes that precedent to `:>` and to any caller of
+/// [`feature_usage_header`]/[`usage_header`]; when present it wins over a before-body clause of
+/// the same kind, the same rule `exhibit_state` already applies.
+///
+/// The caller owns consuming the trailing `;` this clause requires (a bodyless member's `;` and a
+/// bodied member's closing `}` are not this parser's business); see `item_usage_inner` for the
+/// shape.
+pub(crate) fn post_body_specialization(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<(SubsettingKind, Node<SubsettingRelationship>)>> {
+    let before = input;
+    let (input, _) = ws_and_comments(input)?;
+    // `:>>` must be tried before `:>`: `tag(":>")` on `:>>concerns` would match its first two
+    // bytes and strand a leading `>` in front of the target reference.
+    let (input, redefines_tag) = opt(tag(&b":>>"[..])).parse(input)?;
+    let (input, kind) = if redefines_tag.is_some() {
+        (input, Some(SubsettingKind::Redefines))
+    } else {
+        let (input, subsets_tag) = opt(tag(&b":>"[..])).parse(input)?;
+        (input, subsets_tag.map(|_| SubsettingKind::Subsets))
+    };
+    let Some(kind) = kind else {
+        return Ok((before, None));
+    };
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    let span = span_from_to(before, input);
+    Ok((
+        input,
+        Some((kind, single_target_subsetting(span, kind, target))),
+    ))
+}
+
 /// [`subsetting_relationship_node`] for a clause whose authored spelling is known.
 pub(crate) fn spelled_subsetting_relationship_node(
     target: Vec<QualifiedReferenceId>,
