@@ -9,6 +9,7 @@ use crate::parser::node_from_to;
 use crate::parser::occurrence_prefix::next_word_is_reserved;
 use crate::parser::usage::multiplicity_node;
 use crate::parser::Input;
+use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -102,6 +103,27 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     ))
     .parse(input)?;
     let (input, body) = attribute_body(input)?;
+    // `:>` / `:>>` may also come *after* a brace body, attached to this same usage rather than
+    // starting a new member: `item concern1 : Concern { doc /* ... */ } :> concerns;` (Apollo 11
+    // `Purpose/StakeholderPackage.sysml`). A semicolon body already ended the statement, so
+    // anything following it -- including one that happens to start with `:>` -- is a new member,
+    // not this usage's trailing clause; only a brace body leaves that ambiguous.
+    let (input, redefines, subsets) = if matches!(body, crate::ast::Body::Brace { .. }) {
+        let (input, trailing) = crate::parser::usage::post_body_specialization(input)?;
+        match trailing {
+            Some((crate::ast::SubsettingKind::Redefines, relationship)) => {
+                let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+                (input, Some(relationship), header.subsets)
+            }
+            Some((_, relationship)) => {
+                let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+                (input, header.redefines, Some(relationship))
+            }
+            None => (input, header.redefines, header.subsets),
+        }
+    } else {
+        (input, header.redefines, header.subsets)
+    };
     Ok((
         input,
         node_from_to(
@@ -112,8 +134,8 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
                 name,
                 short_name,
                 type_name: header.type_reference,
-                redefines: header.redefines,
-                subsets: header.subsets,
+                redefines,
+                subsets,
                 multiplicity: multiplicity.or(header.multiplicity),
                 multiplicity_modifiers: header.multiplicity_modifiers.clone(),
                 value,
@@ -193,6 +215,49 @@ mod membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::OwningMembership
         );
+    }
+
+    // --- Apollo 11 #128: `:>` trailing a brace body attaches to this usage ---
+
+    #[test]
+    fn item_usage_subsets_a_trailing_specialization_after_a_brace_body() {
+        // `item concern1 : Concern { doc /* ... */ } :> concerns;` (Apollo 11
+        // `Purpose/StakeholderPackage.sysml`): the `:> concerns` after the closing brace is
+        // `concern1`'s own subsetting clause, not a new anonymous member. Consuming the whole
+        // input as one usage is the regression signal: before this fix, `item_usage` stopped at
+        // the closing `}` and left `:> concerns;` unparsed for the enclosing body to (mis)read as
+        // a separate member.
+        let (rest, node) = item_usage(input(
+            "item concern1 : Concern { doc /* Mission success. */ } :> concerns;",
+        ))
+        .expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let subsets = node.value.subsets.expect("trailing subsets clause");
+        assert_eq!(subsets.value.kind, crate::ast::SubsettingKind::Subsets);
+        assert_eq!(subsets.value.target.len(), 1);
+    }
+
+    #[test]
+    fn item_usage_redefines_a_trailing_specialization_after_a_brace_body() {
+        // The `:>>` sibling of the case above: `exhibit_state` already supported this spelling
+        // trailing a body, `item` usage did not.
+        let (rest, node) = item_usage(input(
+            "item concern1 : Concern { doc /* x */ } :>> concerns;",
+        ))
+        .expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let redefines = node.value.redefines.expect("trailing redefines clause");
+        assert_eq!(redefines.value.kind, crate::ast::SubsettingKind::Redefines);
+    }
+
+    #[test]
+    fn item_usage_with_a_semicolon_body_does_not_absorb_a_following_bare_member() {
+        // A semicolon already ends the statement -- a `:>` immediately after belongs to the next,
+        // separate member, not to this usage. Only a brace body leaves that ambiguous.
+        let (rest, node) =
+            item_usage(input("item concern1 : Concern; :> concerns;")).expect("item usage");
+        assert_eq!(node.value.subsets, None);
+        assert_eq!(rest.fragment().trim_ascii_start(), b":> concerns;");
     }
 }
 

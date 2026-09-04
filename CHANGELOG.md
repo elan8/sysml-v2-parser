@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`item` usage accepts a `:>` / `:>>` specialization trailing its own brace body.**
+  `item concern1 : Concern { doc /* ... */ } :> concerns;` (Apollo 11
+  `Purpose/StakeholderPackage.sysml`, 40 occurrences) previously stopped `item_usage` at the
+  closing `}` and left `:> concerns;` for the enclosing body to misread as a separate, anonymous
+  member. `exhibit_state` already supported this shape for `:>>`; the same precedent now covers
+  `:>` and `item` usage, gated to brace bodies only -- a semicolon body already ends the
+  statement, so a `:>` immediately after it is unambiguously the next member, not this usage's
+  trailing clause. No AST shape change. elan8/spec42#128.
+
 - **`verify` accepts a feature-chain target.** `RequirementVerificationUsage`'s
   `OwnedReferenceSubsetting` alternative is `[QualifiedName] | OwnedFeatureChain`, so
   `verify rss.recoverFromStall;` inside an objective body is a typed member rather than
