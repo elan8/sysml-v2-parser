@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Use-case / case bodies model `first`/`then` action flow with the shared action-body nodes.**
+  A `CaseBody` is a SysML `ActionBody` (`CaseBodyItem : ActionBodyItem`), so `first start;`,
+  `then done;`, and any `then <target>;` in a `use case` (or `analysis` / `verification` and
+  their `def`s) body now parse into `UseCaseDefBodyElement::FirstStmt` /
+  `UseCaseDefBodyElement::ThenAction` -- the same typed nodes `entry`/`do`/`exit` state action
+  bodies already use -- instead of the bespoke, sparser `FirstSuccession` / `ThenDone` nodes,
+  which are removed. `then done;` now carries its `done` reference (a `ThenTarget::Feature`)
+  rather than an empty marker, so a consumer can resolve it. `then use case <name> { … }` keeps
+  its dedicated `ThenUseCaseUsage` node. The SysML v2 `18-Use Case` validation fixture parses
+  without recovery. **`PARSE_AST_VERSION` is now 256.** elan8/spec42#138.
+
 - **Port definition and usage bodies retain directed reference usages.** Declarations such as
   `private in ref y : A, B { ... }` now preserve their direction, complete multi-target typing,
   and nested usage body instead of being partially consumed as an input/output declaration.

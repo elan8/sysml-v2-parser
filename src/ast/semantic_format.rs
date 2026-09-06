@@ -1149,11 +1149,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_objective(&objective.value)?;
                         }
-                        UseCaseDefBodyElement::FirstSuccession(first_succession) => {
+                        UseCaseDefBodyElement::FirstStmt(first_stmt) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(first (target ")?;
-                            self.write_reference(first_succession.value.target)?;
-                            self.writer.write_str("))")?;
+                            self.write_first_statement(&first_stmt.value)?;
                         }
                         UseCaseDefBodyElement::ThenIncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
@@ -1193,9 +1191,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 usage.value.type_name,
                                 usage.value.subsets.as_ref(),
                             )?;
-                        }
-                        UseCaseDefBodyElement::ThenDone(_done) => {
-                            self.write_marker(&mut first, "then-done")?;
                         }
                         UseCaseDefBodyElement::IncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;

@@ -1,4 +1,4 @@
-use super::behavior::{AssignStmt, ForLoop, ThenAction};
+use super::behavior::{AssignStmt, FirstStmt, ForLoop, ThenAction};
 use super::body::Body;
 use super::common::DeclarationName;
 use super::common::{AnnotatingMember, Identification, Import, ParseErrorNode, Visibility};
@@ -765,18 +765,6 @@ pub struct UseCaseDef {
 
 pub type UseCaseDefBody = Body<UseCaseDefBodyElement>;
 
-/// `first <name>;` inside a case/use-case body (used in SysML v2 release fixtures).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct FirstSuccession {
-    pub target: QualifiedReferenceId,
-}
-
-/// `then done;` inside a case/use-case body.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ThenDone {}
-
 /// `include <usecase> ...` inside a case/use-case body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -928,10 +916,13 @@ pub enum UseCaseDefBodyElement {
     ActorUsage(Node<ActorUsage>),
     ActorRedefinitionAssignment(Node<ActorRedefinitionAssignment>),
     Objective(Node<Objective>),
-    FirstSuccession(Node<FirstSuccession>),
+    /// `first <node>;` initial-node marker. A case body is a SysML `ActionBody`
+    /// (`CaseBodyItem : ActionBodyItem`), so this reuses the action-body `FirstStmt` node
+    /// exactly as `entry`/`do`/`exit` state action bodies do -- `then` and a `succession`
+    /// prefix are grammatically available even though `first start;` is the common spelling.
+    FirstStmt(Node<FirstStmt>),
     ThenIncludeUseCase(Node<ThenIncludeUseCase>),
     ThenUseCaseUsage(Node<ThenUseCaseUsage>),
-    ThenDone(Node<ThenDone>),
     IncludeUseCase(Node<IncludeUseCase>),
     RefRedefinition(Node<RefRedefinition>),
     /// Full `ref` declaration (`ref use case self : UseCase :>> Case::self;`, Systems Library
