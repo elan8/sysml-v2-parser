@@ -1405,11 +1405,12 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::DefaultReferenceUsage(n) => {
                 walk_default_reference_usage(report, &p, &n.value)
             }
+            UseCaseDefBodyElement::FirstStmt(first) => {
+                walk_first_merge_body(report, &p, &first.value.body)
+            }
             UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
             | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)
-            | UseCaseDefBodyElement::FirstSuccession(_)
-            | UseCaseDefBodyElement::ThenDone(_)
             | UseCaseDefBodyElement::CaseReturnDecl(_)
             | UseCaseDefBodyElement::Assign(_)
             | UseCaseDefBodyElement::Expression(_) => {}

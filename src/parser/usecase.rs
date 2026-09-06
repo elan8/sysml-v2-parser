@@ -1,8 +1,8 @@
 use crate::ast::{
     ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, DeclarationName,
-    FirstSuccession, IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition,
-    ReturnRef, ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenDone, ThenIncludeUseCase,
-    ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
+    IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
+    ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenIncludeUseCase, ThenUseCaseUsage,
+    UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
@@ -73,42 +73,6 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((input, node_from_to(start, input, SubjectRef {})))
-}
-
-fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
-    // Speculated at member starts it does not own; refuse unless one of this production's
-    // leading words follows the trivia, before entering an arena transaction.
-    {
-        let (cursor, _) = ws_and_comments(input)?;
-        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"first") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    }
-    crate::parser::span::reference_transaction(input, first_succession_inner)
-}
-
-fn first_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
-    let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, target) = qualified_reference(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(start, input, FirstSuccession { target }),
-    ))
-}
-
-fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
-    let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"done"[..]).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, ThenDone {})))
 }
 
 pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
@@ -707,10 +671,16 @@ pub(crate) fn use_case_def_body_element(
                 UseCaseDefBodyElement::ActorRedefinitionAssignment,
             ),
             map(objective, UseCaseDefBodyElement::Objective),
-            map(first_succession, UseCaseDefBodyElement::FirstSuccession),
+            // A case body is a SysML `ActionBody` (`CaseBodyItem : ActionBodyItem`), so
+            // `first <node>;` / `then <target>;` use the shared action-flow parsers exactly as
+            // `entry`/`do`/`exit` state bodies do. `then done;` reaches `then_action` lower in
+            // the list as a `ThenTarget::Feature` reference to `done`.
+            map(
+                crate::parser::action::first_stmt,
+                UseCaseDefBodyElement::FirstStmt,
+            ),
         )),
         alt((
-            map(then_done, UseCaseDefBodyElement::ThenDone),
             map(
                 then_include_use_case,
                 UseCaseDefBodyElement::ThenIncludeUseCase,

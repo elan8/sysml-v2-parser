@@ -1246,16 +1246,6 @@ macro_rules! ast_traversal {
                 walk_use_case_def_body_value(self, value)
             }
 
-            /// Visits [`FirstSuccession`]; the default implementation walks its children.
-            fn visit_first_succession(&mut self, node: &$($mutability)? Node<FirstSuccession>) {
-                walk_first_succession(self, node)
-            }
-
-            /// Visits [`ThenDone`]; the default implementation walks its children.
-            fn visit_then_done(&mut self, node: &$($mutability)? Node<ThenDone>) {
-                walk_then_done(self, node)
-            }
-
             /// Visits [`IncludeUseCase`]; the default implementation walks its children.
             fn visit_include_use_case(&mut self, node: &$($mutability)? Node<IncludeUseCase>) {
                 walk_include_use_case(self, node)
@@ -6931,21 +6921,6 @@ macro_rules! ast_traversal {
             }
         }
 
-        pub fn walk_first_succession<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FirstSuccession>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let FirstSuccession { target } = &$($mutability)? node.value;
-            visitor.visit_qualified_reference(target);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_then_done<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ThenDone>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let ThenDone {} = &$($mutability)? node.value;
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
         pub fn walk_include_use_case<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<IncludeUseCase>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
@@ -7126,8 +7101,8 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::Objective(field_0) => {
                     visitor.visit_objective(field_0);
                 }
-                UseCaseDefBodyElement::FirstSuccession(field_0) => {
-                    visitor.visit_first_succession(field_0);
+                UseCaseDefBodyElement::FirstStmt(field_0) => {
+                    visitor.visit_first_stmt(field_0);
                 }
                 UseCaseDefBodyElement::ThenIncludeUseCase(field_0) => {
                     visitor.visit_then_include_use_case(field_0);
@@ -7143,9 +7118,6 @@ macro_rules! ast_traversal {
                 }
                 UseCaseDefBodyElement::VerificationCaseUsage(field_0) => {
                     visitor.visit_verification_case_usage(&$($mutability)? **field_0);
-                }
-                UseCaseDefBodyElement::ThenDone(field_0) => {
-                    visitor.visit_then_done(field_0);
                 }
                 UseCaseDefBodyElement::IncludeUseCase(field_0) => {
                     visitor.visit_include_use_case(field_0);

@@ -784,16 +784,7 @@ fn emit_use_case_body_element(
             w.push_char(';');
             Ok(())
         }
-        UseCaseDefBodyElement::FirstSuccession(f) => {
-            w.push_str("first ");
-            w.push_qualified_reference(&format!("{path}/first/target"), f.value.target)?;
-            w.push_char(';');
-            Ok(())
-        }
-        UseCaseDefBodyElement::ThenDone(_) => {
-            w.push_str("then done;");
-            Ok(())
-        }
+        UseCaseDefBodyElement::FirstStmt(f) => super::behavior::emit_first_stmt(w, path, &f.value),
         UseCaseDefBodyElement::IncludeUseCase(i) => emit_include_use_case(w, path, &i.value),
         UseCaseDefBodyElement::ThenIncludeUseCase(t) => {
             w.push_str("then ");
