@@ -6,7 +6,7 @@ use super::diagnostics::{
     invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
     missing_expression_after_operator_diagnostic, missing_semicolon_or_body_diagnostic,
     missing_type_diagnostic, trim_ascii_end, trim_ascii_start,
-    unexpected_keyword_in_scope_diagnostic,
+    unexpected_keyword_in_scope_diagnostic, verify_requirement_bare_reference_diagnostic,
 };
 use super::lex;
 use super::Input;
@@ -122,6 +122,14 @@ enum RecoveryClassification {
         expected: String,
         suggestion: String,
     },
+    /// `verify requirement <feature-chain>;` -- the `requirement` keyword needs a declaration,
+    /// not a bare reference (SysML textual BNF `RequirementVerificationUsage`).
+    VerifyRequirementExpectsDeclaration {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
     MissingSemicolon,
     /// A `#` or `@` head this scope does not model, but that the pinned grammar admits.
     UnsupportedAnnotation,
@@ -153,6 +161,17 @@ fn classify_recovery(
     scope_label: &str,
 ) -> RecoveryClassification {
     let trimmed = trim_ascii_start(input.fragment());
+
+    if let Some((code, message, expected, suggestion)) =
+        verify_requirement_bare_reference_diagnostic(trimmed)
+    {
+        return RecoveryClassification::VerifyRequirementExpectsDeclaration {
+            code: code.to_string(),
+            message,
+            expected,
+            suggestion,
+        };
+    }
 
     if let Some((code, message, expected, suggestion)) = missing_type_diagnostic(trimmed) {
         return RecoveryClassification::MissingTypeReference {
@@ -375,6 +394,12 @@ pub(crate) fn build_recovery_error_node_from_span(
             suggestion,
         }
         | RecoveryClassification::UnexpectedKeywordInScope {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
+        | RecoveryClassification::VerifyRequirementExpectsDeclaration {
             code,
             message,
             expected,

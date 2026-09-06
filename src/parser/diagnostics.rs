@@ -390,6 +390,57 @@ pub(crate) fn invalid_requirement_short_name_syntax_diagnostic(
     None
 }
 
+/// `verify requirement <feature-chain>;` -- the `requirement` keyword opens the
+/// `RequirementVerificationUsage` alternative that needs a `ConstraintUsageDeclaration` (a name
+/// and/or a `: Type` / `:>>` / `= <ref>` clause), but a bare feature chain is only a reference.
+/// The reference form drops the keyword: `verify <chain>;`.
+pub(crate) fn verify_requirement_bare_reference_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    let rest = trim_ascii_start(fragment).strip_prefix(b"verify")?;
+    if !rest.first()?.is_ascii_whitespace() {
+        return None;
+    }
+    let rest = trim_ascii_start(rest).strip_prefix(b"requirement")?;
+    if !rest.first()?.is_ascii_whitespace() {
+        return None;
+    }
+    let rest = trim_ascii_start(rest);
+    let terminator = rest
+        .iter()
+        .position(|&b| b == b';' || b == b'{' || b == b'\n')?;
+    if rest.get(terminator) != Some(&b';') {
+        return None;
+    }
+    let decl = trim_ascii_end(&rest[..terminator]);
+    // A bare feature chain: a `::` or `.` segment separator and no declaration syntax
+    // (`{`, `=`, `[`, or a `:` that is not part of `::`).
+    let has_chain_separator = decl.windows(2).any(|w| w == b"::")
+        || decl
+            .iter()
+            .zip(decl.iter().skip(1))
+            .any(|(&a, &b)| a == b'.' && (b.is_ascii_alphabetic() || b == b'_'));
+    let has_declaration_syntax = decl.iter().any(|&b| matches!(b, b'=' | b'[' | b'{'))
+        || decl
+            .iter()
+            .zip(decl.iter().skip(1))
+            .any(|(&a, &b)| a == b':' && b != b':')
+        || decl.windows(2).any(|w| w == b":>");
+    if decl.is_empty() || !has_chain_separator || has_declaration_syntax {
+        return None;
+    }
+    let chain = String::from_utf8_lossy(decl).trim().to_string();
+    Some((
+        "verify_requirement_expects_declaration",
+        format!(
+            "`verify requirement` opens an owned requirement usage, which needs a name and/or a `: Type` / `:>>` / `= <ref>` clause; `{chain}` is only a reference"
+        ),
+        "a requirement usage declaration, or `verify <ref>;` to reference an existing requirement"
+            .to_string(),
+        format!("To verify an existing requirement, drop the keyword: `verify {chain};`."),
+    ))
+}
+
 fn starts_declaration_header(fragment: &[u8], prefix: &[u8]) -> bool {
     if !fragment.starts_with(prefix) {
         return false;
@@ -1048,6 +1099,7 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("unexpected_keyword_in_scope")
         | Some("unrecognized_declaration_in_scope")
         | Some("bare_comma_in_feature_value")
+        | Some("verify_requirement_expects_declaration")
         | Some("end_feature_invalid_prefix") => 5,
         Some(code) if code.starts_with("recovered_") => 2,
         Some("expected_end_of_input") | Some("expected_keyword") => 1,

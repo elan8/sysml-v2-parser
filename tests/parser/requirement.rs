@@ -761,3 +761,84 @@ requirement systemSpecification {
             if requirement.value.name.and_then(|n| result.document.declaration_name(n)) == Some("emergencyStop")
     )));
 }
+
+#[test]
+fn test_verify_requirement_keyword_with_bare_reference_gets_a_targeted_diagnostic() {
+    // `verify requirement <feature-chain>;` opens the `RequirementVerificationUsage`
+    // alternative that needs a `ConstraintUsageDeclaration`; a bare reference is invalid
+    // (SysML textual BNF 8.2.2.24). Recovery must be a targeted per-occurrence node that
+    // carries a `verify <chain>;` fix and does not consume the following valid `verify`.
+    let input = "package P {\n\
+        \tverification def V {\n\
+        \t\tobjective {\n\
+        \t\t\tverify requirement rss.recoverFromStall;\n\
+        \t\t\tverify requirement rss.returnToDock;\n\
+        \t\t\tverify rss.recoverFromStall;\n\
+        \t\t}\n\
+        \t}\n\
+        }\n";
+    let result = sysml_v2_parser::parse_with_diagnostics(input);
+
+    let targeted: Vec<&sysml_v2_parser::ParseError> = result
+        .errors
+        .iter()
+        .filter(|e| e.code.as_deref() == Some("verify_requirement_expects_declaration"))
+        .collect();
+    assert_eq!(
+        targeted.len(),
+        2,
+        "one targeted diagnostic per malformed `verify requirement`: {:?}",
+        result.errors
+    );
+    assert!(
+        targeted[0]
+            .suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("verify rss.recoverFromStall;")),
+        "the fix drops the `requirement` keyword: {:?}",
+        targeted[0].suggestion
+    );
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("recovered_requirement_body_element")),
+        "the targeted diagnostic replaces the generic recovery: {:?}",
+        result.errors
+    );
+
+    // The valid trailing `verify rss.recoverFromStall;` survives recovery.
+    let RootElement::Package(pkg) = &result.document.root.elements[0].value else {
+        panic!("expected package");
+    };
+    let PackageBody::Brace { elements, .. } = &pkg.value.body else {
+        panic!("expected package body");
+    };
+    let verification = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::VerificationCaseDef(v) => Some(&v.value),
+            _ => None,
+        })
+        .expect("verification def");
+    let UseCaseDefBody::Brace { elements: body, .. } = &verification.body else {
+        panic!("expected verification body");
+    };
+    let objective = body
+        .iter()
+        .find_map(|e| match &e.value {
+            UseCaseDefBodyElement::Objective(o) => Some(&o.value),
+            _ => None,
+        })
+        .expect("objective");
+    let RequirementDefBody::Brace { elements: obj, .. } = &objective.requirement.body else {
+        panic!("expected objective body");
+    };
+    assert!(
+        obj.iter().any(|e| matches!(
+            &e.value,
+            RequirementDefBodyElement::VerifyRequirement(v) if v.value.target.is_some()
+        )),
+        "the shorthand `verify rss.recoverFromStall;` still lands a typed member",
+    );
+}
