@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`verify requirement <feature-chain>;` gets a targeted recovery diagnostic.** The `requirement`
+  keyword opens the `RequirementVerificationUsage` alternative that needs a
+  `ConstraintUsageDeclaration` (a name and/or a `: Type` / `:>>` / `= <ref>` clause), so a bare
+  feature chain is invalid (SysML textual BNF 8.2.2.24). It now recovers as a
+  `verify_requirement_expects_declaration` node per occurrence — bounded at the next member's
+  `verify` keyword, carrying a `verify <chain>;` fix — instead of the generic
+  `recovered_requirement_body_element`. The reference form (`verify <chain>;`) and the declared
+  form (`verify requirement r : R;`, `verify requirement r :>> outer.inner;`) are unaffected. No
+  AST shape change. elan8/spec42#140.
+
 - **`item` usage accepts a `:>` / `:>>` specialization trailing its own brace body.**
   `item concern1 : Concern { doc /* ... */ } :> concerns;` (Apollo 11
   `Purpose/StakeholderPackage.sysml`, 40 occurrences) previously stopped `item_usage` at the
