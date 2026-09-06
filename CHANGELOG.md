@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-09-06
+
 ### Changed
 
 - **Use-case / case bodies model `first`/`then` action flow with the shared action-body nodes.**
@@ -112,6 +114,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by a body `{` is now routed to `declared_name`; a bare `do action <name>;` / `do <name> { … }`
   (no `action` keyword) stays a reference. **AST version 255.** Part of elan8/sysml-v2-parser#134
   (spec42#100 form 4).
+
+`PARSE_AST_VERSION` moved 248 → 256 across this release. The additions are localised to the
+action-flow families: new `FirstStmt` / `ThenAction` members on the use-case-family, state, and
+occurrence/item definition bodies (replacing the bespoke `FirstSuccession` / `ThenDone` nodes,
+which are removed); `then done;` now carries its `done` reference; new
+`UseCaseDefBodyElement::DefaultReferenceUsage` and `PortDefBodyElement::AliasDef` variants; and
+the multiplicity-before-typing and trailing-`:>`/`:>>` acceptance fixes carry no AST shape
+change. The serialized-AST wire envelope rejects any version mismatch on load, so consumers must
+re-parse against this schema rather than reuse a cached 0.55.0-era AST.
 
 ## [0.55.0] - 2026-08-27
 
