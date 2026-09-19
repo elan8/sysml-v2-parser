@@ -10,11 +10,22 @@
 /// Stack a single body nesting level may consume before the next level must find new headroom.
 ///
 /// One level costs a few kilobytes in release builds and roughly two orders of magnitude more in
-/// unoptimized builds, where every combinator frame survives. 1 MiB covers a debug-build level with
-/// wide margin while staying far below a default thread stack, so flat and shallowly nested
-/// documents -- the overwhelming majority, and every keystroke in an editor session -- never
-/// allocate at all.
-const NESTED_BODY_RED_ZONE: usize = 1024 * 1024;
+/// unoptimized builds, where every combinator frame survives. This isn't uniform across member
+/// kinds, though: a level whose only member is a `doc` comment -- `identification`, `locale`, and
+/// `comment_body` are each their own combinator chain -- costs measurably more than a level with a
+/// plain nested declaration, and `individual` bodies with a redefinition/multi-specialization
+/// header (`individual x : T :>> f { ... }`) cost more again than a bare `part`. 1 MiB was sized
+/// for the general case and, combined with a costly header plus a `doc`-only body six levels deep
+/// (`sysml/src/examples/Vehicle Example/VehicleIndividuals.sysml` -- real, spec-legal content,
+/// nowhere near `MAX_SYNTAX_NESTING`), still starved on a 2 MiB thread in a debug build before the
+/// next level's own check could run: this function is only called once per nesting level, at that
+/// level's own entry, so it can't see a level's *remaining* work (an expensive header already
+/// parsed, an expensive member still to come) at the moment it checks. 2 MiB restores the same
+/// wide margin the original 1 MiB gave the general case, verified against every file in the OMG
+/// SysML-v2-Release corpus (`sysml/src/examples`, `sysml/src/validation`, `sysml.library`,
+/// `kerml/src/examples`) on a 2 MiB thread. Flat and shallowly nested documents -- the
+/// overwhelming majority, and every keystroke in an editor session -- still never allocate at all.
+const NESTED_BODY_RED_ZONE: usize = 2 * 1024 * 1024;
 
 /// Segment size acquired when a nesting level cannot fit in [`NESTED_BODY_RED_ZONE`].
 ///
