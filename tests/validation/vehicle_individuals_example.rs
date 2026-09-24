@@ -7,11 +7,11 @@
 //! levels, well under `MAX_SYNTAX_NESTING`) -- what made it costly was the combination of an
 //! `individual` declaration with a redefinition/multi-specialization header and a body whose sole
 //! member is a `doc` comment (its own multi-step `identification`/`locale`/`comment_body` parse
-//! chain), which together cost enough per level that the existing 1 MiB `NESTED_BODY_RED_ZONE`
-//! could be exhausted *within* a single level's own work, before the next level's own headroom
-//! check ran. See `NESTED_BODY_RED_ZONE` in `src/parser/stack.rs`. This test intentionally runs
-//! on whatever thread `cargo test` gives it (no custom stack size) so it actually exercises the
-//! fix.
+//! chain), which together cost enough per level that a headroom check only at body entry could
+//! be exhausted before the next level's check ran. Member parsing now probes again before each
+//! member (`with_nested_body_stack` in `src/parser/stack.rs`). The in-tree repro is
+//! `individual_redefinition_with_doc_body_does_not_overflow`. This test parses the real fixture
+//! and intentionally runs on whatever thread `cargo test` gives it (no custom stack size).
 
 use sysml_v2_parser::ast::RootElement;
 use sysml_v2_parser::parse;

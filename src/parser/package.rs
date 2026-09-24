@@ -1394,7 +1394,10 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 },
             ));
         }
-        match package_body_element(input) {
+        // Same per-member probe as `parse_structured_brace_members_inner`: the package body is
+        // the outermost brace, and its first `individual` header is otherwise parsed entirely
+        // inside the entry check's margin.
+        match crate::parser::stack::with_nested_body_stack(|| package_body_element(input)) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Failure(nom::error::Error::new(

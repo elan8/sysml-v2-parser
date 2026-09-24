@@ -10,23 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Parsing the SysML v2 spec's own `Vehicle Example/VehicleIndividuals.sysml` example could
-  still crash the process with a stack overflow** on a 2 MiB thread in a debug build, despite
-  `parse_root`/`parse_with_diagnostics` already routing through `stacker::maybe_grow`
-  (`NESTED_BODY_RED_ZONE`/`NESTED_BODY_GROWTH` in `src/parser/stack.rs`, added for the Annex A
-  vehicle example, see 0.51.0). This file's nesting is shallow -- 6 levels, well under
-  `MAX_SYNTAX_NESTING` -- so depth alone doesn't explain it: the cost is concentrated in an
-  `individual` declaration with a redefinition/multi-specialization header
-  (`individual x : T :>> f, g { ... }`) whose body's sole member is a `doc` comment (its own
-  `identification`/`locale`/`comment_body` combinator chain). `with_nested_body_stack` is called
-  once per nesting level, at that level's own entry, so it can't see a level's own remaining
-  work -- an expensive header already behind it, an expensive member still ahead -- when it
-  decides whether to grow. The existing 1 MiB `NESTED_BODY_RED_ZONE`, sized for the general case,
-  could be exhausted within a single such level before the next level's own check ran.
-  `NESTED_BODY_RED_ZONE` is now 2 MiB, verified against every file in the OMG SysML-v2-Release
-  corpus (`sysml/src/examples`, `sysml/src/validation`, `sysml.library`, `kerml/src/examples`) on
-  a 2 MiB thread. Flat and shallowly nested documents still never allocate. Added a regression
-  test parsing the real fixture (gated via `SYSML_V2_RELEASE_DIR`, same as the Annex A test). No
-  AST or behavior changes; `PARSE_AST_VERSION` unchanged.
+  still crash the process with a stack overflow** on a 2 MiB thread in a debug build. The file
+  is only 6 levels deep. The cost is an `individual` redefinition header
+  (`individual x : T :>> f, g { ... }`) plus a body whose only member is a `doc` comment.
+  Headroom was checked once, at brace-body entry, so that header and the following `doc` chain
+  shared one gap and could exhaust the 1 MiB `NESTED_BODY_RED_ZONE` before the next check.
+  `with_nested_body_stack` now also runs immediately before each body member, which splits those
+  two costs, and the red zone is 1.75 MiB. That is still under the ~2.0 MiB a fresh 2 MiB thread
+  has left at the first check, so a flat or shallow document still does not allocate a stack
+  segment. Added an always-on regression for the nested repro, on an explicit 2 MiB thread, plus
+  the real fixture (gated via `SYSML_V2_RELEASE_DIR`, same as the Annex A test). No AST or
+  behavior changes; `PARSE_AST_VERSION` unchanged.
 
 ## [0.56.0] - 2026-09-06
 
