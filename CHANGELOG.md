@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the real fixture (gated via `SYSML_V2_RELEASE_DIR`, same as the Annex A test). No AST or
   behavior changes; `PARSE_AST_VERSION` unchanged.
 
+  Two more recursive body loops shared the same exposure and are fixed the same way:
+  `occurrence_usage_body_brace` (`individual`/`portion` occurrence usages, e.g. bare
+  `individual x : T { doc /* ... */ ... }` with no `part`/`snapshot` at any level) had no
+  `with_nested_body_stack` call at all -- not even at body entry -- and a synthetic 30-level
+  chain of that shape overflowed an explicit 8 MiB thread. `package_body_element_fallback`'s two
+  call sites in `package_body_brace_inner` re-parse a failed primary attempt at the same stack
+  depth and now probe before that retry too. Added an always-on regression for the
+  `occurrence_usage_body_brace` gap on an explicit 8 MiB thread.
+
 ## [0.56.0] - 2026-09-06
 
 ### Changed

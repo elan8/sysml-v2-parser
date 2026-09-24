@@ -1415,7 +1415,11 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                         PACKAGE_BODY_STARTERS,
                     ) =>
             {
-                if let Ok((next, element)) = package_body_element_fallback(input) {
+                // Same probe as the primary attempt above: this retry re-parses at the same
+                // stack depth and can recurse into an equally expensive nested construct.
+                if let Ok((next, element)) = crate::parser::stack::with_nested_body_stack(|| {
+                    package_body_element_fallback(input)
+                }) {
                     if next.location_offset() == input.location_offset() {
                         return Err(nom::Err::Failure(nom::error::Error::new(
                             input,
@@ -1490,7 +1494,11 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 input = next;
             }
             Err(_) => {
-                if let Ok((next, element)) = package_body_element_fallback(input) {
+                // Same probe as the primary attempt above: this retry re-parses at the same
+                // stack depth and can recurse into an equally expensive nested construct.
+                if let Ok((next, element)) = crate::parser::stack::with_nested_body_stack(|| {
+                    package_body_element_fallback(input)
+                }) {
                     if next.location_offset() > input.location_offset() {
                         elements.push(element);
                         input = next;

@@ -377,7 +377,18 @@ fn occurrence_usage_body(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsage
     .parse(input)
 }
 
+/// `individual`/`portion` occurrence usages recurse through this brace body the same way
+/// `parse_structured_brace_members`/`package_body_brace` recurse through theirs (an `individual
+/// part x : T { individual y : U { ... } }` chain), so it needs the same stack-overflow guard --
+/// at body entry, and again before each member (see `with_nested_body_stack`'s doc comment).
+/// Unguarded, this was the one nesting loop the `VehicleIndividuals.sysml` fix (which patched the
+/// two loops above) missed: an `individual x : T { doc /* ... */ ... }` chain ~30 levels deep
+/// (well within `MAX_SYNTAX_NESTING`) overflowed the default 8 MiB thread stack in a debug build.
 fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
+    crate::parser::stack::with_nested_body_stack(move || occurrence_usage_body_brace_inner(input))
+}
+
+fn occurrence_usage_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
     let open_start = input;
     let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
@@ -406,7 +417,10 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
             ));
         }
         let reference_checkpoint = input.extra.reference_checkpoint();
-        match occurrence_body_element(input) {
+        // Probe again before the member, same as `parse_structured_brace_members_inner`/
+        // `package_body_brace_inner`: the entry check above cannot see this member's own header
+        // or a following `doc` chain.
+        match crate::parser::stack::with_nested_body_stack(|| occurrence_body_element(input)) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
                     input.extra.rollback_references(reference_checkpoint);
