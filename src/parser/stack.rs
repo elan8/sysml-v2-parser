@@ -79,4 +79,34 @@ package VehicleIndividuals {
             .join()
             .unwrap();
     }
+
+    /// `occurrence_usage_body_brace` (`src/parser/occurrence_body.rs`, the brace body of a bare
+    /// `individual`/`portion` occurrence usage) was the one nesting loop the fix above missed: it
+    /// had no `with_nested_body_stack` call at all, neither at entry nor per member, unlike
+    /// `parse_structured_brace_members_inner`/`package_body_brace_inner`. This repro -- 30 levels
+    /// of nested bare `individual x : T { doc /* ... */ ... }` (well within `MAX_SYNTAX_NESTING`,
+    /// no `part`/`snapshot` at any level) -- overflows an explicit 8 MiB thread's stack in a debug
+    /// build without that loop's own entry and per-member probes.
+    #[test]
+    fn nested_bare_individual_usages_with_doc_bodies_do_not_overflow() {
+        let depth = 30;
+        let mut src = String::from("package Demo {\n");
+        for level in 0..depth {
+            src.push_str(&format!(
+                "individual x{level} : T {{\n\tdoc /* level {level} */\n"
+            ));
+        }
+        for _ in 0..depth {
+            src.push_str("}\n");
+        }
+        src.push('}');
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || {
+                parse(&src).unwrap_or_else(|e| panic!("parse repro: {e}"));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
