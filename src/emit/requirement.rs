@@ -544,6 +544,7 @@ pub(crate) fn emit_use_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("use case ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");

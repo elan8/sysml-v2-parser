@@ -6852,8 +6852,11 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseUsage { name, type_name, is_abstract, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let UseCaseUsage { name, short_name, type_name, is_abstract, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
             visitor.visit_declaration_name(name);
+            if let Some(inner) = short_name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }

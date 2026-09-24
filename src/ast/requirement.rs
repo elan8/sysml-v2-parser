@@ -709,6 +709,10 @@ pub struct VerificationCaseUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UseCaseUsage {
     pub name: DeclarationName,
+    /// Short name from `< ... >` when present (e.g. `use case <'S-01'> prepareEquipment { ... }`).
+    /// See [`RequirementUsage::short_name`]; `UseCaseUsage` previously had no field for it at all,
+    /// so the grammar accepted `<'S-01'>` on a `requirement` but not on a `use case`.
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// True for `abstract use case ...`.
     pub is_abstract: bool,

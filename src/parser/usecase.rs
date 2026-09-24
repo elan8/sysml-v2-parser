@@ -153,6 +153,7 @@ fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenInclud
 fn use_case_usage_tail(
     input: Input<'_>,
     ident: DeclarationName,
+    short_name: Option<DeclarationName>,
     is_abstract: bool,
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, UseCaseUsage> {
@@ -166,6 +167,7 @@ fn use_case_usage_tail(
         input,
         UseCaseUsage {
             name: ident,
+            short_name,
             type_name: header.type_reference,
             is_abstract,
             multiplicity: header.multiplicity,
@@ -185,10 +187,13 @@ fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUs
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
     // No visibility grammar at this "then use case ..." control-flow position; only the
-    // member-position `use_case_usage` parser below captures real visibility.
+    // member-position `use_case_usage` parser below captures real visibility. Same for the short
+    // name: this control-flow continuation names an existing usage inline, not a fresh
+    // declaration, so there is no `Identification` short-name slot here either.
     let (input, usage) = use_case_usage_tail(
         input,
         ident,
+        None,
         false,
         crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
     )?;
@@ -558,11 +563,16 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
     let (input, _) = tag(&b"use"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
+    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2), e.g. `use case
+    // <'S-01'> prepareEquipment { ... }`. `UseCaseUsage` previously had no field for it, so
+    // `use_case_usage_tail` never got a chance to name the declaration this way.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
     let (input, usage) = use_case_usage_tail(
         input,
         ident,
+        short_name,
         abstract_kw.is_some(),
         crate::ast::Membership::feature(visibility, visibility_span),
     )?;
@@ -1089,6 +1099,37 @@ mod redefines_field_tests {
         assert!(
             emitted.contains(":>> BaseUC"),
             "redefines clause lost on round trip, emitted:\n{emitted}"
+        );
+    }
+
+    /// `UseCaseUsage` previously had no `short_name` field at all, so `<'S-01'>` on a `use case`
+    /// (legal per the same `Identification` production `requirement`/`part`/`item` already
+    /// support it on) fell through to opaque body-element recovery.
+    #[test]
+    fn use_case_usage_accepts_a_short_name() {
+        let src = input("use case <'S-01'> prepareEquipment;");
+        let (rest, node) = use_case_usage(src).expect("use case");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value
+                .short_name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"'S-01'"[..])
+        );
+        assert_eq!(
+            crate::parser::lex::name_bytes(src, node.value.name),
+            &b"prepareEquipment"[..]
+        );
+    }
+
+    #[test]
+    fn use_case_usage_round_trips_its_short_name() {
+        let source = "use case def UC {\n\tuse case <'S-01'> prepareEquipment;\n}\n";
+        let document = crate::parse(source).expect("parse use case def");
+        let emitted = crate::emit_sysml(&document).expect("emit use case def");
+        assert!(
+            emitted.contains("<'S-01'>"),
+            "short name lost on round trip, emitted:\n{emitted}"
         );
     }
 }
