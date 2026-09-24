@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parsing the SysML v2 spec's own `Vehicle Example/VehicleIndividuals.sysml` example could
+  still crash the process with a stack overflow** on a 2 MiB thread in a debug build. The file
+  is only 6 levels deep. The cost is an `individual` redefinition header
+  (`individual x : T :>> f, g { ... }`) plus a body whose only member is a `doc` comment.
+  Headroom was checked once, at brace-body entry, so that header and the following `doc` chain
+  shared one gap and could exhaust the 1 MiB `NESTED_BODY_RED_ZONE` before the next check.
+  `with_nested_body_stack` now also runs immediately before each body member, which splits those
+  two costs, and the red zone is 1.75 MiB. That is still under the ~2.0 MiB a fresh 2 MiB thread
+  has left at the first check, so a flat or shallow document still does not allocate a stack
+  segment. Added an always-on regression for the nested repro, on an explicit 2 MiB thread, plus
+  the real fixture (gated via `SYSML_V2_RELEASE_DIR`, same as the Annex A test). No AST or
+  behavior changes; `PARSE_AST_VERSION` unchanged.
+
 ## [0.56.0] - 2026-09-06
 
 ### Changed

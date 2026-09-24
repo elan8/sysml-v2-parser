@@ -311,7 +311,10 @@ where
             ));
         }
         let reference_checkpoint = input.extra.reference_checkpoint();
-        match parse_element(input) {
+        // Probe again before the member. Body entry already checked, but that check cannot see
+        // this member's header or a following `doc` chain, and either one can spend the red zone
+        // on its own in a debug build (`VehicleIndividuals.sysml`).
+        match crate::parser::stack::with_nested_body_stack(|| parse_element(input)) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
                     input.extra.rollback_references(reference_checkpoint);
