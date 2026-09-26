@@ -779,40 +779,46 @@ pub(crate) fn emit_view_usage(
     usage: &crate::ast::ViewUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if usage.abstract_span.is_some() {
-        w.push_str("abstract ");
+    crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
+    // No trailing space for an anonymous declaration: whichever clause follows emits its own
+    // leading space, so `view :>> columnView` does not come back out as `view  :>> columnView`.
+    if usage.short_name.is_none() && usage.name.is_none() {
+        w.push_str("view");
+    } else {
+        w.push_str("view ");
     }
-    w.push_str("view ");
     w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     if let Some(name) = usage.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    // The anonymous redefinition form parses `:>> target [mult]` (multiplicity after the
-    // target); the named form parses the multiplicity before the trailing subsets clause
-    // (`view columnView[0..*] ordered :> views`). Emit each in the order its parser reparses.
-    if usage.name.is_none() {
+    // The anonymous redefinition form reads as `view :>> target[mult]`: the target stands where
+    // a name would, ahead of the typing and multiplicity. Every other clause follows them.
+    let target_first = usage.name.is_none() && usage.short_name.is_none();
+    if target_first {
         if let Some(redefines) = &usage.redefines {
-            emit_typing_clause_as_subset(w, &redefines.value)?;
+            emit_subsetting_clause(w, &redefines.value)?;
         }
-        if let Some(mult) = &usage.multiplicity {
-            super::structure::emit_multiplicity(w, &mult.value)?;
-        }
-        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
-    } else {
-        if let Some(ty) = &usage.type_name {
-            w.push_str(" : ");
-            w.push_qualified_reference(&format!("{path}/type"), *ty)?;
-        }
-        if let Some(mult) = &usage.multiplicity {
-            super::structure::emit_multiplicity(w, &mult.value)?;
-        }
-        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
+    }
+    if let Some(typing) = &usage.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(mult) = &usage.multiplicity {
+        super::structure::emit_multiplicity(w, &mult.value)?;
+    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
+    for relationship in [&usage.subsets, &usage.references, &usage.crosses]
+        .into_iter()
+        .flatten()
+    {
+        emit_subsetting_clause(w, &relationship.value)?;
+    }
+    if !target_first {
         if let Some(redefines) = &usage.redefines {
-            emit_typing_clause_as_subset(w, &redefines.value)?;
+            emit_subsetting_clause(w, &redefines.value)?;
         }
-        if let Some(subsets) = &usage.subsets {
-            emit_typing_clause_as_subset(w, &subsets.value)?;
-        }
+    }
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
     }
     match &usage.body {
         crate::ast::ViewBody::Semicolon { .. } => {
@@ -877,13 +883,6 @@ pub(crate) fn emit_view_usage(
             Ok(())
         }
     }
-}
-
-fn emit_typing_clause_as_subset(
-    w: &mut EmitWriter<'_>,
-    rel: &crate::ast::SubsettingRelationship,
-) -> Result<(), EmitError> {
-    super::structure::emit_subsetting_clause(w, rel)
 }
 
 pub(crate) fn emit_view_rendering(

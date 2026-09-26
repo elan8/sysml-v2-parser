@@ -5561,19 +5561,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_view_usage(&mut self, usage: &super::ViewUsage) -> io::Result<()> {
-        self.writer.write_str("(view (abstract ")?;
-        self.writer.write_str(if usage.abstract_span.is_some() {
-            "true"
-        } else {
-            "false"
-        })?;
-        self.writer.write_str(") (name ")?;
+        self.writer.write_str("(view ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (name ")?;
         self.write_optional_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
-        self.writer.write_str(") (type ")?;
-        if let Some(reference) = usage.type_name {
-            self.write_reference(reference)?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5584,8 +5580,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_char(' ')?;
-        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
         self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", usage.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
         self.write_view_body(&usage.body)?;
         self.writer.write_char(')')
     }

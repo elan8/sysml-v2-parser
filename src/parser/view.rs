@@ -14,7 +14,6 @@ use crate::parser::lex::{
     VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::requirement_def_body;
-use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to, span_from_to};
 use nom::branch::alt;
@@ -36,6 +35,16 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
         if let Ok((next, usage)) = crate::parser::requirement::satisfy(input) {
             let elem = ViewDefBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
+    // `#Tag view v;` is one `ViewUsage` whose prefix carries a `UsageExtensionKeyword`, not a
+    // standalone `PrefixMetadataMember` followed by an unprefixed sibling; see
+    // `occurrence_prefix::starts_contended_prefix`. A leading `ref` keeps its existing
+    // `RefDecl` dispatch.
+    if input.fragment().starts_with(b"#") {
+        if let Ok((next, usage)) = view_usage(input) {
+            let elem = ViewDefBodyElement::ViewUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
@@ -392,6 +401,15 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // `#Tag view v;`: see the identical first refusal in `view_def_body_element`.
+    if input.fragment().starts_with(b"#") {
+        if let Ok((next, usage)) = view_usage(input) {
+            return Ok((
+                next,
+                node_from_to(start, next, ViewBodyElement::ViewUsage(usage)),
+            ));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -491,34 +509,84 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
     Ok((input, members.into_body()))
 }
 
+/// Keywords that open a `FeatureSpecializationPart` or `ValuePart` clause, so a declaration that
+/// begins with one has no name (`view defined by V;`, `view default = v;`).
+const VIEW_DECLARATION_CLAUSE_KEYWORDS: &[&[u8]] = &[
+    b"defined",
+    b"typed",
+    b"subsets",
+    b"references",
+    b"crosses",
+    b"redefines",
+    b"ordered",
+    b"nonunique",
+    b"default",
+];
+
+/// `ViewUsage = OccurrenceUsagePrefix 'view' UsageDeclaration? ValuePart? ViewBody` (SysML BNF).
+///
+/// Speculated at member starts it does not own, so it refuses by lookahead before entering an
+/// arena transaction, like `part_usage`.
 pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"view") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, view_usage_inner)
+}
+
+fn view_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, abstract_span) =
-        match crate::parser::occurrence_prefix::slot_keyword(input, b"abstract") {
-            Some((rest, span)) => (rest, Some(span)),
-            None => (input, None),
-        };
-    let (input, _) = tag(&b"view"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    // `keyword_token` supplies the token boundary, so `viewpoint` is not claimed here, and it
+    // needs no whitespace after the keyword: `view;`, `view{}` and `view: V;` are legal.
+    let (input, _) = crate::parser::occurrence_prefix::keyword_token(input, b"view")?;
+    // `view def …` is a definition, never a usage named `def`.
+    if crate::parser::lex::starts_with_keyword(input.fragment(), b"def") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
-    // Anonymous redefinition form (BNF `ViewUsage`'s `UsageDeclaration?` legally omits the name
-    // in favor of a leading `:>>` target, same shape `PartUsage`'s `part_usage_redefines_only`
-    // already handles) -- e.g. `view :>> columnView[1] { render asTextualNotation; }`, confirmed
-    // real usage in `sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml` and
-    // `.../validation/11-View and Viewpoint/11a-View-Viewpoint.sysml`. Peek before committing to
-    // the named path, mirroring `part_usage`'s own dispatch.
-    let (peek, _) = ws_and_comments(input)?;
-    if peek.fragment().starts_with(b":>>") {
-        let (input, mut usage) = view_usage_redefines_only(start, input)?;
-        usage.value.abstract_span = abstract_span;
-        usage.value.membership = Membership::feature(visibility, visibility_span);
-        return Ok((input, usage));
-    }
-    let (input, name_str) = name(input)?;
+    let fragment = input.fragment();
+    let opens_clause = [b":".as_slice(), b"[", b";", b"{", b"="]
+        .iter()
+        .any(|token| fragment.starts_with(token))
+        || VIEW_DECLARATION_CLAUSE_KEYWORDS
+            .iter()
+            .any(|keyword| crate::parser::lex::starts_with_keyword(fragment, keyword));
+    let (input, name_str) = if opens_clause {
+        (input, None)
+    } else {
+        let (input, n) = name(input)?;
+        (input, Some(n))
+    };
     let (input, header) = parse_feature_usage_header(input)?;
+    // `Intersects` is a KerML `FeatureSpecialization`; SysML's (`Typings | Subsettings |
+    // References | Crosses | Redefinitions`) does not admit it, so the declaration is refused
+    // rather than retaining a relationship the grammar does not define here.
+    if header.intersects.is_some() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    }
+    // The shared header consumes a `= expr` written directly after a `Subsettings` clause; it is
+    // this usage's `ValuePart`, so it lands on the same `FeatureValue` field.
+    let subsetting_value = header
+        .subsetting_value
+        .map(crate::parser::feature_value::wrap_bind_expression);
+    let (input, explicit_value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -526,49 +594,19 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             start,
             input,
             ViewUsage {
-                abstract_span,
+                prefix,
+                name: name_str,
                 short_name,
-                name: Some(name_str),
-                type_name: header.type_reference,
+                typing: header.typing,
                 subsets: header.subsets,
+                references: header.references,
+                crosses: header.crosses,
                 redefines: header.redefines,
                 multiplicity: header.multiplicity,
-                multiplicity_modifiers: header.multiplicity_modifiers.clone(),
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                value: subsetting_value.or(explicit_value),
                 body,
                 membership: Membership::feature(visibility, visibility_span),
-            },
-        ),
-    ))
-}
-
-/// Anonymous `view :>> name[multiplicity]? ViewBody` redefinition form -- see [`view_usage`]'s
-/// doc comment. Mirrors `part_usage_redefines_only`'s shape exactly: redefinition target,
-/// optional multiplicity, then straight to the body (no `: Type` header -- the type comes from
-/// the redefined feature, not a fresh typing clause).
-fn view_usage_redefines_only<'a>(
-    start: Input<'a>,
-    input: Input<'a>,
-) -> IResult<Input<'a>, Node<ViewUsage>> {
-    let (input, (_, redefines_target)) = prefix_redefinition_target(input)?;
-    let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
-    let (input, body) = view_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ViewUsage {
-                abstract_span: None,
-                short_name: None,
-                name: None,
-                type_name: None,
-                subsets: None,
-                redefines: Some(redefines_target),
-                multiplicity: multiplicity_opt,
-                multiplicity_modifiers: modifiers,
-                body,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -838,7 +876,13 @@ mod expose_diagnostic_tests {
         };
         let view_type = result
             .document
-            .qualified_reference(view.type_name.expect("view type"))
+            .qualified_reference(
+                *view
+                    .typing
+                    .as_ref()
+                    .and_then(|typing| typing.value.target.first())
+                    .expect("view type"),
+            )
             .expect("source-backed view type");
         assert_eq!(view_type.authored_text(), "$::Views::General");
         assert!(view_type.metadata.is_absolute);

@@ -35,6 +35,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`ViewUsage` retains its whole declaration (#148).** `view_usage` kept one typing target, the
+  subsets and redefines targets, and the multiplicity, and consumed the rest of the clause
+  without a trace: `view v : A, B;` came back as `view v : A;` and `view v ::> w;` as `view v;`.
+  `ViewUsage` now carries the shared `OccurrenceUsagePrefix` (`prefix`, replacing
+  `abstract_span`), the complete `Typings` clause (`typing`, replacing `type_name`),
+  `references`, `crosses`, and a `ValuePart` (`value`), alongside the existing subsets,
+  redefines and multiplicity fields. Every form the grammar admits now parses, both at package
+  level and nested in view bodies: an absent declaration (`view;`), anonymous declarations
+  (`view : A;`, `view :>> w : A;`), each prefix slot (`variation`, `derived`, `constant`, a
+  direction, `individual`, a portion kind), and `#Tag view v;` inside a view usage body, which
+  is now one usage whose prefix carries the extension keyword. An `intersects` clause, which
+  SysML's `FeatureSpecialization` does not admit, is refused with a diagnostic. The formatter
+  writes `view :>> x` rather than `view  :>> x`. **`PARSE_AST_VERSION` is now 258.**
+
+- **Nested view usages in view and view definition bodies (#146, #147).** `ViewBodyElement` and
+  `ViewDefBodyElement` gain a `ViewUsage` variant: `ViewBodyItem` and `ViewDefinitionBodyItem`
+  both admit `DefinitionBodyItem`, which reaches `ViewUsage`, but neither body dispatched it,
+  so every nested view reported `missing_body_or_semicolon`. `ViewUsage` also retained the
+  authored `abstract` keyword for the first time. **`PARSE_AST_VERSION` is now 257.** (#147
+  merged without this bump; it is recorded here and the constant moves past it.)
+
 - **Use-case / case bodies model `first`/`then` action flow with the shared action-body nodes.**
   A `CaseBody` is a SysML `ActionBody` (`CaseBodyItem : ActionBodyItem`), so `first start;`,
   `then done;`, and any `then <target>;` in a `use case` (or `analysis` / `verification` and

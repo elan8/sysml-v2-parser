@@ -543,33 +543,42 @@ pub enum RenderingDefBodyElement {
     RefDecl(Node<crate::ast::RefDecl>),
 }
 
-/// View usage: `view` name `:` type? ViewBody, or the anonymous redefinition form `view :>>
-/// name[multiplicity]? ViewBody` (BNF `ViewUsage = OccurrenceUsagePrefix 'view' UsageDeclaration?
-/// ValuePart? ViewBody`, where `UsageDeclaration` legally omits the name in favor of a leading
-/// `:>>` redefinition target -- the same shape `PartUsage`'s `redefines`/`multiplicity` fields
-/// already cover). `name` is empty for the anonymous-redefinition form, matching
-/// `PartUsage::name`'s existing convention.
+/// View usage (SysML BNF `ViewUsage = OccurrenceUsagePrefix 'view' UsageDeclaration? ValuePart?
+/// ViewBody`).
+///
+/// `UsageDeclaration = Identification FeatureSpecializationPart?` is optional as a whole, and its
+/// `Identification` may be empty, so `view;`, `view : V;` and `view :>> columnView[1] { ... }` are
+/// all legal; `name` is `None` for them, matching `PartUsage::name`. Every clause of
+/// `FeatureSpecializationPart` the grammar admits for a usage -- `Typings`, `Subsettings`,
+/// `References`, `Crosses`, `Redefinitions`, and the multiplicity -- is retained, each as the one
+/// relationship node carrying all of its authored targets (#148).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
-    /// The authored `abstract` keyword (`OccurrenceUsagePrefix`), e.g. `abstract view subviews :
-    /// View[0..*];`. Previously accepted by the parser and discarded (#146).
-    pub abstract_span: Option<crate::ast::Span>,
+    /// The complete `OccurrenceUsagePrefix` (`abstract`, `variation`, `derived`, `constant`, a
+    /// direction, `ref`, `individual`, a portion kind, and `#Tag` extension keywords), the same
+    /// shared component `PartUsage` carries.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: Option<DeclarationName>,
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
-    /// Subsets target, e.g. `baseView` in `view v :> baseView { ... }`.
+    /// The complete `Typings` clause: its spelling, conjugation, and every comma-separated target.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// Subsets targets, e.g. `baseView` in `view v :> baseView { ... }`.
     pub subsets: Option<Node<SubsettingRelationship>>,
-    /// Redefines target, e.g. `columnView` in `view :>> columnView[1] { ... }`. `None` for the
-    /// ordinary named form.
+    /// `References` targets (`::>` / `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// `Crosses` targets (`=>` / `crosses`).
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// Redefines targets, e.g. `columnView` in `view :>> columnView[1] { ... }`.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// Multiplicity, e.g. `[1]` in `view :>> columnView[1] { ... }` or `[0..*]` in `view
-    /// columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`). Previously captured
-    /// only by the anonymous redefinition form and discarded on the named path.
+    /// Multiplicity, written before or after the specializations, e.g. `[0..*]` in `view
+    /// columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`).
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
     /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
+    /// `ValuePart`: `= expr`, `:= expr`, or a `default` value.
+    pub value: Option<Node<FeatureValue>>,
     pub body: ViewBody,
     pub membership: Membership,
 }
