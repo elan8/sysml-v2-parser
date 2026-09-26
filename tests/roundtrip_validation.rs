@@ -221,6 +221,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/MetadataTest.sysml",
     "Association Examples/ProductSelection_N_ary.sysml",
+    // Promoted by nested view usages (#146): `view v: V[0..*] { ... }` inside a view definition
+    // body is a structured member instead of a recovered parse error, so the file reparses to
+    // the same AST.
+    "Simple Tests/ViewTest.sysml",
 ];
 
 fn release_root() -> PathBuf {
