@@ -748,6 +748,9 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::ViewpointUsage(v) => {
                         emit_viewpoint_usage(w, path, &v.value)?
                     }
+                    crate::ast::ViewDefBodyElement::ViewUsage(v) => {
+                        emit_view_usage(w, &format!("{path}/body[{i}]"), &v.value)?
+                    }
                     crate::ast::ViewDefBodyElement::Satisfy(s) => {
                         crate::emit::requirement::emit_satisfy(w, path, &s.value)?
                     }
@@ -776,6 +779,9 @@ pub(crate) fn emit_view_usage(
     usage: &crate::ast::ViewUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if usage.abstract_span.is_some() {
+        w.push_str("abstract ");
+    }
     w.push_str("view ");
     w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     if let Some(name) = usage.name {
@@ -852,6 +858,9 @@ pub(crate) fn emit_view_usage(
                             &format!("{path}/body[{i}]"),
                             &e.value.body,
                         )?;
+                    }
+                    crate::ast::ViewBodyElement::ViewUsage(v) => {
+                        emit_view_usage(w, &format!("{path}/body[{i}]"), &v.value)?
                     }
                     crate::ast::ViewBodyElement::Satisfy(s) => {
                         crate::emit::requirement::emit_satisfy(

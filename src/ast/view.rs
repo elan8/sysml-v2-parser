@@ -436,6 +436,11 @@ pub enum ViewDefBodyElement {
     /// ...;` (Systems Library `Views.sysml`). Parsed by the same `viewpoint_usage` that package
     /// and part bodies already dispatch.
     ViewpointUsage(Node<ViewpointUsage>),
+    /// Nested view usage -- a subview: `view introduction;`, `view subviews : View[0..*];`,
+    /// `view :>> introduction { ... }`. `ViewDefinitionBodyItem -> DefinitionBodyItem -> ... ->
+    /// StructureUsageElement -> ViewUsage`; parsed by the same `view_usage` package and part
+    /// bodies dispatch (#146).
+    ViewUsage(Node<ViewUsage>),
     /// `satisfy requirement X by Y;`, e.g. `satisfy requirement viewpointConformance by
     /// this;` (`Views.sysml`). The same `SatisfyRequirementUsage` node part bodies already accept.
     Satisfy(Box<Node<crate::ast::SatisfyRequirementUsage>>),
@@ -547,6 +552,9 @@ pub enum RenderingDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
+    /// The authored `abstract` keyword (`OccurrenceUsagePrefix`), e.g. `abstract view subviews :
+    /// View[0..*];`. Previously accepted by the parser and discarded (#146).
+    pub abstract_span: Option<crate::ast::Span>,
     pub name: Option<DeclarationName>,
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -587,6 +595,11 @@ pub enum ViewBodyElement {
     /// `ViewBodyItem -> DefinitionBodyItem -> StructureUsageElement` admits it.
     RenderingUsage(Node<RenderingUsage>),
     Expose(Node<ExposeMember>),
+    /// Nested view usage -- a subview, in authored order among its siblings. `ViewBodyItem ->
+    /// DefinitionBodyItem -> ... -> StructureUsageElement -> ViewUsage`; the same `view_usage`
+    /// every other body scope dispatches, so every header form it accepts (named, typed, the
+    /// anonymous `view :>> x` redefinition) is accepted here too (#146).
+    ViewUsage(Node<ViewUsage>),
     /// `SatisfyRequirementUsage` in a view usage body.
     ///
     /// `ViewBodyItem → DefinitionBodyItem → … → BehaviorUsageElement →
