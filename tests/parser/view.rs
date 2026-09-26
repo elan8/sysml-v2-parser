@@ -113,7 +113,15 @@ fn test_view_usage_parse() {
                 vu.name.and_then(|n| result.declaration_name(n)),
                 Some("name")
             );
-            assert_eq!(reference_text(&result, vu.type_name), Some("ViewType"));
+            assert_eq!(
+                reference_text(
+                    &result,
+                    vu.typing
+                        .as_ref()
+                        .and_then(|typing| typing.value.target.first().copied()),
+                ),
+                Some("ViewType")
+            );
             assert!(
                 matches!(&vu.body, ViewBody::Brace { ref elements, .. } if elements.is_empty())
             );
@@ -218,7 +226,14 @@ view dashboard typed by Mission::DashboardView;
         other => panic!("expected view usage, got {:?}", other),
     };
     assert_eq!(
-        reference_text(&result, view_usage.value.type_name),
+        reference_text(
+            &result,
+            view_usage.value.typing.as_ref().and_then(|typing| typing
+                .value
+                .target
+                .first()
+                .copied()),
+        ),
         Some("Mission::DashboardView")
     );
 }

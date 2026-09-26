@@ -7710,18 +7710,22 @@ macro_rules! ast_traversal {
         pub fn walk_view_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewUsage { abstract_span, name, short_name, type_name, subsets, redefines, multiplicity, multiplicity_modifiers, body, membership } = &$($mutability)? node.value;
-            if let Some(inner) = abstract_span {
-                visitor.visit_span(inner);
-            }
+            let ViewUsage { prefix, name, short_name, typing, subsets, references, crosses, redefines, multiplicity, multiplicity_modifiers, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = short_name { visitor.visit_declaration_name(inner); }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = redefines {
@@ -7731,6 +7735,9 @@ macro_rules! ast_traversal {
                 visitor.visit_multiplicity(inner);
             }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
+            }
             visitor.visit_view_body(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
