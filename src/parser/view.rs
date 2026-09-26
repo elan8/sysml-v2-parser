@@ -69,6 +69,8 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         map(rendering_usage, ViewDefBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
+        // Before the opaque fallback, which claims a leading `abstract`.
+        map(view_usage, ViewDefBodyElement::ViewUsage),
         map(crate::parser::requirement::satisfy, |n| {
             ViewDefBodyElement::Satisfy(Box::new(n))
         }),
@@ -401,6 +403,7 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
         map(rendering_usage, ViewBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
         map(expose_member, ViewBodyElement::Expose),
+        map(view_usage, ViewBodyElement::ViewUsage),
         // `ViewBodyItem -> DefinitionBodyItem -> ... -> SatisfyRequirementUsage`: one satisfy
         // production, dispatched here through the same parser every other body scope uses.
         map(crate::parser::requirement::satisfy, |n| {
@@ -492,7 +495,11 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_span) =
+        match crate::parser::occurrence_prefix::slot_keyword(input, b"abstract") {
+            Some((rest, span)) => (rest, Some(span)),
+            None => (input, None),
+        };
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
@@ -506,6 +513,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (peek, _) = ws_and_comments(input)?;
     if peek.fragment().starts_with(b":>>") {
         let (input, mut usage) = view_usage_redefines_only(start, input)?;
+        usage.value.abstract_span = abstract_span;
         usage.value.membership = Membership::feature(visibility, visibility_span);
         return Ok((input, usage));
     }
@@ -518,6 +526,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             start,
             input,
             ViewUsage {
+                abstract_span,
                 short_name,
                 name: Some(name_str),
                 type_name: header.type_reference,
@@ -550,6 +559,7 @@ fn view_usage_redefines_only<'a>(
             start,
             input,
             ViewUsage {
+                abstract_span: None,
                 short_name: None,
                 name: None,
                 type_name: None,

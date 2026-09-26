@@ -423,6 +423,8 @@ pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"ref",
     b"satisfy",
     b"abstract",
+    // Nested `ViewUsage` (#146).
+    b"view",
     // FIRST(`OccurrenceUsagePrefix`) on the satisfy usage this scope dispatches; `abstract`,
     // `ref` and the three satisfy keywords were already listed. See
     // `planning/occurrence-usage-prefix-matrix.md` §4.
@@ -448,6 +450,8 @@ pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
     b"render",
     b"rendering",
     b"satisfy",
+    // Nested `ViewUsage` (#146).
+    b"view",
     // FIRST(`OccurrenceUsagePrefix`) on the satisfy usage this scope dispatches. See
     // `planning/occurrence-usage-prefix-matrix.md` §4.
     b"#",

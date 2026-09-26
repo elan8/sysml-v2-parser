@@ -1501,6 +1501,7 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
             ViewDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
+            ViewDefBodyElement::ViewUsage(n) => walk_view_body(report, &p, &n.value.body),
             ViewDefBodyElement::ViewpointUsage(_)
             | ViewDefBodyElement::Satisfy(_)
             | ViewDefBodyElement::Filter(_) => {}
@@ -1530,6 +1531,7 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
             walk_rendering_usage_body(report, path, &n.value.body)
         }
         ViewBodyElement::Expose(n) => walk_relationship_body(report, path, &n.value.body),
+        ViewBodyElement::ViewUsage(n) => walk_view_body(report, path, &n.value.body),
         ViewBodyElement::Satisfy(n) => walk_satisfy(report, path, &n.value),
         ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         ViewBodyElement::Annotating(member) => walk_annotating_member(report, path, member),

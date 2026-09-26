@@ -1081,6 +1081,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_relationship_body(&expose.value.body)?;
                             self.writer.write_char(')')?;
                         }
+                        ViewBodyElement::ViewUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_usage(&usage.value)?;
+                        }
                         ViewBodyElement::Satisfy(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_satisfy_requirement_usage(&usage.value)?;
@@ -5541,6 +5545,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ViewDefBodyElement::ViewpointUsage(_usage) => {
                             self.write_marker(&mut first, "viewpoint-usage")?;
                         }
+                        super::ViewDefBodyElement::ViewUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_usage(&usage.value)?;
+                        }
                         super::ViewDefBodyElement::Satisfy(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_satisfy_requirement_usage(&usage.value)?;
@@ -5553,7 +5561,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_view_usage(&mut self, usage: &super::ViewUsage) -> io::Result<()> {
-        self.writer.write_str("(view (name ")?;
+        self.writer.write_str("(view (abstract ")?;
+        self.writer.write_str(if usage.abstract_span.is_some() {
+            "true"
+        } else {
+            "false"
+        })?;
+        self.writer.write_str(") (name ")?;
         self.write_optional_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
@@ -5563,7 +5577,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_str("none")?;
         }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
         self.write_view_body(&usage.body)?;
         self.writer.write_char(')')
     }

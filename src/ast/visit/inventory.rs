@@ -7561,6 +7561,9 @@ macro_rules! ast_traversal {
                 ViewDefBodyElement::ViewpointUsage(field_0) => {
                     visitor.visit_viewpoint_usage(field_0);
                 }
+                ViewDefBodyElement::ViewUsage(field_0) => {
+                    visitor.visit_view_usage(field_0);
+                }
                 ViewDefBodyElement::Satisfy(field_0) => {
                     visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
@@ -7707,7 +7710,10 @@ macro_rules! ast_traversal {
         pub fn walk_view_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewUsage { name, short_name, type_name, subsets, redefines, multiplicity, multiplicity_modifiers, body, membership } = &$($mutability)? node.value;
+            let ViewUsage { abstract_span, name, short_name, type_name, subsets, redefines, multiplicity, multiplicity_modifiers, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = abstract_span {
+                visitor.visit_span(inner);
+            }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
@@ -7774,6 +7780,9 @@ macro_rules! ast_traversal {
                 }
                 ViewBodyElement::Expose(field_0) => {
                     visitor.visit_expose_member(field_0);
+                }
+                ViewBodyElement::ViewUsage(field_0) => {
+                    visitor.visit_view_usage(field_0);
                 }
                 ViewBodyElement::Satisfy(field_0) => {
                     visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
