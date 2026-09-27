@@ -7583,10 +7583,23 @@ macro_rules! ast_traversal {
         pub fn walk_view_rendering_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewRenderingUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewRenderingUsage { name, type_name, body, membership } = &$($mutability)? node.value;
-            visitor.visit_declaration_name(name);
+            let ViewRenderingUsage { form, type_name, multiplicity, multiplicity_modifiers, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            match form {
+                ViewRenderingForm::Reference(target) => visitor.visit_qualified_reference(target),
+                ViewRenderingForm::Inline(name) => visitor.visit_declaration_name(name),
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
             }
             visitor.visit_rendering_usage_body(body);
             visitor.visit_membership(membership);

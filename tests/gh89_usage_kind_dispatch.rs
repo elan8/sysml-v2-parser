@@ -368,7 +368,10 @@ fn gh89_8_render_rendering_member_in_view_def_body() {
         _ => None,
     });
     let rendering = rendering.expect("expected a ViewRenderingUsage element");
-    assert_eq!(doc.declaration_name(rendering.name), Some("r1"));
+    let sysml_v2_parser::ast::ViewRenderingForm::Inline(name) = rendering.form else {
+        panic!("expected an inline rendering declaration");
+    };
+    assert_eq!(doc.declaration_name(name), Some("r1"));
     assert!(rendering.type_name.is_some());
 }
 

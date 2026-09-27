@@ -891,10 +891,28 @@ pub(crate) fn emit_view_rendering(
     r: &crate::ast::ViewRenderingUsage,
 ) -> Result<(), EmitError> {
     w.push_str("render ");
-    w.push_declaration_name(&format!("{path}/name"), r.name)?;
+    match r.form {
+        crate::ast::ViewRenderingForm::Reference(target) => {
+            w.push_qualified_reference(&format!("{path}/target"), target)?;
+        }
+        crate::ast::ViewRenderingForm::Inline(name) => {
+            w.push_str("rendering ");
+            w.push_declaration_name(&format!("{path}/name"), name)?;
+        }
+    }
     if let Some(ty) = &r.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &r.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &r.multiplicity_modifiers);
+    if let Some(subsets) = &r.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &r.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     match &r.body {
         crate::ast::RenderingUsageBody::Semicolon { .. } => {

@@ -4,14 +4,14 @@ use crate::ast::{
     ExposeMember, FilterMember, ImportTarget, Membership, Node, ParseErrorNode, RenderingDef,
     RenderingDefBody, RenderingDefBodyElement, RenderingUsage, RenderingUsageBody,
     RenderingUsageBodyElement, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
-    ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    ViewRenderingForm, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    name, reference_path, visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS,
-    VIEW_DEF_BODY_STARTERS,
+    name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
+    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::requirement_def_body;
 use crate::parser::Input;
@@ -188,8 +188,14 @@ pub(crate) fn view_rendering_usage(
     // Usage` -- explicit typed usage declaration, vs. the first alternative's bare reference-
     // subsetting shorthand (`render r;`). Real usage: `render rendering r1: R[0..1];` (Simple
     // Tests/ViewTest.sysml:32).
-    let (input, _) = opt(preceded(tag(&b"rendering"[..]), ws1)).parse(input)?;
-    let (input, name_str) = name(input)?;
+    let (input, explicit_rendering) = opt(preceded(tag(&b"rendering"[..]), ws1)).parse(input)?;
+    let (input, form) = if explicit_rendering.is_some() {
+        let (input, name) = name(input)?;
+        (input, ViewRenderingForm::Inline(name))
+    } else {
+        let (input, target) = qualified_reference(input)?;
+        (input, ViewRenderingForm::Reference(target))
+    };
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = rendering_usage_body(input)?;
     Ok((
@@ -198,8 +204,12 @@ pub(crate) fn view_rendering_usage(
             start,
             input,
             ViewRenderingUsage {
-                name: name_str,
+                form,
                 type_name: header.type_reference,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                subsets: header.subsets,
+                redefines: header.redefines,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

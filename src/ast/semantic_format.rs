@@ -5631,15 +5631,32 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_view_rendering(&mut self, usage: &super::ViewRenderingUsage) -> io::Result<()> {
-        self.writer.write_str("(view-rendering (name ")?;
-        self.write_name(usage.name)?;
+        self.writer.write_str("(view-rendering (form ")?;
+        match usage.form {
+            super::ViewRenderingForm::Reference(target) => {
+                self.writer.write_str("reference ")?;
+                self.write_reference(target)?;
+            }
+            super::ViewRenderingForm::Inline(name) => {
+                self.writer.write_str("inline ")?;
+                self.write_name(name)?;
+            }
+        }
         self.writer.write_str(") (type ")?;
         if let Some(reference) = usage.type_name {
             self.write_reference(reference)?;
         } else {
             self.writer.write_str("none")?;
         }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
         self.write_rendering_usage_body(&usage.body)?;
         self.writer.write_char(')')
     }

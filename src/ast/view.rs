@@ -446,14 +446,27 @@ pub enum ViewDefBodyElement {
     Satisfy(Box<Node<crate::ast::SatisfyRequirementUsage>>),
 }
 
-/// View rendering usage: `render` name `:` type (`;` or body).
+/// View rendering usage owned by a `ViewRenderingMembership`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewRenderingUsage {
-    pub name: DeclarationName,
+    pub form: ViewRenderingForm,
     pub type_name: Option<QualifiedReferenceId>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RenderingUsageBody,
     pub membership: Membership,
+}
+
+/// The two grammar alternatives following `render` have different semantics: the short form
+/// references an existing rendering, while `render rendering` declares one in the view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ViewRenderingForm {
+    Reference(QualifiedReferenceId),
+    Inline(DeclarationName),
 }
 
 /// Body of a `render`/`rendering` usage: `;` or `{` RenderingUsageBodyElement* `}`. Per BNF
