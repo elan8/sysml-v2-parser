@@ -1130,16 +1130,30 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
             b'}' if brace_depth == 0 => break,
             b'}' => {
                 brace_depth -= 1;
-                // A `}` that closes this member's own block (`objective fuelEconomy { }`) is the
-                // member boundary. Continuing on to the next depth-0 `;` would swallow the
-                // following member (`return result : Real;`).
+                // A `}` that closes a block opened inside this member is a boundary when another
+                // member follows (`objective fuelEconomy { } return result : Real;`). It is not a
+                // boundary when the statement continues (`import Broken[items->select { ... }];`).
+                // When nothing follows, the `}` belongs to the enclosing body — consuming it makes
+                // that body look unclosed and the root recovery replaces the whole declaration.
                 if brace_depth == 0 {
-                    let (next, _) =
+                    let (after_brace, _) =
                         nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos + 1)
                             .parse(input)
                             .ok()?;
-                    if next.location_offset() != input.location_offset() {
-                        return Some(next);
+                    let (after_ws, _) = ws_and_comments(after_brace).unwrap_or((after_brace, ()));
+                    let following = after_ws.fragment();
+                    if following.starts_with(b"}") || starts_with_any_keyword(following, starters) {
+                        if after_brace.location_offset() != input.location_offset() {
+                            return Some(after_brace);
+                        }
+                    } else if following.is_empty() {
+                        let (at_brace, _) =
+                            nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos)
+                                .parse(input)
+                                .ok()?;
+                        if at_brace.location_offset() != input.location_offset() {
+                            return Some(at_brace);
+                        }
                     }
                 }
             }

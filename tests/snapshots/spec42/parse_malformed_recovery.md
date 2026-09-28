@@ -14,7 +14,7 @@ package Foo {
 (fixture-diagnostics
   (document "parse_malformed_recovery.md"
     (diagnostics
-      (diagnostic (code "recovered_package_body_element") (severity error) (category parseerror) (span (offset 18) (line 2) (column 5) (len 17)) (message "unexpected token in package body"))
+      (diagnostic (code "recovered_package_body_element") (severity error) (category parseerror) (span (offset 18) (line 2) (column 5) (len 12)) (message "unexpected token in package body"))
     )
   )
 )
@@ -28,6 +28,6 @@ package Foo {
 (parsed-document
   (references
   )
-  (root (package (name "Foo") (body brace (malformed (code "recovered_package_body_element") (found "+ bad stuff;") (span (offset 18) (line 2) (column 5) (len 17))) (part-def (name "Bar") (modifiers) (body semicolon)))))
+  (root (package (name "Foo") (body brace (malformed (code "recovered_package_body_element") (found "+ bad stuff;") (span (offset 18) (line 2) (column 5) (len 12))) (part-def (name "Bar") (modifiers) (body semicolon)))))
 )
 ~~~
