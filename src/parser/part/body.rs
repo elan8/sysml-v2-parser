@@ -208,6 +208,18 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
     if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        // `ConnectionUsage`/`ConnectionDefinition` own their `#tag` and `ref` prefixes too
+        // (`#derivation connection : D { … }`); see `planning/connection-usage-prefix-matrix.md`.
+        if crate::parser::occurrence_prefix::kind_keyword_follows(start, b"connection") {
+            if let Ok((next, def)) = connection_def(start) {
+                let elem = PartDefBodyElement::ConnectionDef(def);
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+            if let Ok((next, usage)) = connection_usage_member(start) {
+                let elem = PartDefBodyElement::Connection(Box::new(usage));
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+        }
         if let Ok((next, usage)) = occurrence_usage(start) {
             let elem = PartDefBodyElement::OccurrenceUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
@@ -274,12 +286,14 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(perform_action_decl, PartDefBodyElement::Perform),
             map(perform_usage, PartDefBodyElement::Perform),
             map(allocate_, PartDefBodyElement::Allocate),
-            // `connection_def_required` must be tried before `connection_usage_member`: the
+            // `connection_def` must be tried before `connection_usage_member`: the
             // latter has no guard against a bare `def` keyword (same bug class as
             // `flow_usage_member`/`port_usage`/`calc_usage` above), so `connection def Foo {}`
             // would otherwise misparse as a connection usage named "def".
-            map(connection_def_required, PartDefBodyElement::ConnectionDef),
-            map(connection_usage_member, PartDefBodyElement::Connection),
+            map(connection_def, PartDefBodyElement::ConnectionDef),
+            map(connection_usage_member, |usage| {
+                PartDefBodyElement::Connection(Box::new(usage))
+            }),
             map(connect_, PartDefBodyElement::Connect),
             // `flow_def` (def_required internally) must be tried before `flow_usage_member`:
             // the latter has no guard against a bare `def` keyword being consumed as a flow
@@ -457,47 +471,62 @@ fn connection_usage_member_inner(
 ) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `OccurrenceUsageMember = MemberPrefix ownedRelatedElement += OccurrenceUsageElement`: the
+    // visibility keyword precedes the usage's own `OccurrenceUsagePrefix`.
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    // BNF `RefPrefix`: `( isAbstract ?= 'abstract' | isVariation ?= 'variation' )?` before `ref`.
-    // Only `abstract` is modelled here (the shape the Systems Library and Apollo 11 author); a
-    // def-less `variation connection` has no library precedent yet.
-    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
+    let (after_kw, _) = ws_and_comments(input)?;
+    // `connection def …` is a `ConnectionDefinition`, never this production (`ref connection
+    // def …` would otherwise misparse as a usage named `def`).
+    if starts_with_keyword(after_kw.fragment(), b"def") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            after_kw,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // `Identification = ( '<' ShortName '>' )? Name?` -- both halves optional, so an anonymous
+    // `connection : Derivation { … }` or `connection { … }` leads straight into its
+    // specialization part or body.
+    let (input, short_name) = short_name_prefix(after_kw)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, name) = if input.fragment().starts_with(b":")
-        || input.fragment().starts_with(b"{")
-        || input.fragment().starts_with(b";")
+    let fragment = input.fragment();
+    let (input, name) = if fragment.starts_with(b":")
+        || fragment.starts_with(b"{")
+        || fragment.starts_with(b";")
+        || fragment.starts_with(b"[")
+        || fragment.starts_with(b"=")
+        || starts_with_keyword(fragment, b"defined")
+        || starts_with_keyword(fragment, b"subsets")
+        || starts_with_keyword(fragment, b"redefines")
+        || starts_with_keyword(fragment, b"references")
+        || starts_with_keyword(fragment, b"crosses")
+        || starts_with_keyword(fragment, b"connect")
     {
         (input, None)
     } else {
         let (input, parsed_name) = name(input)?;
         (input, Some(parsed_name))
     };
+    // `FeatureSpecializationPart`: typings, `MultiplicityPart` and the specialization clauses,
+    // through the same shared parsers every migrated usage family uses.
     let (input, leading_multiplicity) =
         opt(crate::parser::usage::multiplicity_node).parse(input)?;
-    let (input, type_reference) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":")
-            && !peek.fragment().starts_with(b":>")
-            && !peek.fragment().starts_with(b":>>")
-        {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, parsed_type) =
-                preceded(ws_and_comments, qualified_reference).parse(input)?;
-            (input, Some(parsed_type))
-        } else {
-            (input, None)
-        }
-    };
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, trailing_multiplicity) =
         opt(crate::parser::usage::multiplicity_node).parse(input)?;
     let multiplicity = leading_multiplicity.or(trailing_multiplicity);
-    // PAR-007 widening: an inline `connect from to to (, extra)*` clause between the type and the
-    // body, e.g. `connection link : Link connect sensorA.cmd to sensorB.cmd;`. Optional -- a
-    // plain `connection link : Link;` declaration with no explicit binding must keep parsing.
-    // This is the fallback `connection_def` now leaves for when its header scan detects a
-    // swallowed `connect` keyword (see `connection_def`'s doc comment).
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+    let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
+    // `( 'connect' ConnectorPart )?`: `connection link : Link connect a to b;`.
     let (input, connect) = opt(preceded(
         preceded(ws_and_comments, tag(&b"connect"[..])),
         preceded(ws1, connect_ends),
@@ -508,51 +537,75 @@ fn connection_usage_member_inner(
         None => (None, None, Vec::new()),
     };
     let (input, body) = connection_member_body(input)?;
+    // Retained compatibility, not BNF: a `:>`/`:>>` clause *after* the body, terminated by `;`
+    // (`connection : CapabilityToGoalDerivation { … } :> capabilityToGoals;` in the Apollo 11
+    // model, `tests/apollo_regressions.rs`). It fills the same slot the header clause would, and
+    // only when the header did not already author it.
+    let mut clauses = clauses;
     let before_subsets = input;
-    let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    let subsets = trailing_subsets.map(|target| {
+    let (input, trailing_subsets) = if clauses.subsets.is_none() {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b":>"[..])),
+            preceded(ws_and_comments, qualified_reference),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    if let Some(target) = trailing_subsets {
         let span = crate::parser::span_from_to(before_subsets, input);
-        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
-    });
+        clauses.subsets = Some((
+            single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target),
+            None,
+        ));
+    }
     let before_redefines = input;
-    let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    let redefines = trailing_redefines.map(|target| {
+    let (input, trailing_redefines) = if clauses.redefines.is_none() {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b":>>"[..])),
+            preceded(ws_and_comments, qualified_reference),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    if let Some(target) = trailing_redefines {
         let span = crate::parser::span_from_to(before_redefines, input);
-        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
-    });
-    let input = if subsets.is_some() || redefines.is_some() {
+        clauses.redefines = Some(single_target_subsetting(
+            span,
+            crate::ast::SubsettingKind::Redefines,
+            target,
+        ));
+    }
+    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
         input
     };
-
     Ok((
         input,
         node_from_to(
             start,
             input,
             ConnectionUsageMember {
-                is_abstract: is_abstract.is_some(),
+                prefix,
                 name,
-                type_reference,
+                short_name,
+                typing,
                 multiplicity,
+                multiplicity_modifiers: modifiers,
+                subsets: clauses.subsets,
+                redefines: clauses.redefines,
+                references: clauses.references,
+                crosses: clauses.crosses,
+                intersects: clauses.intersects,
+                value,
                 connect_from,
                 connect_to,
                 connect_extra_ends,
                 body,
-                subsets,
-                redefines,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
-                by_reference: is_reference.is_some(),
             },
         ),
     ))
@@ -778,7 +831,7 @@ mod par_002_nested_def_tests {
     #[test]
     fn part_def_body_accepts_nested_connection_usage_not_misparsed_as_def() {
         // Bare (`def`-less) connection usage must still dispatch to the usage shape, not be
-        // swallowed by `connection_def_required` (which requires `def`) nor misparse "def" as a
+        // swallowed by `connection_def` (which requires `def`) nor misparse "def" as a
         // usage name via `connection_usage_member`.
         let (rest, node) =
             part_def_body_element(input("connection link: Link;")).expect("connection usage");

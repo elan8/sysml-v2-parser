@@ -7,14 +7,13 @@ use super::writer::{emit_visibility, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
-    ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
-    EndDeclIntroducer, EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
-    InterfaceEnd, InterfaceEndReferenceOperator, InterfaceEndTarget, InterfacePart, InterfaceUsage,
-    InterfaceUsageBodyElement, MetadataBody, MetadataBodyElement, MetadataBodyRedefinitionOperator,
-    MetadataBodyUsage, Multiplicity, Node, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
-    PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement, PortDef, PortDefBody,
-    PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind, SubsettingRelationship,
-    TypingKind, TypingRelationship,
+    ConnectionEnd, DefinitionPrefix, EndDecl, EndDeclIntroducer, EndIdentity, InOut, InterfaceDef,
+    InterfaceDefBody, InterfaceDefBodyElement, InterfaceEnd, InterfaceEndReferenceOperator,
+    InterfaceEndTarget, InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, MetadataBody,
+    MetadataBodyElement, MetadataBodyRedefinitionOperator, MetadataBodyUsage, Multiplicity, Node,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
+    RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -1000,6 +999,7 @@ pub(crate) fn emit_end_decl(
         end.ref_prefix.variance.as_ref().map(|node| &node.value),
         end.ref_prefix.constant_span.is_some(),
     );
+    emit_extension_keywords(w, path, &end.extension_keywords)?;
     match &end.introducer {
         EndDeclIntroducer::Bare => {}
         EndDeclIntroducer::Reference { .. } => w.push_str("ref "),
@@ -1011,10 +1011,6 @@ pub(crate) fn emit_end_decl(
         EndIdentity::Declaration(name) => {
             w.push_authored_name(&format!("{path}/identity"), &name.span)?
         }
-        EndIdentity::Derivation(role) => match role.value {
-            DerivationEndRole::Original => w.push_str("#original"),
-            DerivationEndRole::Derive => w.push_str("#derive"),
-        },
     }
     if let Some(typing) = &end.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -1617,6 +1613,24 @@ pub(crate) fn emit_occurrence_usage_prefix(
     Ok(())
 }
 
+/// A `'#' QualifiedName` run -- `DefinitionExtensionKeyword*` on a definition, or the
+/// `UsageExtensionKeyword+` of an end declaration -- each followed by one space.
+fn emit_extension_keywords(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    keywords: &[crate::ast::Node<crate::ast::UsageExtensionKeyword>],
+) -> Result<(), EmitError> {
+    for (index, keyword) in keywords.iter().enumerate() {
+        w.push_char('#');
+        w.push_qualified_reference(
+            &format!("{path}/extension[{index}]"),
+            keyword.value.annotation,
+        )?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
 pub(crate) fn emit_typing_clause(
     w: &mut EmitWriter<'_>,
     typing: &TypingRelationship,
@@ -2104,19 +2118,16 @@ pub(crate) fn emit_connection_def(
     path: &str,
     def: &crate::ast::ConnectionDef,
 ) -> Result<(), EmitError> {
-    if let Some(role) = &def.derivation_role {
-        match role.value {
-            DerivationConnectionRole::Derivation => w.push_str("#derivation "),
-        }
-    }
     emit_visibility(w, def.membership.visibility);
+    // `OccurrenceDefinitionPrefix = BasicDefinitionPrefix? 'individual'?
+    // DefinitionExtensionKeyword*`, in that order.
     emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
+    emit_extension_keywords(w, path, &def.extension_keywords)?;
     // The trailing space belongs to the identification, not the keyword: an anonymous
-    // `#derivation connection { ... }` has none, and writing it unconditionally produced
-    // `connection def  {` with a doubled space.
+    // `connection def { ... }` has none.
     w.push_str("connection def");
     if def.identification.short_name.is_some() || def.identification.name.is_some() {
         w.push_char(' ');
@@ -2134,28 +2145,52 @@ pub(crate) fn emit_connection_usage(
     usage: &crate::ast::ConnectionUsageMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if usage.is_abstract {
-        w.push_str("abstract ");
+    // `ConnectionUsage = OccurrenceUsagePrefix 'connection' UsageDeclaration ValuePart?
+    // ('connect' ConnectorPart)? UsageBody`, through the shared prefix boundary.
+    emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
+    if usage.short_name.is_none() && usage.name.is_none() {
+        w.push_str("connection");
+    } else {
+        w.push_str("connection ");
     }
-    if usage.by_reference {
-        w.push_str("ref ");
-    }
-    w.push_str("connection ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     if let Some(name) = usage.name {
-        w.push_declaration_name("connection-usage/name", name)?;
+        w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(ty) = usage.type_reference {
-        w.push_str(" : ");
-        w.push_qualified_reference("connection type", ty)?;
+    if let Some(typing) = &usage.typing {
+        emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if let Some(subsets) = &usage.subsets {
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
+    if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
+        if let Some(expr) = subset_value {
+            w.push_str(" = ");
+            emit_expression(w, &expr.value)?;
+        }
     }
-    if let Some(redefines) = &usage.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
+    for clause in [
+        usage.redefines.as_ref(),
+        usage.references.as_ref(),
+        usage.crosses.as_ref(),
+        usage.intersects.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        emit_subsetting_clause(w, &clause.value)?;
+    }
+    if let Some(value) = &usage.value {
+        if usage
+            .subsets
+            .as_ref()
+            .and_then(|(_, v)| v.as_ref())
+            .is_none()
+        {
+            emit_feature_value(w, value)?;
+        }
     }
     if let (Some(from), Some(to)) = (&usage.connect_from, &usage.connect_to) {
         if !usage.connect_extra_ends.is_empty() {

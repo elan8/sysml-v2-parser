@@ -54,7 +54,7 @@ fn interface_def_body_element(
         // GH-33: interfaces don't allow the `#name` derived-end-name form connections do (no
         // matching real-usage evidence found for interfaces) -- see `connector::end_decl`'s doc
         // comment.
-        map(|i| end_decl(i, false), InterfaceDefBodyElement::EndDecl),
+        map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.

@@ -19,7 +19,7 @@ pub(crate) use crate::parser::case::{
     analysis_case_def, analysis_case_usage, case_def, case_usage, verification_case_def,
     verification_case_usage,
 };
-pub(crate) use crate::parser::connection::connection_def_required;
+pub(crate) use crate::parser::connection::connection_def;
 pub(crate) use crate::parser::connection::connection_member_body;
 pub(crate) use crate::parser::connector::connect_ends;
 pub(crate) use crate::parser::constraint::calc_def_required;

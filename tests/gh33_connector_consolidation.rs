@@ -151,30 +151,66 @@ fn per_endpoint_multiplicity_on_connect_works_in_both_connection_and_interface_d
     assert!(connect_stmt.to.value.multiplicity.is_some());
 }
 
-/// Connections keep typed fixed derivation-end roles (real usage: `tests/derivation_connections.rs`);
-/// this is the one genuine, evidenced difference between the two contexts, so it stays
-/// parameterized (`connector::end_decl`'s `allow_derived_name`) rather than shared unconditionally.
+/// `end #original ::> R1;` is `ExtendedUsage`: an anonymous end carrying the prefix metadata
+/// `#original` (SysML BNF 1699), not a fixed derivation role. Connection and interface bodies
+/// share the one end parser, so both retain the keyword.
 #[test]
-fn derivation_end_role_is_connection_only_by_design() {
-    let input = "package P {\nrequirement def R1;\nrequirement def R2;\n#derivation connection { end #original ::> R1; end #derive ::> R2; }\n}";
+fn end_prefix_metadata_is_retained_in_connection_and_interface_bodies() {
+    let input = "package P {\nrequirement def R1;\nrequirement def R2;\n#derivation connection { end #original ::> R1; end #derive ::> R2; }\ninterface def I { end #logical ::> R1; end #physical p : R2; }\n}";
     let elements = package_elements(input);
+    let keyword_texts = |end: &sysml_v2_parser::ast::EndDecl| -> Vec<String> {
+        end.extension_keywords
+            .iter()
+            .map(|keyword| {
+                input[keyword.span.offset..keyword.span.offset + keyword.span.len].to_owned()
+            })
+            .collect()
+    };
     let connection = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::ConnectionDef(c) => Some(&c.value),
+            PackageBodyElement::ConnectionUsage(c) => Some(&c.value),
             _ => None,
         })
-        .expect("expected derivation connection def");
-    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
-        panic!("expected connection def brace body");
+        .expect("expected derivation connection usage");
+    assert_eq!(connection.prefix.extension_keywords.len(), 1);
+    let ConnectionDefBody::Brace { elements: ends, .. } = &connection.body else {
+        panic!("expected connection brace body");
     };
-    assert!(elements.iter().any(|e| matches!(
-        &e.value,
-        ConnectionDefBodyElement::EndDecl(end)
-            if matches!(
-                &end.value.identity,
-                sysml_v2_parser::ast::EndIdentity::Derivation(role)
-                    if role.value == sysml_v2_parser::ast::DerivationEndRole::Original
-            )
-    )));
+    let connection_ends: Vec<Vec<String>> = ends
+        .iter()
+        .filter_map(|e| match &e.value {
+            ConnectionDefBodyElement::EndDecl(end) => Some(keyword_texts(&end.value)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        connection_ends,
+        vec![vec!["#original".to_owned()], vec!["#derive".to_owned()]]
+    );
+    let interface = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::InterfaceDef(i) => Some(&i.value),
+            _ => None,
+        })
+        .expect("expected interface def");
+    let InterfaceDefBody::Brace {
+        elements: interface_elements,
+        ..
+    } = &interface.body
+    else {
+        panic!("expected interface brace body");
+    };
+    let interface_ends: Vec<Vec<String>> = interface_elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            InterfaceDefBodyElement::EndDecl(end) => Some(keyword_texts(&end.value)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        interface_ends,
+        vec![vec!["#logical".to_owned()], vec!["#physical".to_owned()]]
+    );
 }

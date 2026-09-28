@@ -49,9 +49,7 @@ fn connection_def_body_element(
         }
     }
     let (input, elem) = alt((
-        // GH-33: connections allow the fixed `#original`/`#derive` end-role form (tested real usage; see
-        // `connector::end_decl`'s doc comment); interfaces don't.
-        map(|i| end_decl(i, true), ConnectionDefBodyElement::EndDecl),
+        map(end_decl, ConnectionDefBodyElement::EndDecl),
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
         map(connect_stmt, ConnectionDefBodyElement::ConnectStmt),
         map(
@@ -142,81 +140,23 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
     Ok((input, members.into_body()))
 }
 
-/// Connection definition: `connection def` Identification body.
+/// `ConnectionDefinition = OccurrenceDefinitionPrefix 'connection' 'def' Definition` (SysML BNF
+/// 664, clause 8.2.2.13).
 ///
-/// `def` is intentionally optional, same rationale (and same real-library evidence) as
-/// `port_def`/`calc_def`/`constraint_def`: the Systems Library uses bare, `def`-less `connection`
-/// declarations at namespace level with `abstract`, multiplicity, `nonunique`, and `:>` subsets
-/// before the body (e.g. `abstract connection connections: Connection[0..*] nonunique :>
-/// linkObjects, parts { ... }` in `Systems Library/Connections.sysml`), a shape
-/// `connection_usage_member` (`src/parser/part/body.rs`) does not parse (no `abstract`/
-/// multiplicity/`nonunique` support, and its `:>`/`:>>` handling is trailing-after-body only).
-/// `parse_definition_prefix`'s header parsing (`specialization::
-/// parse_optional_definition_header_after_identification`, a generic text-scan for `: Type[mult]
-/// nonunique :> target`) already accepts this whole shape, and identification's `name` is
-/// optional, so `connection_def` is effectively a grammar superset of `connection_usage_member`
-/// for every practical package-level input.
-///
-/// **PAR-006b audit note**: `connection_usage_member` is also dispatched at package level
-/// (`package.rs::try_package_body_structure`, right after `connection_def`, added by PAR-002).
-/// This was investigated as a possible PAR-001-class def/usage ambiguity (an earlier draft of
-/// this comment claimed "nothing else shares the `connection` keyword" at package level, which
-/// PAR-002 made stale). Making `def` conditionally required here (mirroring the `connection`
-/// keyword inside part bodies, where `connection_def_required` is safe because
-/// `connection_usage_member`'s narrower grammar is the *only* usage form dispatched there) was
-/// tried and broke `test_systems_library_node_types_no_extended`/
-/// `test_full_library_node_types_no_extended` in the `SYSML_V2_RELEASE_DIR` gate: the real bare
-/// `abstract connection ... nonunique :> ...` forms above stopped parsing as `ConnectionDef` and,
-/// since `connection_usage_member` can't parse them either, fell all the way through to
-/// `ExtendedLibraryDecl`. That is a worse outcome than the status quo, not a fix. Do not add
-/// `.def_required()` here without first widening `connection_usage_member` to cover
-/// `abstract`/multiplicity/`nonunique`/leading `:>` subsets, matching the port/calc/constraint
-/// precedent from CHANGELOG 0.33.0.
-///
-/// **PAR-007 update**: the PAR-006b claim above that "there is no live misclassification bug
-/// here" was correct for the shapes it checked, but missed one: `connection link : Link connect
-/// a to b;` (a typed connector usage with an inline `connect ... to ...` clause) *was*
-/// misclassified. The plain `: Type` header scan (`specialization::
-/// parse_optional_definition_header_after_identification`) greedily consumes everything up to
-/// `;`/`{` and silently discards it once a leading type name is extracted, so `connection_def`
-/// matched this input too -- with an empty body, having swallowed and dropped the `connect`
-/// clause entirely -- rather than correctly leaving it for `connection_usage_member`. This is
-/// narrower and safer than a `.def_required()` guard: `.reject_header_keyword(b"connect")` only
-/// fails the parse when the discarded header text contains a top-level `connect` keyword, which
-/// the bare Systems-Library shape above never does, so that regression cannot recur (see
-/// `par_006b_audit_tests` below, still green).
+/// `def` is required in every scope. A `def`-less `connection …` is always a `ConnectionUsage`
+/// (`part::connection_usage_member`), including the Systems Library's
+/// `abstract connection connections : Connection[0..*] nonunique :> linkObjects, parts { … }`
+/// and the `#derivation connection d { … }` shape: the usage parser owns the whole
+/// `OccurrenceUsagePrefix` and `UsageDeclaration`, so no definition has to stand in for them.
+/// See `planning/connection-usage-prefix-matrix.md`.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
-            .with_derivation_role()
-            .individual_allowed()
-            .with_captured_visibility()
-            .reject_header_keyword(b"connect")
-            // GH-20: a `def`-less, non-`abstract` `connection name : Type { ... }` with no
-            // `:>`/`specializes` clause in its header (SysML v2 §7.13.2's plain named typed
-            // connection usage) is a `ConnectionUsageMember`, not a definition -- see
-            // `reject_plain_typed_header_without_def`'s doc comment. The bare Systems-Library
-            // definition shape this parser must keep accepting (PAR-006b) always carries
-            // `abstract` and/or a `:>` subclassification clause, so it's unaffected.
-            .reject_plain_typed_header_without_def(),
-    )
-}
-
-/// Connection definition with required `def` keyword, for contexts (e.g. nested inside a part
-/// definition body) where a bare `connection` usage form (`connection_usage_member`) is already
-/// dispatched separately -- requiring `def` here prevents a `def`-less connection usage from
-/// being misclassified as a definition, the same bug class as PAR-001 in `attribute_def`. Does
-/// does not support the `#derivation` def-less form ([`connection_def`] does); nothing in the
-/// nested-part-body grammar currently needs that combination.
-pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
-    parse_connection_def(
-        input,
-        DefinitionPrefixOptions::new(b"connection")
             .def_required()
+            .with_extension_keywords()
             .individual_allowed()
-            .with_captured_visibility()
-            .reject_header_keyword(b"connect"),
+            .with_captured_visibility(),
     )
 }
 
@@ -235,7 +175,7 @@ fn parse_connection_def(
             ConnectionDef {
                 definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
-                derivation_role: prefix.derivation_role,
+                extension_keywords: prefix.extension_keywords,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -313,34 +253,44 @@ mod par_002_widening_tests {
 }
 
 #[cfg(test)]
-mod par_006b_audit_tests {
+mod def_less_usage_tests {
     use super::*;
+    use crate::parser::part::connection_usage_member;
 
     fn input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
     }
 
-    /// PAR-006b audit: `connection_def` must keep accepting this exact real-Systems-Library shape
-    /// (`Systems Library/Connections.sysml`) -- a bare, `def`-less, un-annotated `connection`
-    /// usage with `abstract`, multiplicity, `nonunique`, and leading `:>` subsets before the
-    /// body. This is the shape that made a `def_required_unless_annotated()` guard on
-    /// `connection_def` unsafe (see the doc comment on `connection_def` above): tightening `def`
-    /// requirements here without first widening `connection_usage_member` to cover this shape
-    /// sends it to `ExtendedLibraryDecl` instead, which is what broke the
-    /// `SYSML_V2_RELEASE_DIR` gate (`test_systems_library_node_types_no_extended`) during this
-    /// audit. This test exists so any future attempt to tighten `connection_def` fails fast,
-    /// locally, and points back at this note instead of only failing the much slower full-library
-    /// gate.
+    /// The Systems Library's `def`-less declaration (`Systems Library/Connections.sysml`) is a
+    /// `ConnectionUsage`: `connection_def` refuses it, and the usage parser keeps every slot the
+    /// old definition fallback discarded -- `abstract`, the multiplicity, `nonunique` and the
+    /// leading `:>` subsetting.
     #[test]
-    fn connection_def_accepts_the_bare_abstract_multiplicity_nonunique_subsets_form_that_makes_def_required_unsafe(
-    ) {
+    fn the_bare_systems_library_connection_is_a_usage_with_every_slot() {
         let text =
             "abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { }";
-        let result = connection_def(input(text));
-        assert!(
-            result.is_ok(),
-            "connection_def should still accept the bare Systems-Library connection form, got {result:?}"
-        );
+        assert!(connection_def(input(text)).is_err());
+        let (rest, node) = connection_usage_member(input(text)).expect("connection usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let usage = node.value;
+        assert!(usage
+            .prefix
+            .basic()
+            .is_some_and(|basic| basic.ref_prefix.variance.is_some()));
+        assert!(usage.typing.is_some());
+        assert!(usage.multiplicity.is_some());
+        assert!(usage.multiplicity_modifiers.uniqueness.is_some());
+        assert!(usage.subsets.is_some());
+    }
+
+    /// `#derivation connection d { … }` is a usage whose prefix owns the extension keyword.
+    #[test]
+    fn a_def_less_derivation_connection_is_a_usage_carrying_its_prefix_metadata() {
+        let text = "#derivation connection d { end #original ::> r1; end #derive ::> r2; }";
+        assert!(connection_def(input(text)).is_err());
+        let (rest, node) = connection_usage_member(input(text)).expect("connection usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.prefix.extension_keywords.len(), 1);
     }
 }
 
@@ -397,7 +347,7 @@ mod membership_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"trailerHitch"[..])
         );
-        assert!(node.value.type_reference.is_some());
+        assert!(node.value.typing.is_some());
         let multiplicity = node.value.multiplicity.expect("multiplicity present");
         assert!(multiplicity.value.lower.is_some());
         assert!(multiplicity.value.upper.is_some());

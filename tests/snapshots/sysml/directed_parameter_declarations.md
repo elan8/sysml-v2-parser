@@ -93,7 +93,7 @@ package DirectedParameters {
     }
     occurrence def Message {
         in event occurrence sourceEvent[1] default that.sourceEvent;
-        connection  : HappensDuring connect sourceEvent to [1] self;
+        connection : HappensDuring connect sourceEvent to [1] self;
     }
     requirement def RequirementCheck {
         abstract concern concerns[0..*] :> concernChecks;

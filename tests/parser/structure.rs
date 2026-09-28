@@ -2937,15 +2937,16 @@ end systemOfInterest references theSystem;
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
+    // `connection name { … }` without `def` is a `ConnectionUsage` (SysML BNF 667).
     let connection = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::ConnectionDef(c) => Some(&c.value),
+            PackageBodyElement::ConnectionUsage(c) => Some(&c.value),
             _ => None,
         })
-        .expect("expected connection def");
+        .expect("expected connection usage");
     let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
-        panic!("expected connection def brace body");
+        panic!("expected connection brace body");
     };
     let [party_element, system_element] = elements.as_slice() else {
         panic!(
@@ -3177,14 +3178,13 @@ end device ::> sensorFeed[1];
         usage.name.and_then(|n| result.document.declaration_name(n)),
         Some("connection1")
     );
-    assert!(usage.type_reference.is_some());
+    assert!(usage.typing.is_some());
 }
 
-/// GH-20 contrast case: the bare, `def`-less, `abstract` Systems-Library definition shape
-/// (PAR-006b) must keep dispatching to `ConnectionDef` at package level -- `abstract` is an
-/// unambiguous definition-only signal `reject_plain_typed_header_without_def` checks for.
+/// The bare, `def`-less, `abstract` Systems-Library declaration is a `ConnectionUsage` at package
+/// level too: `abstract` is a `RefPrefix` slot the usage production owns, not a definition signal.
 #[test]
-fn test_package_level_bare_abstract_connection_still_dispatches_to_connection_def() {
+fn test_package_level_bare_abstract_connection_is_a_connection_usage() {
     let input = "package P {\npart def Base1;\npart def Base2;\nabstract connection connections: Base1[0..*] nonunique :> linkObjects, parts { }\n}";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
@@ -3194,18 +3194,14 @@ fn test_package_level_bare_abstract_connection_still_dispatches_to_connection_de
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
-    assert!(
-        elements
-            .iter()
-            .any(|e| matches!(e.value, PackageBodyElement::ConnectionDef(_))),
-        "bare abstract connection with nonunique/subclassification must still be a ConnectionDef: {:?}",
-        elements
-    );
+    assert!(elements
+        .iter()
+        .any(|e| matches!(e.value, PackageBodyElement::ConnectionUsage(_))));
+    assert!(!elements
+        .iter()
+        .any(|e| matches!(e.value, PackageBodyElement::ConnectionDef(_))));
 }
 
-/// GH-20 contrast case: an explicit `connection def name : Type { ... }` (no `abstract`, no
-/// `:>`) is unambiguous -- the user wrote `def` -- and must stay a `ConnectionDef` regardless of
-/// header shape.
 #[test]
 fn test_package_level_explicit_def_typed_connection_stays_connection_def() {
     let input = "package P {\nconnection def Base;\nconnection def Foo : Base { }\n}";
@@ -3242,15 +3238,16 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
+    // `connection name { … }` without `def` is a `ConnectionUsage` (SysML BNF 667).
     let connection = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::ConnectionDef(c) => Some(&c.value),
+            PackageBodyElement::ConnectionUsage(c) => Some(&c.value),
             _ => None,
         })
-        .expect("expected connection def");
+        .expect("expected connection usage");
     let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
-        panic!("expected connection def brace body");
+        panic!("expected connection brace body");
     };
     let end = match &elements[0].value {
         ConnectionDefBodyElement::EndDecl(end) => &end.value,

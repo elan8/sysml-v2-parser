@@ -57,8 +57,8 @@ fn gh89_1_bare_part_usage_in_connection_def_body() {
 }
 
 /// Same gap, but for the anonymous, unnamed `connection { ... }` form (Simple Tests/
-/// ConnectionTest.sysml:51-54: `connection { part q; end ref end1 ::> d1 :> q; end end2 ::> d2; }`
-/// -- parses as an anonymous `ConnectionDef` since it has no name or type), which shares the same
+/// ConnectionTest.sysml:51-54: `connection { part q; end ref end1 ::> d1 :> q; end end2 ::> d2; }`).
+/// Without `def` it is an anonymous `ConnectionUsage`, whose body shares the same
 /// `connection_def_body_element` dispatch as the named def form above.
 #[test]
 fn gh89_1_bare_part_usage_in_anonymous_connection_body() {
@@ -71,8 +71,8 @@ fn gh89_1_bare_part_usage_in_anonymous_connection_body() {
             }
         }"#,
     );
-    let PackageBodyElement::ConnectionDef(c) = &elements[1] else {
-        panic!("expected ConnectionDef, got {:?}", elements[1]);
+    let PackageBodyElement::ConnectionUsage(c) = &elements[1] else {
+        panic!("expected ConnectionUsage, got {:?}", elements[1]);
     };
     let sysml_v2_parser::ast::ConnectionDefBody::Brace { elements, .. } = &c.value.body else {
         panic!("expected brace connection body");
