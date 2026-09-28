@@ -529,11 +529,6 @@ macro_rules! ast_traversal {
                 walk_end_identity(self, node)
             }
 
-            /// Visits [`DerivationEndRole`]; the default implementation walks its children.
-            fn visit_derivation_end_role(&mut self, node: &$($mutability)? Node<DerivationEndRole>) {
-                walk_derivation_end_role(self, node)
-            }
-
             /// Visits [`RefDecl`]; the default implementation walks its children.
             fn visit_ref_decl(&mut self, node: &$($mutability)? Node<RefDecl>) {
                 walk_ref_decl(self, node)
@@ -557,11 +552,6 @@ macro_rules! ast_traversal {
             /// Visits [`RelationshipBodyElement`]; the default implementation walks its children.
             fn visit_relationship_body_element(&mut self, node: &$($mutability)? Node<RelationshipBodyElement>) {
                 walk_relationship_body_element(self, node)
-            }
-
-            /// Visits [`DerivationConnectionRole`]; the default implementation walks its children.
-            fn visit_derivation_connection_role(&mut self, node: &$($mutability)? Node<DerivationConnectionRole>) {
-                walk_derivation_connection_role(self, node)
             }
 
             /// Visits [`ConnectionDef`]; the default implementation walks its children.
@@ -2864,16 +2854,42 @@ macro_rules! ast_traversal {
         pub fn walk_connection_usage_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectionUsageMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectionUsageMember { is_abstract, name, type_reference, multiplicity, connect_from, connect_to, connect_extra_ends, body, subsets, redefines, membership, by_reference } = &$($mutability)? node.value;
-            let _ = is_abstract;
+            let ConnectionUsageMember { prefix, name, short_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, connect_from, connect_to, connect_extra_ends, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_reference {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = short_name {
+                visitor.visit_declaration_name(inner);
+            }
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some(inner) = subsets {
+                let (tuple_0, tuple_1) = inner;
+                visitor.visit_subsetting_relationship(tuple_0);
+                if let Some(inner) = tuple_1 {
+                    visitor.visit_expression(inner);
+                }
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             if let Some(inner) = connect_from {
                 visitor.visit_connection_end(inner);
@@ -2885,14 +2901,7 @@ macro_rules! ast_traversal {
                 visitor.visit_connection_end(inner);
             }
             visitor.visit_connection_def_body(body);
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
             visitor.visit_membership(membership);
-            let _ = by_reference;
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -3953,8 +3962,11 @@ macro_rules! ast_traversal {
         pub fn walk_end_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EndDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EndDecl { ref_prefix, introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, type_ref_span } = &$($mutability)? node.value;
+            let EndDecl { ref_prefix, extension_keywords, introducer, short_name, identity, typing, references, multiplicity, redefines, crosses, type_ref_span } = &$($mutability)? node.value;
             visitor.visit_ref_prefix(ref_prefix);
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
             visitor.visit_end_decl_introducer(introducer);
             if let Some(inner) = short_name { visitor.visit_declaration_name(inner); }
             visitor.visit_end_identity(identity);
@@ -3997,20 +4009,7 @@ macro_rules! ast_traversal {
                 EndIdentity::Declaration(field_0) => {
                     visitor.visit_declaration_name(field_0);
                 }
-                EndIdentity::Derivation(field_0) => {
-                    visitor.visit_derivation_end_role(field_0);
-                }
             }
-        }
-
-        pub fn walk_derivation_end_role<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DerivationEndRole>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            match &$($mutability)? node.value {
-                DerivationEndRole::Original => {}
-                DerivationEndRole::Derive => {}
-            }
-            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_ref_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RefDecl>) {
@@ -4118,22 +4117,13 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_derivation_connection_role<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DerivationConnectionRole>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            match &$($mutability)? node.value {
-                DerivationConnectionRole::Derivation => {}
-            }
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
         pub fn walk_connection_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectionDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectionDef { definition_prefix: _, is_individual, derivation_role, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ConnectionDef { definition_prefix: _, is_individual, extension_keywords, identification, specializes, body, membership } = &$($mutability)? node.value;
             let _ = is_individual;
-            if let Some(inner) = derivation_role {
-                visitor.visit_derivation_connection_role(inner);
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
             }
             visitor.visit_identification(identification);
             if let Some(inner) = specializes {

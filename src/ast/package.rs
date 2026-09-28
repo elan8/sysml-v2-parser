@@ -203,7 +203,7 @@ pub enum PackageBodyElement {
     /// Standalone port usage at package level. See `AttributeUsage`.
     PortUsage(Box<Node<PortUsage>>),
     /// Standalone connection usage at package level. See `AttributeUsage`.
-    ConnectionUsage(Node<ConnectionUsageMember>),
+    ConnectionUsage(Box<Node<ConnectionUsageMember>>),
     /// Standalone interface usage at package level (PAR-007: previously there was no
     /// package-level `interface_usage` dispatch arm at all, so `interface iface : Type connect a
     /// to b;` fell through to `interface_def` and was silently accepted as a definition with the

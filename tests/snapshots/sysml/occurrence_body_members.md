@@ -20,7 +20,6 @@ package OccurrenceBodyMembers {
 (fixture-diagnostics
   (document "occurrence_body_members.md"
     (diagnostics
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 302) (line 8) (column 9) (len 32)) (message "this definition body member is spec-valid but not structurally implemented"))
     )
   )
 )

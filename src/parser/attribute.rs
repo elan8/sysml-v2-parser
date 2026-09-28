@@ -298,6 +298,14 @@ pub(crate) fn attribute_body_element(
     // `RefDecl` and `metadata_keyword_prefix` reads `#Tag` as a standalone member, and neither
     // knows about the `part` keyword that follows, so `PartUsage` gets first refusal.
     if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        // `ConnectionUsage` owns its `#tag` and `ref` prefixes; see
+        // `planning/connection-usage-prefix-matrix.md`.
+        if crate::parser::occurrence_prefix::kind_keyword_follows(start, b"connection") {
+            if let Ok((next, usage)) = crate::parser::part::connection_usage_member(start) {
+                let elem = AttributeBodyElement::Connection(Box::new(usage));
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+        }
         if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
             let elem = AttributeBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
