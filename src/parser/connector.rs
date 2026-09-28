@@ -26,8 +26,7 @@
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndDeclIntroducer, EndIdentity, Node,
-    RefDecl,
+    ConnectStmt, ConnectionEnd, EndDecl, EndDeclIntroducer, EndIdentity, Node, RefDecl,
 };
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
@@ -46,36 +45,15 @@ use nom::sequence::{preceded, terminated};
 use nom::IResult;
 use nom::Parser;
 
-/// Fixed derivation-end role, with its exact authored `#...` marker span.
-fn derivation_end_role(input: Input<'_>) -> IResult<Input<'_>, Node<DerivationEndRole>> {
-    let start = input;
-    let (input, _) = tag(&b"#"[..]).parse(input)?;
-    let (input, role) = if starts_with_keyword(input.fragment(), b"original") {
-        let (input, _) = tag(&b"original"[..]).parse(input)?;
-        (input, DerivationEndRole::Original)
-    } else if starts_with_keyword(input.fragment(), b"derive") {
-        let (input, _) = tag(&b"derive"[..]).parse(input)?;
-        (input, DerivationEndRole::Derive)
-    } else {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
-    };
-    Ok((input, node_from_to(start, input, role)))
-}
-
-/// End declaration: `end` `#tag`? multiplicity? (`ref`|`feature`)? name multiplicity?
-/// (`:` (`~`)? type (`crosses` target)? | (`::>`|`references`) target | nested `occurrence`/`item`
-/// usage) multiplicity? `;`.
+/// End declaration: `end` `RefPrefix` `#tag`* multiplicity? (`ref`|`feature`)? name?
+/// multiplicity? (`:` (`~`)? type (`crosses` target)? | (`::>`|`references`) target | nested
+/// `occurrence`/`item` usage) multiplicity? `;`.
 ///
-/// `allow_derivation_role` gates the fixed derivation-role form above -- `true` for
-/// `connection.rs` (tested real usage), `false` for `interface.rs` (no matching evidence;
-/// preserves existing behavior exactly).
-pub(crate) fn end_decl(
-    input: Input<'_>,
-    allow_derivation_role: bool,
-) -> IResult<Input<'_>, Node<EndDecl>> {
+/// The `#tag` run is `ExtendedUsage`'s `UsageExtensionKeyword+` (SysML BNF 1699): prefix metadata
+/// naming a metadata definition, retained on the node. `#original`/`#derive` (requirement
+/// derivation), `#cause`/`#effect` (cause and effect) and any other metadata are the same
+/// production; none is a fixed role, and none replaces the end's name.
+pub(crate) fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
@@ -87,22 +65,17 @@ pub(crate) fn end_decl(
     let (input, _) = ws_and_comments(input)?;
     let (input, ref_prefix) = crate::parser::occurrence_prefix::ref_prefix(input);
     let (input, _) = ws_and_comments(input)?;
-    // GH-85: a `#tag` metadata-prefix annotation may precede the rest of the end declaration,
-    // e.g. `end #cause cause1 : Causer1;` (OMG spec Annex `Cause and Effect Examples/
+    // `UsageExtensionKeyword*`: `end #cause cause1 : Causer1;` (`Cause and Effect Examples/
     // CauseAndEffectExample.sysml`), `end #original r1 : Req1;` (`Requirements Examples/
-    // RequirementDerivationExample.sysml`). Distinct from `allow_derivation_role`'s fixed-role form
-    // below (`end #original ::> OriginalReq;`, `tests/derivation_connections.rs`): there the
-    // fixed marker is a derivation role, immediately followed by an operator
-    // (`::>`/`:`/`;`/multiplicity); here `#tag` is a separate prefix and a declaration name still
-    // follows. The trailing
-    // `peek(name)` requires that a name actually follows before committing to the prefix
-    // reading, so `#original ::> ...` still falls through to the derivation-role path intact.
-    // Discarded like the kind keywords below -- `EndDecl` doesn't model metadata annotations.
-    let (input, _) = opt(preceded(
-        ws_and_comments,
-        (tag(&b"#"[..]), name, ws1, nom::combinator::peek(name)),
-    ))
-    .parse(input)?;
+    // RequirementDerivationExample.sysml`), `end #derive ::> DerivedReq;`.
+    let mut input = input;
+    let mut extension_keywords = Vec::new();
+    while input.fragment().starts_with(b"#") {
+        let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
+        extension_keywords.push(keyword);
+        let (rest, _) = ws_and_comments(rest)?;
+        input = rest;
+    }
     // GH-51: a leading multiplicity may precede the name (BNF `ConnectorEnd`'s
     // `OwnedCrossMultiplicityMember` position), e.g. `end [*] ref cause:
     // Situation;` (OMG spec Annex `14c-Language Extensions.sysml`). Distinct from the trailing
@@ -136,10 +109,7 @@ pub(crate) fn end_decl(
     let introducer = introducer.unwrap_or(EndDeclIntroducer::Bare);
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
-        let (input, role) = derivation_end_role(input)?;
-        (input, EndIdentity::Derivation(role))
-    } else if input.fragment().starts_with(b":") {
+    let (input, identity) = if input.fragment().starts_with(b":") {
         // `UsageDeclaration = Identification? FeatureSpecializationPart?`: a specialization
         // operator right after `end` means the end has no label of its own.
         (input, EndIdentity::Anonymous)
@@ -176,6 +146,7 @@ pub(crate) fn end_decl(
                 input,
                 EndDecl {
                     ref_prefix: ref_prefix.clone(),
+                    extension_keywords: extension_keywords.clone(),
                     introducer,
                     short_name,
                     identity,
@@ -204,6 +175,7 @@ pub(crate) fn end_decl(
                     rest,
                     EndDecl {
                         ref_prefix: ref_prefix.clone(),
+                        extension_keywords: extension_keywords.clone(),
                         introducer,
                         short_name,
                         identity,
@@ -250,6 +222,7 @@ pub(crate) fn end_decl(
             input,
             EndDecl {
                 ref_prefix: ref_prefix.clone(),
+                extension_keywords: extension_keywords.clone(),
                 introducer,
                 short_name,
                 identity,
@@ -653,7 +626,7 @@ mod end_decl_kind_tests {
         let source = input(
             "end feature source: Occurrence redefines FlowTransfer::source, transfers::source;",
         );
-        let (rest, node) = end_decl(source, true).expect("end feature");
+        let (rest, node) = end_decl(source).expect("end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(
             &node.value.identity,

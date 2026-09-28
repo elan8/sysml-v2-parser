@@ -141,7 +141,7 @@ pub enum PartDefBodyElement {
     Connect(Node<Connect>),
     FlowUsage(Box<Node<crate::ast::behavior::FlowUsage>>),
     /// `connection` usage member inside a part definition body.
-    Connection(Node<ConnectionUsageMember>),
+    Connection(Box<Node<ConnectionUsageMember>>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
     UnsupportedMember(Node<crate::ast::UnsupportedGrammarNode>),
@@ -260,43 +260,62 @@ pub enum PartDefBodyElement {
     AliasDef(Node<AliasDef>),
 }
 
-/// Connection usage member inside part definitions.
+/// A `def`-less connection usage (BNF `ConnectionUsage`, clause 8.2.2.13):
+///
+/// ```text
+/// ConnectionUsage =
+///     OccurrenceUsagePrefix
+///     ( 'connection' UsageDeclaration ValuePart? ( 'connect' ConnectorPart )?
+///     | 'connect' ConnectorPart )
+///     UsageBody                                                     -- SysML BNF 667
+/// ```
+///
+/// This node is the `'connection' UsageDeclaration` alternative; the keyword-less `connect`
+/// alternative is [`crate::ast::Connect`]. The prefix is the shared [`OccurrenceUsagePrefix`]
+/// (see `planning/connection-usage-prefix-matrix.md`), so `#derivation connection d { … }`,
+/// `abstract connection connections : Connection[0..*] nonunique :> linkObjects, parts { … }`
+/// (`Systems Library/Connections.sysml`) and `ref connection c;` all keep every authored slot.
+///
+/// [`OccurrenceUsagePrefix`]: crate::ast::OccurrenceUsagePrefix
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionUsageMember {
-    /// Leading `abstract` keyword (`RefPrefix.isAbstract`), e.g. the Apollo 11
-    /// `abstract connection capabilityToGoals[*] : CapabilityToGoalDerivation;` def-less usage.
-    /// Widened here rather than on `ConnectionDef` because its header text-scan only accepts a
-    /// typing that precedes the multiplicity -- see `connection_def`'s doc comment.
-    pub is_abstract: bool,
+    /// `OccurrenceUsagePrefix`: `RefPrefix`, `ref`, `individual`, portion kind and the
+    /// `UsageExtensionKeyword*` (`#derivation`) run, in authored order.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: Option<DeclarationName>,
-    pub type_reference: Option<QualifiedReferenceId>,
-    /// Multiplicity after the type, e.g. `[0..1]` in `connection trailerHitch :
-    /// TrailerHitch[0..1];` (OMG spec Annex `3c-Function-based Behavior-structure mod.sysml`).
+    /// `Identification`'s `'<' ShortName '>'`.
+    pub short_name: Option<DeclarationName>,
+    /// `FeatureSpecializationPart`'s `Typings` clause (`: Type`, `defined by Type`, ...).
+    pub typing: Option<Node<TypingRelationship>>,
+    /// `MultiplicityPart`'s `OwnedMultiplicity`, e.g. `[0..*]`.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// Optional inline `connect from to to (, extra)* ` clause (PAR-007 widening): a package- or
-    /// part-body-level `connection name : Type connect a to b;` usage. `None` for a plain
-    /// `connection name : Type;` declaration with no explicit binding. See `connect_to`/
-    /// `connect_extra_ends` for the rest of the ends and `connection_def`'s doc comment for why
-    /// this shape previously reached `ConnectionDef` instead of here.
+    /// `MultiplicityPart`'s `ordered`/`nonunique` keyword slots.
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
+    /// `Subsettings` (`:>` / `subsets`), with the default expression the shared clause parser
+    /// retains.
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    /// `Redefinitions` (`:>>` / `redefines`).
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    /// `References` (`::>` / `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// `Crosses` (`=>` / `crosses`).
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// `intersects` clause.
+    pub intersects: Option<Node<SubsettingRelationship>>,
+    /// `ValuePart?`.
+    pub value: Option<Node<crate::ast::FeatureValue>>,
+    /// Optional inline `connect from to to (, extra)*` clause: `connection name : Type connect a
+    /// to b;`. `None` for a plain `connection name : Type;` declaration.
     pub connect_from: Option<Node<ConnectionEnd>>,
     pub connect_to: Option<Node<ConnectionEnd>>,
     /// Additional ends beyond `connect_from`/`connect_to`, from the n-ary
     /// `connect (a, b, c, ...)` form. Always empty when `connect_from` is `None`.
     pub connect_extra_ends: Vec<Node<ConnectionEnd>>,
     pub body: ConnectionDefBody,
-    pub subsets: Option<Node<SubsettingRelationship>>,
-    pub redefines: Option<Node<SubsettingRelationship>>,
-    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
-    /// [`crate::ast::MembershipKind::FeatureMembership`]. See [`PortDef::membership`] for the
-    /// same "genuine new grammar coverage, not just discarded data" rationale --
-    /// `connection_usage_member` did not previously accept a visibility prefix either.
+    /// Ownership/visibility/kind wrapper, `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`].
     pub membership: Membership,
-    /// `true` when the member was declared as `ref connection ...` (a reference connection
-    /// usage) rather than a plain `connection ...` usage. See `unsupported_part_member`'s former
-    /// `ReferenceConnectionUsage` short-circuit in `src/parser/part/body.rs`, now folded into
-    /// `connection_usage_member_inner`.
-    pub by_reference: bool,
 }
 
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
@@ -830,14 +849,14 @@ pub enum PartUsageBodyElement {
     PortDef(Node<PortDef>),
     /// `calc def` nested inside a part usage body, using `calc_def_required`. See `StateDef`.
     CalcDef(Node<crate::ast::view::CalcDef>),
-    /// `connection def` nested inside a part usage body, using `connection_def_required`. See
+    /// `connection def` nested inside a part usage body, using `connection_def`. See
     /// `StateDef`.
     ConnectionDef(Node<ConnectionDef>),
     /// `enum def` nested inside a part usage body. See `StateDef`.
     EnumDef(Node<EnumDef>),
     /// `connection` usage member inside a part usage body (previously only reachable from part
     /// definition bodies; see `PartDefBodyElement::Connection`).
-    Connection(Node<ConnectionUsageMember>),
+    Connection(Box<Node<ConnectionUsageMember>>),
     /// `assert (not)? constraint { ... }` inside a part usage body (previously only reachable
     /// from part definition and occurrence definition bodies; see
     /// `PartDefBodyElement::AssertConstraint`).
@@ -1470,11 +1489,14 @@ pub struct EndDecl {
     /// therefore what lets a semantic layer report those rules against authored text rather than
     /// treating them as unreachable.
     pub ref_prefix: crate::ast::RefPrefix,
+    /// `UsageExtensionKeyword*` after the prefix, in authored order: `#original` in `end #original
+    /// r1 : Req1;` and `end #derive ::> DerivedReq;` (`ExtendedUsage = UnextendedUsagePrefix
+    /// UsageExtensionKeyword+ Usage`, SysML BNF 1699). Prefix metadata, not a name.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
     /// `Bare`, source-backed `ref`, or source-backed KerML `feature` immediately after `end`.
     pub introducer: EndDeclIntroducer,
     pub short_name: Option<DeclarationName>,
-    /// A normal declared name or a fixed derivation-end role. `#original`/`#derive` are grammar
-    /// roles, not declaration labels.
+    /// The end's declared name, or none (`end : T;`, `end #derive ::> R;`).
     pub identity: EndIdentity,
     /// Structured typing for the `: Type` form. A reference-only end has no typing and stores its
     /// target in `references`.
@@ -1510,23 +1532,12 @@ pub enum EndIdentity {
     Anonymous,
     /// Ordinary declaration label with its authored token span.
     Declaration(DeclarationName),
-    /// Fixed derivation role with its authored `#...` token span.
-    Derivation(Node<DerivationEndRole>),
-}
-
-/// Fixed roles inside a `#derivation connection` body.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DerivationEndRole {
-    /// The `#original` end.
-    Original,
-    /// The `#derive` end.
-    Derive,
 }
 
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
         self.ref_prefix == other.ref_prefix
+            && self.extension_keywords == other.extension_keywords
             && self.introducer == other.introducer
             && self.short_name == other.short_name
             && self.identity == other.identity
@@ -1701,14 +1712,8 @@ pub enum RelationshipBodyElement {
 // Connection (Phase 2)
 // ---------------------------------------------------------------------------
 
-/// Connection definition: `connection def` Identification body (BNF ConnectionDefinition).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DerivationConnectionRole {
-    /// The fixed `#derivation` grammar marker.
-    Derivation,
-}
-
+/// Connection definition (BNF `ConnectionDefinition = OccurrenceDefinitionPrefix 'connection' 'def'
+/// Definition`, clause 8.2.2.13).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
@@ -1716,14 +1721,16 @@ pub struct ConnectionDef {
     /// `individual connection def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix
     /// `isIndividual`, GH-90.1), mirroring `ActionDef::is_individual`.
     pub is_individual: bool,
-    /// Fixed derivation role and exact marker span. Ordinary connections have no role.
-    pub derivation_role: Option<Node<DerivationConnectionRole>>,
+    /// `OccurrenceDefinitionPrefix`'s `DefinitionExtensionKeyword*` (`#derivation`,
+    /// `#multicausation`), in authored order. Each is a `PrefixMetadataMember` -- `'#'` and the
+    /// qualified name of a metadata definition -- so no marker is a fixed grammar role.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConnectionDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::OwningMembership`]. Like `PartDef`/`PortDef`/`ItemDef`,
-    /// `connection_def`/`connection_def_required` did not previously accept a visibility prefix
+    /// `connection_def`/`connection_def` did not previously accept a visibility prefix
     /// at all -- confirmed as a genuine parsing gap the same way. See
     /// `connection::parse_connection_def`.
     pub membership: Membership,

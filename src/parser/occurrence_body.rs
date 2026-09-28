@@ -492,6 +492,14 @@ pub(crate) fn occurrence_body_element(
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
     if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        // `ConnectionUsage` owns its `#tag` and `ref` prefixes; see
+        // `planning/connection-usage-prefix-matrix.md`.
+        if crate::parser::occurrence_prefix::kind_keyword_follows(start, b"connection") {
+            if let Ok((next, usage)) = crate::parser::part::connection_usage_member(start) {
+                let elem = OccurrenceBodyElement::ConnectionUsage(Box::new(usage));
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+        }
         if let Ok((next, usage)) = occurrence_usage(start) {
             let elem = OccurrenceBodyElement::OccurrenceUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
@@ -548,7 +556,7 @@ pub(crate) fn occurrence_body_element(
         map(satisfy, |n| OccurrenceBodyElement::Satisfy(Box::new(n))),
         // Allocation / connection ends in structured definition bodies (`allocation def { end …; }`).
         map(
-            |i| crate::parser::connector::end_decl(i, true),
+            crate::parser::connector::end_decl,
             OccurrenceBodyElement::EndDecl,
         ),
         // §6 G17: a nested `allocate` decomposing the enclosing allocation usage.
