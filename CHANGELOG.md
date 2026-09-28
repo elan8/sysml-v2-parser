@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A syntax error inside an action or definition body no longer hides later diagnostics in
+  that body.** Member recovery resyncs at the next `;`, the next member keyword, or the closing
+  `}`, so a second `return` and a following sibling are both reported ([#141](https://github.com/elan8/sysml-v2-parser/issues/141)).
+  `return` in an action body now suggests a calculation-family body or an `out` parameter.
+  A name the lexer split into a number plus an identifier tail (`part def 4WheelDrive`) is
+  reported as `invalid_identifier`, with a single-quote suggestion, instead of a missing `;`/`{`.
+
 - **Parsing the SysML v2 spec's own `Vehicle Example/VehicleIndividuals.sysml` example could
   still crash the process with a stack overflow** on a 2 MiB thread in a debug build. The file
   is only 6 levels deep. The cost is an `individual` redefinition header

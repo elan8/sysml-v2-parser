@@ -1128,7 +1128,33 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
         match byte {
             b'{' => brace_depth += 1,
             b'}' if brace_depth == 0 => break,
-            b'}' => brace_depth -= 1,
+            b'}' => {
+                brace_depth -= 1;
+                // A `}` that closes this member's own block (`objective fuelEconomy { }`) is the
+                // member boundary. Continuing on to the next depth-0 `;` would swallow the
+                // following member (`return result : Real;`).
+                if brace_depth == 0 {
+                    let (next, _) =
+                        nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos + 1)
+                            .parse(input)
+                            .ok()?;
+                    if next.location_offset() != input.location_offset() {
+                        return Some(next);
+                    }
+                }
+            }
+            b';' if brace_depth == 0 => {
+                // End of this statement. Stopping here lets the next member — including another
+                // unrecognized `return` — be diagnosed on its own instead of being folded into
+                // this recovery span up to the closing `}`.
+                let (next, _) =
+                    nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos + 1)
+                        .parse(input)
+                        .ok()?;
+                if next.location_offset() != input.location_offset() {
+                    return Some(next);
+                }
+            }
             _ => {}
         }
         pos += 1;

@@ -322,7 +322,6 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
         "recovered_part_usage_body_element",
         part_usage_body_element,
         part_usage_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )?;
     log::debug!(
         "part_usage_body: brace ok, {} elements",
@@ -372,7 +371,6 @@ pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
                 PartUsageBodyElement::Error(node_from_to(start, end, recovery)),
             )
         },
-        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -387,7 +385,6 @@ fn consume_part_usage_structured_brace(
         "recovered_part_usage_body_element",
         part_usage_body_element,
         part_usage_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )
 }
 
@@ -943,7 +940,6 @@ fn interface_usage_body(
         "recovered_interface_usage_body_element",
         interface_usage_body_element,
         interface_usage_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

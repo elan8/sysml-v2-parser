@@ -113,7 +113,6 @@ fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
         "recovered_port_body_element",
         port_body_element,
         port_body_recovery,
-        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -397,7 +396,6 @@ fn port_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
         "recovered_port_def_body_element",
         port_def_body_element,
         port_def_body_recovery,
-        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

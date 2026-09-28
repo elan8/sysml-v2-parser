@@ -138,7 +138,6 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
         "recovered_connection_def_body_element",
         connection_def_body_element,
         connection_def_body_recovery,
-        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

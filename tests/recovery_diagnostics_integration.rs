@@ -1159,6 +1159,176 @@ fn connection_def_body_recovery_diagnostics_reach_parse_with_diagnostics() {
     );
 }
 
+const RETURN_IN_ACTION_HINT: &str = "`return` parameters are only allowed in calculation-family bodies (`calc`/`constraint`/`requirement`/`case`); use an `out` parameter.";
+
+fn diagnostic_summary(result: &sysml_v2_parser::ParseResult) -> Vec<String> {
+    result
+        .errors
+        .iter()
+        .map(|error| {
+            format!(
+                "{}:{} {} code={:?} suggestion={:?}",
+                error.line.unwrap_or(0),
+                error.column.unwrap_or(0),
+                error.message,
+                error.code,
+                error.suggestion
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn gh141_action_body_error_keeps_enclosing_sibling_diagnostic() {
+    let input = "\
+package V {
+    part def Car {
+        action a {
+            return x : ScalarValues::Real;
+        }
+        part def 9Lives;
+    }
+}
+";
+    let result = parse_with_diagnostics(input);
+    let summary = diagnostic_summary(&result);
+    assert!(
+        result.errors.iter().any(|error| {
+            error.line == Some(4)
+                && error.code.as_deref() == Some("unexpected_keyword_in_scope")
+                && error
+                    .message
+                    .contains("unexpected keyword `return` in action body")
+                && error.suggestion.as_deref() == Some(RETURN_IN_ACTION_HINT)
+        }),
+        "return in an action body should explain the legal scopes: {summary:?}"
+    );
+    assert!(
+        result.errors.iter().any(|error| {
+            error.line == Some(6)
+                && error.code.as_deref() == Some("invalid_identifier")
+                && error.message.contains("invalid identifier '9Lives'")
+                && error.message.contains("single-quoted ('9Lives')")
+        }),
+        "the sibling digit-leading name must still be reported: {summary:?}"
+    );
+}
+
+#[test]
+fn gh141_repeated_return_in_action_bodies_are_all_reported() {
+    let input = "\
+package V {
+    part def Calc {
+        action a {
+            return x : ScalarValues::Real;
+            return y : ScalarValues::Real;
+        }
+        action b { return z : ScalarValues::Real; }
+    }
+}
+";
+    let result = parse_with_diagnostics(input);
+    let returns: Vec<_> = result
+        .errors
+        .iter()
+        .filter(|error| {
+            error.code.as_deref() == Some("unexpected_keyword_in_scope")
+                && error.message.contains("`return`")
+        })
+        .collect();
+    assert_eq!(
+        returns.len(),
+        3,
+        "each return is its own diagnostic: {}",
+        diagnostic_summary(&result).join("\n")
+    );
+    assert!(
+        returns
+            .iter()
+            .all(|error| error.suggestion.as_deref() == Some(RETURN_IN_ACTION_HINT)),
+        "every return hint should name the calculation-family bodies"
+    );
+    let lines: Vec<_> = returns.iter().map(|error| error.line).collect();
+    assert_eq!(lines, vec![Some(4), Some(5), Some(7)]);
+}
+
+#[test]
+fn gh141_action_body_without_semicolon_still_reaches_the_next_member() {
+    let input = "\
+package V {
+    part def Car {
+        action a {
+            return x : ScalarValues::Real
+            part def 9Lives;
+        }
+    }
+}
+";
+    let result = parse_with_diagnostics(input);
+    let summary = diagnostic_summary(&result);
+    assert!(
+        result.errors.iter().any(|error| {
+            error.code.as_deref() == Some("unexpected_keyword_in_scope")
+                && error.message.contains("`return`")
+        }),
+        "the return is still diagnosed: {summary:?}"
+    );
+    assert!(
+        result.errors.iter().any(|error| {
+            error.code.as_deref() == Some("invalid_identifier")
+                && error.message.contains("'9Lives'")
+        }),
+        "the following member is not swallowed by the return recovery: {summary:?}"
+    );
+}
+
+#[test]
+fn gh141_digit_leading_identifier_suggests_quoting() {
+    let input = "part def 4WheelDrive { }\n";
+    let result = parse_with_diagnostics(input);
+    let summary = diagnostic_summary(&result);
+    assert!(
+        result.errors.iter().any(|error| {
+            error.code.as_deref() == Some("invalid_identifier")
+                && error.message.contains("invalid identifier '4WheelDrive'")
+                && error.suggestion.as_deref() == Some("Quote the name: '4WheelDrive'.")
+        }),
+        "digit-leading names are identifiers, not a missing body terminator: {summary:?}"
+    );
+    assert!(
+        result.errors.iter().all(|error| error.code.as_deref()
+            != Some("missing_body_or_semicolon")
+            && error.code.as_deref() != Some("expected_keyword")),
+        "the old header/keyword diagnostics must not hide the name: {summary:?}"
+    );
+}
+
+#[test]
+fn gh141_quoted_digit_leading_name_and_calc_return_stay_valid() {
+    let quoted = "part def '4WheelDrive' { }\n";
+    let quoted_result = parse_with_diagnostics(quoted);
+    assert!(
+        quoted_result.errors.is_empty(),
+        "a single-quoted digit-leading name is legal: {}",
+        diagnostic_summary(&quoted_result).join("\n")
+    );
+
+    let calc = "\
+package P {
+  calc def CalcActualRPM {
+    in rotationLevel : Real;
+    return outSpeed : Real;
+  }
+}
+";
+    let calc_result = parse_with_diagnostics(calc);
+    assert!(
+        calc_result.errors.is_empty(),
+        "return stays legal in a calc body: {}",
+        diagnostic_summary(&calc_result).join("\n")
+    );
+}
+
 #[test]
 fn valid_interface_def_body_still_parses_without_diagnostics() {
     // No regression: the interface_def_body recovery-machinery change must not affect legitimate
