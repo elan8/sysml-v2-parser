@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `Cause and Effect Examples/MedicalDeviceFailure.sysml` now round-trips.
   - See `planning/connection-usage-prefix-matrix.md`.
 
+- Preserve the distinction between a `render` reference and an inline `render rendering`
+  declaration in `ViewRenderingUsage`, including a source-backed qualified reference target.
+  `PARSE_AST_VERSION` is now 260.
+
 ### Fixed
 
 - **A syntax error inside an action or definition body no longer hides later diagnostics in
