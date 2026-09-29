@@ -79,7 +79,6 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
         "recovered_part_def_body_element",
         try_part_def_body_element,
         part_def_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

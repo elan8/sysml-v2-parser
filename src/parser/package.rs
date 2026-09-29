@@ -1451,7 +1451,8 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 );
                 if matches!(
                     recovery.code.as_str(),
-                    "invalid_typing_operator"
+                    "invalid_identifier"
+                        | "invalid_typing_operator"
                         | "missing_body_or_semicolon"
                         | "missing_expression_after_operator"
                         | "unexpected_keyword_in_scope"
@@ -2576,6 +2577,19 @@ pub(crate) fn package_body_element(
                 "package body",
                 "recovered_package_body_element",
             );
+            if recovery.code == "invalid_identifier" {
+                // Keep the targeted diagnostic on the member. Returning `Err` here drops it, and
+                // the root/package fallback then reports a generic expected-keyword error while
+                // `extended_library_decl` can swallow the declaration with no diagnostic at all.
+                return Ok((
+                    next,
+                    Box::new(node_from_to(
+                        input,
+                        next,
+                        PackageBodyElement::Error(node_from_to(input, next, recovery)),
+                    )),
+                ));
+            }
             if matches!(
                 recovery.code.as_str(),
                 "invalid_typing_operator"

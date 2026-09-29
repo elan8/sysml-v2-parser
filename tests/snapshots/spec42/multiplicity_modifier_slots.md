@@ -26,8 +26,8 @@ package MultiplicityModifiers {
   (document "multiplicity_modifier_slots.md"
     (diagnostics
       (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 444) (line 10) (column 5) (len 46)) (message "the spec-valid extended-library declaration production is retained but not structurally implemented"))
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 495) (line 11) (column 5) (len 48)) (message "unrecognized declaration `readonly` in package body"))
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 579) (line 13) (column 5) (len 48)) (message "unrecognized declaration `variable` in package body"))
+      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 495) (line 11) (column 5) (len 43)) (message "unrecognized declaration `readonly` in package body"))
+      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 579) (line 13) (column 5) (len 43)) (message "unrecognized declaration `variable` in package body"))
     )
   )
 )
@@ -55,6 +55,6 @@ package MultiplicityModifiers {
 (parsed-document
   (references
   )
-  (root (package (name "MultiplicityModifiers") (body brace (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (extended-library-declaration) (malformed (code "unrecognized_declaration_in_scope") (found "readonly attribute rejectedReadonly : Real;") (span (offset 495) (line 11) (column 5) (len 48))) (attribute-usage) (malformed (code "unrecognized_declaration_in_scope") (found "variable attribute rejectedVariable : Real;") (span (offset 579) (line 13) (column 5) (len 48))) (attribute-usage))))
+  (root (package (name "MultiplicityModifiers") (body brace (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (extended-library-declaration) (malformed (code "unrecognized_declaration_in_scope") (found "readonly attribute rejectedReadonly : Real;") (span (offset 495) (line 11) (column 5) (len 43))) (attribute-usage) (malformed (code "unrecognized_declaration_in_scope") (found "variable attribute rejectedVariable : Real;") (span (offset 579) (line 13) (column 5) (len 43))) (attribute-usage))))
 )
 ~~~

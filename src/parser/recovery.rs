@@ -2,11 +2,12 @@
 
 use super::diagnostics::{
     bare_comma_sequence_diagnostic, category_from_code, invalid_bare_identifier_in_body_diagnostic,
-    invalid_bracket_expression_diagnostic, invalid_end_feature_prefix_diagnostic,
-    invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
-    missing_expression_after_operator_diagnostic, missing_semicolon_or_body_diagnostic,
-    missing_type_diagnostic, trim_ascii_end, trim_ascii_start,
-    unexpected_keyword_in_scope_diagnostic, verify_requirement_bare_reference_diagnostic,
+    invalid_bracket_expression_diagnostic, invalid_digit_leading_identifier_diagnostic,
+    invalid_end_feature_prefix_diagnostic, invalid_expose_separator_diagnostic,
+    invalid_typing_operator_diagnostic, missing_expression_after_operator_diagnostic,
+    missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
+    trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
+    verify_requirement_bare_reference_diagnostic,
 };
 use super::lex;
 use super::Input;
@@ -111,6 +112,12 @@ enum RecoveryClassification {
         suggestion: String,
     },
     InvalidBareIdentifierInBody {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
+    InvalidIdentifier {
         code: String,
         message: String,
         expected: String,
@@ -231,6 +238,19 @@ fn classify_recovery(
         invalid_bracket_expression_diagnostic(trimmed)
     {
         return RecoveryClassification::InvalidBracketExpression {
+            code: code.to_string(),
+            message,
+            expected,
+            suggestion,
+        };
+    }
+
+    // Ahead of `missing_body_or_semicolon`: `part def 4WheelDrive` fails the name parse, and the
+    // header-terminator diagnostic hides the digit the lexer already consumed.
+    if let Some((code, message, expected, suggestion)) =
+        invalid_digit_leading_identifier_diagnostic(trimmed)
+    {
+        return RecoveryClassification::InvalidIdentifier {
             code: code.to_string(),
             message,
             expected,
@@ -388,6 +408,12 @@ pub(crate) fn build_recovery_error_node_from_span(
             suggestion,
         }
         | RecoveryClassification::InvalidBareIdentifierInBody {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
+        | RecoveryClassification::InvalidIdentifier {
             code,
             message,
             expected,

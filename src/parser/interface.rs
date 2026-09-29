@@ -127,7 +127,6 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
         "recovered_interface_def_body_element",
         interface_def_body_element,
         interface_def_body_recovery,
-        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

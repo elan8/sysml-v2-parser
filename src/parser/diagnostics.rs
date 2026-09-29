@@ -78,6 +78,32 @@ pub(crate) fn nom_err_to_parse_error(
     let line = e.input.location_line();
     let column = crate::parser::span::column_of(&e.input);
     let fragment = e.input.fragment();
+    if let Some((rel, token)) = find_digit_leading_identifier(fragment) {
+        use nom::Parser as _;
+        let at_token = nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(rel)
+            .parse(e.input)
+            .map(|(rest, _)| rest)
+            .unwrap_or(e.input);
+        let text = String::from_utf8_lossy(token);
+        let (code, message, expected, suggestion) = digit_leading_identifier_parts(&text);
+        let (found_snippet, _) = fragment_to_found_snippet(fragment);
+        let mut pe = ParseError::new(message)
+            .with_location(
+                at_token.location_offset(),
+                at_token.location_line(),
+                crate::parser::span::column_of(&at_token),
+            )
+            .with_length(token.len().max(1))
+            .with_code(code)
+            .with_expected(expected)
+            .with_suggestion(suggestion)
+            .with_severity(DiagnosticSeverity::Error)
+            .with_category(DiagnosticCategory::ParseError);
+        if !found_snippet.is_empty() {
+            pe = pe.with_found(found_snippet);
+        }
+        return pe;
+    }
     let (found_snippet, found_len) = fragment_to_found_snippet(fragment);
     let message = nom_error_kind_to_message(&e.code).to_string();
     let span_len = length_override.unwrap_or(found_len).max(1);
@@ -865,6 +891,158 @@ pub(crate) fn invalid_bracket_expression_diagnostic(
     None
 }
 
+/// `ReturnParameterMember` is a calculation-body member (`calc`, `constraint`, `requirement`,
+/// `case`), not an action-body member. A scope label that names one of those families is not
+/// told to move its `return`.
+fn return_parameter_scope(scope_label: &str) -> bool {
+    scope_label.contains("calc")
+        || scope_label.contains("constraint")
+        || scope_label.contains("requirement")
+        || scope_label.contains("case")
+        || scope_label.contains("return")
+}
+
+fn is_name_continue(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+/// Length of a complete numeric literal at `fragment`, using the same mantissa/exponent rules as
+/// expression literals. `None` when the spelling is not a finished number (for example an `e`
+/// with no exponent digits).
+fn complete_numeric_literal_len(fragment: &[u8]) -> Option<usize> {
+    if fragment.first().is_none_or(|byte| !byte.is_ascii_digit()) {
+        return None;
+    }
+    let mut index = 0usize;
+    while index < fragment.len() && fragment[index].is_ascii_digit() {
+        index += 1;
+    }
+    if index + 1 < fragment.len() && fragment[index] == b'.' && fragment[index + 1].is_ascii_digit()
+    {
+        index += 1;
+        while index < fragment.len() && fragment[index].is_ascii_digit() {
+            index += 1;
+        }
+    }
+    if index < fragment.len() && matches!(fragment[index], b'e' | b'E') {
+        let mut exponent = index + 1;
+        if exponent < fragment.len() && matches!(fragment[exponent], b'+' | b'-') {
+            exponent += 1;
+        }
+        let exponent_start = exponent;
+        while exponent < fragment.len() && fragment[exponent].is_ascii_digit() {
+            exponent += 1;
+        }
+        if exponent == exponent_start {
+            return None;
+        }
+        index = exponent;
+    }
+    Some(index)
+}
+
+/// Bytes of a declaration header: everything before the first name-ending `:`, `=`, `{`, or `;`.
+///
+/// A digit-leading name is a header problem (`part def 4WheelDrive`). Scanning past `{` would
+/// also see numeric text inside a body that failed for a different reason.
+fn declaration_header_bytes(mut fragment: &[u8]) -> &[u8] {
+    fragment = trim_ascii_start(fragment);
+    let mut index = 0usize;
+    let mut quoted = false;
+    while index < fragment.len() {
+        if !quoted && (fragment[index..].starts_with(b"//") || fragment[index..].starts_with(b"/*"))
+        {
+            break;
+        }
+        let byte = fragment[index];
+        if byte == b'\'' {
+            quoted = !quoted;
+            index += 1;
+            continue;
+        }
+        if !quoted && matches!(byte, b'{' | b'=' | b';' | b':') {
+            break;
+        }
+        index += 1;
+    }
+    &fragment[..index]
+}
+
+/// A name the lexer split into a number plus a glued identifier tail (`4` + `WheelDrive`).
+///
+/// Returns the token and its byte offset within `fragment`. Quoted names are skipped: `'4Wheel'`
+/// is a legal unrestricted name.
+fn find_digit_leading_identifier(fragment: &[u8]) -> Option<(usize, &[u8])> {
+    let trimmed_len = fragment.len() - trim_ascii_start(fragment).len();
+    let header = declaration_header_bytes(fragment);
+    let mut index = 0usize;
+    while index < header.len() {
+        if header[index] == b'\'' {
+            index += 1;
+            while index < header.len() {
+                if header[index] == b'\\' && header.get(index + 1) == Some(&b'\'') {
+                    index += 2;
+                    continue;
+                }
+                if header[index] == b'\'' {
+                    index += 1;
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        if header[index].is_ascii_digit() {
+            let start = index;
+            if let Some(numeric_len) = complete_numeric_literal_len(&header[index..]) {
+                let after = index + numeric_len;
+                if header
+                    .get(after)
+                    .is_some_and(|byte| is_name_continue(*byte))
+                {
+                    let mut end = after;
+                    while header.get(end).is_some_and(|byte| is_name_continue(*byte)) {
+                        end += 1;
+                    }
+                    return Some((trimmed_len + start, &header[start..end]));
+                }
+                index = after;
+                continue;
+            }
+        }
+        if is_name_continue(header[index]) {
+            while header
+                .get(index)
+                .is_some_and(|byte| is_name_continue(*byte))
+            {
+                index += 1;
+            }
+            continue;
+        }
+        index += 1;
+    }
+    None
+}
+
+fn digit_leading_identifier_parts(text: &str) -> (&'static str, String, String, String) {
+    (
+        "invalid_identifier",
+        format!(
+            "invalid identifier '{text}': names must start with a letter or '_', or be single-quoted ('{text}')"
+        ),
+        "a name starting with a letter or '_', or a single-quoted name".to_string(),
+        format!("Quote the name: '{text}'."),
+    )
+}
+
+pub(crate) fn invalid_digit_leading_identifier_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    let (_, token) = find_digit_leading_identifier(fragment)?;
+    let text = String::from_utf8_lossy(token);
+    Some(digit_leading_identifier_parts(&text))
+}
+
 pub(crate) fn unexpected_keyword_in_scope_diagnostic(
     fragment: &[u8],
     starters: &[&[u8]],
@@ -889,11 +1067,18 @@ pub(crate) fn unexpected_keyword_in_scope_diagnostic(
     if lex::is_reserved_keyword(keyword) {
         // A real SysML keyword used somewhere it isn't valid in this scope -- a grammar-context
         // mismatch, so "unexpected keyword" is accurate.
+        let suggestion = if keyword == b"return" && !return_parameter_scope(scope_label) {
+            // `ReturnParameterMember` belongs to `CalculationBodyItem`, not `ActionBodyItem`.
+            // The generic "replace this keyword" hint does not say where `return` is legal.
+            "`return` parameters are only allowed in calculation-family bodies (`calc`/`constraint`/`requirement`/`case`); use an `out` parameter.".to_string()
+        } else {
+            format!("Replace `{keyword_text}` with a valid {scope_label} member or remove it.")
+        };
         Some((
             "unexpected_keyword_in_scope",
             format!("unexpected keyword `{keyword_text}` in {scope_label}"),
             format!("valid {scope_label} element"),
-            format!("Replace `{keyword_text}` with a valid {scope_label} member or remove it."),
+            suggestion,
         ))
     } else {
         // Not a SysML keyword at all -- an unrecognized identifier is an input defect, not a
@@ -1093,6 +1278,7 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("missing_closing_brace")
         | Some("unsupported_annotation_syntax")
         | Some("malformed_annotation_head")
+        | Some("invalid_identifier")
         | Some("invalid_bare_identifier_in_action_body")
         | Some("invalid_bare_identifier_in_state_body")
         | Some("recovery_cascade_suppressed")
