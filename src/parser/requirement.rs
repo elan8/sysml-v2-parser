@@ -8,7 +8,6 @@ use crate::ast::{
 use crate::parser::attribute::{attribute_def, attribute_usage, redefinition_feature_binding};
 use crate::parser::body::{
     parse_structured_brace_members_with_skip, semicolon_or_structured_definition_body,
-    BraceMemberSkip,
 };
 use crate::parser::constraint::{constraint_def_body, constraint_usage};
 use crate::parser::definition_header::parse_feature_usage_header;
@@ -140,7 +139,6 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
         // malformed member with no terminator of its own would otherwise borrow from the valid
         // member after it. The part definition and usage bodies already recover this way; it
         // matters here too because a `SatisfyRequirementUsage` owns a `RequirementBody`.
-        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

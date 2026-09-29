@@ -1128,7 +1128,47 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
         match byte {
             b'{' => brace_depth += 1,
             b'}' if brace_depth == 0 => break,
-            b'}' => brace_depth -= 1,
+            b'}' => {
+                brace_depth -= 1;
+                // A `}` that closes a block opened inside this member is a boundary when another
+                // member follows (`objective fuelEconomy { } return result : Real;`). It is not a
+                // boundary when the statement continues (`import Broken[items->select { ... }];`).
+                // When nothing follows, the `}` belongs to the enclosing body — consuming it makes
+                // that body look unclosed and the root recovery replaces the whole declaration.
+                if brace_depth == 0 {
+                    let (after_brace, _) =
+                        nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos + 1)
+                            .parse(input)
+                            .ok()?;
+                    let (after_ws, _) = ws_and_comments(after_brace).unwrap_or((after_brace, ()));
+                    let following = after_ws.fragment();
+                    if following.starts_with(b"}") || starts_with_any_keyword(following, starters) {
+                        if after_brace.location_offset() != input.location_offset() {
+                            return Some(after_brace);
+                        }
+                    } else if following.is_empty() {
+                        let (at_brace, _) =
+                            nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos)
+                                .parse(input)
+                                .ok()?;
+                        if at_brace.location_offset() != input.location_offset() {
+                            return Some(at_brace);
+                        }
+                    }
+                }
+            }
+            b';' if brace_depth == 0 => {
+                // End of this statement. Stopping here lets the next member — including another
+                // unrecognized `return` — be diagnosed on its own instead of being folded into
+                // this recovery span up to the closing `}`.
+                let (next, _) =
+                    nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos + 1)
+                        .parse(input)
+                        .ok()?;
+                if next.location_offset() != input.location_offset() {
+                    return Some(next);
+                }
+            }
             _ => {}
         }
         pos += 1;

@@ -284,7 +284,8 @@ dispatches it:
 | `PartUsage` | 623 | package/namespace/root, `part def`, `part` usage, attribute/item, metadata, `perform`, `connection def`, occurrence, `use case def`, `calc def`, `action def`, `action` usage, `variant` | **migrated** — `planning/part-usage-prefix-matrix.md` |
 | `ConstraintUsage` | 1382 | package/namespace/root, `constraint def`/`constraint` usage body, `part def`, `part` usage, attribute/item/metadata, `requirement def` | **migrated** — `planning/constraint-usage-prefix-matrix.md` |
 | `PortUsage` | 645 | package/namespace/root, `part def`, `part` usage, `port def`, `port` usage, `interface def`, `connection def`, `requirement def`, `variant` | **migrated** — `planning/port-usage-prefix-matrix.md` |
-| `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
+| `ConnectionUsage` (`'connection' UsageDeclaration` alternative) | 668 | package/namespace/root, `part def`, `part` usage, occurrence body, attribute body | **migrated** — `planning/connection-usage-prefix-matrix.md` |
+| `ViewUsage`, `RenderingUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
 | `ActionUsage`, `CalculationUsage`, `StateUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode`, `ActionNodePrefix` | 938–1569 | various | deferred — §9 |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | 973–1010 | action bodies | **not this production** — `ControlNodePrefix` (§1.1) |
 
@@ -466,7 +467,7 @@ component this one defines:
 | --- | --- | --- |
 | `ActionUsage` | `is_abstract`, `is_variation`, `is_reference`, `is_individual` | spans, direction, `derived`, `constant`, `PortionKind`, extension keywords |
 | `StateUsage`, `CalcUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage` | varying subsets of `abstract`/`variation`/`ref`/`individual`/direction | spans, and the slots each does not carry |
-| `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `FlowUsage`, `Message`, `SuccessionFlowUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode` | little or none | the whole prefix |
+| `ViewUsage`, `RenderingUsage`, `InterfaceUsage`, `AllocationUsage`, `FlowUsage`, `Message`, `SuccessionFlowUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode` | little or none | the whole prefix |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | none | **`ControlNodePrefix`, not this production** — needs its own `RefPrefix`-rooted component, which §5.2's nesting already provides |
 
 ## 10. Coverage

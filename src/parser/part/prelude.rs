@@ -13,13 +13,13 @@ pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
 pub(crate) use crate::parser::attribute::{
     attribute_def, attribute_usage, default_reference_usage, redefinition_feature_binding,
 };
-pub(crate) use crate::parser::body::{parse_structured_brace_members_with_skip, BraceMemberSkip};
+pub(crate) use crate::parser::body::parse_structured_brace_members_with_skip;
 pub(crate) use crate::parser::build_recovery_error_node_from_span;
 pub(crate) use crate::parser::case::{
     analysis_case_def, analysis_case_usage, case_def, case_usage, verification_case_def,
     verification_case_usage,
 };
-pub(crate) use crate::parser::connection::connection_def_required;
+pub(crate) use crate::parser::connection::connection_def;
 pub(crate) use crate::parser::connection::connection_member_body;
 pub(crate) use crate::parser::connector::connect_ends;
 pub(crate) use crate::parser::constraint::calc_def_required;

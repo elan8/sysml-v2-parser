@@ -1451,7 +1451,8 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 );
                 if matches!(
                     recovery.code.as_str(),
-                    "invalid_typing_operator"
+                    "invalid_identifier"
+                        | "invalid_typing_operator"
                         | "missing_body_or_semicolon"
                         | "missing_expression_after_operator"
                         | "unexpected_keyword_in_scope"
@@ -1757,7 +1758,7 @@ fn try_package_body_structure<'a>(
         starter,
         Connection,
         crate::parser::part::connection_usage_member,
-        PackageBodyElement::ConnectionUsage
+        |usage| PackageBodyElement::ConnectionUsage(Box::new(usage))
     );
     // Standalone `connect a to b;` connector usage at package level (distinct from the
     // `connection <name> : Type` usage form above) -- see the OMG spec Annex `14c-Language
@@ -2351,6 +2352,31 @@ pub(crate) fn package_body_element(
     // general reference path before the analysis dispatcher. A failed attempt rolls its arena
     // work back and leaves the existing RefDecl priority untouched for every other `ref` kind.
     if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        // `ConnectionUsage`/`ConnectionDefinition` own their `#tag` and `ref` prefixes
+        // (`#derivation connection d { … }`, `#multicausation connection def M { … }`); see
+        // `planning/connection-usage-prefix-matrix.md`.
+        if crate::parser::occurrence_prefix::kind_keyword_follows(input, b"connection") {
+            if let Ok((next, def)) = connection_def(input) {
+                return Ok((
+                    next,
+                    Box::new(node_from_to(
+                        start,
+                        next,
+                        PackageBodyElement::ConnectionDef(def),
+                    )),
+                ));
+            }
+            if let Ok((next, usage)) = crate::parser::part::connection_usage_member(input) {
+                return Ok((
+                    next,
+                    Box::new(node_from_to(
+                        start,
+                        next,
+                        PackageBodyElement::ConnectionUsage(Box::new(usage)),
+                    )),
+                ));
+            }
+        }
         if let Ok((next, usage)) = analysis_case_usage(input) {
             return Ok((
                 next,
@@ -2551,6 +2577,19 @@ pub(crate) fn package_body_element(
                 "package body",
                 "recovered_package_body_element",
             );
+            if recovery.code == "invalid_identifier" {
+                // Keep the targeted diagnostic on the member. Returning `Err` here drops it, and
+                // the root/package fallback then reports a generic expected-keyword error while
+                // `extended_library_decl` can swallow the declaration with no diagnostic at all.
+                return Ok((
+                    next,
+                    Box::new(node_from_to(
+                        input,
+                        next,
+                        PackageBodyElement::Error(node_from_to(input, next, recovery)),
+                    )),
+                ));
+            }
             if matches!(
                 recovery.code.as_str(),
                 "invalid_typing_operator"
@@ -2762,7 +2801,7 @@ mod tests {
                 .map(|n| crate::parser::lex::name_bytes(source, n)),
             Some(&b"link"[..])
         );
-        assert!(usage.value.type_reference.is_some());
+        assert!(usage.value.typing.is_some());
         assert!(usage.value.connect_from.is_some());
         assert!(usage.value.connect_to.is_some());
         assert!(usage.value.connect_extra_ends.is_empty());
@@ -2789,18 +2828,20 @@ mod tests {
         assert!(matches!(node.value, PackageBodyElement::InterfaceUsage(_)));
     }
 
-    /// PAR-006b guard, exercised through the full package-body dispatch this time (not just
-    /// `connection_def` in isolation, as in `connection::par_006b_audit_tests`): the real
-    /// Systems-Library shape must still classify as `ConnectionDef`, not fall through to
-    /// `ConnectionUsage`, since it contains no `connect` keyword.
+    /// The Systems Library's `def`-less declaration, through the full package-body dispatch: a
+    /// `ConnectionUsage` keeping `abstract`, the multiplicity, `nonunique` and the `:>` clause.
     #[test]
-    fn package_body_still_accepts_bare_systems_library_connection_def_shape() {
+    fn package_body_parses_the_bare_systems_library_connection_as_a_usage() {
         let (rest, node) = package_body_element(parse_input(
             "abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { }",
         ))
-        .expect("bare Systems Library connection def");
+        .expect("bare Systems Library connection usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(matches!(node.value, PackageBodyElement::ConnectionDef(_)));
+        let PackageBodyElement::ConnectionUsage(usage) = node.value else {
+            panic!("expected ConnectionUsage, got {:?}", node.value);
+        };
+        assert!(usage.value.subsets.is_some());
+        assert!(usage.value.multiplicity_modifiers.uniqueness.is_some());
     }
 
     /// PAR-002 acceptance criterion, increment 3: the same legal `:>>`-prefixed attribute usage
@@ -2873,21 +2914,17 @@ mod package_metadata_and_connect_tests {
         assert!(matches!(node.value, PackageBodyElement::Connect(_)));
     }
 
-    /// Regression guard: `connection_def`'s fixed derivation-role prefix must still win over the
-    /// new bare
-    /// metadata-tag dispatch, or `#derivation connection { ... }` misparses into a stray tag
-    /// followed by an unannotated (and here invalid) `connection` declaration.
+    /// `#derivation connection { … }` is a `def`-less connection *usage* whose
+    /// `OccurrenceUsagePrefix` owns the `#derivation` extension keyword -- not a stray metadata
+    /// tag followed by a separate declaration, and not a definition.
     #[test]
-    fn package_body_prefers_typed_derivation_connection_role() {
+    fn package_body_keeps_a_derivation_connection_usage_with_its_prefix_metadata() {
         let (rest, node) = package_body_element(input("#derivation connection { end a; end b; }"))
-            .expect("connection def with hash annotation");
+            .expect("connection usage with hash annotation");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PackageBodyElement::ConnectionDef(conn) = node.value else {
-            panic!("expected ConnectionDef, got {:?}", node.value);
+        let PackageBodyElement::ConnectionUsage(usage) = node.value else {
+            panic!("expected ConnectionUsage, got {:?}", node.value);
         };
-        assert!(matches!(
-            conn.value.derivation_role.as_ref().map(|role| role.value),
-            Some(crate::ast::DerivationConnectionRole::Derivation)
-        ));
+        assert_eq!(usage.value.prefix.extension_keywords.len(), 1);
     }
 }

@@ -11,15 +11,15 @@ use std::io::Write as _;
 
 use super::{
     ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectionDefBody,
-    ConnectionDefBodyElement, DeclarationName, DerivationConnectionRole, DerivationEndRole,
-    EndDeclIntroducer, EndIdentity, Expression, FeatureValue, FeatureValueKind, FirstMergeBody,
-    FirstMergeBodyElement, ImportShape, ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody,
-    InterfaceDefBodyElement, Node, PackageBody, PackageBodyElement, ParsedDocument, PartDefBody,
-    PartDefBodyElement, PerformBody, PerformBodyElement, PortDefBody, PortDefBodyElement,
-    QualifiedReferenceId, ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement,
-    RootElement, Span, StateDefBody, StateDefBodyElement, StringLiteral, SubsettingKind,
-    SubsettingRelationship, TypeCheckKind, TypingKind, TypingRelationship, UseCaseDefBody,
-    UseCaseDefBodyElement, ViewBody, ViewBodyElement, Visibility,
+    ConnectionDefBodyElement, DeclarationName, EndDeclIntroducer, EndIdentity, Expression,
+    FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement, ImportShape,
+    ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement, Node,
+    PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody,
+    PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator,
+    RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
+    StateDefBodyElement, StringLiteral, SubsettingKind, SubsettingRelationship, TypeCheckKind,
+    TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
+    ViewBodyElement, Visibility,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -1736,8 +1736,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&usage.value)?;
                         }
-                        PartDefBodyElement::Connection(_connection) => {
-                            self.write_marker(&mut first, "connection")?;
+                        PartDefBodyElement::Connection(connection) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connection_usage(&connection.value)?;
                         }
                         PartDefBodyElement::Perform(perform) => {
                             self.write_item_prefix(&mut first)?;
@@ -3320,19 +3321,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             definition.definition_prefix.as_ref(),
             definition.is_individual,
         )?;
-        self.writer.write_str(") (role ")?;
-        if let Some(role) = &definition.derivation_role {
-            match role.value {
-                DerivationConnectionRole::Derivation => {
-                    self.writer.write_str("(derivation ")?;
-                    write_span(self.writer, &role.span)?;
-                    self.writer.write_char(')')?;
-                }
-            }
-        } else {
-            self.writer.write_str("ordinary")?;
-        }
-        self.writer.write_str(") (specializes ")?;
+        self.writer.write_str(")")?;
+        self.write_extension_keywords(&definition.extension_keywords)?;
+        self.writer.write_str(" (specializes ")?;
         if let Some(specializes) = &definition.specializes {
             self.write_typing(&specializes.value)?;
         } else {
@@ -4115,8 +4106,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::EnumDef(_member) => {
                             self.write_marker(&mut first, "enum-def")?;
                         }
-                        super::PartUsageBodyElement::Connection(_member) => {
-                            self.write_marker(&mut first, "connection")?;
+                        super::PartUsageBodyElement::Connection(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connection_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -4418,8 +4410,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::AttributeBodyElement::Bind(_member) => {
                 self.write_marker(first, "bind")?;
             }
-            super::AttributeBodyElement::Connection(_member) => {
-                self.write_marker(first, "connection")?;
+            super::AttributeBodyElement::Connection(member) => {
+                self.write_item_prefix(first)?;
+                self.write_connection_usage(&member.value)?;
             }
             super::AttributeBodyElement::CalcDef(_member) => {
                 self.write_marker(first, "calc-def")?;
@@ -4762,7 +4755,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')?;
             }
         }
-        self.writer.write_str(") (short-name ")?;
+        self.writer.write_str(")")?;
+        self.write_extension_keywords(&end.extension_keywords)?;
+        self.writer.write_str(" (short-name ")?;
         self.write_optional_name(end.short_name)?;
         self.writer.write_str(") (identity ")?;
         match &end.identity {
@@ -4772,16 +4767,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_name(*name)?;
                 self.writer.write_str(") ")?;
                 write_span(self.writer, name.span())?;
-                self.writer.write_char(')')?;
-            }
-            EndIdentity::Derivation(role) => {
-                self.writer.write_str("(derivation-role (kind ")?;
-                match role.value {
-                    DerivationEndRole::Original => self.writer.write_str("original")?,
-                    DerivationEndRole::Derive => self.writer.write_str("derive")?,
-                }
-                self.writer.write_str(") ")?;
-                write_span(self.writer, &role.span)?;
                 self.writer.write_char(')')?;
             }
         }
@@ -5347,8 +5332,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             super::OccurrenceBodyElement::Allocate(_) => self.write_marker(first, "allocate"),
             super::OccurrenceBodyElement::StateUsage(_) => self.write_marker(first, "state-usage"),
-            super::OccurrenceBodyElement::ConnectionUsage(_) => {
-                self.write_marker(first, "connection-usage")
+            super::OccurrenceBodyElement::ConnectionUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_connection_usage(&usage.value)
             }
         }
     }
@@ -6174,6 +6160,80 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     ///
     /// Every scope that owns a `PortUsage` routes through here, so the same syntax projects the
     /// same way wherever it is written; three of the nine used to write a bare marker instead.
+    /// A `'#' QualifiedName` run owned by a definition or end declaration, as ` (extensions …)`.
+    fn write_extension_keywords(
+        &mut self,
+        keywords: &[super::Node<super::UsageExtensionKeyword>],
+    ) -> io::Result<()> {
+        self.writer.write_str(" (extensions")?;
+        for keyword in keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_char(')')
+    }
+
+    /// `ConnectionUsage`'s `'connection' UsageDeclaration` alternative.
+    fn write_connection_usage(&mut self, usage: &super::ConnectionUsageMember) -> io::Result<()> {
+        self.writer.write_str("(connection-usage ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (declaration-name ")?;
+        self.write_usage_declaration_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_str(" (subsets ")?;
+        if let Some((subsets, value)) = &usage.subsets {
+            self.writer.write_str("(clause ")?;
+            self.write_subsetting(&subsets.value)?;
+            self.writer.write_str(" (value ")?;
+            if let Some(value) = value {
+                self.write_expression(value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", usage.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("intersects", usage.intersects.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (connect")?;
+        for end in usage
+            .connect_from
+            .iter()
+            .chain(usage.connect_to.iter())
+            .chain(usage.connect_extra_ends.iter())
+        {
+            self.writer.write_char(' ')?;
+            self.write_connection_end(&end.value)?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_connection_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_port_usage_member(
         &mut self,
         first: &mut bool,
@@ -6670,8 +6730,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::PortUsage(usage) => {
                 self.write_port_usage_member(first, &usage.value)
             }
-            PackageBodyElement::ConnectionUsage(_usage) => {
-                self.write_marker(first, "connection-usage")
+            PackageBodyElement::ConnectionUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_connection_usage(&usage.value)
             }
             PackageBodyElement::InterfaceUsage(usage) => {
                 self.write_item_prefix(first)?;

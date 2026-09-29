@@ -322,7 +322,6 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
         "recovered_part_usage_body_element",
         part_usage_body_element,
         part_usage_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )?;
     log::debug!(
         "part_usage_body: brace ok, {} elements",
@@ -372,7 +371,6 @@ pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
                 PartUsageBodyElement::Error(node_from_to(start, end, recovery)),
             )
         },
-        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -387,7 +385,6 @@ fn consume_part_usage_structured_brace(
         "recovered_part_usage_body_element",
         part_usage_body_element,
         part_usage_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )
 }
 
@@ -895,7 +892,7 @@ fn interface_usage_annotating(
 // GH-85: interfaces don't allow the `#name` derived-end-name form (same as
 // `interface_def_body_element`'s `end_decl` call -- see `connector::end_decl`'s doc comment).
 fn interface_usage_end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::EndDecl>> {
-    crate::parser::connector::end_decl(input, false)
+    crate::parser::connector::end_decl(input)
 }
 
 fn interface_usage_ref_redef(
@@ -943,7 +940,6 @@ fn interface_usage_body(
         "recovered_interface_usage_body_element",
         interface_usage_body_element,
         interface_usage_body_recovery,
-        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -1539,6 +1535,18 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
     if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        // `ConnectionUsage`/`ConnectionDefinition` own their `#tag` and `ref` prefixes too; see
+        // `planning/connection-usage-prefix-matrix.md`.
+        if crate::parser::occurrence_prefix::kind_keyword_follows(start, b"connection") {
+            if let Ok((next, def)) = connection_def(start) {
+                let elem = PartUsageBodyElement::ConnectionDef(def);
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+            if let Ok((next, usage)) = connection_usage_member(start) {
+                let elem = PartUsageBodyElement::Connection(Box::new(usage));
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+        }
         if let Ok((next, usage)) = occurrence_usage(start) {
             let elem = PartUsageBodyElement::OccurrenceUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
@@ -1586,7 +1594,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                     PartUsageBodyElement::InOutDecl,
                 ),
                 map(
-                    |i| crate::parser::connector::end_decl(i, true),
+                    crate::parser::connector::end_decl,
                     PartUsageBodyElement::EndDecl,
                 ),
                 map(
@@ -1641,7 +1649,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         )),
         // PAR-002: nested `def` kinds -- usage bodies legally contain nested definitions per BNF
         // `UsageBody = DefinitionBody`. `port_def`/`calc_def_required`/
-        // `connection_def_required` must be tried before `port_usage`/`connection_usage_member`
+        // `connection_def` must be tried before `port_usage`/`connection_usage_member`
         // -- both usage-form parsers have no guard against a bare `def` keyword (same bug class
         // fixed for `PartDefBodyElement` in a prior increment), so `port def Foo;`/
         // `connection def Foo;` would otherwise misparse as a usage named "def".
@@ -1675,8 +1683,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(constraint_usage, PartUsageBodyElement::ConstraintUsage),
             // §6 G16: a part body is a namespace, so it owns imports too.
             map(crate::parser::import::import_, PartUsageBodyElement::Import),
-            map(connection_def_required, PartUsageBodyElement::ConnectionDef),
-            map(connection_usage_member, PartUsageBodyElement::Connection),
+            map(connection_def, PartUsageBodyElement::ConnectionDef),
+            map(connection_usage_member, |usage| {
+                PartUsageBodyElement::Connection(Box::new(usage))
+            }),
             map(port_def, PartUsageBodyElement::PortDef),
         )),
         alt((

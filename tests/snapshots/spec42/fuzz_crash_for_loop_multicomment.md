@@ -19,7 +19,8 @@ perform action doS : Dff {     for y // ndent g {
 (fixture-diagnostics
   (document "fuzz_crash_for_loop_multicomment.md"
     (diagnostics
-      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 31) (line 3) (column 5) (len 105)) (message "unexpected token in action body"))
+      (diagnostic (code "missing_semicolon") (severity error) (category parseerror) (span (offset 31) (line 3) (column 5) (len 4)) (message "missing semicolon before next declaration"))
+      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 35) (line 4) (column 1) (len 101)) (message "unexpected token in action body"))
       (diagnostic (code "unexpected_closing_brace") (severity error) (category parseerror) (span (offset 140) (line 9) (column 1) (len 1)) (message "unexpected closing '}'"))
     )
   )
@@ -30,7 +31,7 @@ perform action doS : Dff {     for y // ndent g {
 package P {
     action def A {
         for
-perform action doS : Dff {     for y // ndent g {
+        perform action doS : Dff {     for y // ndent g {
 //'//ug {
 // port for HTTPprin items { }
     }
@@ -42,6 +43,6 @@ perform action doS : Dff {     for y // ndent g {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body brace (action-def (name "A") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "for") (span (offset 31) (line 3) (column 5) (len 105))))))))
+  (root (package (name "P") (body brace (action-def (name "A") (modifiers) (specializes none) (body brace (malformed (code "missing_semicolon") (found "for") (span (offset 31) (line 3) (column 5) (len 4))) (malformed (code "recovered_action_body_element") (found "perform action doS : Dff {     for y // ndent g {") (span (offset 35) (line 4) (column 1) (len 101))))))))
 )
 ~~~

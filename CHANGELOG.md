@@ -9,11 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Connection usages own the full `OccurrenceUsagePrefix`, and `#`-prefix metadata is no longer a
+  fixed derivation role (breaking AST change, `PARSE_AST_VERSION` 259).**
+  - `ConnectionUsageMember` replaces `is_abstract`/`by_reference`/`type_reference` with
+    `prefix: OccurrenceUsagePrefix`, `short_name`, `typing`, `multiplicity_modifiers`, `subsets`,
+    `redefines`, `references`, `crosses`, `intersects` and `value`, parsed before the body as
+    `ConnectionUsage` (SysML BNF 667) spells them. `#derivation connection d { … }`,
+    `ref connection c;` and the Systems Library's `abstract connection connections :
+    Connection[0..*] nonunique :> linkObjects, parts { … }` keep every slot. It is boxed in
+    `PackageBodyElement::ConnectionUsage`, `PartDefBodyElement::Connection` and
+    `PartUsageBodyElement::Connection`.
+  - `connection def` requires `def` in every scope. A `def`-less `connection …` was a
+    `ConnectionDef` at package level, which discarded its typing, multiplicity and `nonunique`
+    and made the formatter write an invented `def`; it is now a `ConnectionUsage`.
+  - `ConnectionDef::derivation_role` and `DerivationConnectionRole` are replaced by
+    `ConnectionDef::extension_keywords` (`DefinitionExtensionKeyword*`), so `#multicausation
+    connection def` keeps its metadata like `#derivation connection def` does.
+  - `EndIdentity::Derivation` and `DerivationEndRole` are removed. `EndDecl::extension_keywords`
+    keeps any `#Name` prefix metadata beside the end's name (`ExtendedUsage`, BNF 1699):
+    `end #original r1 : Req1;` used to drop `#original`, and `end #cause c : C;` its metadata;
+    `end #mystery ::> X;` is valid syntax instead of a malformed member.
+  - Prefixed connections get first refusal over the stand-alone `#` member in package, part
+    definition, part usage, occurrence and attribute bodies, so `#derivation connection : D { … }`
+    inside a part is one usage rather than a stray metadata member and an unsupported declaration.
+  - Connection usages are projected structurally in semantic snapshots instead of as a marker.
+    `Cause and Effect Examples/MedicalDeviceFailure.sysml` now round-trips.
+  - See `planning/connection-usage-prefix-matrix.md`.
+
 - Preserve the distinction between a `render` reference and an inline `render rendering`
   declaration in `ViewRenderingUsage`, including a source-backed qualified reference target.
-  `PARSE_AST_VERSION` is now 259.
+  `PARSE_AST_VERSION` is now 260.
 
 ### Fixed
+
+- **A syntax error inside an action or definition body no longer hides later diagnostics in
+  that body.** Member recovery resyncs at the next `;`, the next member keyword, or the closing
+  `}`, so a second `return` and a following sibling are both reported ([#141](https://github.com/elan8/sysml-v2-parser/issues/141)).
+  `return` in an action body now suggests a calculation-family body or an `out` parameter.
+  A name the lexer split into a number plus an identifier tail (`part def 4WheelDrive`) is
+  reported as `invalid_identifier`, with a single-quote suggestion, instead of a missing `;`/`{`.
 
 - **Parsing the SysML v2 spec's own `Vehicle Example/VehicleIndividuals.sysml` example could
   still crash the process with a stack overflow** on a 2 MiB thread in a debug build. The file

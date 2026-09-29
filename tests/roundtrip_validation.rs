@@ -121,6 +121,9 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Arrowhead Framework Example/AHFProfileLib.sysml",
     "Camera Example/Camera.sysml",
     "Camera Example/PictureTaking.sysml",
+    // Promoted by the connection-usage prefix migration: `#multicausation connection` is a usage
+    // owning its prefix metadata, so it no longer round-trips as an invented `connection def`.
+    "Cause and Effect Examples/MedicalDeviceFailure.sysml",
     "Comment Examples/Comments.sysml",
     // Promoted alongside Dynamics.sysml above.
     "Simple Tests/ConstraintTest.sysml",

@@ -514,7 +514,6 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
         "recovered_view_body_element",
         view_body_element,
         view_body_recovery,
-        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

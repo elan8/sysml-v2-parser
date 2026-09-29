@@ -1035,13 +1035,19 @@ fn abstract_connection_usage_accepts_multiplicity_before_type() {
         PackageBodyElement::ConnectionUsage(usage) => &usage.value,
         other => panic!("expected connection usage, got {other:?}"),
     };
-    assert!(usage.is_abstract, "`abstract` prefix should be retained");
+    assert!(
+        usage
+            .prefix
+            .basic()
+            .is_some_and(|basic| basic.ref_prefix.variance.is_some()),
+        "`abstract` prefix should be retained"
+    );
     assert!(
         usage.multiplicity.is_some(),
         "multiplicity should be retained"
     );
     assert!(
-        usage.type_reference.is_some(),
+        usage.typing.is_some(),
         "typing after multiplicity should be retained"
     );
 }
@@ -1425,7 +1431,7 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
             _ => None,
         })
         .expect("expected structured connection member in part body");
-    assert!(connection.type_reference.is_some());
+    assert!(connection.typing.is_some());
     assert!(connection.subsets.is_some());
     let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection body");

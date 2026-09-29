@@ -24,23 +24,15 @@
 //! strict superset of the `_usage` parser's -- confirm which shapes only the usage parser accepts
 //! before assuming a guard is missing.
 //!
-//! **`reject_header_keyword`/`reject_plain_typed_header_without_def` are two instances of the
-//! same underlying question, not yet unified ([#34](https://github.com/elan8/sysml-v2-parser/issues/34)).**
-//! Both exist because `connection`/`interface`/`port`/`constraint`/`calc` are deliberately
-//! `def`-optional (see above), which makes their definition grammar a strict superset of the
-//! sibling usage grammar -- so telling "genuine bare definition" apart from "usage that the
-//! def-optional grammar happened to swallow" needs a real check, not just optionality. Each was
-//! added ad hoc to fix one specific reported bug (PAR-007's `connect` clause; GH-20's plain `:
-//! Type` header) rather than modeling "does this header actually look like a definition" (some
-//! combination of `is_abstract`, a genuine `:>`/`specializes` clause, or an explicit `def`) once.
-//! Two options isn't unreasonable to carry as-is, but if a third disambiguation guard is ever
-//! needed here (`port`/`constraint`/`calc` are the most likely next candidates, per the same
-//! def-optional shape), that's the signal to stop adding narrow booleans and unify them into one
-//! general definition-shape check instead.
+//! **`reject_header_keyword`** exists because some definitions (`interface`, ...) are still
+//! `def`-optional, which makes their definition grammar a superset of the sibling usage grammar
+//! ([#34](https://github.com/elan8/sysml-v2-parser/issues/34)). `connection` no longer is: it
+//! requires `def`, because `ConnectionUsage` now owns the whole `OccurrenceUsagePrefix` and
+//! `UsageDeclaration` (see `planning/connection-usage-prefix-matrix.md`), which retired the
+//! GH-20 `reject_plain_typed_header_without_def` guard the def-optional grammar needed.
 
 use crate::ast::{
-    DefinitionPrefix, DerivationConnectionRole, Identification, Node, TypingKind,
-    TypingRelationship, Visibility,
+    DefinitionPrefix, Identification, Node, TypingRelationship, UsageExtensionKeyword, Visibility,
 };
 use crate::parser::definition_header::parse_definition_header_after_ident;
 use crate::parser::lex::{contains_keyword, identification, ws1, ws_and_comments};
@@ -70,11 +62,13 @@ pub enum VisibilityPrefix {
     Captured,
 }
 
+/// Whether the production spells `DefinitionExtensionKeyword*` after its basic prefix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DerivationRoleMode {
+pub enum ExtensionKeywordMode {
     None,
-    /// Fixed leading `#derivation` marker on derivation connection definitions.
-    Connection,
+    /// `OccurrenceDefinitionPrefix`'s `DefinitionExtensionKeyword*` (SysML BNF 541--546): a run
+    /// of `'#' QualifiedName` prefix metadata after `individual`, before the kind keyword.
+    Occurrence,
 }
 
 /// Which prefix slot a definition production actually spells, as the pinned grammar writes it.
@@ -121,16 +115,11 @@ pub struct DefinitionPrefixOptions {
     /// from it and must keep rejecting a leading `individual` as usual.
     pub individual_allowed: bool,
     pub visibility: VisibilityPrefix,
-    pub derivation_role: DerivationRoleMode,
+    pub extension_keywords: ExtensionKeywordMode,
     /// When set, fail this definition parse if the plain `: Type` header scan swallows this
     /// keyword as part of its discarded trailing text. See
     /// [`DefinitionPrefixOptions::reject_header_keyword`].
     pub reject_header_keyword: Option<&'static [u8]>,
-    /// When set, fail this definition parse for the `def`-less, non-`abstract` plain `: Type`
-    /// header shape (the header parses to `kind: Typing`, i.e. no `:>`/`specializes` clause was
-    /// found before the body). See
-    /// [`DefinitionPrefixOptions::reject_plain_typed_header_without_def`].
-    pub reject_plain_typed_header_without_def: bool,
 }
 
 impl DefinitionPrefixOptions {
@@ -142,9 +131,8 @@ impl DefinitionPrefixOptions {
             basic_prefix_slot: BasicPrefixSlot::Basic,
             individual_allowed: false,
             visibility: VisibilityPrefix::None,
-            derivation_role: DerivationRoleMode::None,
+            extension_keywords: ExtensionKeywordMode::None,
             reject_header_keyword: None,
-            reject_plain_typed_header_without_def: false,
         }
     }
 
@@ -185,8 +173,9 @@ impl DefinitionPrefixOptions {
         self
     }
 
-    pub const fn with_derivation_role(mut self) -> Self {
-        self.derivation_role = DerivationRoleMode::Connection;
+    /// Parse `OccurrenceDefinitionPrefix`'s `DefinitionExtensionKeyword*` run.
+    pub const fn with_extension_keywords(mut self) -> Self {
+        self.extension_keywords = ExtensionKeywordMode::Occurrence;
         self
     }
 
@@ -200,32 +189,15 @@ impl DefinitionPrefixOptions {
         self.reject_header_keyword = Some(keyword);
         self
     }
-
-    /// Reject (fail) this definition parse for the `def`-less, non-`abstract` plain `: Type`
-    /// header shape (GH-20): e.g. `connection connection1 : DeviceConnection { ... }` at package
-    /// level. `def`-optional definition parsers like `connection_def` exist so genuine bare
-    /// library-style definitions (`abstract connection connections: Connection[0..*] nonunique
-    /// :> linkObjects, parts { ... }`) keep parsing -- but that grammar superset also swallows
-    /// ordinary named typed *usages* that were never meant to be definitions, since both share the
-    /// same `: Type { ... }` shape once `abstract` and a `:>`/`specializes` clause are absent.
-    /// `abstract` and an actual `:>`/`specializes` clause in the header (`kind:
-    /// TypingKind::Subclassification`) are unambiguous definition-only signals (a usage's `:>` is
-    /// a `subsets` clause positioned *after* the body, not in this header); their absence with
-    /// `def` also absent means this is a plain usage and should be left for the sibling usage
-    /// parser to claim, matching [`DefinitionPrefixOptions::reject_header_keyword`]'s "leave it
-    /// for the usage parser" rationale. Explicit `def` (`connection def name : Type;`) is always
-    /// honored regardless of header shape, since it's unambiguous.
-    pub const fn reject_plain_typed_header_without_def(mut self) -> Self {
-        self.reject_plain_typed_header_without_def = true;
-        self
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct DefinitionPrefixResult {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    pub derivation_role: Option<Node<DerivationConnectionRole>>,
+    /// `DefinitionExtensionKeyword*`, in authored order; empty unless
+    /// [`DefinitionPrefixOptions::with_extension_keywords`] was set.
+    pub extension_keywords: Vec<Node<UsageExtensionKeyword>>,
     /// `BasicDefinitionPrefix` -- one slot, two alternatives -- with the authored keyword's
     /// exact span. `None` is the ordinary "no prefix authored" state.
     ///
@@ -286,23 +258,6 @@ pub(crate) fn parse_definition_prefix(
 ) -> IResult<Input<'_>, DefinitionPrefixResult> {
     let (input, _) = ws_and_comments(input)?;
 
-    let (input, derivation_role) = match options.derivation_role {
-        DerivationRoleMode::None => (input, None),
-        DerivationRoleMode::Connection => {
-            let marker_start = input;
-            let (input, marker) = opt((tag(&b"#"[..]), tag(&b"derivation"[..]))).parse(input)?;
-            let role = marker.map(|_| {
-                crate::parser::node_from_to(
-                    marker_start,
-                    input,
-                    DerivationConnectionRole::Derivation,
-                )
-            });
-            let (input, _) = ws_and_comments(input)?;
-            (input, role)
-        }
-    };
-
     let (input, visibility, visibility_span) = match options.visibility {
         VisibilityPrefix::None => (input, None, crate::parser::span_from_to(input, input)),
         VisibilityPrefix::Captured => {
@@ -312,17 +267,29 @@ pub(crate) fn parse_definition_prefix(
     };
 
     let (input, basic_prefix) = parse_basic_definition_prefix(input, options.basic_prefix_slot)?;
-    let is_abstract = matches!(
-        basic_prefix.as_ref().map(|prefix| prefix.value),
-        Some(DefinitionPrefix::Abstract)
-    );
-
     // BNF `OccurrenceDefinitionPrefix`: `individual` follows `abstract`, before the keyword.
     let (input, is_individual) = if options.individual_allowed {
         let (input, found) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
         (input, found.is_some())
     } else {
         (input, false)
+    };
+
+    // `DefinitionExtensionKeyword*` follows `individual` and precedes the kind keyword.
+    let (input, extension_keywords) = match options.extension_keywords {
+        ExtensionKeywordMode::None => (input, Vec::new()),
+        ExtensionKeywordMode::Occurrence => {
+            let mut input = input;
+            let mut keywords = Vec::new();
+            while input.fragment().starts_with(b"#") {
+                let (rest, keyword) =
+                    crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
+                keywords.push(keyword);
+                let (rest, _) = ws_and_comments(rest)?;
+                input = rest;
+            }
+            (input, keywords)
+        }
     };
 
     let (input, _) = tag(options.keyword).parse(input)?;
@@ -335,15 +302,15 @@ pub(crate) fn parse_definition_prefix(
         input
     };
 
-    let (input, has_def) = match options.def {
+    let input = match options.def {
         DefKeywordMode::Required => {
             let (input, _) = tag(&b"def"[..]).parse(input)?;
             let (input, _) = ws1(input)?;
-            (input, true)
+            input
         }
         DefKeywordMode::Optional => {
-            let (input, found) = opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-            (input, found.is_some())
+            let (input, _) = opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
+            input
         }
     };
 
@@ -365,25 +332,13 @@ pub(crate) fn parse_definition_prefix(
         }
     }
     let specializes = header.specializes;
-    if options.reject_plain_typed_header_without_def
-        && !has_def
-        && !is_abstract
-        && specializes
-            .as_ref()
-            .is_some_and(|s| s.value.kind == TypingKind::Typing)
-    {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
-    }
 
     Ok((
         input,
         DefinitionPrefixResult {
             identification,
             specializes,
-            derivation_role,
+            extension_keywords,
             basic_prefix,
             is_individual,
             visibility,
@@ -458,36 +413,25 @@ mod tests {
     }
 
     #[test]
-    fn prefix_parses_derivation_connection_role() {
-        let input = span_input("#derivation abstract connection conn :> Base ;");
+    fn prefix_parses_definition_extension_keywords_after_the_basic_prefix() {
+        let text = "abstract #derivation connection def Conn :> Base ;";
+        let input = span_input(text);
         let (rest, prefix) = parse_definition_prefix(
             input,
-            DefinitionPrefixOptions::new(b"connection").with_derivation_role(),
+            DefinitionPrefixOptions::new(b"connection")
+                .def_required()
+                .with_extension_keywords(),
         )
         .expect("prefix");
-        assert!(matches!(
-            prefix.derivation_role.as_ref().map(|node| node.value),
-            Some(DerivationConnectionRole::Derivation)
-        ));
+        assert_eq!(prefix.extension_keywords.len(), 1);
+        let keyword = &prefix.extension_keywords[0];
         assert_eq!(
-            prefix.derivation_role.as_ref().map(|node| &node.span),
-            Some(&crate::ast::Span {
-                offset: 0,
-                line: 1,
-                column: 1,
-                len: 11,
-            })
+            &text[keyword.span.offset..keyword.span.offset + keyword.span.len],
+            "#derivation"
         );
         assert_eq!(
             prefix.basic_prefix.as_ref().map(|node| node.value),
             Some(DefinitionPrefix::Abstract)
-        );
-        assert_eq!(
-            prefix
-                .specializes
-                .as_ref()
-                .map(|n| target_texts(input, &n.value.target)),
-            Some(vec!["Base".to_string()])
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
