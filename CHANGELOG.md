@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-09-29
+
 ### Changed
+
+- **Preserve the distinction between a `render` reference and an inline `render rendering`
+  declaration in `ViewRenderingUsage` (#151).** The short form retains its source-backed
+  qualified reference target; the inline `rendering` form retains its declaration name,
+  specializations, multiplicity, and body. **`PARSE_AST_VERSION` is now 260.** Prerequisite for
+  elan8/spec42#209.
 
 - **Connection usages own the full `OccurrenceUsagePrefix`, and `#`-prefix metadata is no longer a
   fixed derivation role (breaking AST change, `PARSE_AST_VERSION` 259).**
@@ -36,45 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `Cause and Effect Examples/MedicalDeviceFailure.sysml` now round-trips.
   - See `planning/connection-usage-prefix-matrix.md`.
 
-- Preserve the distinction between a `render` reference and an inline `render rendering`
-  declaration in `ViewRenderingUsage`, including a source-backed qualified reference target.
-  `PARSE_AST_VERSION` is now 260.
-
-### Fixed
-
-- **A syntax error inside an action or definition body no longer hides later diagnostics in
-  that body.** Member recovery resyncs at the next `;`, the next member keyword, or the closing
-  `}`, so a second `return` and a following sibling are both reported ([#141](https://github.com/elan8/sysml-v2-parser/issues/141)).
-  `return` in an action body now suggests a calculation-family body or an `out` parameter.
-  A name the lexer split into a number plus an identifier tail (`part def 4WheelDrive`) is
-  reported as `invalid_identifier`, with a single-quote suggestion, instead of a missing `;`/`{`.
-
-- **Parsing the SysML v2 spec's own `Vehicle Example/VehicleIndividuals.sysml` example could
-  still crash the process with a stack overflow** on a 2 MiB thread in a debug build. The file
-  is only 6 levels deep. The cost is an `individual` redefinition header
-  (`individual x : T :>> f, g { ... }`) plus a body whose only member is a `doc` comment.
-  Headroom was checked once, at brace-body entry, so that header and the following `doc` chain
-  shared one gap and could exhaust the 1 MiB `NESTED_BODY_RED_ZONE` before the next check.
-  `with_nested_body_stack` now also runs immediately before each body member, which splits those
-  two costs, and the red zone is 1.75 MiB. That is still under the ~2.0 MiB a fresh 2 MiB thread
-  has left at the first check, so a flat or shallow document still does not allocate a stack
-  segment. Added an always-on regression for the nested repro, on an explicit 2 MiB thread, plus
-  the real fixture (gated via `SYSML_V2_RELEASE_DIR`, same as the Annex A test). No AST or
-  behavior changes; `PARSE_AST_VERSION` unchanged.
-
-  Two more recursive body loops shared the same exposure and are fixed the same way:
-  `occurrence_usage_body_brace` (`individual`/`portion` occurrence usages, e.g. bare
-  `individual x : T { doc /* ... */ ... }` with no `part`/`snapshot` at any level) had no
-  `with_nested_body_stack` call at all -- not even at body entry -- and a synthetic 30-level
-  chain of that shape overflowed an explicit 8 MiB thread. `package_body_element_fallback`'s two
-  call sites in `package_body_brace_inner` re-parse a failed primary attempt at the same stack
-  depth and now probe before that retry too. Added an always-on regression for the
-  `occurrence_usage_body_brace` gap on an explicit 8 MiB thread.
-
-## [0.56.0] - 2026-09-06
-
-### Changed
-
 - **`ViewUsage` retains its whole declaration (#148).** `view_usage` kept one typing target, the
   subsets and redefines targets, and the multiplicity, and consumed the rest of the clause
   without a trace: `view v : A, B;` came back as `view v : A;` and `view v ::> w;` as `view v;`.
@@ -95,6 +64,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so every nested view reported `missing_body_or_semicolon`. `ViewUsage` also retained the
   authored `abstract` keyword for the first time. **`PARSE_AST_VERSION` is now 257.** (#147
   merged without this bump; it is recorded here and the constant moves past it.)
+  `Simple Tests/ViewTest.sysml` now round-trips.
+
+- **`UseCaseUsage` retains its short name (#144).** `use case <'S-01'> prepareEquipment { … }`
+  previously fell through to opaque body-element recovery because `UseCaseUsage` had no
+  `short_name` field, unlike sibling usage kinds. The field is additive; constructors and
+  exhaustive matches need `short_name: None` (or the parsed value).
+
+### Fixed
+
+- **A syntax error inside an action or definition body no longer hides later diagnostics in
+  that body (#154, [#141](https://github.com/elan8/sysml-v2-parser/issues/141)).** Member recovery
+  resyncs at the next `;`, the next member keyword, or the closing `}`, so a second `return` and
+  a following sibling are both reported. `return` in an action body now suggests a
+  calculation-family body or an `out` parameter. A name the lexer split into a number plus an
+  identifier tail (`part def 4WheelDrive`) is reported as `invalid_identifier`, with a
+  single-quote suggestion, instead of a missing `;`/`{`.
+
+- **Parsing the SysML v2 spec's own `Vehicle Example/VehicleIndividuals.sysml` example could
+  still crash the process with a stack overflow (#142, #145)** on a 2 MiB thread in a debug build.
+  The file is only 6 levels deep. The cost is an `individual` redefinition header
+  (`individual x : T :>> f, g { ... }`) plus a body whose only member is a `doc` comment.
+  Headroom was checked once, at brace-body entry, so that header and the following `doc` chain
+  shared one gap and could exhaust the 1 MiB `NESTED_BODY_RED_ZONE` before the next check.
+  `with_nested_body_stack` now also runs immediately before each body member, which splits those
+  two costs, and the red zone is 1.75 MiB. That is still under the ~2.0 MiB a fresh 2 MiB thread
+  has left at the first check, so a flat or shallow document still does not allocate a stack
+  segment. Added an always-on regression for the nested repro, on an explicit 2 MiB thread, plus
+  the real fixture (gated via `SYSML_V2_RELEASE_DIR`, same as the Annex A test). No AST or
+  behavior changes; `PARSE_AST_VERSION` unchanged.
+
+  Two more recursive body loops shared the same exposure and are fixed the same way:
+  `occurrence_usage_body_brace` (`individual`/`portion` occurrence usages, e.g. bare
+  `individual x : T { doc /* ... */ ... }` with no `part`/`snapshot` at any level) had no
+  `with_nested_body_stack` call at all -- not even at body entry -- and a synthetic 30-level
+  chain of that shape overflowed an explicit 8 MiB thread. `package_body_element_fallback`'s two
+  call sites in `package_body_brace_inner` re-parse a failed primary attempt at the same stack
+  depth and now probe before that retry too. Added an always-on regression for the
+  `occurrence_usage_body_brace` gap on an explicit 8 MiB thread.
+
+`PARSE_AST_VERSION` moved 256 → 260 across this release. The additions cover nested and fully
+declared `ViewUsage` forms (257–258), connection usages owning `OccurrenceUsagePrefix` with
+generic `#`-prefix metadata (259), and distinct short versus inline `render` forms (260).
+`UseCaseUsage::short_name` is an additive field that landed without its own version bump.
+Stack-overflow and body-recovery fixes carry no AST shape change. The serialized-AST wire
+envelope rejects any version mismatch on load, so consumers must re-parse against this schema
+rather than reuse a cached 0.56.0-era AST.
+
+## [0.56.0] - 2026-09-06
+
+### Changed
 
 - **Use-case / case bodies model `first`/`then` action flow with the shared action-body nodes.**
   A `CaseBody` is a SysML `ActionBody` (`CaseBodyItem : ActionBodyItem`), so `first start;`,
