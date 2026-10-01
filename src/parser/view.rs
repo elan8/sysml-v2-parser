@@ -628,7 +628,13 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    let (
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: name_str,
+        },
+    ) = crate::parser::lex::identification(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
@@ -638,6 +644,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
             input,
             ViewpointUsage {
                 name: name_str,
+                short_name,
                 type_name: header.type_reference,
                 subsets: header.subsets,
                 redefines: header.redefines,
@@ -659,12 +666,22 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     // subrenderings[0..*] = columnView.viewRendering;` (Systems Library `Views.sysml`) goes
     // straight to its specialization clause.
     let (after_gap, _) = ws_and_comments(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (after_gap, input) = if short_name.is_some() {
+        let (after_gap, _) = ws_and_comments(input)?;
+        (after_gap, after_gap)
+    } else {
+        (after_gap, input)
+    };
     let (input, name_str) = if after_gap.fragment().starts_with(b":")
         || after_gap.fragment().starts_with(b"[")
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
     {
         (after_gap, None)
+    } else if short_name.is_some() {
+        let (input, n) = name(input)?;
+        (input, Some(n))
     } else {
         let (input, _) = ws1(input)?;
         let (input, n) = name(input)?;
@@ -718,6 +735,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
             RenderingUsage {
                 is_abstract: is_abstract.is_some(),
                 name: name_str,
+                short_name,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
                 multiplicity_modifiers: modifiers,

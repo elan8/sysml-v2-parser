@@ -649,7 +649,9 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
 /// same anonymous-prefix shape, confirmed by matching real usage (`binding [1] bind ...` in
 /// Systems Library `Domain Libraries/Geometry/ShapeItems.sysml` mirrors `succession [seBeforeNum]
 /// first ...` in `Flows.sysml`).
+/// The leading element is the `<...>` short name of that `UsageDeclaration`'s `Identification`.
 type BindingPrefix = (
+    Option<DeclarationName>,
     Option<DeclarationName>,
     Option<crate::ast::QualifiedReferenceId>,
     Option<Node<crate::ast::Multiplicity>>,
@@ -658,6 +660,7 @@ type BindingPrefix = (
 fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
     let (input, _) = tag(&b"binding"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
     let (input, binding_name) = if starts_with_keyword(frag, b"bind") || frag.starts_with(b"[") {
@@ -677,7 +680,10 @@ fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
         };
     let (input, binding_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    Ok((input, (binding_name, binding_type, binding_multiplicity)))
+    Ok((
+        input,
+        (short_name, binding_name, binding_type, binding_multiplicity),
+    ))
 }
 
 /// Bind: (`binding` name? (`: Type`)? multiplicity?)? `bind` multiplicity? path `=` multiplicity?
@@ -688,7 +694,8 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = opt(binding_prefix).parse(input)?;
-    let (binding_name, binding_type, binding_multiplicity) = prefix.unwrap_or((None, None, None));
+    let (binding_short_name, binding_name, binding_type, binding_multiplicity) =
+        prefix.unwrap_or((None, None, None, None));
     let (input, _) = preceded(ws_and_comments, tag(&b"bind"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, left_multiplicity) = opt(multiplicity_node).parse(input)?;
@@ -711,6 +718,7 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
             input,
             Bind {
                 binding_name,
+                binding_short_name,
                 binding_type,
                 binding_multiplicity,
                 left,
@@ -1118,6 +1126,14 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     } else {
         ws1(input)?
     };
+    // The `Identification` of the interface's `UsageDeclaration`; the name alternatives below
+    // then run unchanged on what follows it.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = if short_name.is_some() {
+        ws_and_comments(input)?
+    } else {
+        (input, ())
+    };
     let (input, named_interface) = opt((
         name,
         opt(multiplicity_node),
@@ -1199,6 +1215,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 input,
                 InterfaceUsage::TypedConnect {
                     name: iface_name,
+                    short_name,
                     interface_type,
                     subsets,
                     redefines,
@@ -1210,7 +1227,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     }
     // BNF: the bare `InterfacePart` alternative (no `connect` keyword) is only legal when there
     // is no preceding `UsageDeclaration` at all -- i.e. no name and no type were captured above.
-    if iface_name.is_none() && interface_type.is_none() {
+    if iface_name.is_none() && interface_type.is_none() && short_name.is_none() {
         if let Ok((after_part, part)) = interface_part(input) {
             let (input, body) = interface_usage_body(after_part)?;
             return Ok((
@@ -1238,6 +1255,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             input,
             InterfaceUsage::Declaration {
                 name: iface_name,
+                short_name,
                 interface_type,
                 subsets,
                 redefines,
@@ -1794,6 +1812,7 @@ pub(crate) fn exhibit_state_as_state_usage(
         is_reference: exhibit.value.is_reference,
         is_individual: exhibit.value.is_individual,
         name: exhibit.value.name,
+        short_name: exhibit.value.short_name,
         state_reference: exhibit.value.state_reference,
         type_name: exhibit
             .value

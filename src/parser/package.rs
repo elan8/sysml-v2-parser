@@ -451,6 +451,9 @@ fn binding_connector_usage_inner(
     let (input, all) = opt(preceded(tag(&b"all"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
+    // `'binding' UsageDeclaration`: its `Identification` may carry a short name, with or without
+    // a declared name (`binding <'B1'> b bind x = y;`, `binding <'B1'> bind x = y;`).
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
     let (input, binding_name) = if all
@@ -460,7 +463,7 @@ fn binding_connector_usage_inner(
     {
         (input, None)
     } else {
-        let (input, binding_name) = name(input)?;
+        let (input, binding_name) = preceded(ws_and_comments, name).parse(input)?;
         (input, Some(binding_name))
     };
     let (input, multiplicity) = opt(preceded(
@@ -497,6 +500,7 @@ fn binding_connector_usage_inner(
             start,
             input,
             crate::ast::BindingConnectorUsage {
+                short_name,
                 all,
                 name: binding_name,
                 multiplicity,

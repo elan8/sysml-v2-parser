@@ -414,6 +414,8 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                     is_reference: false,
                     is_var: false,
                     name: None,
+                    // `in :>> target` redefines; it declares no `Identification` of its own.
+                    short_name: None,
                     subsets: None,
                     type_name,
                     multiplicity,
@@ -440,12 +442,15 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // Anonymous typed parameter: `in : TensorQuantityValue[1];` (Domain Libraries
         // `TensorCalculations.sysml`). The name is legally omitted when the typing follows
         // directly.
+        // The parameter's `UsageDeclaration` reaches `Identification`, so a short name may
+        // precede the name or stand alone: `in <'X1'> x : T;`, `in <'X1'> : T;`.
+        let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
         let (peek_anon, _) = ws_and_comments(input)?;
         let (input, param_name) =
             if peek_anon.fragment().starts_with(b":") && !peek_anon.fragment().starts_with(b":>") {
                 (input, None)
             } else {
-                let (input, n) = name(input)?;
+                let (input, n) = preceded(ws_and_comments, name).parse(input)?;
                 (input, Some(n))
             };
         // BNF `FeatureSpecializationPart` allows the `MultiplicityPart` before or after the
@@ -554,6 +559,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 is_reference: is_reference.is_some(),
                 is_var: is_var.is_some(),
                 name: param_name,
+                short_name,
                 subsets,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
@@ -1090,8 +1096,10 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
 /// `succession stateSequencing first ...` (name, no type), and
 /// `sysml/src/examples/Simple Tests/ConnectionTest.sysml`'s `succession s first a then b;` /
 /// `succession s1 : AB first a then b;` (name, and name + type).
-/// `(name, type, multiplicity)` of a parsed `succession` prefix, all `None` when absent.
+/// `(short name, name, type, multiplicity)` of a parsed `succession` prefix, all `None` when
+/// absent. The short name is the `<...>` half of the `UsageDeclaration`'s `Identification`.
 type SuccessionPrefix = (
+    Option<crate::ast::DeclarationName>,
     Option<crate::ast::DeclarationName>,
     Option<crate::ast::QualifiedReferenceId>,
     Option<Node<Multiplicity>>,
@@ -1100,6 +1108,7 @@ type SuccessionPrefix = (
 fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
     // GH-92.3: unnamed `succession : Type first a then b;` (a `:` type clause with no name at
@@ -1128,7 +1137,12 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     Ok((
         input,
-        (succession_name, succession_type, succession_multiplicity),
+        (
+            short_name,
+            succession_name,
+            succession_type,
+            succession_multiplicity,
+        ),
     ))
 }
 
@@ -1237,8 +1251,8 @@ fn first_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, succession) = opt(succession_prefix).parse(input)?;
-    let (succession_name, succession_type, succession_multiplicity) =
-        succession.unwrap_or((None, None, None));
+    let (succession_short_name, succession_name, succession_type, succession_multiplicity) =
+        succession.unwrap_or((None, None, None, None));
     let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, first_multiplicity) =
@@ -1267,6 +1281,7 @@ fn first_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
             input,
             FirstStmt {
                 succession_name,
+                succession_short_name,
                 succession_type,
                 succession_multiplicity,
                 first: first_expr,

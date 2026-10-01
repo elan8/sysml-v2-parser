@@ -634,6 +634,13 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     // check for the sibling `first`-embedded form. `flow` is excluded so a malformed `succession
     // flow ...` that reaches this parser (normally claimed first by `flow_usage_member`) doesn't
     // misread the keyword as a name.
+    // The `UsageDeclaration` after `succession` reaches `Identification`, so a short name may
+    // precede the name or stand alone (`succession <'S1'> first a then b;`).
+    let (input, short_name) = if succession_keyword_span.is_none() {
+        (input, None)
+    } else {
+        crate::parser::lex::short_name_prefix(input)?
+    };
     let (input, name) = if succession_keyword_span.is_none() {
         (input, None)
     } else {
@@ -689,6 +696,7 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
             SuccessionUsage {
                 succession_keyword_span,
                 name,
+                short_name,
                 type_name,
                 multiplicity,
                 source,
@@ -733,17 +741,27 @@ fn assert_constraint_member_inner(
     // ConstraintTest.sysml:78), richer than the already-supported `assert constraint ...` form.
     let (input, constraint_keyword) =
         opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
+    // With the `constraint` keyword this declares an `AssertConstraintUsage`, whose
+    // `ConstraintUsageDeclaration` carries a full `Identification` (`assert constraint <'C1'>
+    // c : C;`). The keyword-less form references an existing constraint and has none.
+    let (input, short_name) = if constraint_keyword.is_some() {
+        crate::parser::lex::short_name_prefix(input)?
+    } else {
+        (input, None)
+    };
     let (input, _) = ws_and_comments(input)?;
-    let (input, declaration_name, target) =
-        if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";") {
-            (input, None, None)
-        } else if constraint_keyword.is_some() {
-            let (input, parsed_name) = name(input)?;
-            (input, Some(parsed_name), None)
-        } else {
-            let (input, target) = reference_path(input)?;
-            (input, None, Some(target))
-        };
+    let (input, declaration_name, target) = if input.fragment().starts_with(b"{")
+        || input.fragment().starts_with(b";")
+        || (short_name.is_some() && input.fragment().starts_with(b":"))
+    {
+        (input, None, None)
+    } else if constraint_keyword.is_some() {
+        let (input, parsed_name) = name(input)?;
+        (input, Some(parsed_name), None)
+    } else {
+        let (input, target) = reference_path(input)?;
+        (input, None, Some(target))
+    };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_reference),
@@ -757,6 +775,7 @@ fn assert_constraint_member_inner(
             input,
             AssertConstraintMember {
                 declaration_name,
+                short_name,
                 target,
                 type_name,
                 body,

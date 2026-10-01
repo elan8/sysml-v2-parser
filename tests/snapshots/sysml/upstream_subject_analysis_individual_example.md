@@ -34,6 +34,6 @@ package AnalysisIndividualExample {
   (references
     (reference r0 (scope relative) (span (offset 84) (line 2) (column 49) (len 21)) (segments (segment 0 (token "FuelEconomyAnalysis_1") (name "FuelEconomyAnalysis_1") (separator none) (span (offset 84) (line 2) (column 49) (len 21)))))
   )
-  (root (package (name "AnalysisIndividualExample") (body brace (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual true) (portion none) (extensions)) (name "fuelEconomyAnalysis_1") (type (ref r0)) (subsets none) (redefines none)))))
+  (root (package (name "AnalysisIndividualExample") (body brace (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual true) (portion none) (extensions)) (name "fuelEconomyAnalysis_1") (short-name none) (type (ref r0)) (subsets none) (redefines none)))))
 )
 ~~~

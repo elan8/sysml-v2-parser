@@ -338,6 +338,8 @@ pub struct ExhibitState {
     pub is_individual: bool,
     /// Declaration label in the explicit `exhibit state name` form.
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// Referenced state path in the shorthand `exhibit path` form.
     pub state_reference: Option<QualifiedReferenceId>,
     /// Structured typing clause when a `:` target was written.
@@ -1798,7 +1800,9 @@ pub struct MetadataDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_reference: Option<QualifiedReferenceId>,
     pub about_targets: Vec<QualifiedReferenceId>,
     pub body: MetadataBody,
@@ -1969,6 +1973,8 @@ pub struct AssertConstraintMember {
     /// `assert constraint engineSelectionRational { ... }`. `None` for the anonymous form
     /// (`assert constraint { ... }`).
     pub declaration_name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// Referenced constraint in the shorthand `assert path { ... }` form.
     pub target: Option<QualifiedReferenceId>,
     /// Optional type after `:`, e.g. `DiscBrakeFitConstraint_Alt` in `assert constraint
@@ -2053,6 +2059,8 @@ pub struct SuccessionUsage {
     /// real usage in Systems Library `Domain Libraries/Cause and Effect/
     /// CausationConnections.sysml`.
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// Type of the succession usage itself (BNF `UsageDeclaration`'s `FeatureSpecializationPart`),
     /// e.g. `HappensJustBefore` in the unnamed `succession : HappensJustBefore first a then b;`
     /// (GH-92.3, `Vehicle Example/VehicleIndividuals.sysml:49`). Mirrors
@@ -2109,6 +2117,8 @@ pub struct Bind {
     /// `None` for the bare `bind a = b;` form (no `binding` keyword) or an unnamed `binding`
     /// prefix (e.g. `binding [1] bind ...`).
     pub binding_name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub binding_short_name: Option<DeclarationName>,
     /// Type of the binding connector itself, e.g. `binding ab1 : AB bind a = b;`.
     pub binding_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the binding connector feature itself, e.g. `binding [1] bind ...`
@@ -2204,6 +2214,8 @@ pub enum InterfaceUsage {
     /// (`Connection` variant) forms were reachable.
     TypedConnect {
         name: Option<DeclarationName>,
+        /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+        short_name: Option<DeclarationName>,
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
@@ -2231,6 +2243,8 @@ pub enum InterfaceUsage {
     /// to` form.
     Declaration {
         name: Option<DeclarationName>,
+        /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+        short_name: Option<DeclarationName>,
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
@@ -2301,6 +2315,8 @@ pub struct BindingConnectorUsage {
     /// all ...`, `binding [0..1] ...`). The name text lives in the document source and is
     /// resolved through it rather than copied into this node.
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// Multiplicity on the binding connector itself, e.g. `[instantNum]` / `[0..1]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `true` when the `of` keyword introduced `left` (e.g. `of startShot`); `false` when `left`

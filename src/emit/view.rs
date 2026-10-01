@@ -690,8 +690,11 @@ pub(crate) fn emit_assert_constraint(
         // emitter supplies its own leading space.
         w.push_str("constraint");
     }
-    if let Some(name) = assert.declaration_name {
+    if assert.short_name.is_some() || assert.declaration_name.is_some() {
         w.push_char(' ');
+    }
+    w.push_short_name_prefix(&format!("{path}/short_name"), assert.short_name)?;
+    if let Some(name) = assert.declaration_name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = assert.type_name {
@@ -986,7 +989,13 @@ pub(crate) fn emit_viewpoint_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("viewpoint ");
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), type_name)?;
@@ -1064,8 +1073,11 @@ pub(crate) fn emit_rendering_usage(
         w.push_str("abstract ");
     }
     w.push_str("rendering");
-    if let Some(name) = usage.name {
+    if usage.short_name.is_some() || usage.name.is_some() {
         w.push_char(' ');
+    }
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+    if let Some(name) = usage.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(ty) = &usage.type_name {

@@ -149,6 +149,8 @@ pub enum RequirementDefBodyElement {
 pub struct StakeholderMember {
     /// Declaration label for `stakeholder name : Type;`; empty for reference forms.
     pub declaration_name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// Concern reference for `stakeholder Concern;` and `stakeholder :>> Concern;`.
     pub target: Option<QualifiedReferenceId>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -507,7 +509,9 @@ pub struct ItemUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumerationUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: AttributeBody,
@@ -552,7 +556,9 @@ pub struct FrameMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
     /// The authored `NAME` token.
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// `abstract` keyword, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
     /// (Systems Library `Requirements.sysml`). The parser has always accepted it; this struct
     /// had nowhere to put it, so emission dropped the keyword.
@@ -602,7 +608,9 @@ pub struct CaseDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
     /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). The declaration's tail
@@ -649,7 +657,9 @@ pub struct AnalysisCaseDef {
 pub struct AnalysisCaseUsage {
     /// The complete `OccurrenceUsagePrefix` in its authored slot order.
     pub prefix: crate::ast::OccurrenceUsagePrefix,
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -683,7 +693,9 @@ pub struct VerificationCaseDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerificationCaseUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity after the type, e.g. `[0..*]` in `abstract verification
     /// subVerificationCases : VerificationCase[0..*] :> verificationCases, subcases { ... }`

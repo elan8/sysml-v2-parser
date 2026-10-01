@@ -650,7 +650,9 @@ pub struct ExposeMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>` subsets clause (spec42 gap 25), mirroring [`ViewUsage::subsets`]. Previously parsed
     /// by the shared usage header and discarded.
@@ -670,6 +672,8 @@ pub struct RenderingUsage {
     /// Declared name. `None` for the anonymous redefinition form (`rendering :>>
     /// subrenderings[0..*] = columnView.viewRendering;`, Systems Library `Views.sysml`).
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity clause (BNF `MultiplicityPart`), e.g. `asTreeDiagram :
     /// GraphicalRendering[1]` (Systems Library `Views.sysml`). Previously parsed and discarded

@@ -3,7 +3,7 @@ use crate::ast::{
     VerificationCaseUsage,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, ws1, ws_and_comments};
+use crate::parser::lex::{ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -125,6 +125,7 @@ fn analysis_case_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Analys
             AnalysisCaseUsage {
                 prefix,
                 name: usage.name,
+                short_name: usage.short_name,
                 type_name: usage.type_name,
                 subsets: usage.subsets,
                 redefines: usage.redefines,
@@ -188,6 +189,7 @@ pub(crate) fn verification_case_usage(
             input,
             VerificationCaseUsage {
                 name: usage.name,
+                short_name: usage.short_name,
                 type_name: usage.type_name,
                 multiplicity: usage.multiplicity,
                 subsets: usage.subsets,
@@ -205,7 +207,8 @@ fn case_like_usage_body(
     is_abstract: bool,
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, CaseUsage> {
-    let (input, name) = name(input)?;
+    let (input, crate::ast::Identification { short_name, name }) =
+        crate::parser::lex::identification(input)?;
     // `parse_feature_usage_header` rather than `usage_header` + `take_until_terminator`: the
     // latter skipped whatever stood between the typing and the body, so the multiplicity in
     // `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (Systems Library
@@ -216,6 +219,7 @@ fn case_like_usage_body(
         input,
         CaseUsage {
             name,
+            short_name,
             type_name: header.type_reference,
             multiplicity: header.multiplicity,
             subsets: header.subsets,

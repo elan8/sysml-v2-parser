@@ -1666,6 +1666,23 @@ pub(crate) fn short_name_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<D
     .parse(input)
 }
 
+/// The separator between a kind keyword (or a short name) and the declared name in a usage
+/// whose name is optional. A `<ShortName>` already separates the name from the keyword, so the
+/// mandatory `ws1` only applies when there is none: `state <'S1'>s1` and `state s1` both name the
+/// state, `states1` does not.
+pub(crate) fn gap_before_declared_name(
+    input: Input<'_>,
+    short_name: Option<DeclarationName>,
+) -> IResult<Input<'_>, ()> {
+    if short_name.is_some() {
+        let (input, _) = ws_and_comments(input)?;
+        Ok((input, ()))
+    } else {
+        let (input, _) = ws1(input)?;
+        Ok((input, ()))
+    }
+}
+
 /// Optional `private` / `protected` / `public` visibility prefix, shared by every `*Def`/`*Usage`
 /// parser that needs to feed a [`crate::ast::Membership`] (parser work item 4b, post-PAR-006).
 /// Returns the span of the whole prefix (zero-width, positioned at `input`, when no prefix is

@@ -119,12 +119,16 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
     // states';` (OMG spec Annex `5-State-based Behavior-2.sysml`) exhibits an already-declared
     // state usage by redefinition, without redeclaring its kind.
     let (input, state_keyword) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
-    let (input, name, state_reference) = if state_keyword.is_some() {
-        let (input, name) = name(input)?;
-        (input, Some(name), None)
+    // With the `state` keyword this is an `ExhibitStateUsage` declaration, so its
+    // `UsageDeclaration` carries a full `Identification`; the keyword-less form references an
+    // existing state usage and has none.
+    let (input, short_name, name, state_reference) = if state_keyword.is_some() {
+        let (input, crate::ast::Identification { short_name, name }) =
+            crate::parser::lex::identification(input)?;
+        (input, short_name, name, None)
     } else {
         let (input, reference) = crate::parser::lex::reference_path(input)?;
-        (input, None, Some(reference))
+        (input, None, None, Some(reference))
     };
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
@@ -170,6 +174,7 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
             start,
             input,
             ExhibitState {
+                short_name,
                 body_modifier,
                 direction,
                 is_derived: is_derived.is_some(),

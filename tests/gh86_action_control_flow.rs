@@ -129,7 +129,7 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
     });
     let metadata_usage = metadata_usage.expect("expected a MetadataUsage element");
     assert_eq!(
-        doc.declaration_name(metadata_usage.name),
+        doc.declaration_name(metadata_usage.name.expect("named metadata usage")),
         Some("ToolExecution")
     );
 }
@@ -400,7 +400,7 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_usage_body() {
     });
     let metadata_usage = metadata_usage.expect("expected a MetadataUsage element");
     assert_eq!(
-        doc.declaration_name(metadata_usage.name),
+        doc.declaration_name(metadata_usage.name.expect("named metadata usage")),
         Some("ToolExecution")
     );
 }

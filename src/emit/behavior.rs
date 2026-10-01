@@ -33,6 +33,7 @@ pub(crate) fn emit_inout_decl(
         w.push_str("var ");
     }
     let leading_redefinition = decl.name.is_none();
+    w.push_short_name_prefix(&format!("{path}/short_name"), decl.short_name)?;
     if let Some(name) = decl.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     } else if let Some(redefines) = &decl.redefines {
@@ -812,8 +813,14 @@ pub(crate) fn emit_state_usage(
     w.push_str("state ");
     if let Some(reference) = usage.state_reference {
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
-    } else if let Some(name) = usage.name {
-        w.push_declaration_name(&format!("{path}/name"), name)?;
+    } else {
+        emit_identification(
+            w,
+            &crate::ast::Identification {
+                short_name: usage.short_name,
+                name: usage.name,
+            },
+        )?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -858,9 +865,15 @@ pub(crate) fn emit_exhibit_state(
     w.push_str("exhibit ");
     if let Some(reference) = exhibit.state_reference {
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
-    } else if let Some(name) = exhibit.name {
+    } else {
         w.push_str("state ");
-        w.push_declaration_name(&format!("{path}/name"), name)?;
+        emit_identification(
+            w,
+            &crate::ast::Identification {
+                short_name: exhibit.short_name,
+                name: exhibit.name,
+            },
+        )?;
     }
     if let Some(typing) = &exhibit.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -1104,7 +1117,12 @@ pub(crate) fn emit_allocation_usage(
     emit_visibility(w, usage.membership.visibility);
     // Bare `allocate src to dst` (package-level `allocate_usage`) must not be rewritten as
     // `allocation allocate …` — that form reparses as ExtendedLibraryDecl (validation `12b`).
-    let shorthand = usage.name.is_none() && usage.type_name.is_none();
+    let shorthand = usage.name.is_none()
+        && usage.short_name.is_none()
+        && usage.type_name.is_none()
+        && usage.subsets.is_none()
+        && usage.redefines.is_none()
+        && (usage.source.is_some() || usage.target.is_some());
     if shorthand {
         w.push_str("allocate ");
         let (Some(source), Some(target)) = (&usage.source, &usage.target) else {
@@ -1116,9 +1134,13 @@ pub(crate) fn emit_allocation_usage(
         return emit_definition_body(w, path, &usage.body);
     }
     w.push_str("allocation ");
-    if let Some(name) = usage.name {
-        w.push_declaration_name(&format!("{path}/name"), name)?;
-    }
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(ty) = usage.type_name {
         w.push_str(" : ");
         if usage.type_is_conjugated {
@@ -1396,6 +1418,7 @@ fn emit_transition(
     t: &crate::ast::Transition,
 ) -> Result<(), EmitError> {
     w.push_str("transition ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), t.short_name)?;
     if let Some(name) = t.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
         w.push_char(' ');
@@ -1433,10 +1456,15 @@ pub(crate) fn emit_first_stmt(
     first: &crate::ast::FirstStmt,
 ) -> Result<(), EmitError> {
     if first.succession_name.is_some()
+        || first.succession_short_name.is_some()
         || first.succession_type.is_some()
         || first.succession_multiplicity.is_some()
     {
         w.push_str("succession ");
+        w.push_short_name_prefix(
+            &format!("{path}/succession-short-name"),
+            first.succession_short_name,
+        )?;
         if let Some(mult) = &first.succession_multiplicity {
             emit_multiplicity(w, &mult.value)?;
             w.push_char(' ');
@@ -1813,6 +1841,7 @@ pub(crate) fn emit_succession_usage(
     emit_visibility(w, succ.membership.visibility);
     if succ.succession_keyword_span.is_some() {
         w.push_str("succession ");
+        w.push_short_name_prefix(&format!("{path}/short_name"), succ.short_name)?;
     }
     if let Some(mult) = &succ.multiplicity {
         emit_multiplicity(w, &mult.value)?;

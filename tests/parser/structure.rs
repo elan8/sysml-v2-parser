@@ -3752,7 +3752,8 @@ part def Foo {
         .expect("expected an EnumerationUsage member");
     assert!(enum_usage.is_end);
     assert_eq!(
-        diag.document.declaration_name(enum_usage.name),
+        diag.document
+            .declaration_name(enum_usage.name.expect("named enum usage")),
         Some("status")
     );
 }

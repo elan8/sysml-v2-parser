@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Regular names are optional independently of short names in case, analysis, verification,
+  concern, viewpoint, enum, allocation, metadata, state and exhibit-state declarations.
+  Their parsers consume the existing `Identification` production, and the affected usage AST
+  name fields now use `Option<DeclarationName>`. Emitters and semantic snapshots retain
+  short-name-only declarations. This updates `PARSE_AST_VERSION` to 262.
+
+- **Short names are accepted wherever SysML's `Identification` allows them (breaking AST change,
+  `PARSE_AST_VERSION` 262).** `Identification = ( '<' ShortName '>' )? Name?` is part of every
+  `DefinitionDeclaration` and `UsageDeclaration`, but several usage parsers read their name with a
+  bare `name`, so `verification <'V1'> v : V;`, `state <'S1'> s;` and the rest fell through to
+  recovery (`unsupported_grammar_form`, or an `unexpected keyword` error inside a body) while
+  `requirement <'R1'> r;` parsed.
+  - The existing `lex::identification` parser (independently optional names) and
+    `lex::gap_before_declared_name` (optional name after a short name). The previously failing
+    parsers use them instead of reading the name directly.
+  - New `short_name: Option<DeclarationName>` on `CaseUsage`, `AnalysisCaseUsage`,
+    `VerificationCaseUsage`, `ConcernUsage` (also `concern def`), `StateUsage`, `ExhibitState`,
+    `ViewpointUsage`, `RenderingUsage`, `EnumerationUsage`, `AllocationUsage`, `MetadataUsage`,
+    `SuccessionUsage`, `BindingConnectorUsage`, `Transition`, `InOutDecl`, `StakeholderMember`,
+    `AssertConstraintMember`, and the declared `InterfaceUsage` variants (`TypedConnect`,
+    `Declaration`); `succession_short_name` on `FirstStmt` and `binding_short_name` on `Bind`.
+  - `dependency <'D1'> d from a to b;` now fills the existing `Dependency::identification`.
+  - The emitter writes every short name back; `objective` and `stakeholder` short names, which
+    were parsed but dropped, are now retained.
+  - The semantic AST projection writes `(short-name …)` next to the declared name for every
+    node above whose projection shows its name (85 snapshot files gain `(short-name none)`).
+  - `tests/short_name_identification.rs` checks every `Identification`-bearing production (97
+    cases across package, definition, state, use case, requirement, connection, action and calc
+    bodies): the source without the short name parses cleanly, the source with it parses without
+    diagnostics, the AST retains it (via the structural visitor), and it round-trips through the
+    emitter.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed
