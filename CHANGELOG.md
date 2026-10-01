@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     bodies): the source without the short name parses cleanly, the source with it parses without
     diagnostics, the AST retains it (via the structural visitor), and it round-trips through the
     emitter.
+- **KerML connectors own the full `FeatureSpecializationPart` (breaking AST change,
+  `PARSE_AST_VERSION` 264).** `KermlConnectorMember::typing` is replaced by ordered
+  `specializations: Vec<FeatureSpecialization>` plus `multiplicity_modifiers`, so
+  `connector tern subsets links [1] { end feature e1; ... }`, `connector c :> a redefines b from x
+  to y;` and `connector typed by T references r;` parse instead of falling into recovery. The
+  multiplicity positions are read by the parser shared with `KermlFeature`. Semantic snapshots now
+  project the connector (`kerml-connector`) instead of an opaque marker, and the anonymous typed
+  form formats as `connector : T`. `specializes` remains rejected: KerML `FeatureSpecialization`
+  has no such spelling.
 
 ## [0.57.0] - 2026-09-30
 

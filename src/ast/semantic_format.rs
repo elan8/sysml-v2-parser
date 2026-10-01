@@ -2616,47 +2616,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             feature.is_member, feature.is_all
         )?;
         self.write_usage_declaration_name(feature.name)?;
-        self.writer.write_str(") (specializations")?;
-        for specialization in &feature.specializations {
-            self.writer.write_char(' ')?;
-            match specialization {
-                super::FeatureSpecialization::Typing(typing) => {
-                    self.writer.write_str("(typing ")?;
-                    self.write_typing(&typing.value)?;
-                    self.writer.write_char(')')?;
-                }
-                super::FeatureSpecialization::Subsetting {
-                    relationship,
-                    value,
-                } => {
-                    self.writer.write_str("(subsetting ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_str(" (value ")?;
-                    if let Some(value) = value {
-                        self.write_expression(value)?;
-                    } else {
-                        self.writer.write_str("none")?;
-                    }
-                    self.writer.write_str("))")?;
-                }
-                super::FeatureSpecialization::ReferenceSubsetting(relationship) => {
-                    self.writer.write_str("(reference-subsetting ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_char(')')?;
-                }
-                super::FeatureSpecialization::CrossSubsetting(relationship) => {
-                    self.writer.write_str("(cross-subsetting ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_char(')')?;
-                }
-                super::FeatureSpecialization::Redefinition(relationship) => {
-                    self.writer.write_str("(redefinition ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_char(')')?;
-                }
-            }
-        }
-        self.writer.write_str(") (multiplicity ")?;
+        self.writer.write_str(") ")?;
+        self.write_feature_specializations(&feature.specializations)?;
+        self.writer.write_str(" (multiplicity ")?;
         self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
@@ -2702,6 +2664,82 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&feature.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// Ordered KerML `FeatureSpecialization` alternatives as `(specializations ...)`.
+    fn write_feature_specializations(
+        &mut self,
+        specializations: &[super::FeatureSpecialization],
+    ) -> io::Result<()> {
+        self.writer.write_str("(specializations")?;
+        for specialization in specializations {
+            self.writer.write_char(' ')?;
+            match specialization {
+                super::FeatureSpecialization::Typing(typing) => {
+                    self.writer.write_str("(typing ")?;
+                    self.write_typing(&typing.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Subsetting {
+                    relationship,
+                    value,
+                } => {
+                    self.writer.write_str("(subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_str(" (value ")?;
+                    if let Some(value) = value {
+                        self.write_expression(value)?;
+                    } else {
+                        self.writer.write_str("none")?;
+                    }
+                    self.writer.write_str("))")?;
+                }
+                super::FeatureSpecialization::ReferenceSubsetting(relationship) => {
+                    self.writer.write_str("(reference-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::CrossSubsetting(relationship) => {
+                    self.writer.write_str("(cross-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Redefinition(relationship) => {
+                    self.writer.write_str("(redefinition ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+            }
+        }
+        self.writer.write_char(')')
+    }
+
+    fn write_kerml_connector(&mut self, connector: &super::KermlConnectorMember) -> io::Result<()> {
+        write!(
+            self.writer,
+            "(kerml-connector (all {}) (name ",
+            connector.is_all
+        )?;
+        self.write_optional_name(connector.name)?;
+        self.writer.write_str(") ")?;
+        self.write_feature_specializations(&connector.specializations)?;
+        self.writer.write_str(" (multiplicity ")?;
+        self.write_multiplicity_clause(connector.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&connector.multiplicity_modifiers)?;
+        self.writer.write_str(" (from ")?;
+        match &connector.from {
+            Some(end) => self.write_kerml_connector_end(&end.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (to ")?;
+        match &connector.to {
+            Some(end) => self.write_kerml_connector_end(&end.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&connector.body)?;
         self.writer.write_char(')')
     }
 
@@ -2998,8 +3036,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Invariant(_member) => {
                             self.write_marker(&mut first, "invariant")?;
                         }
-                        super::CalcDefBodyElement::Connector(_member) => {
-                            self.write_marker(&mut first, "connector")?;
+                        super::CalcDefBodyElement::Connector(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_connector(&member.value)?;
                         }
                         super::CalcDefBodyElement::Binding(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -4492,8 +4531,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::AttributeBodyElement::Invariant(_member) => {
                 self.write_marker(first, "invariant")?;
             }
-            super::AttributeBodyElement::KermlConnector(_member) => {
-                self.write_marker(first, "kerml-connector")?;
+            super::AttributeBodyElement::KermlConnector(member) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_connector(&member.value)?;
             }
             super::AttributeBodyElement::KermlClassifier(declaration) => {
                 self.write_item_prefix(first)?;
@@ -6791,8 +6831,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
-            PackageBodyElement::KermlConnector(_connector) => {
-                self.write_marker(first, "kerml-connector")
+            PackageBodyElement::KermlConnector(connector) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_connector(&connector.value)
             }
             PackageBodyElement::KermlRelationship(relationship) => {
                 self.write_item_prefix(first)?;

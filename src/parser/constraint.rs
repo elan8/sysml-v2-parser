@@ -801,8 +801,9 @@ fn kerml_connector_member_inner(
                 crate::ast::KermlConnectorMember {
                     is_all: is_all.is_some(),
                     name: None,
-                    typing: None,
+                    specializations: Vec::new(),
                     multiplicity: None,
+                    multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                     from: Some(from),
                     to: Some(to),
                     body,
@@ -814,25 +815,29 @@ fn kerml_connector_member_inner(
     // Name is optional: the common library shapes are the anonymous `connector :Type` and the
     // declaration-less `connector (all)? from a to b;`.
     let (peek, _) = ws_and_comments(input)?;
+    // The keyword spellings of `FeatureSpecialization` are reserved words, so one leading the
+    // declaration means `Identification` was omitted (`connector typed by T from a to b;`).
     let (input, name_str) = if peek.fragment().starts_with(b":")
         || peek.fragment().starts_with(b"[")
         || from_keyword_next
-    {
+        || starts_with_any_keyword(
+            peek.fragment(),
+            &[
+                b"typed",
+                b"subsets",
+                b"references",
+                b"crosses",
+                b"redefines",
+            ],
+        ) {
         (input, None)
     } else {
         let (input, n) = preceded(ws_and_comments, name).parse(input)?;
         (input, Some(n))
     };
-    let (input, typing) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::multiplicity_node,
-    ))
-    .parse(input)?;
+    // The rest of `FeatureDeclaration`: `FeatureSpecializationPart` (typing, subsetting,
+    // reference/cross subsetting, redefinition, and multiplicity in any grammatical position).
+    let (input, part) = kerml_feature_specialization_part(input)?;
     // Ends: `from end to end`, or the `from`-less binary shorthand `connector [0..1]
     // transitionLink to [1..*] trigger;` (`TransitionPerformances.kerml`).
     let (input, ends) = opt(map(
@@ -858,8 +863,9 @@ fn kerml_connector_member_inner(
             crate::ast::KermlConnectorMember {
                 is_all: is_all.is_some(),
                 name: name_str,
-                typing,
-                multiplicity,
+                specializations: part.specializations,
+                multiplicity: part.multiplicity,
+                multiplicity_modifiers: part.multiplicity_modifiers,
                 from,
                 to,
                 body,
@@ -1539,6 +1545,55 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
             (input, Some(n))
         }
     };
+    let (input, part) = kerml_feature_specialization_part(input)?;
+    let mut specializations =
+        Vec::with_capacity(usize::from(leading_redefines.is_some()) + part.specializations.len());
+    if let Some(relationship) = leading_redefines {
+        specializations.push(crate::ast::FeatureSpecialization::Redefinition(
+            relationship,
+        ));
+    }
+    specializations.extend(part.specializations);
+    let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlFeature {
+                is_member: is_member.is_some(),
+                prefix,
+                kind,
+                is_all: is_all.is_some(),
+                name: name_str,
+                specializations,
+                multiplicity: part.multiplicity,
+                multiplicity_modifiers: part.multiplicity_modifiers,
+                relationship_parts,
+                value,
+                body,
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// The parsed KerML `FeatureSpecializationPart` (KerML BNF 573-576): ordered
+/// `FeatureSpecialization` alternatives plus the single `MultiplicityPart` that may precede,
+/// interleave, or follow them. Shared by every KerML owner whose `FeatureDeclaration` admits the
+/// part (`KermlFeature`, `KermlConnectorMember`), so the multiplicity positions are read once.
+struct KermlFeatureSpecializationPart {
+    specializations: Vec<crate::ast::FeatureSpecialization>,
+    multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    multiplicity_modifiers: crate::ast::MultiplicityModifiers,
+}
+
+/// Parse an optional KerML `FeatureSpecializationPart`; every component may be absent.
+fn kerml_feature_specialization_part(
+    input: Input<'_>,
+) -> IResult<Input<'_>, KermlFeatureSpecializationPart> {
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -1576,43 +1631,17 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // whichever position lost.
     let (input, modifiers) =
         crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
-    let mut specializations = Vec::with_capacity(
-        usize::from(leading_redefines.is_some())
-            + early_specializations.len()
-            + trailing_specializations.len(),
-    );
-    if let Some(relationship) = leading_redefines {
-        specializations.push(crate::ast::FeatureSpecialization::Redefinition(
-            relationship,
-        ));
-    }
-    specializations.extend(early_specializations);
+    let mut specializations = early_specializations;
     specializations.extend(trailing_specializations);
-    let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
-    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, body) = calc_def_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::KermlFeature {
-                is_member: is_member.is_some(),
-                prefix,
-                kind,
-                is_all: is_all.is_some(),
-                name: name_str,
-                specializations,
-                multiplicity: leading_multiplicity
-                    .or(trailing_multiplicity)
-                    .or(post_specialization_multiplicity),
-                multiplicity_modifiers: modifiers,
-                relationship_parts,
-                value,
-                body,
-                membership: Membership::feature(visibility, visibility_span),
-            },
-        ),
+        KermlFeatureSpecializationPart {
+            specializations,
+            multiplicity: leading_multiplicity
+                .or(trailing_multiplicity)
+                .or(post_specialization_multiplicity),
+            multiplicity_modifiers: modifiers,
+        },
     ))
 }
 

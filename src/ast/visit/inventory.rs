@@ -8228,17 +8228,18 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_connector_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlConnectorMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlConnectorMember { is_all, name, typing, multiplicity, from, to, body, membership } = &$($mutability)? node.value;
+            let KermlConnectorMember { is_all, name, specializations, multiplicity, multiplicity_modifiers, from, to, body, membership } = &$($mutability)? node.value;
             let _ = is_all;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = typing {
-                visitor.visit_qualified_reference(inner);
+            for inner in specializations {
+                visitor.visit_feature_specialization(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = from {
                 visitor.visit_kerml_connector_end(inner);
             }
