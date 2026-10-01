@@ -1330,7 +1330,13 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, (short_name, ident)) = crate::parser::lex::usage_identification(input)?;
+    let (
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: ident,
+        },
+    ) = crate::parser::lex::identification(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
@@ -1580,7 +1586,7 @@ mod membership_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_definition);
         assert_eq!(
-            crate::parser::lex::name_bytes(src, node.value.name),
+            crate::parser::lex::name_bytes(src, node.value.name.expect("declared concern name")),
             b"ConcernType"
         );
     }

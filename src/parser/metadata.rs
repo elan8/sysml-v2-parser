@@ -57,7 +57,8 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
     if starts_with_keyword(input.fragment(), b"def") {
         return Err(nom::Err::Error(Error::new(input, ErrorKind::Tag)));
     }
-    let (input, (short_name, name)) = crate::parser::lex::usage_identification(input)?;
+    let (input, crate::ast::Identification { short_name, name }) =
+        crate::parser::lex::identification(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, about_targets) = parse_about_targets(input)?;
     let (input, body) = metadata_body(input)?;

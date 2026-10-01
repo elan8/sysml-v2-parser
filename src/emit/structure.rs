@@ -1929,8 +1929,13 @@ pub(crate) fn emit_metadata_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("metadata ");
-    w.push_short_name_prefix("metadata-usage/short_name", usage.short_name)?;
-    w.push_declaration_name("metadata-usage/name", usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(ty) = usage.type_reference {
         w.push_str(" : ");
         w.push_qualified_reference("metadata type", ty)?;

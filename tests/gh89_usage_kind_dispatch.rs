@@ -330,7 +330,7 @@ fn gh89_6_verification_usage_in_part_usage_body() {
     });
     let verification = verification.expect("expected a VerificationCaseUsage element");
     assert_eq!(
-        doc.declaration_name(verification.name),
+        doc.declaration_name(verification.name.expect("named verification usage")),
         Some("verificationPlan")
     );
 }

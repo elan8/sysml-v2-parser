@@ -4231,7 +4231,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = type_reference {
                 visitor.visit_qualified_reference(inner);
             }
@@ -6648,7 +6650,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }
@@ -6749,7 +6753,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             let _ = is_abstract;
             let _ = is_individual;
             if let Some(inner) = multiplicity {
@@ -6794,7 +6800,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
@@ -6838,7 +6846,9 @@ macro_rules! ast_traversal {
                 visitor.visit_declaration_name(inner);
             }
             visitor.visit_occurrence_usage_prefix(prefix);
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }
@@ -6877,7 +6887,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
@@ -7875,7 +7887,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            visitor.visit_declaration_name(name);
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }

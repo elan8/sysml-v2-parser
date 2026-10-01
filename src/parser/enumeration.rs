@@ -180,7 +180,8 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
     let is_end = is_end.is_some();
     let (input, _) = tag(&b"enum"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (short_name, name)) = crate::parser::lex::usage_identification(input)?;
+    let (input, crate::ast::Identification { short_name, name }) =
+        crate::parser::lex::identification(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = attribute_body(input)?;

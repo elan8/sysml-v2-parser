@@ -1800,7 +1800,7 @@ pub struct MetadataDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     pub type_reference: Option<QualifiedReferenceId>,

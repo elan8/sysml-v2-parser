@@ -123,8 +123,9 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
     // `UsageDeclaration` carries a full `Identification`; the keyword-less form references an
     // existing state usage and has none.
     let (input, short_name, name, state_reference) = if state_keyword.is_some() {
-        let (input, (short_name, name)) = crate::parser::lex::usage_identification(input)?;
-        (input, short_name, Some(name), None)
+        let (input, crate::ast::Identification { short_name, name }) =
+            crate::parser::lex::identification(input)?;
+        (input, short_name, name, None)
     } else {
         let (input, reference) = crate::parser::lex::reference_path(input)?;
         (input, None, None, Some(reference))

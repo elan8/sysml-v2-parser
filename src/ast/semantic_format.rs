@@ -262,6 +262,22 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write!(self.writer, "({kind})")
     }
 
+    /// Project the Identification owned by a usage even where its remaining syntax is a marker.
+    fn write_identified_usage_marker(
+        &mut self,
+        first: &mut bool,
+        kind: &str,
+        name: Option<DeclarationName>,
+        short_name: Option<DeclarationName>,
+    ) -> io::Result<()> {
+        self.write_item_prefix(first)?;
+        write!(self.writer, "({kind} (name ")?;
+        self.write_optional_name(name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(short_name)?;
+        self.writer.write_str("))")
+    }
+
     fn write_expression(&mut self, expression: &Node<Expression>) -> io::Result<()> {
         self.writer.write_str("(expression ")?;
         write_span(self.writer, &expression.span)?;
@@ -985,8 +1001,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
-                        RequirementDefBodyElement::AllocationUsage(_usage) => {
-                            self.write_marker(&mut first, "allocation-usage")?;
+                        RequirementDefBodyElement::AllocationUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "allocation-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         RequirementDefBodyElement::ConcernUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1172,7 +1193,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_case_like_usage(
                                 "use-case-usage",
-                                usage.value.name,
+                                Some(usage.value.name),
                                 usage.value.short_name,
                                 usage.value.is_abstract,
                                 usage.value.type_name,
@@ -1803,8 +1824,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::StateUsage(_usage) => {
                             self.write_marker(&mut first, "state-usage")?;
                         }
-                        PartDefBodyElement::EnumerationUsage(_usage) => {
-                            self.write_marker(&mut first, "enumeration-usage")?;
+                        PartDefBodyElement::EnumerationUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "enumeration-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         PartDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -1860,8 +1886,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::AllocationDef(_definition) => {
                             self.write_marker(&mut first, "allocation-def")?;
                         }
-                        PartDefBodyElement::AllocationUsage(_usage) => {
-                            self.write_marker(&mut first, "allocation-usage")?;
+                        PartDefBodyElement::AllocationUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "allocation-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         PartDefBodyElement::ViewDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1878,8 +1909,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 definition.value.definition_prefix.as_ref(),
                             )?;
                         }
-                        PartDefBodyElement::ViewpointUsage(_usage) => {
-                            self.write_marker(&mut first, "viewpoint-usage")?;
+                        PartDefBodyElement::ViewpointUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "viewpoint-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         PartDefBodyElement::RenderingDef(definition) => {
                             self.write_definition_prefix_marker(
@@ -1906,8 +1942,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 definition.value.definition_prefix.as_ref(),
                             )?;
                         }
-                        PartDefBodyElement::CaseUsage(_usage) => {
-                            self.write_marker(&mut first, "case-usage")?;
+                        PartDefBodyElement::CaseUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "case-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         PartDefBodyElement::UseCaseDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1930,8 +1971,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::VerificationCaseDef(_definition) => {
                             self.write_marker(&mut first, "verification-case-def")?;
                         }
-                        PartDefBodyElement::VerificationCaseUsage(_usage) => {
-                            self.write_marker(&mut first, "verification-case-usage")?;
+                        PartDefBodyElement::VerificationCaseUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "verification-case-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         PartDefBodyElement::FirstStmt(statement) => {
                             self.write_item_prefix(&mut first)?;
@@ -4021,8 +4067,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_default_reference_usage(&member.value)?;
                         }
-                        super::PartUsageBodyElement::EnumerationUsage(_member) => {
-                            self.write_marker(&mut first, "enumeration-usage")?;
+                        super::PartUsageBodyElement::EnumerationUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "enumeration-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         super::PartUsageBodyElement::PartUsage(member) => {
                             self.write_part_usage_member(&mut first, &member.value)?;
@@ -4174,8 +4225,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::UseCaseUsage(_member) => {
                             self.write_marker(&mut first, "use-case-usage")?;
                         }
-                        super::PartUsageBodyElement::VerificationCaseUsage(_member) => {
-                            self.write_marker(&mut first, "verification-case-usage")?;
+                        super::PartUsageBodyElement::VerificationCaseUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "verification-case-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         super::PartUsageBodyElement::ViewDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -4192,8 +4248,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 definition.value.definition_prefix.as_ref(),
                             )?;
                         }
-                        super::PartUsageBodyElement::ViewpointUsage(_usage) => {
-                            self.write_marker(&mut first, "viewpoint-usage")?;
+                        super::PartUsageBodyElement::ViewpointUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "viewpoint-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         super::PartUsageBodyElement::RenderingDef(definition) => {
                             self.write_definition_prefix_marker(
@@ -4554,7 +4615,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_metadata_usage(&mut self, usage: &super::MetadataUsage) -> io::Result<()> {
         self.writer
             .write_str("(metadata-usage (declaration-name ")?;
-        self.write_name(usage.name)?;
+        self.write_optional_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
@@ -4889,7 +4950,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_case_like_usage(
         &mut self,
         label: &str,
-        name: DeclarationName,
+        name: Option<DeclarationName>,
         short_name: Option<DeclarationName>,
         is_abstract: bool,
         type_name: Option<QualifiedReferenceId>,
@@ -4898,7 +4959,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("(")?;
         self.writer.write_str(label)?;
         self.writer.write_str(" (name ")?;
-        self.write_name(name)?;
+        self.write_optional_name(name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(short_name)?;
         self.writer.write_str(") (abstract ")?;
@@ -4927,7 +4988,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("(analysis-case-usage ")?;
         self.write_occurrence_usage_prefix(&usage.prefix)?;
         self.writer.write_str(" (name ")?;
-        self.write_name(usage.name)?;
+        self.write_optional_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
@@ -5456,7 +5517,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// name and its typed header/body survive the source-backed name spelling used by emission.
     fn write_concern_usage(&mut self, usage: &super::ConcernUsage) -> io::Result<()> {
         self.writer.write_str("(concern-usage (name ")?;
-        self.write_name(usage.name)?;
+        self.write_optional_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         write!(
@@ -5552,8 +5613,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        super::ViewDefBodyElement::ViewpointUsage(_usage) => {
-                            self.write_marker(&mut first, "viewpoint-usage")?;
+                        super::ViewDefBodyElement::ViewpointUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "viewpoint-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         super::ViewDefBodyElement::ViewUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -6375,8 +6441,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PortDefBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
                         }
-                        PortDefBodyElement::EnumerationUsage(_usage) => {
-                            self.write_marker(&mut first, "enumeration-usage")?;
+                        PortDefBodyElement::EnumerationUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "enumeration-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
                         }
                         PortDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
@@ -6589,9 +6660,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_view_usage(&usage.value)
             }
-            PackageBodyElement::ViewpointUsage(_usage) => {
-                self.write_marker(first, "viewpoint-usage")
-            }
+            PackageBodyElement::ViewpointUsage(usage) => self.write_identified_usage_marker(
+                first,
+                "viewpoint-usage",
+                usage.value.name,
+                usage.value.short_name,
+            ),
             PackageBodyElement::RenderingUsage(_usage) => {
                 self.write_marker(first, "rendering-usage")
             }
@@ -6636,9 +6710,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_allocation_definition(&definition.value)
             }
-            PackageBodyElement::AllocationUsage(_usage) => {
-                self.write_marker(first, "allocation-usage")
-            }
+            PackageBodyElement::AllocationUsage(usage) => self.write_identified_usage_marker(
+                first,
+                "allocation-usage",
+                usage.value.name,
+                usage.value.short_name,
+            ),
             PackageBodyElement::FlowDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_flow_definition(&definition.value)
@@ -6656,7 +6733,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 "case-def",
                 definition.value.definition_prefix.as_ref(),
             ),
-            PackageBodyElement::CaseUsage(_usage) => self.write_marker(first, "case-usage"),
+            PackageBodyElement::CaseUsage(usage) => self.write_identified_usage_marker(
+                first,
+                "case-usage",
+                usage.value.name,
+                usage.value.short_name,
+            ),
             PackageBodyElement::AnalysisCaseDef(definition) => self.write_definition_prefix_marker(
                 first,
                 "analysis-case-def",
@@ -6675,9 +6757,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_use_case_body(&definition.value.body)?;
                 self.writer.write_char(')')
             }
-            PackageBodyElement::VerificationCaseUsage(_usage) => {
-                self.write_marker(first, "verification-case-usage")
-            }
+            PackageBodyElement::VerificationCaseUsage(usage) => self.write_identified_usage_marker(
+                first,
+                "verification-case-usage",
+                usage.value.name,
+                usage.value.short_name,
+            ),
             PackageBodyElement::UseCaseUsage(_usage) => self.write_marker(first, "use-case-usage"),
             PackageBodyElement::FeatureDecl(_declaration) => {
                 self.write_marker(first, "feature-declaration")
@@ -6768,9 +6853,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_ref_declaration(&declaration.value)
             }
-            PackageBodyElement::EnumerationUsage(_usage) => {
-                self.write_marker(first, "enumeration-usage")
-            }
+            PackageBodyElement::EnumerationUsage(usage) => self.write_identified_usage_marker(
+                first,
+                "enumeration-usage",
+                usage.value.name,
+                usage.value.short_name,
+            ),
             PackageBodyElement::MetadataKeywordUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_metadata_keyword_usage(&usage.value)

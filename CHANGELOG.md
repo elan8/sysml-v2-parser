@@ -9,13 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Regular names are optional independently of short names in case, analysis, verification,
+  concern, viewpoint, enum, allocation, metadata, state and exhibit-state declarations.
+  Their parsers consume the existing `Identification` production, and the affected usage AST
+  name fields now use `Option<DeclarationName>`. Emitters and semantic snapshots retain
+  short-name-only declarations. This updates `PARSE_AST_VERSION` to 262.
+
 - **Short names are accepted wherever SysML's `Identification` allows them (breaking AST change,
-  `PARSE_AST_VERSION` 261).** `Identification = ( '<' ShortName '>' )? Name?` is part of every
+  `PARSE_AST_VERSION` 262).** `Identification = ( '<' ShortName '>' )? Name?` is part of every
   `DefinitionDeclaration` and `UsageDeclaration`, but several usage parsers read their name with a
   bare `name`, so `verification <'V1'> v : V;`, `state <'S1'> s;` and the rest fell through to
   recovery (`unsupported_grammar_form`, or an `unexpected keyword` error inside a body) while
   `requirement <'R1'> r;` parsed.
-  - New shared helpers `lex::usage_identification` (required name) and
+  - The existing `lex::identification` parser (independently optional names) and
     `lex::gap_before_declared_name` (optional name after a short name). The previously failing
     parsers use them instead of reading the name directly.
   - New `short_name: Option<DeclarationName>` on `CaseUsage`, `AnalysisCaseUsage`,

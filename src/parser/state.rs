@@ -722,6 +722,11 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, n) = if (after_gap.fragment().starts_with(b":")
         && !after_gap.fragment().starts_with(b":>")
         && !after_gap.fragment().starts_with(b":>>"))
+        || after_gap.fragment().starts_with(b";")
+        || after_gap.fragment().starts_with(b"{")
+        || after_gap.fragment().starts_with(b"[")
+        || (short_name.is_some() && after_gap.fragment().starts_with(b":>"))
+        || starts_with_keyword(after_gap.fragment(), b"parallel")
         || starts_with_keyword(after_gap.fragment(), b"defined")
     {
         (after_gap, None)

@@ -989,8 +989,13 @@ pub(crate) fn emit_viewpoint_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("viewpoint ");
-    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), type_name)?;

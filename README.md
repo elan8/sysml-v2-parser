@@ -34,6 +34,9 @@ Semantic references in the AST are opaque, document-local identities. Resolve th
 `ParsedDocument::qualified_reference` to borrow their authored segments, separator kinds, and
 source spans without splitting or reparsing display strings.
 
+Declaration names are optional independently of short names in `Identification`. For example,
+`verification <V1> : VerificationType;` retains its short name while its AST `name` is `None`.
+
 With the optional `serde` feature, serialize and deserialize `ParsedDocument` as the atomic cache
 unit. Its wire envelope includes `PARSE_AST_VERSION` and rejects version mismatches, invalid arena
 ranges, and dangling AST reference identities during deserialization.

@@ -509,7 +509,7 @@ pub struct ItemUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumerationUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -556,7 +556,7 @@ pub struct FrameMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
     /// The authored `NAME` token.
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     /// `abstract` keyword, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
@@ -608,7 +608,7 @@ pub struct CaseDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -657,7 +657,7 @@ pub struct AnalysisCaseDef {
 pub struct AnalysisCaseUsage {
     /// The complete `OccurrenceUsagePrefix` in its authored slot order.
     pub prefix: crate::ast::OccurrenceUsagePrefix,
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -693,7 +693,7 @@ pub struct VerificationCaseDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerificationCaseUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,

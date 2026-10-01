@@ -505,8 +505,13 @@ pub(crate) fn emit_concern_usage(
     if concern.is_definition {
         w.push_str("def ");
     }
-    w.push_short_name_prefix(&format!("{path}/short_name"), concern.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), concern.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: concern.short_name,
+            name: concern.name,
+        },
+    )?;
     if let Some(mult) = &concern.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
@@ -595,8 +600,13 @@ pub(crate) fn emit_analysis_case_usage(
     emit_visibility(w, usage.membership.visibility);
     structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("analysis ");
-    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -638,8 +648,13 @@ pub(crate) fn emit_verification_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("verification ");
-    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -684,8 +699,13 @@ pub(crate) fn emit_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("case ");
-    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -992,8 +1012,13 @@ pub(crate) fn emit_enumeration_usage(
         w.push_str("end ");
     }
     w.push_str("enum ");
-    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    emit_identification(
+        w,
+        &crate::ast::Identification {
+            short_name: usage.short_name,
+            name: usage.name,
+        },
+    )?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;

@@ -52,8 +52,14 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"allocation"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (short_name, name_str)) = crate::parser::lex::usage_identification(input)?;
-    let name_str = Some(name_str);
+    let (
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: name_str,
+        },
+    ) = crate::parser::lex::identification(input)?;
+
     let (input, header) = feature_usage_header(input)?;
     let type_name = header.type_reference;
     // `#73`: `allocate logical ::> torqueGenerator to physical ::> powerTrain` — optional

@@ -628,7 +628,13 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (short_name, name_str)) = crate::parser::lex::usage_identification(input)?;
+    let (
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: name_str,
+        },
+    ) = crate::parser::lex::identification(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((

@@ -207,7 +207,8 @@ fn case_like_usage_body(
     is_abstract: bool,
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, CaseUsage> {
-    let (input, (short_name, name)) = crate::parser::lex::usage_identification(input)?;
+    let (input, crate::ast::Identification { short_name, name }) =
+        crate::parser::lex::identification(input)?;
     // `parse_feature_usage_header` rather than `usage_header` + `take_until_terminator`: the
     // latter skipped whatever stood between the typing and the body, so the multiplicity in
     // `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (Systems Library

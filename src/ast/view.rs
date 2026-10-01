@@ -650,7 +650,7 @@ pub struct ExposeMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
