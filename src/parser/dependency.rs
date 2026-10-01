@@ -36,6 +36,15 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
     let (input, _) = preceded(ws_and_comments, tag(&b"dependency"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = ws_and_comments(input)?;
+    // `Dependency = 'dependency' ( Identification? 'from' )? ...`: a short name belongs to that
+    // optional `Identification`, so when one is written the `from` keyword must follow it (with
+    // or without a declared name in between).
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let anonymous = short_name.map(|short_name| Identification {
+        short_name: Some(short_name),
+        name: None,
+    });
 
     let (input, (ident, clients, suppliers)) = alt((
         // `from clients to suppliers` — must beat the bare client-list form so `from` is not
@@ -46,7 +55,7 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
                 reference_list,
                 to_suppliers,
             ),
-            |(_, clients, suppliers)| (None, clients, suppliers),
+            |(_, clients, suppliers)| (anonymous, clients, suppliers),
         ),
         map(
             (
@@ -59,7 +68,7 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
             |(name, _, _, clients, suppliers)| {
                 (
                     Some(Identification {
-                        short_name: None,
+                        short_name,
                         name: Some(name),
                     }),
                     clients,
@@ -67,9 +76,14 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
                 )
             },
         ),
-        map((reference_list, to_suppliers), |(clients, suppliers)| {
-            (None, clients, suppliers)
-        }),
+        map(
+            (
+                nom::combinator::verify(nom::combinator::success(()), |_| short_name.is_none()),
+                reference_list,
+                to_suppliers,
+            ),
+            |(_, clients, suppliers)| (None, clients, suppliers),
+        ),
     ))
     .parse(input)?;
 

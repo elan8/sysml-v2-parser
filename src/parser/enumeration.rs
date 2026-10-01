@@ -8,7 +8,7 @@ use crate::parser::attribute::attribute_body;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{identification, name, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{identification, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{feature_usage_header, multiplicity_node};
 use crate::parser::with_span;
@@ -180,7 +180,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
     let is_end = is_end.is_some();
     let (input, _) = tag(&b"enum"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name) = name(input)?;
+    let (input, (short_name, name)) = crate::parser::lex::usage_identification(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = attribute_body(input)?;
@@ -191,6 +191,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
             input,
             EnumerationUsage {
                 name,
+                short_name,
                 type_name: header.type_reference,
                 multiplicity,
                 body,

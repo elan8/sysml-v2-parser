@@ -204,8 +204,14 @@ fn emit_requirement_body_element(
             }
             if let Some(target) = s.value.target {
                 w.push_qualified_reference(&format!("{path}/stakeholder/target"), target)?;
-            } else if let Some(name) = s.value.declaration_name {
-                w.push_declaration_name(&format!("{path}/stakeholder/name"), name)?;
+            } else {
+                w.push_short_name_prefix(
+                    &format!("{path}/stakeholder/short_name"),
+                    s.value.short_name,
+                )?;
+                if let Some(name) = s.value.declaration_name {
+                    w.push_declaration_name(&format!("{path}/stakeholder/name"), name)?;
+                }
             }
             if let Some(ty) = &s.value.type_name {
                 w.push_str(" : ");
@@ -499,6 +505,7 @@ pub(crate) fn emit_concern_usage(
     if concern.is_definition {
         w.push_str("def ");
     }
+    w.push_short_name_prefix(&format!("{path}/short_name"), concern.short_name)?;
     w.push_declaration_name(&format!("{path}/name"), concern.name)?;
     if let Some(mult) = &concern.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -588,6 +595,7 @@ pub(crate) fn emit_analysis_case_usage(
     emit_visibility(w, usage.membership.visibility);
     structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("analysis ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
@@ -630,6 +638,7 @@ pub(crate) fn emit_verification_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("verification ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
@@ -675,6 +684,7 @@ pub(crate) fn emit_case_usage(
         w.push_str("abstract ");
     }
     w.push_str("case ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
@@ -806,6 +816,7 @@ fn emit_use_case_body_element(
             }
             w.push_str("objective ");
             let req = &o.value.requirement.value;
+            w.push_short_name_prefix(&format!("{path}/objective/short_name"), req.short_name)?;
             if let Some(name) = req.name {
                 w.push_declaration_name(&format!("{path}/objective/name"), name)?;
                 w.push_char(' ');
@@ -981,6 +992,7 @@ pub(crate) fn emit_enumeration_usage(
         w.push_str("end ");
     }
     w.push_str("enum ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     w.push_declaration_name(&format!("{path}/name"), usage.name)?;
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");

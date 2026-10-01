@@ -489,6 +489,7 @@ fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<Stakeho
             input,
             StakeholderMember {
                 declaration_name: decl.name,
+                short_name: decl.short_name,
                 target: None,
                 type_name: Some(decl.type_name),
                 is_redefinition: false,
@@ -527,6 +528,7 @@ fn stakeholder_shorthand_member_inner(
             input,
             StakeholderMember {
                 declaration_name: None,
+                short_name: None,
                 target: Some(target),
                 type_name: None,
                 is_redefinition: false,
@@ -568,6 +570,7 @@ fn stakeholder_redefinition_member_inner(
             input,
             StakeholderMember {
                 declaration_name: None,
+                short_name: None,
                 target: Some(target),
                 type_name: None,
                 is_redefinition: true,
@@ -1327,11 +1330,12 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, ident) = name(input)?;
+    let (input, (short_name, ident)) = crate::parser::lex::usage_identification(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
+        short_name,
         is_abstract: abstract_kw.is_some(),
         is_individual: individual_kw.is_some(),
         type_name: header.type_reference,

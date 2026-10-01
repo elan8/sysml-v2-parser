@@ -30,6 +30,6 @@ package AnalysisCaseUsagePrefixRecovery {
   (references
     (reference r0 (scope relative) (span (offset 92) (line 3) (column 30) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 92) (line 3) (column 30) (len 1)))))
   )
-  (root (package (name "AnalysisCaseUsagePrefixRecovery") (body brace (malformed (code "missing_type_reference") (found "ref analysis : ;") (span (offset 46) (line 2) (column 5) (len 16))) (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual false) (portion none) (extensions)) (name "recovered") (type (ref r0)) (subsets none) (redefines none)) (case-usage))))
+  (root (package (name "AnalysisCaseUsagePrefixRecovery") (body brace (malformed (code "missing_type_reference") (found "ref analysis : ;") (span (offset 46) (line 2) (column 5) (len 16))) (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual false) (portion none) (extensions)) (name "recovered") (short-name none) (type (ref r0)) (subsets none) (redefines none)) (case-usage))))
 )
 ~~~

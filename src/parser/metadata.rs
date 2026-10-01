@@ -4,7 +4,7 @@ use crate::ast::{Membership, MetadataDef, MetadataUsage, Node};
 use crate::parser::attribute::metadata_body as attribute_metadata_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::parse_about_targets;
 use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
@@ -57,7 +57,7 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
     if starts_with_keyword(input.fragment(), b"def") {
         return Err(nom::Err::Error(Error::new(input, ErrorKind::Tag)));
     }
-    let (input, name) = name(input)?;
+    let (input, (short_name, name)) = crate::parser::lex::usage_identification(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, about_targets) = parse_about_targets(input)?;
     let (input, body) = metadata_body(input)?;
@@ -68,6 +68,7 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
             input,
             MetadataUsage {
                 name,
+                short_name,
                 type_reference: header.type_reference,
                 about_targets,
                 body,

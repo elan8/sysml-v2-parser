@@ -1666,6 +1666,39 @@ pub(crate) fn short_name_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<D
     .parse(input)
 }
 
+/// `Identification` (BNF §8.2.2.2) for a declaration whose name is required:
+/// `( '<' ShortName '>' )? Name`.
+///
+/// Every `UsageDeclaration`, `ConnectorDeclaration`, `TransitionUsage` and the other productions
+/// that reach `Identification` allow a short name wherever they allow a declared name. Usage
+/// parsers that read their name with a bare `name` silently lost that slot, so `verification
+/// <'V1'> v;` fell through to recovery while `requirement <'R1'> r;` parsed. Call this instead
+/// of `name` at the declared-name position; leading whitespace and comments are skipped.
+pub(crate) fn usage_identification(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (Option<DeclarationName>, DeclarationName)> {
+    let (input, short_name) = short_name_prefix(input)?;
+    let (input, declared) = preceded(ws_and_comments, name).parse(input)?;
+    Ok((input, (short_name, declared)))
+}
+
+/// The separator between a kind keyword (or a short name) and the declared name in a usage
+/// whose name is optional. A `<ShortName>` already separates the name from the keyword, so the
+/// mandatory `ws1` only applies when there is none: `state <'S1'>s1` and `state s1` both name the
+/// state, `states1` does not.
+pub(crate) fn gap_before_declared_name(
+    input: Input<'_>,
+    short_name: Option<DeclarationName>,
+) -> IResult<Input<'_>, ()> {
+    if short_name.is_some() {
+        let (input, _) = ws_and_comments(input)?;
+        Ok((input, ()))
+    } else {
+        let (input, _) = ws1(input)?;
+        Ok((input, ()))
+    }
+}
+
 /// Optional `private` / `protected` / `public` visibility prefix, shared by every `*Def`/`*Usage`
 /// parser that needs to feed a [`crate::ast::Membership`] (parser work item 4b, post-PAR-006).
 /// Returns the span of the whole prefix (zero-width, positioned at `input`, when no prefix is

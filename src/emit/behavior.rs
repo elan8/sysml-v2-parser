@@ -33,6 +33,7 @@ pub(crate) fn emit_inout_decl(
         w.push_str("var ");
     }
     let leading_redefinition = decl.name.is_none();
+    w.push_short_name_prefix(&format!("{path}/short_name"), decl.short_name)?;
     if let Some(name) = decl.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     } else if let Some(redefines) = &decl.redefines {
@@ -812,8 +813,11 @@ pub(crate) fn emit_state_usage(
     w.push_str("state ");
     if let Some(reference) = usage.state_reference {
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
-    } else if let Some(name) = usage.name {
-        w.push_declaration_name(&format!("{path}/name"), name)?;
+    } else {
+        w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
+        if let Some(name) = usage.name {
+            w.push_declaration_name(&format!("{path}/name"), name)?;
+        }
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -860,6 +864,7 @@ pub(crate) fn emit_exhibit_state(
         w.push_qualified_reference(&format!("{path}/state"), reference)?;
     } else if let Some(name) = exhibit.name {
         w.push_str("state ");
+        w.push_short_name_prefix(&format!("{path}/short_name"), exhibit.short_name)?;
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
     if let Some(typing) = &exhibit.typing {
@@ -1116,6 +1121,7 @@ pub(crate) fn emit_allocation_usage(
         return emit_definition_body(w, path, &usage.body);
     }
     w.push_str("allocation ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     if let Some(name) = usage.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
@@ -1396,6 +1402,7 @@ fn emit_transition(
     t: &crate::ast::Transition,
 ) -> Result<(), EmitError> {
     w.push_str("transition ");
+    w.push_short_name_prefix(&format!("{path}/short_name"), t.short_name)?;
     if let Some(name) = t.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
         w.push_char(' ');
@@ -1433,10 +1440,15 @@ pub(crate) fn emit_first_stmt(
     first: &crate::ast::FirstStmt,
 ) -> Result<(), EmitError> {
     if first.succession_name.is_some()
+        || first.succession_short_name.is_some()
         || first.succession_type.is_some()
         || first.succession_multiplicity.is_some()
     {
         w.push_str("succession ");
+        w.push_short_name_prefix(
+            &format!("{path}/succession-short-name"),
+            first.succession_short_name,
+        )?;
         if let Some(mult) = &first.succession_multiplicity {
             emit_multiplicity(w, &mult.value)?;
             w.push_char(' ');
@@ -1813,6 +1825,7 @@ pub(crate) fn emit_succession_usage(
     emit_visibility(w, succ.membership.visibility);
     if succ.succession_keyword_span.is_some() {
         w.push_str("succession ");
+        w.push_short_name_prefix(&format!("{path}/short_name"), succ.short_name)?;
     }
     if let Some(mult) = &succ.multiplicity {
         emit_multiplicity(w, &mult.value)?;

@@ -237,6 +237,8 @@ pub struct InOutDecl {
     pub is_var: bool,
     /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// `:>` subsets clause (`out voltage :> ISQ::electricPotential = ...;`, spec42 evsample;
     /// Gap 45 fallout). Previously the `:>` spelling was silently folded into `type_name`.
     pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
@@ -651,6 +653,8 @@ pub struct FirstStmt {
     /// bare `first ... then ...` form is used (no `succession` keyword) or the `succession`
     /// prefix is unnamed.
     pub succession_name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub succession_short_name: Option<DeclarationName>,
     /// Type of the succession itself, e.g. `succession s1 : AB first a then b;`.
     pub succession_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the succession feature itself, e.g. `succession [seBeforeNum] first ...`.
@@ -996,6 +1000,8 @@ pub struct AllocationDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationUsage {
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
     /// `:>` subsets clause (spec42 gap 27), previously parsed by the shared usage header and
@@ -1222,6 +1228,8 @@ pub struct StateUsage {
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// Referenced state path when an `exhibit path` is represented in an occurrence body.
     pub state_reference: Option<QualifiedReferenceId>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -1248,6 +1256,8 @@ pub struct StateUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Transition {
     pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     /// If omitted, form is `transition name then target;`.
     pub source: Option<Node<Expression>>,
     /// When `first` is present on a transition, the source state is also an initial state.

@@ -1094,6 +1094,7 @@ pub(crate) fn emit_interface_usage(
     match usage {
         InterfaceUsage::TypedConnect {
             name,
+            short_name,
             interface_type,
             subsets,
             redefines,
@@ -1101,8 +1102,11 @@ pub(crate) fn emit_interface_usage(
             body,
         } => {
             w.push_str("interface");
-            if let Some(n) = name {
+            if short_name.is_some() || name.is_some() {
                 w.push_char(' ');
+            }
+            w.push_short_name_prefix("interface/short_name", *short_name)?;
+            if let Some(n) = name {
                 w.push_declaration_name("interface/name", *n)?;
             }
             if let Some(ty) = interface_type {
@@ -1139,14 +1143,18 @@ pub(crate) fn emit_interface_usage(
         }
         InterfaceUsage::Declaration {
             name,
+            short_name,
             interface_type,
             subsets,
             redefines,
             body,
         } => {
             w.push_str("interface");
-            if let Some(n) = name {
+            if short_name.is_some() || name.is_some() {
                 w.push_char(' ');
+            }
+            w.push_short_name_prefix("interface/short_name", *short_name)?;
+            if let Some(n) = name {
                 w.push_declaration_name("interface/name", *n)?;
             }
             if let Some(ty) = interface_type {
@@ -1373,10 +1381,15 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
 
 pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, path: &str, bind: &Bind) -> Result<(), EmitError> {
     if bind.binding_name.is_some()
+        || bind.binding_short_name.is_some()
         || bind.binding_type.is_some()
         || bind.binding_multiplicity.is_some()
     {
         w.push_str("binding");
+        if bind.binding_short_name.is_some() {
+            w.push_char(' ');
+            w.push_short_name_prefix("binding/short_name", bind.binding_short_name)?;
+        }
         if let Some(mult) = &bind.binding_multiplicity {
             w.push_char(' ');
             emit_multiplicity(w, &mult.value)?;
@@ -1415,8 +1428,14 @@ pub(crate) fn emit_binding_connector_usage(
     if usage.all {
         w.push_str(" all");
     }
-    if let Some(name) = usage.name {
+    if usage.short_name.is_some() {
         w.push_char(' ');
+        w.push_short_name_prefix("binding-connector-usage/short_name", usage.short_name)?;
+    }
+    if let Some(name) = usage.name {
+        if usage.short_name.is_none() {
+            w.push_char(' ');
+        }
         w.push_declaration_name("binding-connector-usage/name", name)?;
     }
     if let Some(mult) = &usage.multiplicity {
@@ -1910,6 +1929,7 @@ pub(crate) fn emit_metadata_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("metadata ");
+    w.push_short_name_prefix("metadata-usage/short_name", usage.short_name)?;
     w.push_declaration_name("metadata-usage/name", usage.name)?;
     if let Some(ty) = usage.type_reference {
         w.push_str(" : ");

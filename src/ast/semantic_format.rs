@@ -912,6 +912,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(stakeholder (declaration ")?;
                             self.write_optional_name(stakeholder.value.declaration_name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            self.write_optional_name(stakeholder.value.short_name)?;
                             self.writer.write_str(") (target ")?;
                             if let Some(reference) = stakeholder.value.target {
                                 self.write_reference(reference)?;
@@ -1171,6 +1173,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_case_like_usage(
                                 "use-case-usage",
                                 usage.value.name,
+                                usage.value.short_name,
                                 usage.value.is_abstract,
                                 usage.value.type_name,
                                 usage.value.subsets.as_ref(),
@@ -1181,6 +1184,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_case_like_usage(
                                 "case-usage",
                                 usage.value.name,
+                                usage.value.short_name,
                                 usage.value.is_abstract,
                                 usage.value.type_name,
                                 usage.value.subsets.as_ref(),
@@ -1191,6 +1195,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_case_like_usage(
                                 "verification-case-usage",
                                 usage.value.name,
+                                usage.value.short_name,
                                 usage.value.is_abstract,
                                 usage.value.type_name,
                                 usage.value.subsets.as_ref(),
@@ -1471,6 +1476,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_transition(&mut self, transition: &super::Transition) -> io::Result<()> {
         self.writer.write_str("(transition (name ")?;
         self.write_optional_name(transition.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(transition.short_name)?;
         self.writer.write_str(") (source ")?;
         if let Some(source) = &transition.source {
             self.write_expression(source)?;
@@ -1755,6 +1762,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(exhibit (declaration ")?;
                             self.write_optional_name(exhibit.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            self.write_optional_name(exhibit.value.short_name)?;
                             self.writer.write_str(") (state ")?;
                             if let Some(reference) = exhibit.value.state_reference {
                                 self.write_reference(reference)?;
@@ -3037,6 +3046,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 })?;
                 self.writer.write_str(") (declaration ")?;
                 self.write_usage_declaration_name(declaration.value.name)?;
+                self.writer.write_str(") (short-name ")?;
+                self.write_optional_name(declaration.value.short_name)?;
                 self.writer.write_str(") (subsets ")?;
                 match &declaration.value.subsets {
                     Some(subsets) => self.write_subsetting(&subsets.value)?,
@@ -3755,6 +3766,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_state_usage(&mut self, usage: &super::StateUsage) -> io::Result<()> {
         self.writer.write_str("(state-usage (name ")?;
         self.write_optional_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (prefix (direction ")?;
         match usage.direction {
             Some(super::InOut::In) => self.writer.write_str("in")?,
@@ -4542,6 +4555,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer
             .write_str("(metadata-usage (declaration-name ")?;
         self.write_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
         match usage.type_reference {
             Some(reference) => self.write_reference(reference)?,
@@ -4875,6 +4890,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         &mut self,
         label: &str,
         name: DeclarationName,
+        short_name: Option<DeclarationName>,
         is_abstract: bool,
         type_name: Option<QualifiedReferenceId>,
         subsets: Option<&Node<SubsettingRelationship>>,
@@ -4883,6 +4899,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(label)?;
         self.writer.write_str(" (name ")?;
         self.write_name(name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(short_name)?;
         self.writer.write_str(") (abstract ")?;
         self.writer
             .write_str(if is_abstract { "true" } else { "false" })?;
@@ -4910,6 +4928,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_occurrence_usage_prefix(&usage.prefix)?;
         self.writer.write_str(" (name ")?;
         self.write_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
         if let Some(reference) = usage.type_name {
             self.write_reference(reference)?;
@@ -5351,6 +5371,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.succession_keyword_span.is_some()
         )?;
         self.write_optional_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
         self.writer.write_str("))")
     }
 
@@ -5435,6 +5457,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_concern_usage(&mut self, usage: &super::ConcernUsage) -> io::Result<()> {
         self.writer.write_str("(concern-usage (name ")?;
         self.write_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
         write!(
             self.writer,
             ") (visibility {}) (abstract {}) (individual {}) (definition {}) (type ",
@@ -5591,6 +5615,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             .write_str(if usage.is_abstract { "true" } else { "false" })?;
         self.writer.write_str(") (name ")?;
         self.write_usage_declaration_name(usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
         if let Some(reference) = usage.type_name {
             self.write_reference(reference)?;
@@ -6795,6 +6821,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_exhibit_state(&mut self, exhibit: &super::ExhibitState) -> io::Result<()> {
         self.writer.write_str("(exhibit (declaration ")?;
         self.write_optional_name(exhibit.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(exhibit.short_name)?;
         self.writer.write_str(") (state ")?;
         if let Some(reference) = exhibit.state_reference {
             self.write_reference(reference)?;

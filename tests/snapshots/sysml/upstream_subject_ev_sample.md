@@ -33,6 +33,6 @@ package EVSample {
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 32) (len 15)) (segments (segment 0 (token "VehicleAnalysis") (name "VehicleAnalysis") (separator none) (span (offset 50) (line 2) (column 32) (len 15)))))
   )
-  (root (package (name "EVSample") (body brace (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (name "largeEVAnalysis") (type (ref r0)) (subsets none) (redefines none)))))
+  (root (package (name "EVSample") (body brace (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (name "largeEVAnalysis") (short-name none) (type (ref r0)) (subsets none) (redefines none)))))
 )
 ~~~

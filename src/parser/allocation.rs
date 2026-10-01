@@ -1,7 +1,7 @@
 use crate::ast::{AllocationDef, AllocationUsage, Membership, Node};
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::feature_usage_header;
 use crate::parser::Input;
@@ -52,7 +52,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"allocation"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    let (input, (short_name, name_str)) = crate::parser::lex::usage_identification(input)?;
     let name_str = Some(name_str);
     let (input, header) = feature_usage_header(input)?;
     let type_name = header.type_reference;
@@ -80,6 +80,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
             input,
             AllocationUsage {
                 name: name_str,
+                short_name,
                 type_name,
                 type_is_conjugated: header.type_is_conjugated,
                 subsets: header.subsets,
@@ -108,6 +109,8 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             start,
             input,
             AllocationUsage {
+                // `allocate a to b` is anonymous; there is no `Identification` to carry one.
+                short_name: None,
                 name: None,
                 type_name: None,
                 type_is_conjugated: false,

@@ -708,7 +708,9 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, is_individual) =
         nom::combinator::opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"state"[..]).parse(input)?;
-    // SysML allows anonymous state usages: `state: Mode;` (Identification may be empty).
+    // SysML allows anonymous state usages: `state: Mode;` (Identification may be empty), and a
+    // short name with or without a declared name: `state <'S1'> s1;`, `state <'S1'> : Mode;`.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (after_gap, _) = ws_and_comments(input)?;
     // `state def …` is a definition, not a usage named `def`.
     if starts_with_keyword(after_gap.fragment(), b"def") {
@@ -724,7 +726,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     {
         (after_gap, None)
     } else {
-        let (input, _) = ws1(input)?;
+        let (input, _) = crate::parser::lex::gap_before_declared_name(input, short_name)?;
         let (input, n) = name(input)?;
         (input, Some(n))
     };
@@ -758,6 +760,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
                 name: n,
+                short_name,
                 state_reference: None,
                 type_name,
                 typing,
@@ -901,6 +904,9 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let start = input;
     let (input, _) = tag(&b"transition"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `TransitionUsage = 'transition' ( UsageDeclaration 'first' )? ...`: the declaration's
+    // `Identification` may carry a short name, with or without a declared name.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, n) = {
         let (peek, _) = ws_and_comments(input)?;
         if starts_with_keyword(peek.fragment(), b"first")
@@ -911,11 +917,11 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
         {
             (input, None)
         } else {
-            let (input, n) = name(input)?;
+            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
             (input, Some(n))
         }
     };
-    transition_tail(start, input, n)
+    transition_tail(start, input, short_name, n)
 }
 
 /// Shorthand transition without the `transition` keyword (validation `05-2`):
@@ -934,12 +940,13 @@ fn transition_shorthand(input: Input<'_>) -> IResult<Input<'_>, Node<Transition>
         )));
     }
     // Bare `do … then …` is uncommon and would fight `do_action`; omit that starter here.
-    transition_tail(start, input, None)
+    transition_tail(start, input, None, None)
 }
 
 fn transition_tail<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    short_name: Option<DeclarationName>,
     name: Option<DeclarationName>,
 ) -> IResult<Input<'a>, Node<Transition>> {
     // Optional: `first` source with optional `accept` trigger.
@@ -952,7 +959,7 @@ fn transition_tail<'a>(
     .parse(input)?;
     let (source, accept_from_first, is_initial) = match first_clause {
         // Named transitions use `first` for the source state; only unnamed transitions are initial.
-        Some((_, _, src, acc)) => (Some(src), acc, name.is_none()),
+        Some((_, _, src, acc)) => (Some(src), acc, name.is_none() && short_name.is_none()),
         None => (None, None, false),
     };
     // Shorthand may start with a top-level `accept` (no `first` source).
@@ -986,6 +993,7 @@ fn transition_tail<'a>(
             start,
             input,
             Transition {
+                short_name,
                 name,
                 source,
                 is_initial,
