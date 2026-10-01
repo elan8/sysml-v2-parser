@@ -152,7 +152,7 @@ fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenInclud
 
 fn use_case_usage_tail(
     input: Input<'_>,
-    ident: DeclarationName,
+    ident: Option<DeclarationName>,
     short_name: Option<DeclarationName>,
     is_abstract: bool,
     membership: crate::ast::Membership,
@@ -192,7 +192,7 @@ fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUs
     // declaration, so there is no `Identification` short-name slot here either.
     let (input, usage) = use_case_usage_tail(
         input,
-        ident,
+        Some(ident),
         None,
         false,
         crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
@@ -453,8 +453,15 @@ fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, n) = name(input)?;
-    let (input, mult) = opt(multiplicity_node).parse(input)?;
+    // `'ref' UsageDeclaration`: a full `Identification`, either half optional.
+    let (
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: n,
+        },
+    ) = crate::parser::lex::identification(input)?;
+    let (input, mult) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = return_ref_body(input)?;
     Ok((
@@ -464,6 +471,7 @@ fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
             input,
             ReturnRef {
                 name: n,
+                short_name,
                 multiplicity: mult,
                 body,
             },
@@ -563,12 +571,16 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
     let (input, _) = tag(&b"use"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
-    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2), e.g. `use case
-    // <'S-01'> prepareEquipment { ... }`. `UseCaseUsage` previously had no field for it, so
-    // `use_case_usage_tail` never got a chance to name the declaration this way.
-    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, ident) = name(input)?;
+    // `UseCaseUsage = ... 'use' 'case' ConstraintUsageDeclaration`, whose `Identification` makes
+    // both the short name and the name optional: `use case <'S-01'> prepare { ... }`,
+    // `use case <'S-01'> : Prepare;` and the anonymous `use case : Prepare;` all declare one.
+    let (
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: ident,
+        },
+    ) = crate::parser::lex::identification(input)?;
     let (input, usage) = use_case_usage_tail(
         input,
         ident,
@@ -1117,8 +1129,10 @@ mod redefines_field_tests {
             Some(&b"'S-01'"[..])
         );
         assert_eq!(
-            crate::parser::lex::name_bytes(src, node.value.name),
-            &b"prepareEquipment"[..]
+            node.value
+                .name
+                .map(|n| crate::parser::lex::name_bytes(src, n)),
+            Some(&b"prepareEquipment"[..])
         );
     }
 

@@ -15,7 +15,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{
-    conjugated_qualified_name, multiplicity_node, optional_typings, usage_declaration,
+    conjugated_qualified_name, multiplicity_node, optional_typings,
     usage_declaration_without_identification,
 };
 use crate::parser::Input;
@@ -173,10 +173,12 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
     // `Identification` is optional in `UsageDeclaration`. The `of` keyword starts the following
     // payload clause, so it must not be claimed as an invented declaration name. This remains the
     // declaration-led grammar alternative; the endpoint-only alternative is selected separately.
+    // A short name may precede it too (`message <'M1'> of Payload from a to b;`), so the
+    // keyword check also applies after the short name.
     let (input, declaration) = if starts_with_keyword(input.fragment(), b"of") {
         usage_declaration_without_identification(input)?
     } else {
-        usage_declaration(input)?
+        crate::parser::usage::usage_declaration_before(input, &[b"of", b"from"])?
     };
     let (input, value) = opt(preceded(
         ws_and_comments,

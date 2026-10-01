@@ -2820,6 +2820,9 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::CaseUsage(field_0) => {
                     visitor.visit_case_usage(field_0);
                 }
+                PartDefBodyElement::ConcernUsage(field_0) => {
+                    visitor.visit_concern_usage(field_0);
+                }
                 PartDefBodyElement::UseCaseDef(field_0) => {
                     visitor.visit_use_case_def(field_0);
                 }
@@ -3415,6 +3418,12 @@ macro_rules! ast_traversal {
                 }
                 PartUsageBodyElement::VerificationCaseUsage(field_0) => {
                     visitor.visit_verification_case_usage(field_0);
+                }
+                PartUsageBodyElement::CaseUsage(field_0) => {
+                    visitor.visit_case_usage(field_0);
+                }
+                PartUsageBodyElement::ConcernUsage(field_0) => {
+                    visitor.visit_concern_usage(field_0);
                 }
                 PartUsageBodyElement::ViewDef(field_0) => {
                     visitor.visit_view_def(field_0);
@@ -6912,8 +6921,10 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             let UseCaseUsage { name, short_name, type_name, is_abstract, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
-            visitor.visit_declaration_name(name);
             if let Some(inner) = short_name {
+                visitor.visit_declaration_name(inner);
+            }
+            if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = multiplicity {
@@ -7086,8 +7097,13 @@ macro_rules! ast_traversal {
         pub fn walk_return_ref<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ReturnRef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ReturnRef { name, multiplicity, body } = &$($mutability)? node.value;
-            visitor.visit_declaration_name(name);
+            let ReturnRef { name, short_name, multiplicity, body } = &$($mutability)? node.value;
+            if let Some(inner) = short_name {
+                visitor.visit_declaration_name(inner);
+            }
+            if let Some(inner) = name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }

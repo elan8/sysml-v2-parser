@@ -106,17 +106,11 @@ fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Constrain
     let (input, _) = ws1(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
-    // Anonymous body-only form: `constraint { stateSpace.order == order }` (Domain Libraries
-    // `StateSpaceRepresentation.sysml`; spec42 Gap 49a).
-    let (input, name_str) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b"{") {
-            (input, None)
-        } else {
-            let (input, n) = name(input)?;
-            (input, Some(n))
-        }
-    };
+    // `ConstraintUsageDeclaration`'s `Identification` makes the name optional: the anonymous
+    // body-only form `constraint { stateSpace.order == order }` (Domain Libraries
+    // `StateSpaceRepresentation.sysml`; spec42 Gap 49a), the typed `constraint : C;` and the
+    // short-name-only `constraint <'C1'> : C;` all omit it.
+    let (input, name_str) = opt(name).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = constraint_def_body(input)?;
     Ok((

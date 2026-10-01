@@ -1193,7 +1193,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_case_like_usage(
                                 "use-case-usage",
-                                Some(usage.value.name),
+                                usage.value.name,
                                 usage.value.short_name,
                                 usage.value.is_abstract,
                                 usage.value.type_name,
@@ -1251,7 +1251,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::ReturnRef(return_ref) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(return-ref (name ")?;
-                            self.write_name(return_ref.value.name)?;
+                            self.write_optional_name(return_ref.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            self.write_optional_name(return_ref.value.short_name)?;
                             self.writer.write_str(") (body-span ")?;
                             write_span(self.writer, &return_ref.value.body.span)?;
                             self.writer.write_str(") ")?;
@@ -1949,6 +1951,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 usage.value.name,
                                 usage.value.short_name,
                             )?;
+                        }
+                        PartDefBodyElement::ConcernUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_concern_usage(&usage.value)?;
                         }
                         PartDefBodyElement::UseCaseDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -4232,6 +4238,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 usage.value.name,
                                 usage.value.short_name,
                             )?;
+                        }
+                        super::PartUsageBodyElement::CaseUsage(usage) => {
+                            self.write_identified_usage_marker(
+                                &mut first,
+                                "case-usage",
+                                usage.value.name,
+                                usage.value.short_name,
+                            )?;
+                        }
+                        super::PartUsageBodyElement::ConcernUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_concern_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::ViewDef(definition) => {
                             self.write_item_prefix(&mut first)?;

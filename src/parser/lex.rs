@@ -1653,6 +1653,40 @@ pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identificat
     ))
 }
 
+/// `Identification` in a production whose next mandatory token after it is a keyword:
+/// `'alias' Identification 'for' …`, `'flow' UsageDeclaration ('of' … | 'from' …)`. Both halves
+/// of `Identification` are optional, and `name` accepts keyword spellings (models and libraries
+/// do use names like `item` or `entry`), so plain [`identification`] would read `alias <'A'>
+/// for T;` as an alias *named* `for`. A bare word equal to one of `follow` therefore ends the
+/// identification instead; a quoted `'for'` is still a name.
+pub(crate) fn identification_before<'a>(
+    input: Input<'a>,
+    follow: &[&[u8]],
+) -> IResult<Input<'a>, Identification> {
+    let (input, short_name) = short_name_prefix(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    if follow
+        .iter()
+        .any(|keyword| starts_with_keyword(peek.fragment(), keyword))
+    {
+        return Ok((
+            input,
+            Identification {
+                short_name,
+                name: None,
+            },
+        ));
+    }
+    let (input, decl_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    Ok((
+        input,
+        Identification {
+            short_name,
+            name: decl_name,
+        },
+    ))
+}
+
 /// The `( '<' ShortName '>' )?` half of `Identification` (BNF §8.2.2.2) in isolation, for usage
 /// parsers (`attribute_usage`, `part_usage`, `item_usage`, `port_usage`, ...) whose own
 /// name-dispatch logic (anonymous colon form vs. named vs. prefix-redefines) can't reuse

@@ -600,6 +600,9 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::VerifyRequirement(_) => {}
             PartDefBodyElement::CaseDef(n) => walk_use_case_def_body(report, &p, &n.value.body),
             PartDefBodyElement::CaseUsage(n) => walk_use_case_def_body(report, &p, &n.value.body),
+            PartDefBodyElement::ConcernUsage(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
+            }
             PartDefBodyElement::UseCaseDef(n) => walk_use_case_def_body(report, &p, &n.value.body),
             PartDefBodyElement::UseCaseUsage(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body)
@@ -752,6 +755,10 @@ fn walk_part_usage_body_elements(
             }
             PartUsageBodyElement::VerificationCaseUsage(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body)
+            }
+            PartUsageBodyElement::CaseUsage(n) => walk_use_case_def_body(report, &p, &n.value.body),
+            PartUsageBodyElement::ConcernUsage(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
             }
             PartUsageBodyElement::Import(import) => {
                 walk_optional_relationship_body(report, &p, import.value.body_elements.as_deref())

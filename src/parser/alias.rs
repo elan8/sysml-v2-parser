@@ -1,7 +1,7 @@
 //! Alias definition parsing.
 
 use crate::ast::{AliasBody, AliasDef, Node};
-use crate::parser::lex::{identification, qualified_reference, ws1, ws_and_comments};
+use crate::parser::lex::{qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::span::reference_transaction;
 use crate::parser::Input;
@@ -34,7 +34,9 @@ fn alias_def_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"alias"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
+    // `'alias' Identification 'for'`: an anonymous `alias <'A'> for T;` must not read `for` as
+    // its name.
+    let (input, identification) = crate::parser::lex::identification_before(input, &[b"for"])?;
     let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = qualified_reference(input)?;
@@ -70,6 +72,42 @@ mod membership_tests {
     // BNF `AliasMember : Membership = MemberPrefix 'alias' ...` legally permits a visibility
     // prefix, but `alias_def` never parsed one at all before this increment -- same gap class
     // found repeatedly in this rollout.
+
+    /// `'alias' Identification 'for'`: both halves of `Identification` are optional, so the
+    /// `for` keyword must not be read as the alias's name.
+    #[test]
+    fn alias_def_identification_halves_are_optional() {
+        for (source, short, name) in [
+            ("alias for ISQ::mass;", None, None),
+            ("alias <'m'> for ISQ::mass;", Some(&b"'m'"[..]), None),
+            (
+                "alias <'m'> mass for ISQ::mass;",
+                Some(&b"'m'"[..]),
+                Some(&b"mass"[..]),
+            ),
+            ("alias 'for' for ISQ::mass;", None, Some(&b"'for'"[..])),
+        ] {
+            let src = input(source);
+            let (rest, node) = alias_def(src).expect(source);
+            assert!(
+                rest.fragment().is_empty(),
+                "{source}: rest {:?}",
+                rest.fragment()
+            );
+            let id = node.value.identification;
+            assert_eq!(
+                id.short_name
+                    .map(|n| crate::parser::lex::name_bytes(src, n)),
+                short,
+                "{source}"
+            );
+            assert_eq!(
+                id.name.map(|n| crate::parser::lex::name_bytes(src, n)),
+                name,
+                "{source}"
+            );
+        }
+    }
 
     #[test]
     fn alias_def_visibility_prefix_is_captured_on_membership() {

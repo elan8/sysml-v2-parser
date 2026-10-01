@@ -434,16 +434,28 @@ fn emit_part_def_body_element(
         PartDefBodyElement::VerifyRequirement(n) => {
             super::requirement::emit_verify_requirement(w, path, &n.value)
         }
-        other @ (PartDefBodyElement::OccurrenceDef(_)
-        | PartDefBodyElement::CaseDef(_)
-        | PartDefBodyElement::CaseUsage(_)
-        | PartDefBodyElement::UseCaseDef(_)
-        | PartDefBodyElement::UseCaseUsage(_)
-        | PartDefBodyElement::VerificationCaseDef(_)
-        | PartDefBodyElement::VerificationCaseUsage(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        // The case family and occurrence definitions emit exactly as they do at package level;
+        // only their owner differs.
+        PartDefBodyElement::OccurrenceDef(o) => {
+            super::behavior::emit_occurrence_def(w, path, &o.value)
+        }
+        PartDefBodyElement::CaseDef(c) => super::requirement::emit_case_def(w, path, &c.value),
+        PartDefBodyElement::CaseUsage(c) => super::requirement::emit_case_usage(w, path, &c.value),
+        PartDefBodyElement::ConcernUsage(c) => {
+            super::requirement::emit_concern_usage(w, path, &c.value)
+        }
+        PartDefBodyElement::UseCaseDef(u) => {
+            super::requirement::emit_use_case_def(w, path, &u.value)
+        }
+        PartDefBodyElement::UseCaseUsage(u) => {
+            super::requirement::emit_use_case_usage(w, path, &u.value)
+        }
+        PartDefBodyElement::VerificationCaseDef(v) => {
+            super::requirement::emit_verification_case_def(w, path, &v.value)
+        }
+        PartDefBodyElement::VerificationCaseUsage(v) => {
+            super::requirement::emit_verification_case_usage(w, path, &v.value)
+        }
     }
 }
 
@@ -578,6 +590,12 @@ fn emit_part_usage_body_element(
         }
         PartUsageBodyElement::VerificationCaseUsage(v) => {
             super::requirement::emit_verification_case_usage(w, path, &v.value)
+        }
+        PartUsageBodyElement::CaseUsage(c) => {
+            super::requirement::emit_case_usage(w, path, &c.value)
+        }
+        PartUsageBodyElement::ConcernUsage(c) => {
+            super::requirement::emit_concern_usage(w, path, &c.value)
         }
         PartUsageBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
         PartUsageBodyElement::ViewDef(n) => super::view::emit_view_def(w, path, &n.value),

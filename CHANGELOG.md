@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every `Identification` accepts a short name without a regular name, and `concern`/`case`
+  usages are accepted in part bodies (breaking AST change, `PARSE_AST_VERSION` 263; #158, #159).**
+  - `UseCaseUsage::name` and `ReturnRef::name` are now `Option<DeclarationName>`, and `ReturnRef`
+    gains `short_name`: `use case <'U1'> : UC;`, `use case : UC;` and `return ref <'R'> { }` parse.
+  - New `lex::identification_before(follow)` for productions whose next token after
+    `Identification` is a keyword. `alias <'A'> for T;`, the anonymous `alias for T;` and
+    `message <'M'> of P from a to b;` used to read `for`/`of` as the declared name. A quoted
+    `'for'` is still a name, and keyword-spelled names elsewhere (`in item`, `for entry : T`) are
+    unaffected.
+  - `constraint <'C'> : C;` and the typed anonymous `constraint : C;` parse.
+  - `PartDefBodyElement::ConcernUsage`, `PartUsageBodyElement::ConcernUsage` and
+    `PartUsageBodyElement::CaseUsage`: `concern` usages in part definition and part usage
+    bodies, and `case` usages in part usage bodies, were rejected (#158). Item definition bodies
+    still accept only a handful of member kinds; that is a broader gap than `concern`.
+  - The part-definition-body emitter writes `case`, `verification` and `use case` usages and the
+    occurrence, case, use case and verification definitions; it reported them `Unsupported`
+    (#159).
+  - `tests/short_name_identification.rs` also derives a short-name-only variant of every case,
+    and checks the emitter round trip for all of them (the skip for constructs the emitter could
+    not write is gone).
+  - The `view_body_rendering_and_alias_recovery` fixture used `alias for AliasTarget;` as its
+    malformed alias; that is a valid anonymous alias, so the fixture now uses `alias for ;`.
+
+### Changed
+
 - Regular names are optional independently of short names in case, analysis, verification,
   concern, viewpoint, enum, allocation, metadata, state and exhibit-state declarations.
   Their parsers consume the existing `Identification` production, and the affected usage AST

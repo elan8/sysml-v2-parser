@@ -1765,6 +1765,14 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 crate::parser::case::verification_case_usage,
                 PartUsageBodyElement::VerificationCaseUsage,
             ),
+            map(
+                crate::parser::case::case_usage,
+                PartUsageBodyElement::CaseUsage,
+            ),
+            map(
+                crate::parser::requirement::concern_usage,
+                PartUsageBodyElement::ConcernUsage,
+            ),
             // The view family. `UsageBody = DefinitionBody`, so a part *usage* body admits the
             // same six a part *definition* body already dispatched; this scope had none of them,
             // so `rendering r { ... }` or `view v { ... }` inside `part p { ... }` reached

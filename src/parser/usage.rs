@@ -57,6 +57,17 @@ pub(crate) fn usage_declaration(input: Input<'_>) -> IResult<Input<'_>, Node<Usa
     usage_declaration_with_identification(start, input, identification)
 }
 
+/// [`usage_declaration`] for a production whose clause after the declaration starts with one of
+/// the `follow` keywords; see [`crate::parser::lex::identification_before`].
+pub(crate) fn usage_declaration_before<'a>(
+    input: Input<'a>,
+    follow: &[&[u8]],
+) -> IResult<Input<'a>, Node<UsageDeclaration>> {
+    let start = input;
+    let (input, identification) = crate::parser::lex::identification_before(input, follow)?;
+    usage_declaration_with_identification(start, input, identification)
+}
+
 /// Parse the `UsageDeclaration` form whose optional `Identification` is absent.
 ///
 /// This is a real, source-positioned declaration (with a zero-width identification span), not a

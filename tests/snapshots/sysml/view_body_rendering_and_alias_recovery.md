@@ -11,7 +11,7 @@ package ViewBodyRenderingAndAliasRecovery {
     view Recovered {
         rendering = ;
         rendering retainedRendering : RenderingType;
-        alias for AliasTarget;
+        alias for ;
         alias retainedAlias for AliasTarget;
     }
 }
@@ -35,7 +35,7 @@ package ViewBodyRenderingAndAliasRecovery {
     view Recovered {
         rendering = ;
         rendering retainedRendering : RenderingType;
-        alias for AliasTarget;
+        alias for ;
         alias retainedAlias for AliasTarget;
     }
 }
@@ -45,8 +45,8 @@ package ViewBodyRenderingAndAliasRecovery {
 (parsed-document
   (references
     (reference r0 (scope relative) (span (offset 185) (line 7) (column 39) (len 13)) (segments (segment 0 (token "RenderingType") (name "RenderingType") (separator none) (span (offset 185) (line 7) (column 39) (len 13)))))
-    (reference r1 (scope relative) (span (offset 263) (line 9) (column 33) (len 11)) (segments (segment 0 (token "AliasTarget") (name "AliasTarget") (separator none) (span (offset 263) (line 9) (column 33) (len 11)))))
+    (reference r1 (scope relative) (span (offset 252) (line 9) (column 33) (len 11)) (segments (segment 0 (token "AliasTarget") (name "AliasTarget") (separator none) (span (offset 252) (line 9) (column 33) (len 11)))))
   )
-  (root (package (name "ViewBodyRenderingAndAliasRecovery") (body brace (rendering-def (modifiers)) (part-def (name "AliasTarget") (modifiers) (body semicolon)) (view (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (name "Recovered") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (references none) (crosses none) (redefines none) (value none) (body brace (malformed (code "recovered_view_body_element") (found "rendering = ;") (span (offset 133) (line 6) (column 9) (len 22))) (rendering-usage (abstract false) (name "retainedRendering") (short-name none) (type (ref r0)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (malformed (code "recovered_view_body_element") (found "alias for AliasTarget;") (span (offset 208) (line 8) (column 9) (len 31))) (alias (name "retainedAlias") (target (ref r1)) (body semicolon)))))))
+  (root (package (name "ViewBodyRenderingAndAliasRecovery") (body brace (rendering-def (modifiers)) (part-def (name "AliasTarget") (modifiers) (body semicolon)) (view (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (name "Recovered") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (references none) (crosses none) (redefines none) (value none) (body brace (malformed (code "recovered_view_body_element") (found "rendering = ;") (span (offset 133) (line 6) (column 9) (len 22))) (rendering-usage (abstract false) (name "retainedRendering") (short-name none) (type (ref r0)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)) (malformed (code "recovered_view_body_element") (found "alias for ;") (span (offset 208) (line 8) (column 9) (len 20))) (alias (name "retainedAlias") (target (ref r1)) (body semicolon)))))))
 )
 ~~~

@@ -290,7 +290,7 @@ fn test_verification_return_ref_parses_return_expression() {
         })
         .expect("return ref should be present");
     assert_eq!(
-        result.declaration_name(return_ref.name),
+        result.declaration_name(return_ref.name.expect("named return ref")),
         Some("verdictResult")
     );
     let ReturnRefBody::Brace { elements, .. } = &return_ref.body.value else {
