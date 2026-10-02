@@ -213,7 +213,10 @@ fn gh89_4_include_and_use_case_usage_in_part_usage_body() {
         _ => None,
     });
     let use_case = use_case.expect("expected a UseCaseUsage element");
-    assert_eq!(doc.declaration_name(use_case.name), Some("uc1"));
+    assert_eq!(
+        doc.declaration_name(use_case.name.expect("named use case usage")),
+        Some("uc1")
+    );
 }
 
 /// Real usage: `Simple Tests/ConstraintTest.sysml:78-81`:

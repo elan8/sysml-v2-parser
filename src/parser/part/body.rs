@@ -357,6 +357,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
+            map(
+                crate::parser::requirement::concern_usage,
+                PartDefBodyElement::ConcernUsage,
+            ),
         )),
         alt((
             // PAR-002: nested `def` kinds that were previously only reachable at package level.

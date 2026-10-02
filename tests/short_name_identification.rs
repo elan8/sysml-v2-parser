@@ -12,7 +12,7 @@
 //! 2. with the short name it parses with no diagnostics and the AST retains it as a
 //!    `DeclarationName` (found through the structural visitor, so no per-node accessor is
 //!    needed and a new production is covered by adding one line here);
-//! 3. the emitter writes it back (where the emitter supports the construct at all).
+//! 3. the emitter writes it back.
 
 use sysml_v2_parser::ast::visit::{walk_root_namespace, Visitor};
 use sysml_v2_parser::ast::DeclarationName;
@@ -64,6 +64,8 @@ enum Context {
     ActionDef,
     /// In a calculation definition body.
     CalcDef,
+    /// In a part usage body that owns parts `a` and `b`.
+    PartUsage,
 }
 
 fn wrap(context: Context, snippet: &str) -> String {
@@ -78,6 +80,7 @@ fn wrap(context: Context, snippet: &str) -> String {
         Context::ConnectionDef => format!("connection def Owner {{ {snippet} }}"),
         Context::ActionDef => format!("action def Owner {{ {snippet} }}"),
         Context::CalcDef => format!("calc def Owner {{ {snippet} }}"),
+        Context::PartUsage => format!("part owner {{ part a : T; part b : T; {snippet} }}"),
     };
     format!("package P {{ {PRELUDE} {member} }}\n")
 }
@@ -154,6 +157,7 @@ const CASES: &[(Context, &str)] = &[
     (Context::PartDef, "constraint <'SN'> cs : CND;"),
     (Context::PartDef, "assert constraint <'SN'> ac2 : CND;"),
     (Context::PartDef, "requirement <'SN'> rq : RD;"),
+    (Context::PartDef, "concern <'SN'> co : CCD;"),
     (Context::PartDef, "case <'SN'> ca : CSD;"),
     (Context::PartDef, "analysis <'SN'> an : ANLD;"),
     (Context::PartDef, "verification <'SN'> ve : VD;"),
@@ -181,8 +185,13 @@ const CASES: &[(Context, &str)] = &[
     (Context::RequirementDef, "frame concern <'SN'> fc : CCD;"),
     (Context::CalcDef, "return <'SN'> r : AD;"),
     (Context::ActionDef, "out <'SN'> y : AD;"),
+    (Context::PartUsage, "case <'SN'> ca : CSD;"),
+    (Context::PartUsage, "concern <'SN'> co : CCD;"),
+    (Context::PartUsage, "verification <'SN'> ve : VD;"),
+    (Context::PartUsage, "use case <'SN'> uc : UCD;"),
     (Context::StateDef, "transition <'SN'> tr first s1 then s2;"),
     (Context::UseCaseDef, "include use case <'SN'> inc : UCD;"),
+    (Context::UseCaseDef, "return ref <'SN'> rr { }"),
     (Context::UseCaseDef, "subject <'SN'> sb : T;"),
     (Context::UseCaseDef, "actor <'SN'> ar : T;"),
     (Context::UseCaseDef, "objective <'SN'> ob;"),
@@ -202,8 +211,27 @@ impl Visitor for Names {
 }
 
 /// Why a case fails, or `None` when it passes.
+/// The same snippet with the declared name after `<'SN'>` removed, or `None` when the case has
+/// no declared name to remove. `Identification` makes both halves optional, so every
+/// production that accepts `<'SN'> name` also accepts `<'SN'>` alone.
+fn short_name_only(snippet: &str) -> Option<String> {
+    let (before, after) = snippet.split_once("<'SN'> ")?;
+    let name_len = after
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .unwrap_or(after.len());
+    if name_len == 0 {
+        return None;
+    }
+    Some(format!("{before}<'SN'>{}", &after[name_len..]))
+}
+
 fn check(context: Context, snippet: &str) -> Option<String> {
-    let control = wrap(context, &snippet.replace("<'SN'> ", ""));
+    check_against(context, snippet, &snippet.replace("<'SN'> ", ""))
+}
+
+/// `control` is a source for the same context that is known to be valid without the short name.
+fn check_against(context: Context, snippet: &str, control: &str) -> Option<String> {
+    let control = wrap(context, control);
     let control_result = parse_with_diagnostics(&control);
     if !control_result.errors.is_empty() {
         return Some(format!(
@@ -226,17 +254,30 @@ fn check(context: Context, snippet: &str) -> Option<String> {
     {
         return Some("the short name is not retained in the AST".to_owned());
     }
-    // Some body scopes have no emitter for a construct at all, with or without a short name.
-    // That is an emitter coverage gap, not a short-name one, so the round trip is only checked
-    // where the control emits.
-    if emit_sysml(&control_result.document).is_err() {
-        return None;
-    }
     match emit_sysml(&result.document) {
         Ok(emitted) if emitted.contains("<'SN'>") => None,
         Ok(emitted) => Some(format!("the emitter drops the short name:\n{emitted}")),
         Err(error) => Some(format!("emit failed: {error:?}")),
     }
+}
+
+#[test]
+fn every_identification_production_accepts_a_short_name_without_a_name() {
+    let failures = CASES
+        .iter()
+        .filter_map(|(context, snippet)| {
+            let only = short_name_only(snippet)?;
+            // The named form of the declaration is the control: it establishes the context.
+            check_against(*context, &only, &snippet.replace("<'SN'> ", ""))
+                .map(|reason| format!("`{only}`: {reason}"))
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        failures.is_empty(),
+        "{} short-name-only cases fail:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 #[test]

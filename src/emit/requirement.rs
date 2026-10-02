@@ -557,7 +557,9 @@ pub(crate) fn emit_use_case_usage(
     }
     w.push_str("use case ");
     w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
-    w.push_declaration_name(&format!("{path}/name"), usage.name)?;
+    if let Some(name) = usage.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -921,7 +923,10 @@ fn emit_return_ref(
     return_ref: &ReturnRef,
 ) -> Result<(), EmitError> {
     w.push_str("return ref ");
-    w.push_declaration_name(&format!("{path}/name"), return_ref.name)?;
+    w.push_short_name_prefix(&format!("{path}/short_name"), return_ref.short_name)?;
+    if let Some(name) = return_ref.name {
+        w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
     if let Some(multiplicity) = &return_ref.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }

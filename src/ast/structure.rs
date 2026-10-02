@@ -235,6 +235,8 @@ pub enum PartDefBodyElement {
     KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
     CaseDef(Node<crate::ast::requirement::CaseDef>),
     CaseUsage(Node<crate::ast::requirement::CaseUsage>),
+    /// `concern` usage (`ConcernUsage` is an `OccurrenceUsage`, so `DefinitionBody` admits it).
+    ConcernUsage(Node<crate::ast::requirement::ConcernUsage>),
     UseCaseDef(Node<crate::ast::requirement::UseCaseDef>),
     UseCaseUsage(Node<crate::ast::requirement::UseCaseUsage>),
     AnalysisCaseDef(Node<crate::ast::requirement::AnalysisCaseDef>),
@@ -914,6 +916,10 @@ pub enum PartUsageBodyElement {
     /// }` (Simple Tests/VerificationTest.sysml:35). Already dispatched in `PartDefBodyElement`,
     /// just not here.
     VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
+    /// `case` and `concern` usages: `UsageBody = DefinitionBody`, so a part *usage* body admits
+    /// the same `OccurrenceUsage` members as a part *definition* body.
+    CaseUsage(Node<crate::ast::requirement::CaseUsage>),
+    ConcernUsage(Node<crate::ast::requirement::ConcernUsage>),
     /// The view family. `RenderingUsage`, `ViewUsage` and `ViewpointUsage` are
     /// `StructureUsageElement`/`BehaviorUsageElement` alternatives and the three definitions are
     /// `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits all six here

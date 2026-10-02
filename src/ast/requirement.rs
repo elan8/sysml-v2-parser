@@ -720,7 +720,7 @@ pub struct VerificationCaseUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UseCaseUsage {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (e.g. `use case <'S-01'> prepareEquipment { ... }`).
     /// See [`RequirementUsage::short_name`]; `UseCaseUsage` previously had no field for it at all,
     /// so the grammar accepted `<'S-01'>` on a `requirement` but not on a `use case`.
@@ -898,7 +898,9 @@ impl PartialEq for CaseReturnDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReturnRef {
-    pub name: DeclarationName,
+    pub name: Option<DeclarationName>,
+    /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
+    pub short_name: Option<DeclarationName>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: Node<ReturnRefBody>,
 }
