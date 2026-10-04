@@ -109,6 +109,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ResultExpressionMember`s. `calc def K { objective o; }` reported
   `recovered_calc_body_element`; it now reports `unexpected_keyword_in_scope`.
 
+- **Namespace-level `interface X;` and `calc X;` are usages (breaking AST change,
+  `PARSE_AST_VERSION` 265).** `InterfaceDefKeyword` and `CalculationDefKeyword` are `interface
+  def` and `calc def` (`SysML.xtext:1101-1107, 1938-1945`), but the package-body dispatcher kept
+  `def` optional and returned `InterfaceDef`/`CalcDef`, so the usage form was unrepresentable and
+  the emitter rewrote `calc ms : MassSum;` as `calc def ms : MassSum;`. `def` is now required in
+  every scope (the `def`-optional `calc_def`/`interface_def` parsers are removed), so these are
+  `PackageBodyElement::InterfaceUsage`/`CalcUsage`. To carry the Systems Library usage forms
+  (`abstract interface interfaces : Interface[0..*] nonunique :> connections { ... }`):
+  - every `InterfaceUsage` variant gains `prefix: OccurrenceUsagePrefix`, and `TypedConnect` and
+    `Declaration` gain `multiplicity` and `multiplicity_modifiers` (the multiplicity was parsed
+    and discarded); the projection writes them.
+  - `CalcUsage` gains `multiplicity_modifiers`.
+  `connection X;` was already a `ConnectionUsage`.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed

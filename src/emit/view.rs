@@ -200,6 +200,7 @@ pub(crate) fn emit_calc_usage(
     if let Some(multiplicity) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &multiplicity.value)?;
     }
+    super::structure::emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if leading_target.is_none() {
         if let Some(redefines) = &usage.redefines {
             w.push_str(" :>> ");

@@ -2219,10 +2219,17 @@ pub enum InterfaceUsage {
     /// previously only the typed (`interface name: Type connect ...`) and fully anonymous
     /// (`Connection` variant) forms were reachable.
     TypedConnect {
+        /// `OccurrenceUsagePrefix` before `interface`.
+        prefix: crate::ast::OccurrenceUsagePrefix,
         name: Option<DeclarationName>,
         /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
         short_name: Option<DeclarationName>,
         interface_type: Option<QualifiedReferenceId>,
+        /// The `UsageDeclaration`'s multiplicity, before or after the type. Boxed to keep the
+        /// enum's variants close in size.
+        multiplicity: Option<Box<Node<Multiplicity>>>,
+        /// `MultiplicityPart`'s `ordered`/`nonunique` keyword slots.
+        multiplicity_modifiers: crate::ast::MultiplicityModifiers,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
         part: Node<InterfacePart>,
@@ -2232,6 +2239,8 @@ pub enum InterfaceUsage {
     },
     /// `interface` from `to` to body.
     Connection {
+        /// `OccurrenceUsagePrefix` before `interface`.
+        prefix: crate::ast::OccurrenceUsagePrefix,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
         part: Node<InterfacePart>,
@@ -2248,10 +2257,19 @@ pub enum InterfaceUsage {
     /// `interface_usage` unconditionally required either a `connect` clause or a bare `from to
     /// to` form.
     Declaration {
+        /// `OccurrenceUsagePrefix` before `interface`, e.g. the `abstract` of `abstract interface
+        /// interfaces : Interface[0..*] nonunique :> connections { ... }` (Systems Library
+        /// `Interfaces.sysml`).
+        prefix: crate::ast::OccurrenceUsagePrefix,
         name: Option<DeclarationName>,
         /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
         short_name: Option<DeclarationName>,
         interface_type: Option<QualifiedReferenceId>,
+        /// The `UsageDeclaration`'s multiplicity, before or after the type. Boxed to keep the
+        /// enum's variants close in size.
+        multiplicity: Option<Box<Node<Multiplicity>>>,
+        /// `MultiplicityPart`'s `ordered`/`nonunique` keyword slots.
+        multiplicity_modifiers: crate::ast::MultiplicityModifiers,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
         /// See [`InterfaceUsage::TypedConnect`]'s body.

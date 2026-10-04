@@ -4846,7 +4846,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                InterfaceUsage::TypedConnect { name, short_name, interface_type, subsets, redefines, part, body } => {
+                InterfaceUsage::TypedConnect { prefix, name, short_name, interface_type, multiplicity, multiplicity_modifiers, subsets, redefines, part, body } => {
+                    visitor.visit_occurrence_usage_prefix(prefix);
                     if let Some(inner) = short_name {
                         visitor.visit_declaration_name(inner);
                     }
@@ -4856,6 +4857,10 @@ macro_rules! ast_traversal {
                     if let Some(inner) = interface_type {
                         visitor.visit_qualified_reference(inner);
                     }
+                    if let Some(inner) = multiplicity {
+                        visitor.visit_multiplicity(inner);
+                    }
+                    visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
                     if let Some(inner) = subsets {
                         visitor.visit_subsetting_relationship(inner);
                     }
@@ -4865,7 +4870,8 @@ macro_rules! ast_traversal {
                     visitor.visit_interface_part(part);
                     walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Connection { subsets, redefines, part, body } => {
+                InterfaceUsage::Connection { prefix, subsets, redefines, part, body } => {
+                    visitor.visit_occurrence_usage_prefix(prefix);
                     if let Some(inner) = subsets {
                         visitor.visit_subsetting_relationship(inner);
                     }
@@ -4875,7 +4881,8 @@ macro_rules! ast_traversal {
                     visitor.visit_interface_part(part);
                     walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Declaration { name, short_name, interface_type, subsets, redefines, body } => {
+                InterfaceUsage::Declaration { prefix, name, short_name, interface_type, multiplicity, multiplicity_modifiers, subsets, redefines, body } => {
+                    visitor.visit_occurrence_usage_prefix(prefix);
                     if let Some(inner) = short_name {
                         visitor.visit_declaration_name(inner);
                     }
@@ -4885,6 +4892,10 @@ macro_rules! ast_traversal {
                     if let Some(inner) = interface_type {
                         visitor.visit_qualified_reference(inner);
                     }
+                    if let Some(inner) = multiplicity {
+                        visitor.visit_multiplicity(inner);
+                    }
+                    visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
                     if let Some(inner) = subsets {
                         visitor.visit_subsetting_relationship(inner);
                     }
@@ -7435,7 +7446,7 @@ macro_rules! ast_traversal {
         pub fn walk_calc_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcUsage { identification, is_abstract, type_name, multiplicity, subsets, redefines, value, direction, is_reference: _, body, membership } = &$($mutability)? node.value;
+            let CalcUsage { identification, is_abstract, type_name, multiplicity, multiplicity_modifiers, subsets, redefines, value, direction, is_reference: _, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             let _ = is_abstract;
             if let Some(inner) = subsets {
@@ -7447,6 +7458,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = redefines {
                 for inner in inner {
                     visitor.visit_qualified_reference(inner);

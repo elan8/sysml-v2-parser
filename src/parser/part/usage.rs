@@ -1114,9 +1114,25 @@ fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePa
 /// all (BNF `InterfaceUsageDeclaration`'s `('connect' InterfacePart)?` is optional: ends may be
 /// declared inside the body instead, or omitted entirely). The optional interface member name is
 /// captured only for the declaration-only form; the connect forms still ignore it.
+///
+/// `InterfaceUsage = OccurrenceUsagePrefix 'interface' InterfaceUsageDeclaration InterfaceBody`
+/// (`SysML.xtext:1153-1156`): every form carries the shared prefix, and the declared forms keep
+/// their `UsageDeclaration` multiplicity and `MultiplicityPart` keywords.
 pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
+    // Speculated at member starts it does not own; refuse by lookahead before the prefix
+    // allocates `#` extension references, and roll them back if the production then fails.
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"interface") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, interface_usage_inner)
+}
+
+fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"interface"[..]).parse(input)?;
     let (input, _) = if input.fragment().starts_with(b":")
         || input.fragment().starts_with(b";")
@@ -1141,9 +1157,9 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    let (input, iface_name, interface_type) =
-        if let Some((iface_name, _, _, interface_type)) = named_interface {
-            (input, Some(iface_name), Some(interface_type))
+    let (input, iface_name, leading_multiplicity, interface_type) =
+        if let Some((iface_name, multiplicity, _, interface_type)) = named_interface {
+            (input, Some(iface_name), multiplicity, Some(interface_type))
         } else {
             // GH-85: a bare name with no `: Type` at all, immediately followed by `connect`, e.g.
             // `interface userToFlashlight connect user.onOffCmdPort to
@@ -1159,8 +1175,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 preceded(ws_and_comments, nom::combinator::peek(tag(&b"connect"[..]))),
             ))
             .parse(input)?;
-            if let Some((iface_name, _, _)) = bare_named {
-                (input, Some(iface_name), None)
+            if let Some((iface_name, multiplicity, _)) = bare_named {
+                (input, Some(iface_name), multiplicity, None)
             } else {
                 // A declared interface usage with a name but no typing and no `connect` clause:
                 // `interface i;`, `interface i { ... }`, `interface i :> J;`. `UsageDeclaration`
@@ -1187,18 +1203,33 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     ),
                 ))
                 .parse(input)?;
-                if let Some((iface_name, _, _)) = declared_name {
-                    (input, Some(iface_name), None)
+                if let Some((iface_name, multiplicity, _)) = declared_name {
+                    (input, Some(iface_name), multiplicity, None)
                 } else {
                     let (input, interface_type) = opt(preceded(
                         tag(&b":"[..]),
                         preceded(ws_and_comments, qualified_reference),
                     ))
                     .parse(input)?;
-                    (input, None, interface_type)
+                    (input, None, None, interface_type)
                 }
             }
         };
+    // `FeatureSpecializationPart` also admits the `MultiplicityPart` after the typing
+    // (`interfaces : Interface[0..*] nonunique :> connections`), and its keyword slots follow
+    // the multiplicity in either position.
+    let declared = iface_name.is_some() || interface_type.is_some() || short_name.is_some();
+    let (input, multiplicity) = match leading_multiplicity {
+        Some(multiplicity) => (input, Some(multiplicity)),
+        None if declared => opt(multiplicity_node).parse(input)?,
+        None => (input, None),
+    };
+    let multiplicity = multiplicity.map(Box::new);
+    let (input, multiplicity_modifiers) = if declared {
+        crate::parser::usage::multiplicity_modifier_slots(input)?
+    } else {
+        (input, crate::ast::MultiplicityModifiers::default())
+    };
     let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
     let subsets = spec.subsets.map(|(target, _)| target);
     let redefines = spec.redefines;
@@ -1214,9 +1245,12 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 start,
                 input,
                 InterfaceUsage::TypedConnect {
+                    prefix,
                     name: iface_name,
                     short_name,
                     interface_type,
+                    multiplicity,
+                    multiplicity_modifiers,
                     subsets,
                     redefines,
                     part,
@@ -1236,6 +1270,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     start,
                     input,
                     InterfaceUsage::Connection {
+                        prefix: prefix.clone(),
                         subsets: subsets.clone(),
                         redefines: redefines.clone(),
                         part,
@@ -1254,9 +1289,12 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             start,
             input,
             InterfaceUsage::Declaration {
+                prefix,
                 name: iface_name,
                 short_name,
                 interface_type,
+                multiplicity,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 body,

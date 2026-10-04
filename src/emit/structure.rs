@@ -1111,14 +1111,18 @@ pub(crate) fn emit_interface_usage(
 ) -> Result<(), EmitError> {
     match usage {
         InterfaceUsage::TypedConnect {
+            prefix,
             name,
             short_name,
             interface_type,
+            multiplicity,
+            multiplicity_modifiers,
             subsets,
             redefines,
             part,
             body,
         } => {
+            emit_occurrence_usage_prefix(w, path, prefix)?;
             w.push_str("interface");
             if short_name.is_some() || name.is_some() {
                 w.push_char(' ');
@@ -1131,6 +1135,10 @@ pub(crate) fn emit_interface_usage(
                 w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
             }
+            if let Some(multiplicity) = multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            emit_multiplicity_modifiers(w, multiplicity_modifiers);
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
             }
@@ -1143,11 +1151,13 @@ pub(crate) fn emit_interface_usage(
             emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Connection {
+            prefix,
             subsets,
             redefines,
             part,
             body,
         } => {
+            emit_occurrence_usage_prefix(w, path, prefix)?;
             w.push_str("interface");
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
@@ -1160,13 +1170,17 @@ pub(crate) fn emit_interface_usage(
             emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Declaration {
+            prefix,
             name,
             short_name,
             interface_type,
+            multiplicity,
+            multiplicity_modifiers,
             subsets,
             redefines,
             body,
         } => {
+            emit_occurrence_usage_prefix(w, path, prefix)?;
             w.push_str("interface");
             if short_name.is_some() || name.is_some() {
                 w.push_char(' ');
@@ -1179,6 +1193,10 @@ pub(crate) fn emit_interface_usage(
                 w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
             }
+            if let Some(multiplicity) = multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            emit_multiplicity_modifiers(w, multiplicity_modifiers);
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
             }

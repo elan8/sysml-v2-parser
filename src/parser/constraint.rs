@@ -383,6 +383,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
+    let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
     // `calc self: Calculation :>> Action::self, Evaluation::self;` (Systems Library
     // `Calculations.sysml`) -- only retry if the earlier attempt (right after `calc`) didn't
@@ -416,6 +417,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
                 is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
                 type_name,
                 multiplicity,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 value,
@@ -427,34 +429,19 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     ))
 }
 
-/// `def` is intentionally optional: the standard library uses bare, `def`-less `calc` usages at
-/// namespace level (e.g. `abstract calc calculations: Calculation[0..*] nonunique :> actions,
-/// evaluations { ... }` in `Systems Library/Calculations.sysml`). `calc_def` and `calc_usage` are
-/// never dispatched together in the same alt today (`calc_usage` is only used standalone in part
-/// bodies), so this is not the PAR-001 bug class, but do not add `.def_required()` here without
-/// checking package-level content first.
-pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
-    parse_calc_def(input, false)
-}
-
-/// Calc definition with required `def` keyword, for contexts (e.g. nested inside a part
-/// definition body) where `calc_usage` is already dispatched in the same `alt(...)` -- requiring
-/// `def` here prevents a `def`-less calc usage from being misclassified as a definition, the same
-/// bug class as PAR-001 in `attribute_def`. Unlike [`calc_def`] (kept `def`-optional for the
-/// namespace-level bare form documented on that function), this variant is safe to stack ahead of
-/// `calc_usage`.
+/// `CalculationDefinition = OccurrenceDefinitionPrefix 'calc' 'def' DefinitionDeclaration
+/// CalculationBody` (`SysML.xtext:1938-1945`). `def` is required in every scope: without it the
+/// member is a `CalculationUsage` (`calc ms : MassSum;`), which [`calc_usage`] owns.
 pub(crate) fn calc_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
-    parse_calc_def(input, true)
+    parse_calc_def(input)
 }
 
-fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<CalcDef>> {
+fn parse_calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"calc")
+    let options = DefinitionPrefixOptions::new(b"calc")
         .with_captured_visibility()
-        .individual_allowed();
-    if require_def {
-        options = options.def_required();
-    }
+        .individual_allowed()
+        .def_required();
     let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = calculation_body(input)?;
     Ok((
@@ -2571,7 +2558,7 @@ mod membership_tests {
 
     #[test]
     fn calc_def_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) = calc_def(input("protected calc def C1;")).expect("calc def");
+        let (rest, node) = calc_def_required(input("protected calc def C1;")).expect("calc def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -2585,7 +2572,7 @@ mod membership_tests {
 
     #[test]
     fn calc_def_without_visibility_prefix_has_no_membership_visibility() {
-        let (rest, node) = calc_def(input("calc def C1;")).expect("calc def");
+        let (rest, node) = calc_def_required(input("calc def C1;")).expect("calc def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.membership.visibility, None);
     }

@@ -175,6 +175,10 @@ pub struct CalcUsage {
     pub is_abstract: bool,
     pub type_name: Option<QualifiedReferenceId>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart`'s `ordered`/`nonunique` keyword slots after the multiplicity, e.g.
+    /// `abstract calc calculations: Calculation[0..*] nonunique :> actions, evaluations { ... }`
+    /// (Systems Library `Calculations.sysml`).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `:>` subsets clause, which may name several comma-separated targets. Also previously
     /// parsed and discarded, with a comment claiming `CalcUsage` "doesn't model subsetting
     /// separately from redefines" -- it does now, because they are different relationships.

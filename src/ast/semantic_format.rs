@@ -2980,6 +2980,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_str(" (redefines")?;
         match &usage.redefines {
@@ -5183,21 +5185,81 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// Project the form and typed body so a regular comment cannot be invisible in a snapshot.
     fn write_interface_usage(&mut self, usage: &super::InterfaceUsage) -> io::Result<()> {
         self.writer.write_str("(interface-usage (form ")?;
-        let (part, body) = match usage {
-            super::InterfaceUsage::TypedConnect { part, body, .. } => {
+        let (prefix, declaration, part, body) = match usage {
+            super::InterfaceUsage::TypedConnect {
+                prefix,
+                name,
+                short_name,
+                interface_type,
+                multiplicity,
+                multiplicity_modifiers,
+                part,
+                body,
+                ..
+            } => {
                 self.writer.write_str("typed-connect")?;
-                (Some(part), body)
+                (
+                    prefix,
+                    Some((
+                        *name,
+                        *short_name,
+                        *interface_type,
+                        multiplicity,
+                        multiplicity_modifiers,
+                    )),
+                    Some(part),
+                    body,
+                )
             }
-            super::InterfaceUsage::Connection { part, body, .. } => {
+            super::InterfaceUsage::Connection {
+                prefix, part, body, ..
+            } => {
                 self.writer.write_str("connection")?;
-                (Some(part), body)
+                (prefix, None, Some(part), body)
             }
-            super::InterfaceUsage::Declaration { body, .. } => {
+            super::InterfaceUsage::Declaration {
+                prefix,
+                name,
+                short_name,
+                interface_type,
+                multiplicity,
+                multiplicity_modifiers,
+                body,
+                ..
+            } => {
                 self.writer.write_str("declaration")?;
-                (None, body)
+                (
+                    prefix,
+                    Some((
+                        *name,
+                        *short_name,
+                        *interface_type,
+                        multiplicity,
+                        multiplicity_modifiers,
+                    )),
+                    None,
+                    body,
+                )
             }
         };
-        self.writer.write_str(") (part ")?;
+        self.writer.write_str(") ")?;
+        self.write_occurrence_usage_prefix(prefix)?;
+        if let Some((name, short_name, interface_type, multiplicity, modifiers)) = declaration {
+            self.writer.write_str(" (name ")?;
+            self.write_optional_name(name)?;
+            self.writer.write_str(") (short-name ")?;
+            self.write_optional_name(short_name)?;
+            self.writer.write_str(") (type ")?;
+            match interface_type {
+                Some(reference) => self.write_reference(reference)?,
+                None => self.writer.write_str("none")?,
+            }
+            self.writer.write_str(") (multiplicity ")?;
+            self.write_multiplicity_clause(multiplicity.as_deref())?;
+            self.writer.write_str(") ")?;
+            self.write_multiplicity_modifiers(modifiers)?;
+        }
+        self.writer.write_str(" (part ")?;
         if let Some(part) = part {
             self.write_interface_part(&part.value)?;
         } else {

@@ -131,43 +131,22 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
     Ok((input, members.into_body()))
 }
 
-/// Interface definition: `interface` `def` Identification body
-///
-/// `def` is optional here: the standard library uses bare, `def`-less `interface` usages at
-/// namespace level (e.g. `abstract interface interfaces: Interface[0..*] nonunique :>
-/// connections { ... }` in `Systems Library/Interfaces.sysml`), a shape a `def_required` usage
-/// parser can't recover. `parse_interface_def` sets `.reject_header_keyword(b"connect")` (mirror
-/// of `connection_def`'s PAR-007 fix, same rationale) so a package-level `interface iface :
-/// PowerInterface connect a to b;` usage -- which used to be misclassified as `InterfaceDef` with
-/// its `connect` clause silently discarded -- fails this parser and falls through to
-/// `interface_usage` (`part::usage::interface_usage`, now also dispatched at package level; see
-/// `package.rs`) instead of being swallowed here. The bare abstract/multiplicity Systems Library
-/// shape above never contains a `connect` keyword, so it is unaffected.
-pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
-    parse_interface_def(input, false)
-}
-
-/// Interface definition with a mandatory `def` keyword: for body contexts (e.g. part-def bodies)
-/// that also dispatch `interface_usage`. `interface_usage` only recognizes connector forms
-/// (`connect ... to ...`), so an optional `def` would let a non-connector interface usage (e.g.
-/// `interface foo : IfaceType;`) be silently misclassified as a definition — the same bug class
-/// as PAR-001 in `attribute_def`.
+/// `InterfaceDefinition = OccurrenceDefinitionPrefix 'interface' 'def' DefinitionDeclaration
+/// InterfaceBody` (`SysML.xtext:1101-1107`). `def` is required in every scope: without it the
+/// member is an `InterfaceUsage` (`interface i : I;`), which `interface_usage` owns.
+/// `.reject_header_keyword(b"connect")` stays as a guard: a definition header never takes a
+/// `connect` clause.
 pub(crate) fn interface_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
-    parse_interface_def(input, true)
+    parse_interface_def(input)
 }
 
-fn parse_interface_def(
-    input: Input<'_>,
-    require_def: bool,
-) -> IResult<Input<'_>, Node<InterfaceDef>> {
+fn parse_interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"interface")
+    let options = DefinitionPrefixOptions::new(b"interface")
         .individual_allowed()
         .with_captured_visibility()
-        .reject_header_keyword(b"connect");
-    if require_def {
-        options = options.def_required();
-    }
+        .reject_header_keyword(b"connect")
+        .def_required();
     let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = interface_def_body(input)?;
     Ok((
@@ -267,7 +246,7 @@ mod membership_tests {
     #[test]
     fn interface_def_visibility_prefix_is_captured_on_membership() {
         let (rest, node) =
-            interface_def(input("private interface def I1;")).expect("interface def");
+            interface_def_required(input("private interface def I1;")).expect("interface def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -281,7 +260,8 @@ mod membership_tests {
 
     #[test]
     fn interface_def_without_visibility_prefix_has_no_membership_visibility() {
-        let (rest, node) = interface_def(input("interface def I1;")).expect("interface def");
+        let (rest, node) =
+            interface_def_required(input("interface def I1;")).expect("interface def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.membership.visibility, None);
     }

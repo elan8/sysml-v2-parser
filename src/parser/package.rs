@@ -15,7 +15,7 @@ use crate::parser::case::{
     verification_case_usage,
 };
 use crate::parser::connection::connection_def;
-use crate::parser::constraint::{calc_def, constraint_def, constraint_usage};
+use crate::parser::constraint::{constraint_def, constraint_usage};
 use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
 use crate::parser::expr::expression;
@@ -25,7 +25,6 @@ use crate::parser::grammar_scope::{
 };
 use crate::parser::import::import_;
 use crate::parser::individual::individual_def;
-use crate::parser::interface::interface_def;
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     name, qualified_declaration_name, recover_body_element, skip_statement_or_block,
@@ -1732,12 +1731,11 @@ fn try_package_body_structure<'a>(
         start,
         starter,
         Interface,
-        interface_def,
+        crate::parser::interface::interface_def_required,
         PackageBodyElement::InterfaceDef
     );
-    // PAR-007: standalone interface usage at package level, tried after `interface_def` above
-    // now that `interface_def` rejects a swallowed `connect` clause instead of silently
-    // discarding it -- see `interface_def`'s doc comment and `PackageBodyElement::InterfaceUsage`.
+    // `InterfaceUsage`: `interface` without `def` (`SysML.xtext:1153-1156`).
+    // `interface_def_required` above refuses it, so `interface i : I;` is a usage.
     try_package_body_dispatch!(
         input,
         start,
@@ -2017,14 +2015,11 @@ fn try_package_body_behavior<'a>(
         start,
         starter,
         Calculation,
-        calc_def,
+        crate::parser::constraint::calc_def_required,
         PackageBodyElement::CalcDef
     );
-    // After `calc_def`, never before it: `calc_def` is deliberately `def`-optional here (see
-    // `definition_prefix`'s module doc) because the Systems Library authors bare `calc Name : T;`
-    // definitions at namespace level. This arm catches only what that grammar refuses -- a
-    // `CalculationUsage`'s multiplicity, `ordered`/`nonunique` and value clauses -- which
-    // previously fell through to the unimplemented extended-library declaration.
+    // `CalculationUsage`: `calc` without `def` (`SysML.xtext:1977-1979`). `calc_def_required`
+    // above refuses it, so a namespace-level `calc ms : MassSum;` is a usage, not a definition.
     try_package_body_dispatch!(
         input,
         start,
