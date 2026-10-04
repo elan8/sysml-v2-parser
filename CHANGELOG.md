@@ -92,6 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as `then` targets instead of being recovered. The semantic projection writes the prefix on
   every control node.
 
+- **`multiplicity` members in KerML type bodies.** `TypeBodyElement` reaches `NonFeatureMember
+  -> NonFeatureElement -> Multiplicity` (`KerML.xtext:153-155, 234-239, 754-764`), so
+  `classifier Two[1] { multiplicity extra [2]; }` yields a `CalcDefBodyElement::KermlClassifier`
+  with keyword `multiplicity` and its bounds -- the node a package body already produces --
+  instead of two shredded result expressions. The semantic projection of `kerml-classifier` now
+  writes its `(multiplicity …)`.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed

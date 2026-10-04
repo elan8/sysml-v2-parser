@@ -1959,6 +1959,10 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"behavior",
             b"predicate",
             b"interaction",
+            // `TypeBodyElement -> NonFeatureMember -> MemberElement -> NonFeatureElement ->
+            // Multiplicity` (KerML.xtext 153-155, 234-239, 754-764): `multiplicity extra [2];`
+            // is a `MultiplicityRange` member, the same production a package body reaches.
+            b"multiplicity",
         ],
     ) {
         // Nested classifier declarations inside a type body (`struct StructuredSurface

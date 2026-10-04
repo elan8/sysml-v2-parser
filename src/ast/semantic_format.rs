@@ -2593,6 +2593,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             declaration.is_abstract
         )?;
         self.write_optional_name(declaration.identification.name)?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
         self.writer.write_str(") (specializes ")?;
         match &declaration.specializes {
             Some(typing) => self.write_typing(&typing.value)?,
