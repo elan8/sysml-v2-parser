@@ -274,7 +274,13 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::AttributeUsage(Box::new(n))
         })
         .parse(input)?
-    } else if input.fragment().starts_with(b":>>") || input.fragment().starts_with(b":>") {
+    } else if input.fragment().starts_with(b":>>")
+        || input.fragment().starts_with(b":>")
+        || starts_with_keyword(input.fragment(), b"redefines")
+    {
+        // `redefines partMasses = (…);` is the keyword spelling of the same `:>>` member
+        // (`Redefinitions = ( ':>>' | 'redefines' ) OwnedRedefinition`, SysML BNF); without it the
+        // reserved word reached the terminal arm's refusal and the member became recovery.
         map(
             crate::parser::attribute::redefinition_feature_binding,
             |n| ConstraintDefBodyElement::AttributeUsage(Box::new(n)),

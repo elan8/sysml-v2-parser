@@ -107,7 +107,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start with is refused by the terminal expression arm and recovered as one node
   (`unexpected_keyword_in_scope`), so `Expression` body elements are exactly authored
   `ResultExpressionMember`s. `calc def K { objective o; }` reported
-  `recovered_calc_body_element`; it now reports `unexpected_keyword_in_scope`.
+  `recovered_calc_body_element`; it now reports `unexpected_keyword_in_scope`. A constraint body
+  accepts the keyword spelling `redefines partMasses = (…);` of its `:>>` member, which that
+  refusal had sent to recovery. `end 'bool' g;` in a type body is recovered as one member rather
+  than three silent expressions: a quoted name followed by another name is neither an owned cross
+  feature (which needs a following `feature` keyword) nor a `FeatureDeclaration`; the library's
+  `end bool constrainedGuard;` and `end y;` are features.
 
 - **Namespace-level `interface X;` and `calc X;` are usages (breaking AST change,
   `PARSE_AST_VERSION` 265).** `InterfaceDefKeyword` and `CalculationDefKeyword` are `interface
