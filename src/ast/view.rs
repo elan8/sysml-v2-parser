@@ -99,7 +99,8 @@ pub enum ConstraintDefBodyElement {
     /// Boxed because the shared `OccurrenceUsagePrefix` makes `ConstraintUsage` much the largest
     /// member of this scope; the indirection keeps the enum the size of its other variants.
     Constraint(Box<Node<ConstraintUsage>>),
-    /// Keyword-less `:>> name = …` binding inside `require name { … }` (validation `10c`).
+    /// `attribute` usage member (`attribute a : T;`), or the keyword-less `:>> name = …` binding
+    /// inside `require name { … }` (validation `10c`).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
     /// Keyword-less feature declaration (`mass : Real;`): a constraint definition body is a
     /// `DefinitionBody`, so it owns usages as well as the constraint expression.

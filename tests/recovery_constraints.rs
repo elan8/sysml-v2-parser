@@ -16,9 +16,11 @@ fn calc_reports_unmodeled_members_as_explicit_recovery() {
         "the unmodeled member must produce exactly one diagnostic: {:?}",
         result.errors
     );
+    // The reserved keyword reaches recovery as itself rather than after the result-expression
+    // arm read it as a feature reference, so the diagnostic names the misplaced keyword.
     assert_eq!(
         result.errors[0].code.as_deref(),
-        Some("recovered_calc_body_element")
+        Some("unexpected_keyword_in_scope")
     );
     let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,

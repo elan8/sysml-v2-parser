@@ -265,6 +265,15 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::InOutDecl(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(after_visibility.fragment(), b"attribute") {
+        // `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem ->
+        // NonOccurrenceUsageMember -> AttributeUsage` (SysML BNF 1359-1368, 901-917): the same
+        // `attribute_usage` a calculation body dispatches. Without this arm the terminal
+        // expression arm split `attribute a : T;` into an `attribute` expression and a feature.
+        map(crate::parser::attribute::attribute_usage, |n| {
+            ConstraintDefBodyElement::AttributeUsage(Box::new(n))
+        })
+        .parse(input)?
     } else if input.fragment().starts_with(b":>>") || input.fragment().starts_with(b":>") {
         map(
             crate::parser::attribute::redefinition_feature_binding,
@@ -312,6 +321,11 @@ pub(crate) fn constraint_def_body_element(
             rest,
             ConstraintDefBodyElement::FeatureDecl(Box::new(binding)),
         )
+    } else if refuses_result_expression_fallback(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     } else {
         map(expression, ConstraintDefBodyElement::Expression).parse(input)?
     };
@@ -1971,13 +1985,12 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::KermlClassifier(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"in")
-        || starts_with_keyword(input.fragment(), b"out")
-        || starts_with_keyword(input.fragment(), b"inout")
-    {
+    } else if starts_with_any_keyword(after_visibility, &[b"in", b"out", b"inout"]) {
         // A directed `in part …` was claimed here before the scope had a `PartUsage` arm at all;
-        // the arm above owns every part usage now, directed or not.
-        match directed_member_keyword(input) {
+        // the arm above owns every part usage now, directed or not. The direction is looked for
+        // past `MemberPrefix`, which every arm's parser re-reads: `protected in c : C;` is one
+        // feature, not a `protected` expression followed by a feature.
+        match directed_member_keyword(after_visibility_input) {
             // `in calc scenario : NominalScenario;` (validation `10c-Fuel Economy Analysis`) is a
             // SysML `CalculationUsage = OccurrenceUsagePrefix 'calc' …` (SysML BNF 1355), not a
             // KerML `Feature`. It reached the directed-parameter node only because this arm ran
@@ -2055,11 +2068,52 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             next,
             CalcDefBodyElement::DefaultReferenceUsage(Box::new(binding)),
         )
+    } else if refuses_result_expression_fallback(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     } else {
         map(expression, CalcDefBodyElement::Expression).parse(input)?
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// Whether a member that no keyword arm claimed must not reach the terminal result-expression
+/// arm of a calculation, constraint or KerML type body.
+///
+/// That arm models `ResultExpressionMember`'s `OwnedExpression` only. A member that opens --
+/// after its optional `MemberPrefix` -- with a reserved keyword no expression can start with is a
+/// member this scope does not model; the expression parser would read its first word as a feature reference
+/// and the rest as further members (`attribute a : T;` became an `attribute` expression beside a
+/// feature). Refusing hands the whole member to the body's recovery as one node, so `Expression`
+/// elements are exactly the authored result expressions.
+fn refuses_result_expression_fallback(input: Input<'_>) -> bool {
+    /// Reserved words of the expression grammar: those that begin an `OwnedExpression`, and the
+    /// operator words, which this refusal leaves to the expression arm's own handling rather than
+    /// reclassifying as misplaced member keywords.
+    const EXPRESSION_KEYWORDS: &[&[u8]] = &[
+        b"if", b"not", b"all", b"new", b"true", b"false", b"null", b"and", b"or", b"xor",
+        b"implies", b"istype", b"hastype", b"as", b"meta",
+    ];
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    // `ResultExpressionMember = MemberPrefix OwnedExpression`, so a visibility keyword alone
+    // does not disqualify the member; the word after it decides.
+    let input = crate::parser::lex::visibility_prefix(input)
+        .map(|(rest, _)| rest)
+        .unwrap_or(input);
+    let fragment = input.fragment();
+    let word_len = fragment
+        .iter()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+        .count();
+    let word = &fragment[..word_len];
+    word_len > 0
+        && crate::parser::lex::is_reserved_keyword(word)
+        && !EXPRESSION_KEYWORDS.contains(&word)
 }
 
 /// Whether a reserved `FeaturePrefix` head is immediately followed by a token which makes its

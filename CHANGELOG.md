@@ -99,6 +99,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of two shredded result expressions. The semantic projection of `kerml-classifier` now
   writes its `(multiplicity …)`.
 
+- **Calculation, constraint and KerML type bodies no longer shred unmodeled members into result
+  expressions.** `attribute a : T;` in a `constraint def` body is a
+  `ConstraintDefBodyElement::AttributeUsage`, and `protected in c : C;` in a KerML `class` body is
+  one directed `KermlFeature` (the direction is looked for past `MemberPrefix`). A member that,
+  after its optional visibility, opens with a reserved keyword no arm models and no expression can
+  start with is refused by the terminal expression arm and recovered as one node
+  (`unexpected_keyword_in_scope`), so `Expression` body elements are exactly authored
+  `ResultExpressionMember`s. `calc def K { objective o; }` reported
+  `recovered_calc_body_element`; it now reports `unexpected_keyword_in_scope`.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed
