@@ -659,6 +659,11 @@ macro_rules! ast_traversal {
                 walk_usage_extension_keyword(self, node)
             }
 
+            /// Visits [`ControlNodePrefix`]; the default implementation walks its children.
+            fn visit_control_node_prefix(&mut self, node: &$($mutability)? ControlNodePrefix) {
+                walk_control_node_prefix(self, node)
+            }
+
             /// Visits [`OccurrenceUsagePrefix`]; the default implementation walks its children.
             fn visit_occurrence_usage_prefix(&mut self, node: &$($mutability)? OccurrenceUsagePrefix) {
                 walk_occurrence_usage_prefix(self, node)
@@ -4494,6 +4499,20 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_control_node_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ControlNodePrefix) {
+            let ControlNodePrefix { ref_prefix, individual_span, portion, extension_keywords } = node;
+            visitor.visit_ref_prefix(ref_prefix);
+            if let Some(inner) = individual_span {
+                visitor.visit_span(inner);
+            }
+            if let Some(inner) = portion {
+                visitor.visit_occurrence_portion_kind(inner);
+            }
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
+        }
+
         pub fn walk_occurrence_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsagePrefix) {
             let OccurrenceUsagePrefix { head, extension_keywords } = node;
             visitor.visit_occurrence_usage_prefix_head(head);
@@ -5726,7 +5745,8 @@ macro_rules! ast_traversal {
         pub fn walk_merge_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MergeStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let MergeStmt { declaration, body } = &$($mutability)? node.value;
+            let MergeStmt { prefix, declaration, body } = &$($mutability)? node.value;
+            visitor.visit_control_node_prefix(prefix);
             match declaration {
                 ControlNodeDeclaration::Anonymous => {}
                 ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
@@ -5738,7 +5758,8 @@ macro_rules! ast_traversal {
         pub fn walk_decision_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DecisionStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DecisionStmt { declaration, body } = &$($mutability)? node.value;
+            let DecisionStmt { prefix, declaration, body } = &$($mutability)? node.value;
+            visitor.visit_control_node_prefix(prefix);
             match declaration {
                 ControlNodeDeclaration::Anonymous => {}
                 ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
@@ -5750,7 +5771,8 @@ macro_rules! ast_traversal {
         pub fn walk_join_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<JoinStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let JoinStmt { declaration, body } = &$($mutability)? node.value;
+            let JoinStmt { prefix, declaration, body } = &$($mutability)? node.value;
+            visitor.visit_control_node_prefix(prefix);
             match declaration {
                 ControlNodeDeclaration::Anonymous => {}
                 ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
@@ -5762,7 +5784,8 @@ macro_rules! ast_traversal {
         pub fn walk_fork_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForkStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ForkStmt { declaration, body } = &$($mutability)? node.value;
+            let ForkStmt { prefix, declaration, body } = &$($mutability)? node.value;
+            visitor.visit_control_node_prefix(prefix);
             match declaration {
                 ControlNodeDeclaration::Anonymous => {}
                 ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),

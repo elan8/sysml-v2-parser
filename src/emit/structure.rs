@@ -1594,6 +1594,33 @@ pub(crate) fn emit_basic_usage_prefix(
     }
 }
 
+/// `ControlNodePrefix`: `RefPrefix ('individual')? PortionKind? UsageExtensionKeyword*`, each
+/// authored slot followed by one space.
+pub(crate) fn emit_control_node_prefix(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    prefix: &crate::ast::ControlNodePrefix,
+) -> Result<(), EmitError> {
+    let ref_prefix = &prefix.ref_prefix;
+    if let Some(direction) = &ref_prefix.direction {
+        emit_direction(w, direction.value);
+    }
+    emit_ref_prefix(
+        w,
+        ref_prefix.derived_span.is_some(),
+        ref_prefix.variance.as_ref().map(|node| &node.value),
+        ref_prefix.constant_span.is_some(),
+    );
+    if prefix.individual_span.is_some() {
+        w.push_str("individual ");
+    }
+    if let Some(portion) = &prefix.portion {
+        w.push_str(portion.value.keyword());
+        w.push_char(' ');
+    }
+    emit_extension_keywords(w, &format!("{path}/prefix"), &prefix.extension_keywords)
+}
+
 pub(crate) fn emit_occurrence_usage_prefix(
     w: &mut EmitWriter<'_>,
     path: &str,

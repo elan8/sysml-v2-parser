@@ -1322,13 +1322,21 @@ fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
 
 fn merge_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::control_node_prefix(input)?;
     let (input, _) = tag(&b"merge"[..]).parse(input)?;
     let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, MergeStmt { declaration, body }),
+        node_from_to(
+            start,
+            input,
+            MergeStmt {
+                prefix,
+                declaration,
+                body,
+            },
+        ),
     ))
 }
 
@@ -1336,27 +1344,32 @@ fn merge_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
 fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
-    {
-        let (cursor, _) = ws_and_comments(input)?;
-        if !starts_with_keyword(cursor.fragment(), b"decide") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"decide") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     }
     crate::parser::span::reference_transaction(input, decision_stmt_inner)
 }
 
 fn decision_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::control_node_prefix(input)?;
     let (input, _) = tag(&b"decide"[..]).parse(input)?;
     let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, DecisionStmt { declaration, body }),
+        node_from_to(
+            start,
+            input,
+            DecisionStmt {
+                prefix,
+                declaration,
+                body,
+            },
+        ),
     ))
 }
 
@@ -1364,27 +1377,32 @@ fn decision_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt
 fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
-    {
-        let (cursor, _) = ws_and_comments(input)?;
-        if !starts_with_keyword(cursor.fragment(), b"join") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"join") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     }
     crate::parser::span::reference_transaction(input, join_stmt_inner)
 }
 
 fn join_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::control_node_prefix(input)?;
     let (input, _) = tag(&b"join"[..]).parse(input)?;
     let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, JoinStmt { declaration, body }),
+        node_from_to(
+            start,
+            input,
+            JoinStmt {
+                prefix,
+                declaration,
+                body,
+            },
+        ),
     ))
 }
 
@@ -1403,13 +1421,21 @@ fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
 
 fn fork_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::occurrence_prefix::control_node_prefix(input)?;
     let (input, _) = tag(&b"fork"[..]).parse(input)?;
     let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, ForkStmt { declaration, body }),
+        node_from_to(
+            start,
+            input,
+            ForkStmt {
+                prefix,
+                declaration,
+                body,
+            },
+        ),
     ))
 }
 

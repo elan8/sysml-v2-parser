@@ -2146,11 +2146,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_control_node(
         &mut self,
         keyword: &str,
+        prefix: &super::ControlNodePrefix,
         declaration: &super::ControlNodeDeclaration,
         body: &FirstMergeBody,
     ) -> io::Result<()> {
         self.writer.write_char('(')?;
         self.writer.write_str(keyword)?;
+        self.writer.write_char(' ')?;
+        self.write_control_node_prefix(prefix)?;
         self.writer.write_str(" (declaration ")?;
         self.write_control_node_declaration(declaration)?;
         self.writer.write_str(") ")?;
@@ -2162,18 +2165,29 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         match &action.target {
             super::ThenTarget::Merge(merge) => {
                 self.writer.write_str("(then-control ")?;
-                self.write_control_node("merge", &merge.value.declaration, &merge.value.body)?;
+                self.write_control_node(
+                    "merge",
+                    &merge.value.prefix,
+                    &merge.value.declaration,
+                    &merge.value.body,
+                )?;
                 self.writer.write_char(')')
             }
             super::ThenTarget::Fork(fork) => {
                 self.writer.write_str("(then-control ")?;
-                self.write_control_node("fork", &fork.value.declaration, &fork.value.body)?;
+                self.write_control_node(
+                    "fork",
+                    &fork.value.prefix,
+                    &fork.value.declaration,
+                    &fork.value.body,
+                )?;
                 self.writer.write_char(')')
             }
             super::ThenTarget::Decide(decision) => {
                 self.writer.write_str("(then-control ")?;
                 self.write_control_node(
                     "decide",
+                    &decision.value.prefix,
                     &decision.value.declaration,
                     &decision.value.body,
                 )?;
@@ -2181,7 +2195,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             super::ThenTarget::Join(join) => {
                 self.writer.write_str("(then-control ")?;
-                self.write_control_node("join", &join.value.declaration, &join.value.body)?;
+                self.write_control_node(
+                    "join",
+                    &join.value.prefix,
+                    &join.value.declaration,
+                    &join.value.body,
+                )?;
                 self.writer.write_char(')')
             }
             super::ThenTarget::If(if_stmt) => {
@@ -3194,18 +3213,30 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_guarded_succession(&succession.value)
             }
             ActionDefBodyElement::FirstStmt(first) => self.write_first_statement(&first.value),
-            ActionDefBodyElement::MergeStmt(merge) => {
-                self.write_control_node("merge", &merge.value.declaration, &merge.value.body)
-            }
-            ActionDefBodyElement::DecisionStmt(decision) => {
-                self.write_control_node("decide", &decision.value.declaration, &decision.value.body)
-            }
-            ActionDefBodyElement::JoinStmt(join) => {
-                self.write_control_node("join", &join.value.declaration, &join.value.body)
-            }
-            ActionDefBodyElement::ForkStmt(fork) => {
-                self.write_control_node("fork", &fork.value.declaration, &fork.value.body)
-            }
+            ActionDefBodyElement::MergeStmt(merge) => self.write_control_node(
+                "merge",
+                &merge.value.prefix,
+                &merge.value.declaration,
+                &merge.value.body,
+            ),
+            ActionDefBodyElement::DecisionStmt(decision) => self.write_control_node(
+                "decide",
+                &decision.value.prefix,
+                &decision.value.declaration,
+                &decision.value.body,
+            ),
+            ActionDefBodyElement::JoinStmt(join) => self.write_control_node(
+                "join",
+                &join.value.prefix,
+                &join.value.declaration,
+                &join.value.body,
+            ),
+            ActionDefBodyElement::ForkStmt(fork) => self.write_control_node(
+                "fork",
+                &fork.value.prefix,
+                &fork.value.declaration,
+                &fork.value.body,
+            ),
             ActionDefBodyElement::TerminateStmt(terminate) => {
                 self.write_terminate_statement(&terminate.value)
             }
@@ -3957,6 +3988,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "merge",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -3965,6 +3997,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "decide",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -3973,6 +4006,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "join",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -3981,6 +4015,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "fork",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -6101,9 +6136,40 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("))")
     }
 
+    /// `ControlNodePrefix`'s slots, each naming the alternative that was authored.
+    fn write_control_node_prefix(&mut self, prefix: &super::ControlNodePrefix) -> io::Result<()> {
+        self.writer.write_str("(prefix ")?;
+        self.write_ref_prefix(&prefix.ref_prefix)?;
+        write!(
+            self.writer,
+            " (individual {}) (portion ",
+            prefix.individual_span.is_some()
+        )?;
+        match prefix.portion.as_ref().map(|node| node.value) {
+            Some(super::OccurrencePortionKind::Snapshot) => self.writer.write_str("snapshot")?,
+            Some(super::OccurrencePortionKind::Timeslice) => self.writer.write_str("timeslice")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (extensions")?;
+        for keyword in &prefix.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str("))")
+    }
+
     /// `BasicUsagePrefix`'s slots, each naming the alternative that was authored.
     fn write_basic_usage_prefix(&mut self, basic: &super::BasicUsagePrefix) -> io::Result<()> {
-        let ref_prefix = &basic.ref_prefix;
+        self.write_ref_prefix(&basic.ref_prefix)?;
+        write!(
+            self.writer,
+            " (reference {})",
+            basic.reference_span.is_some()
+        )
+    }
+
+    /// `RefPrefix`'s slots, each naming the alternative that was authored.
+    fn write_ref_prefix(&mut self, ref_prefix: &super::RefPrefix) -> io::Result<()> {
         self.writer.write_str("(direction ")?;
         self.write_direction(ref_prefix.direction.as_ref().map(|node| node.value))?;
         write!(
@@ -6118,9 +6184,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         write!(
             self.writer,
-            ") (constant {}) (reference {})",
-            ref_prefix.constant_span.is_some(),
-            basic.reference_span.is_some(),
+            ") (constant {})",
+            ref_prefix.constant_span.is_some()
         )
     }
 

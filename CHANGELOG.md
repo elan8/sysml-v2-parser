@@ -85,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sides, so the emitter rewrote an authored `[1..1]` as `[1]`; both spellings now round-trip.
   The semantic projection writes `(lower none)` and `(infinity)` instead of `unbounded`.
 
+- **Control nodes own `ControlNodePrefix` (breaking AST change, `PARSE_AST_VERSION` 265).**
+  `MergeStmt`, `DecisionStmt`, `JoinStmt` and `ForkStmt` gain `prefix: ControlNodePrefix`
+  (`RefPrefix`, `individual`, `PortionKind`, `UsageExtensionKeyword*`; `SysML.xtext:1657-1686`),
+  so `in fork g;`, `out derived join j;` and `timeslice #Tag fork t;` parse in action bodies and
+  as `then` targets instead of being recovered. The semantic projection writes the prefix on
+  every control node.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed
