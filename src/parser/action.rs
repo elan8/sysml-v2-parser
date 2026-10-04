@@ -2972,7 +2972,10 @@ mod membership_tests {
             multiplicity.lower.as_deref().map(|bound| &bound.value),
             Some(Expression::LiteralInteger(0))
         ));
-        assert!(multiplicity.upper.is_none());
+        assert!(matches!(
+            multiplicity.upper.value,
+            Expression::LiteralInfinity
+        ));
         let subsets = crate::parser::usage::reference_list_text(
             source,
             &node

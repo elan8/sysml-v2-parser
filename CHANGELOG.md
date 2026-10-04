@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   form formats as `connector : T`. `specializes` remains rejected: KerML `FeatureSpecialization`
   has no such spelling.
 
+- **`*` is a `LiteralInfinity` expression, and a multiplicity's lower bound is only the one
+  authored (breaking AST change, `PARSE_AST_VERSION` 265).** KerML `LiteralExpression` includes
+  `LiteralInfinity`, so `Expression::LiteralInfinity` is now parsed wherever a primary expression
+  is written: `feature x = *;` parses instead of falling to the opaque feature fallback.
+  `Multiplicity` follows KerML `MultiplicityRange` (`'[' (lowerBound '..')? upperBound ']'`):
+  `upper` is a required `Box<Node<Expression>>` (`*` is `LiteralInfinity`), and `lower` is
+  `Some` only when `lowerBound '..'` was written. `[3]` used to duplicate its bound into both
+  sides, so the emitter rewrote an authored `[1..1]` as `[1]`; both spellings now round-trip.
+  The semantic projection writes `(lower none)` and `(infinity)` instead of `unbounded`.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed

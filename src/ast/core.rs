@@ -282,6 +282,9 @@ pub enum Expression {
     LiteralReal(RealLiteral),
     LiteralString(StringLiteral),
     LiteralBoolean(bool),
+    /// KerML `LiteralInfinity`, the `*` literal: an unbounded multiplicity bound (`[1..*]`) or
+    /// any other expression position (`feature x = *;`).
+    LiteralInfinity,
     /// Single name or qualified name.
     FeatureRef(QualifiedReferenceId),
     /// base.member (e.g. engine.fuelCmdPort).
@@ -545,6 +548,7 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         | Expression::LiteralReal(_)
         | Expression::LiteralString(_)
         | Expression::LiteralBoolean(_)
+        | Expression::LiteralInfinity
         | Expression::FeatureRef(_)
         | Expression::Classification { .. }
         | Expression::Null
@@ -690,17 +694,18 @@ impl CollectionOperator {
 
 /// Multiplicity bounds, e.g. `[1..*]`, `[0..1]`, `[3]` (PAR-004/PAR-003 item 5).
 ///
-/// A bare bound like `[3]` means `lower == upper == Some(3)`. An unbounded `*` (as in `[1..*]` or
-/// bare `[*]`) is represented as `None` for that side.
+/// KerML `MultiplicityRange`: `'[' (lowerBound '..')? upperBound ']'`. A bare bound like `[3]`
+/// authors only the upper bound, so `lower` is `None`; `[3..3]` authors both. An unbounded `*` is
+/// the [`Expression::LiteralInfinity`] bound it is written as.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Multiplicity {
-    /// Lower bound expression, e.g. `1` in `[1..*]`. `None` when the lower bound is unbounded
-    /// (bare `[*]` with no explicit lower bound).
+    /// The authored lower bound, e.g. `1` in `[1..*]`; `None` when no `lowerBound '..'` was
+    /// written (`[3]`, `[*]`).
     pub lower: Option<Box<Node<Expression>>>,
-    /// Upper bound expression, e.g. `*` renders as `None` (unbounded); `10` in `[1..10]` is
-    /// `Some(10)`.
-    pub upper: Option<Box<Node<Expression>>>,
+    /// The upper bound, always authored: `*` in `[1..*]` is [`Expression::LiteralInfinity`],
+    /// `3` in `[3]` is the integer literal.
+    pub upper: Box<Node<Expression>>,
     /// Span of the whole `[...]` fragment, including the brackets.
     pub span: Span,
 }

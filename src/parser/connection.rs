@@ -350,7 +350,6 @@ mod membership_tests {
         assert!(node.value.typing.is_some());
         let multiplicity = node.value.multiplicity.expect("multiplicity present");
         assert!(multiplicity.value.lower.is_some());
-        assert!(multiplicity.value.upper.is_some());
     }
 
     #[test]

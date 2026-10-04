@@ -47,7 +47,7 @@ package TypedContracts {
     datatype DeferredType;
     feature deferredFeature : DeferredType;
     class DeferredClass;
-    multiplicity exactlyOne[1];
+    multiplicity exactlyOne[1..1];
     interaction DeferredInteraction;
     predicate deferredPredicate;
     verification def Verify {

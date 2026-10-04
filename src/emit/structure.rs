@@ -1737,13 +1737,11 @@ pub(crate) fn emit_multiplicity(
     mult: &Multiplicity,
 ) -> Result<(), EmitError> {
     w.push_char('[');
-    if mult.lower == mult.upper {
-        emit_bound(w, &mult.lower)?;
-    } else {
-        emit_bound(w, &mult.lower)?;
+    if let Some(lower) = &mult.lower {
+        emit_bound(w, lower)?;
         w.push_str("..");
-        emit_bound(w, &mult.upper)?;
     }
+    emit_bound(w, &mult.upper)?;
     w.push_char(']');
     Ok(())
 }
@@ -1777,15 +1775,9 @@ pub(crate) fn emit_multiplicity_modifiers(
 
 fn emit_bound(
     w: &mut EmitWriter<'_>,
-    bound: &Option<Box<Node<crate::ast::Expression>>>,
+    bound: &Node<crate::ast::Expression>,
 ) -> Result<(), EmitError> {
-    match bound {
-        None => {
-            w.push_char('*');
-            Ok(())
-        }
-        Some(expr) => emit_expression(w, &expr.value),
-    }
+    emit_expression(w, &bound.value)
 }
 
 pub(crate) fn emit_alias_def(

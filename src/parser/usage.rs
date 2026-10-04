@@ -222,23 +222,20 @@ fn find_top_level_range_dots(frag: &[u8], limit: usize) -> Option<usize> {
     None
 }
 
-/// Parse one already-isolated multiplicity bound slice: `*` (unbounded, renders as `None`) or a
-/// bound expression via [`expression`]. The slice is exactly the bound's text (whitespace
+/// Parse one already-isolated multiplicity bound slice via [`expression`]; `*` is the
+/// [`Expression::LiteralInfinity`] primary. The slice is exactly the bound's text (whitespace
 /// aside), so any trailing remainder after a successful expression parse is ignored rather than
 /// enforced with `all_consuming` — there isn't anything else it could legally contain.
 fn parse_multiplicity_bound_text(
     slice: Input<'_>,
-) -> Result<Option<Box<Node<Expression>>>, nom::Err<nom::error::Error<Input<'_>>>> {
+) -> Result<Box<Node<Expression>>, nom::Err<nom::error::Error<Input<'_>>>> {
     let (rest, _) = ws_and_comments(slice)?;
-    if rest.fragment().first() == Some(&b'*') {
-        return Ok(None);
-    }
     let (_, expr) = expression(rest)?;
-    Ok(Some(Box::new(expr)))
+    Ok(Box::new(expr))
 }
 
-/// Multiplicity part, parsed into structured bounds: `'[' ('*' | bound ('..' ('*' | bound))?) ']'`.
-/// A bare `[3]` yields `lower == upper == Some(3)`; `[1..*]` yields `upper == None`. Bound text is
+/// Multiplicity part, parsed into structured bounds: `'[' (bound '..')? bound ']'`.
+/// A bare `[3]` yields `lower == None, upper == 3`; `[1..*]` yields an infinity `upper`. Bound text is
 /// isolated by scanning for the closing `]` and an optional top-level `..` first (rather than
 /// handing the whole bracket content to [`expression`] in one call), because `expression`'s
 /// binary-operator chain commits once it matches `..` as a range operator and does not backtrack
@@ -262,11 +259,11 @@ pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Mul
         let (rest, right_slice) = nom::bytes::complete::take(right_len).parse(rest)?;
         let lower = parse_multiplicity_bound_text(left_slice)?;
         let upper = parse_multiplicity_bound_text(right_slice)?;
-        (lower, upper, rest)
+        (Some(lower), upper, rest)
     } else {
         let (rest, content_slice) = nom::bytes::complete::take(close_rel).parse(input)?;
-        let bound = parse_multiplicity_bound_text(content_slice)?;
-        (bound.clone(), bound, rest)
+        let upper = parse_multiplicity_bound_text(content_slice)?;
+        (None, upper, rest)
     };
     let (input, _) = tag(&b"]"[..]).parse(input)?;
     let span = span_from_to(start, input);
@@ -1381,8 +1378,8 @@ mod tests {
 mod multiplicity_node_tests {
     use super::*;
 
-    fn literal_bound(bound: &Option<Box<Node<Expression>>>) -> Option<i64> {
-        match bound.as_deref().map(|node| &node.value) {
+    fn literal_bound(bound: Option<&Node<Expression>>) -> Option<i64> {
+        match bound.map(|node| &node.value) {
             Some(Expression::LiteralInteger(value)) => Some(*value),
             _ => None,
         }
@@ -1398,17 +1395,17 @@ mod multiplicity_node_tests {
     }
 
     #[test]
-    fn bare_number_sets_lower_and_upper_equal() {
+    fn bare_number_authors_only_the_upper_bound() {
         let (_, m) = parse_ok("[3]");
-        assert_eq!(literal_bound(&m.lower), Some(3));
-        assert_eq!(m.lower, m.upper);
+        assert!(m.lower.is_none());
+        assert_eq!(literal_bound(Some(&m.upper)), Some(3));
     }
 
     #[test]
     fn range_with_upper_bound() {
         let (_, m) = parse_ok("[0..1]");
-        assert_eq!(literal_bound(&m.lower), Some(0));
-        assert_eq!(literal_bound(&m.upper), Some(1));
+        assert_eq!(literal_bound(m.lower.as_deref()), Some(0));
+        assert_eq!(literal_bound(Some(&m.upper)), Some(1));
     }
 
     #[test]
@@ -1418,31 +1415,29 @@ mod multiplicity_node_tests {
         // to parse as a primary expression — multiplicity_node must not hand the whole bracket
         // content to expression() in one call, or this panics/hard-errors instead of parsing.
         let (rest, m) = parse_ok("[1..*] ordered : RocketEngine;");
-        assert_eq!(literal_bound(&m.lower), Some(1));
-        assert!(m.upper.is_none());
+        assert_eq!(literal_bound(m.lower.as_deref()), Some(1));
+        assert!(matches!(m.upper.value, Expression::LiteralInfinity));
         assert_eq!(rest.trim_start(), "ordered : RocketEngine;");
     }
 
     #[test]
     fn bare_unbounded_star() {
         let (_, m) = parse_ok("[*]");
-        assert!(m.lower.is_none() && m.upper.is_none());
+        assert!(m.lower.is_none());
+        assert!(matches!(m.upper.value, Expression::LiteralInfinity));
     }
 
     #[test]
     fn bare_feature_ref_bound() {
         let input = crate::parser::span::test_input("[seBeforeNum]");
         let (_, node) = multiplicity_node(input).expect("multiplicity_node should parse");
-        let Some(lower) = node.value.lower else {
-            panic!("feature lower bound");
-        };
-        let Expression::FeatureRef(reference) = lower.value else {
-            panic!("feature-reference lower bound");
+        assert!(node.value.lower.is_none());
+        let Expression::FeatureRef(reference) = node.value.upper.value else {
+            panic!("feature-reference upper bound");
         };
         assert_eq!(
             reference_text(input, reference).as_deref(),
             Some("seBeforeNum")
         );
-        assert_eq!(node.value.upper.as_deref(), Some(lower.as_ref()));
     }
 }

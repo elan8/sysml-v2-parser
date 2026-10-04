@@ -405,6 +405,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str("))")
             }
             Expression::Null => self.writer.write_str("(null)"),
+            Expression::LiteralInfinity => self.writer.write_str("(infinity)"),
             Expression::Constructor { type_name, args } => {
                 self.writer.write_str("(constructor (type ")?;
                 self.write_reference(*type_name)?;
@@ -816,13 +817,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("(lower ")?;
         match &multiplicity.value.lower {
             Some(lower) => self.write_expression(lower)?,
-            None => self.writer.write_str("unbounded")?,
+            None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (upper ")?;
-        match &multiplicity.value.upper {
-            Some(upper) => self.write_expression(upper)?,
-            None => self.writer.write_str("unbounded")?,
-        }
+        self.write_expression(&multiplicity.value.upper)?;
         self.writer.write_char(')')
     }
 
@@ -3151,23 +3149,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.writer.write_str("none")?;
                 }
                 self.writer.write_str(") (multiplicity ")?;
-                if let Some(multiplicity) = &declaration.value.multiplicity {
-                    self.writer.write_str("(lower ")?;
-                    if let Some(lower) = &multiplicity.value.lower {
-                        self.write_expression(lower)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_str(") (upper ")?;
-                    if let Some(upper) = &multiplicity.value.upper {
-                        self.write_expression(upper)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_char(')')?;
-                } else {
-                    self.writer.write_str("none")?;
-                }
+                self.write_multiplicity_clause(declaration.value.multiplicity.as_ref())?;
                 self.writer.write_str(") ")?;
                 self.write_multiplicity_modifiers(&declaration.value.multiplicity_modifiers)?;
                 self.writer.write_char(' ')?;
@@ -6866,23 +6848,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str(") (name ")?;
                 self.write_optional_name(declaration.value.name)?;
                 self.writer.write_str(") (multiplicity ")?;
-                if let Some(multiplicity) = &declaration.value.multiplicity {
-                    self.writer.write_str("(lower ")?;
-                    if let Some(lower) = &multiplicity.value.lower {
-                        self.write_expression(lower)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_str(") (upper ")?;
-                    if let Some(upper) = &multiplicity.value.upper {
-                        self.write_expression(upper)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_char(')')?;
-                } else {
-                    self.writer.write_str("none")?;
-                }
+                self.write_multiplicity_clause(declaration.value.multiplicity.as_ref())?;
                 self.writer.write_str("))")
             }
             PackageBodyElement::KermlFeatureDecl(_declaration) => {

@@ -1707,6 +1707,7 @@ macro_rules! ast_traversal {
                     visitor.visit_qualified_reference(selector);
                 }
                 Expression::Null => {}
+                Expression::LiteralInfinity => {}
                 Expression::Sequence { open_paren_span, operands, close_paren_span } => {
                     visitor.visit_span(open_paren_span);
                     visitor.visit_span(&$($mutability)? operands.span);
@@ -1849,9 +1850,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = lower {
                 visitor.visit_expression(&$($mutability)? **inner);
             }
-            if let Some(inner) = upper {
-                visitor.visit_expression(&$($mutability)? **inner);
-            }
+            visitor.visit_expression(&$($mutability)? **upper);
             visitor.visit_span(span);
             visitor.leave_node(&$($mutability)? node.span);
         }
