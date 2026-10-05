@@ -79,7 +79,9 @@ pub(crate) fn metadata_annotation(
 /// `@Tag;` -- whose single qualified name *is* the typing -- never has `Tag` mistaken for a
 /// declared name. The whole attempt is inside the caller's reference transaction, so the
 /// speculative `Identification` costs no arena entry when it does not pan out.
-fn metadata_declared_name(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataDeclaredName>> {
+pub(crate) fn metadata_declared_name(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<MetadataDeclaredName>> {
     let (start, _) = ws_and_comments(input)?;
     let (input, ident) = identification(start)?;
     let (input, _) = ws_and_comments(input)?;

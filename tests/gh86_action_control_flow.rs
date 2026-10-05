@@ -128,8 +128,13 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
         _ => None,
     });
     let metadata_usage = metadata_usage.expect("expected a MetadataUsage element");
+    // `MetadataUsageDeclaration`: without `:` / `typed by`, `ToolExecution` is the typing.
+    assert!(metadata_usage.name.is_none(), "no name was declared");
+    let typing = doc
+        .qualified_reference(metadata_usage.type_reference)
+        .expect("typing reference");
     assert_eq!(
-        doc.declaration_name(metadata_usage.name.expect("named metadata usage")),
+        typing.segment_decoded_text(0).as_deref(),
         Some("ToolExecution")
     );
 }
@@ -399,8 +404,13 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_usage_body() {
         _ => None,
     });
     let metadata_usage = metadata_usage.expect("expected a MetadataUsage element");
+    // `MetadataUsageDeclaration`: without `:` / `typed by`, `ToolExecution` is the typing.
+    assert!(metadata_usage.name.is_none(), "no name was declared");
+    let typing = doc
+        .qualified_reference(metadata_usage.type_reference)
+        .expect("typing reference");
     assert_eq!(
-        doc.declaration_name(metadata_usage.name.expect("named metadata usage")),
+        typing.segment_decoded_text(0).as_deref(),
         Some("ToolExecution")
     );
 }

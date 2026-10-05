@@ -2,14 +2,15 @@
 
 use crate::ast::{Membership, MetadataDef, MetadataUsage, Node};
 use crate::parser::attribute::metadata_body as attribute_metadata_body;
-use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::lex::qualified_reference;
 use crate::parser::lex::{starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
-use crate::parser::metadata_annotation::parse_about_targets;
+use crate::parser::metadata_annotation::{metadata_declared_name, parse_about_targets};
 use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
+use nom::combinator::opt;
 use nom::error::{Error, ErrorKind};
 use nom::IResult;
 use nom::Parser;
@@ -47,8 +48,18 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
     ))
 }
 
-/// Metadata usage: `metadata` name (`:` type)? body.
+/// Metadata usage: `metadata` MetadataUsageDeclaration (`about` targets)? body.
+///
+/// `MetadataUsageDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping`:
+/// the `Identification` is a declared name only when a separator follows it, and the typing is
+/// required. So `metadata Tag about x;` is typed by `Tag` and declares no name; only
+/// `metadata t : Tag about x;` declares `t`. The declaration is parsed exactly as the `@` /
+/// `metadata` annotation member parses it ([`metadata_declared_name`]).
 pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataUsage>> {
+    crate::parser::span::reference_transaction(input, metadata_usage_inner)
+}
+
+fn metadata_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -57,9 +68,16 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
     if starts_with_keyword(input.fragment(), b"def") {
         return Err(nom::Err::Error(Error::new(input, ErrorKind::Tag)));
     }
-    let (input, crate::ast::Identification { short_name, name }) =
-        crate::parser::lex::identification(input)?;
-    let (input, header) = parse_feature_usage_header(input)?;
+    let (input, declared_name) = opt(metadata_declared_name).parse(input)?;
+    let (short_name, name) = match declared_name {
+        Some(declared) => (
+            declared.value.identification.short_name,
+            declared.value.identification.name,
+        ),
+        None => (None, None),
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, type_reference) = qualified_reference(input)?;
     let (input, about_targets) = parse_about_targets(input)?;
     let (input, body) = metadata_body(input)?;
     Ok((
@@ -70,7 +88,7 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
             MetadataUsage {
                 name,
                 short_name,
-                type_reference: header.type_reference,
+                type_reference,
                 about_targets,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
@@ -122,6 +140,66 @@ mod membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
         );
+    }
+
+    fn parse_usage(text: &str) -> (crate::ParsedDocument, crate::ast::MetadataUsage) {
+        let document = crate::parse(&format!("package P {{ {text} }}")).expect("parse");
+        let crate::ast::RootElement::Package(package) = &document.root.elements[0].value else {
+            panic!("expected package");
+        };
+        let crate::ast::PackageBody::Brace { elements, .. } = &package.value.body else {
+            panic!("expected package body");
+        };
+        let crate::ast::PackageBodyElement::MetadataUsage(usage) = &elements[0].value else {
+            panic!("expected MetadataUsage, got {:?}", elements[0].value);
+        };
+        let usage = usage.value.clone();
+        (document, usage)
+    }
+
+    fn typing_text(document: &crate::ParsedDocument, usage: &crate::ast::MetadataUsage) -> String {
+        document
+            .qualified_reference(usage.type_reference)
+            .expect("typing reference")
+            .authored_text()
+            .to_owned()
+    }
+
+    #[test]
+    fn a_lone_name_is_the_metadata_typing_not_a_declared_name() {
+        let (document, usage) = parse_usage("metadata Tag about x;");
+        assert!(usage.name.is_none() && usage.short_name.is_none());
+        assert_eq!(typing_text(&document, &usage), "Tag");
+        assert_eq!(usage.about_targets.len(), 1);
+    }
+
+    #[test]
+    fn a_qualified_lone_name_is_the_metadata_typing() {
+        let (document, usage) = parse_usage("metadata Lib::Tag;");
+        assert!(usage.name.is_none());
+        assert_eq!(typing_text(&document, &usage), "Lib::Tag");
+    }
+
+    #[test]
+    fn a_name_before_a_separator_is_declared_and_the_typing_follows() {
+        for text in [
+            "metadata t : Tag about x;",
+            "metadata t typed by Tag about x;",
+        ] {
+            let (document, usage) = parse_usage(text);
+            let name = usage.name.expect("declared name");
+            assert_eq!(document.declaration_name(name), Some("t"), "{text}");
+            assert_eq!(typing_text(&document, &usage), "Tag", "{text}");
+        }
+    }
+
+    #[test]
+    fn a_short_name_only_declaration_is_kept() {
+        let (document, usage) = parse_usage("metadata <s> : Tag;");
+        assert!(usage.name.is_none());
+        let short_name = usage.short_name.expect("short name");
+        assert_eq!(document.declaration_name(short_name), Some("s"));
+        assert_eq!(typing_text(&document, &usage), "Tag");
     }
 
     #[test]
