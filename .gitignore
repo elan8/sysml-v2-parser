@@ -2,3 +2,5 @@
 /test-logs
 /sysml-v2-release
 /conformance-out
+/.oracle
+/tools/parser_oracle/target
