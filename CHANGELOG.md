@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`metadata` usages parse `MetadataUsageDeclaration` per the grammar (breaking AST change,
+  `PARSE_AST_VERSION` 264).** `metadata Tag about x;` and `metadata Tag { ... }` read the lone name
+  as a *declared name* with no typing. Per `( Identification ( ':' | 'typed' 'by' ) )?
+  OwnedFeatureTyping`, it is the metadata type, and a name is declared only when `:` or `typed by`
+  follows it, the same rule the `@` / `metadata` annotation member already applied.
+  `MetadataUsage::type_reference` is now a required `QualifiedReferenceId`, and the emitter writes
+  `name : ` only for a declared name.
+
 - **Every `Identification` accepts a short name without a regular name, and `concern`/`case`
   usages are accepted in part bodies (breaking AST change, `PARSE_AST_VERSION` 263; #158, #159).**
   - `UseCaseUsage::name` and `ReturnRef::name` are now `Option<DeclarationName>`, and `ReturnRef`
