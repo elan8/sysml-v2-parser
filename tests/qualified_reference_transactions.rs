@@ -186,3 +186,30 @@ action def Iterate {
         "the failed Ghost::leaked range must publish no arena identities"
     );
 }
+
+/// A member that two arms speculate on must publish its references once. Each case was
+/// allocated twice before its probe became transactional: the calculation-usage arm of a
+/// use-case body parsed the member and then refused it as undirected, and the action-body probes
+/// of constraint and calculation bodies allocated an `if` condition before declining a
+/// conditional result expression.
+#[test]
+fn speculated_calculation_and_result_members_publish_each_reference_once() {
+    for (source, expected) in [
+        ("package P { use case def U { calc c : T; } }", 1),
+        ("package P { use case def U { abstract #Tag calc c; } }", 1),
+        ("package P { use case def U { in calc e : F; } }", 1),
+        ("package P { constraint def C { if a ? b else c } }", 3),
+        ("package P { calc def F { if a ? b else c } }", 3),
+        ("package P { constraint def C { if a.b.c ? x else y } }", 5),
+        ("package P { calc def F { individual calc d : T; } }", 1),
+        ("package P { calc def F { #Tag calc e; } }", 1),
+    ] {
+        let result = parse_with_diagnostics(source);
+        assert!(result.errors.is_empty(), "{source}: {:?}", result.errors);
+        assert_eq!(
+            result.document.qualified_references.len(),
+            expected,
+            "{source}"
+        );
+    }
+}

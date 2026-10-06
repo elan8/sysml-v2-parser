@@ -325,7 +325,14 @@ pub(crate) fn constraint_def_body_element(
             after_visibility.fragment(),
             crate::parser::lex::CALCULATION_ACTION_STARTERS,
         ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
-        .then(|| crate::parser::action::action_def_body_element(input))
+        .then(|| {
+            // Transactional: when the action parser declines (`if a ? b else c` is a result
+            // expression), the references it allocated must not stay in the arena.
+            crate::parser::span::reference_transaction(
+                input,
+                crate::parser::action::action_def_body_element,
+            )
+        })
         .and_then(Result::ok)
     {
         // `CalculationBodyItem = ActionBodyItem | ...` (SysML BNF 1366-1368): the same action-body
@@ -601,7 +608,12 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) {
         let start = input;
-        match crate::parser::action::action_def_body_element(peek) {
+        // Transactional for the same reason as the constraint-body probe: a declined attempt
+        // (`if a ? b else c` is a result expression) must leave no arena entries behind.
+        match crate::parser::span::reference_transaction(
+            peek,
+            crate::parser::action::action_def_body_element,
+        ) {
             Ok((next, member)) => {
                 return Ok((
                     next,
@@ -1786,14 +1798,20 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     // c;`, `ref individual calc r;`): without it `individual` matched no arm, and `#Tag` was
     // claimed by the metadata arm and split from its calculation. A bare `calc c` keeps its own
     // arm below; `calc def` is refused by `calc_usage` and reaches the definition arm.
-    let prefixed_calc_usage =
+    let (input, elem) = if let Some((next, usage)) = part_usage_member {
+        (next, CalcDefBodyElement::PartUsage(Box::new(usage)))
+    } else if let Some((next, usage)) =
         (crate::parser::occurrence_prefix::kind_keyword_follows(input, b"calc")
             && !starts_with_keyword(after_visibility, b"calc"))
         .then(|| calc_usage(input))
-        .and_then(Result::ok);
-    let (input, elem) = if let Some((next, usage)) = part_usage_member {
-        (next, CalcDefBodyElement::PartUsage(Box::new(usage)))
-    } else if let Some((next, usage)) = prefixed_calc_usage {
+        .and_then(Result::ok)
+    {
+        // A prefixed `CalculationUsage` (`individual calc c;`, `#Tag calc c;`, `ref individual
+        // calc r;`) gets first refusal after the part-usage arm and ahead of the metadata arm:
+        // without it `individual` matched no arm, and `#Tag` was claimed by the metadata arm and
+        // split from its calculation. A bare `calc c` keeps its own arm below; `calc def` is
+        // refused by `calc_usage` and reaches the definition arm. Tried only here, after the
+        // part-usage arm has declined, so no member pays for both attempts.
         (next, CalcDefBodyElement::CalcUsage(Box::new(usage)))
     } else if let Some((next, annotation)) = prefixed_metadata_feature {
         (

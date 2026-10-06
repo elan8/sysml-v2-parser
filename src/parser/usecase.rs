@@ -1,5 +1,5 @@
 use crate::ast::{
-    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, DeclarationName,
+    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CaseReturnDecl, DeclarationName,
     IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
     ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenIncludeUseCase, ThenUseCaseUsage,
     UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
@@ -764,9 +764,8 @@ pub(crate) fn use_case_def_body_element(
             map(crate::parser::case::analysis_case_usage, |n| {
                 UseCaseDefBodyElement::AnalysisCaseUsage(Box::new(n))
             }),
-            map(directed_calc_usage, |n| {
-                UseCaseDefBodyElement::CalcUsage(Box::new(n))
-            }),
+            // `calc_usage` owns the whole `OccurrenceUsagePrefix`, direction included, so
+            // `in calc eval : F;` and `calc c : T;` are one arm.
             map(crate::parser::constraint::calc_usage, |n| {
                 UseCaseDefBodyElement::CalcUsage(Box::new(n))
             }),
@@ -838,24 +837,6 @@ fn is_use_case_statement_keyword(frag: &[u8]) -> bool {
         || crate::parser::lex::starts_with_keyword(frag, b"actor")
         || crate::parser::lex::starts_with_keyword(frag, b"objective")
         || crate::parser::lex::starts_with_keyword(frag, b"flow")
-}
-
-/// A `calc` usage whose `OccurrenceUsagePrefix` carries a direction (`in calc eval : F;`);
-/// `calc_usage` owns the whole prefix, so this only refuses the undirected spelling.
-fn directed_calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
-    let (rest, usage) = crate::parser::constraint::calc_usage(input)?;
-    let directed = usage
-        .value
-        .prefix
-        .basic()
-        .is_some_and(|basic| basic.ref_prefix.direction.is_some());
-    if !directed {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    Ok((rest, usage))
 }
 
 fn directed_requirement_usage(

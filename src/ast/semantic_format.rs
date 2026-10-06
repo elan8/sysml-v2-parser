@@ -1304,8 +1304,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_analysis_case_usage(&usage.value)?;
                         }
-                        UseCaseDefBodyElement::CalcUsage(_usage) => {
-                            self.write_marker(&mut first, "calc-usage")?;
+                        UseCaseDefBodyElement::CalcUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_calculation_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::AttributeUsage(_usage) => {
                             self.write_marker(&mut first, "attribute-usage")?;
