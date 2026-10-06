@@ -89,7 +89,7 @@ both-reject	negative/grammar/k08-return-without-feature.kerml
 both-reject	negative/grammar/k09-inverting-without-target.kerml
 both-reject	negative/grammar/k10-featuring-without-type.kerml
 theirs-rejects	negative/grammar/k11-namespace-prefix-metadata-without-name.kerml
-theirs-rejects	negative/grammar/k12-multiplicity-subset-without-target.kerml
+both-reject	negative/grammar/k12-multiplicity-subset-without-target.kerml
 both-reject	negative/grammar/k13-step-without-declaration.kerml
 both-reject	negative/grammar/k14-flow-without-payload-target.kerml
 both-reject	negative/grammar/k15-conjugation-without-original.kerml
@@ -102,6 +102,7 @@ theirs-rejects	negative/grammar/k21-name-before-feature-keyword.kerml
 ours-rejects	negative/semantic/k26-binary-connector-three-ends.kerml
 ours-rejects	negative/semantic/k35-metadata-annotates-wrong-kind.kerml
 ours-rejects	negative/semantic/k45-conjugated-feature-without-type.kerml
+ours-rejects	negative/semantic/k49-binding-connector-with-three-ends.kerml
 theirs-rejects	negative/semantic/k51-return-parameter-in-classifier.kerml
 both-reject	negative/semantic/k52-two-conjugators.kerml
 ours-rejects	negative/semantic/k54-cross-feature-typed-narrower-than-end.kerml

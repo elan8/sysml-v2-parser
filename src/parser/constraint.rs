@@ -320,12 +320,13 @@ pub(crate) fn constraint_def_body_element(
             )?;
             (next, ConstraintDefBodyElement::Error(node))
         }
-    } else if let Some((next, member)) = (starts_with_any_keyword(
-        after_visibility.fragment(),
-        crate::parser::lex::CALCULATION_ACTION_STARTERS,
-    ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
-    .then(|| crate::parser::action::action_def_body_element(input))
-    .and_then(Result::ok)
+    } else if let Some((next, member)) =
+        (starts_with_any_keyword(
+            after_visibility.fragment(),
+            crate::parser::lex::CALCULATION_ACTION_STARTERS,
+        ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
+        .then(|| crate::parser::action::action_def_body_element(input))
+        .and_then(Result::ok)
     {
         // `CalculationBodyItem = ActionBodyItem | ...` (SysML BNF 1366-1368): the same action-body
         // dispatch `calculation_body_element` makes for the one `CalculationBody` production, and
@@ -336,7 +337,10 @@ pub(crate) fn constraint_def_body_element(
         // `ref` members keep this scope's own route below: the action-body `ref` parser drops a
         // `default` feature value (`ref :>> a, b default that.that;` would lose `default
         // that.that`), which the keyword-less binding retains.
-        (next, ConstraintDefBodyElement::ActionMember(Box::new(member)))
+        (
+            next,
+            ConstraintDefBodyElement::ActionMember(Box::new(member)),
+        )
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.
@@ -356,24 +360,29 @@ pub(crate) fn constraint_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Calculation usage: `calc` Identification (`:` type)? (`=` value)? body (SysML §7.19.2).
+/// Calculation usage: `OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
+/// (SysML BNF 1388).
 pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
+    // Speculated at member starts it does not own (a prefixed `individual calc c;` is tried
+    // ahead of a scope's other arms); refuse by lookahead before entering an arena transaction,
+    // as `constraint_usage` does, so a refused `#Tag` prefix leaves no arena entry behind.
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"calc") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, calc_usage_inner)
+}
+
+fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    // `BasicUsagePrefix`'s `RefPrefix`: the direction (`in calc eval : EvaluationFunction { ... }`,
-    // `sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`) and `abstract` (`abstract
-    // calc subcalculations: Calculation :> calculations, subactions { ... }`, Systems Library
-    // `Calculations.sysml`) are slots of one production. `CalcUsage::direction` existed but was
-    // never populated, and `abstract` was consumed and dropped.
-    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
-    // `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`. Without this the keyword was
-    // never consumed, `tag("calc")` failed on `ref calc ...`, and the enclosing calculation body
-    // fell through to its expression parser, which happily took the bare word `ref` as an
-    // expression statement of its own.
-    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1))
-        .parse(input)
-        .map(|(input, found)| (input, found.is_some()))?;
+    // The whole `OccurrenceUsagePrefix` (SysML BNF 1388): `in calc eval : EvaluationFunction`
+    // (`TradeStudies.sysml:61`), `abstract calc subcalculations` and `ref calc self`
+    // (`Calculations.sysml`), `individual calc c`, `#Tag calc c`.
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
@@ -396,11 +405,8 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         let (input, identification) = identification(input)?;
         (input, (identification, None))
     };
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -435,16 +441,14 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
             start,
             input,
             CalcUsage {
-                is_reference,
+                prefix,
                 identification,
-                is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
-                type_name,
+                typing,
                 multiplicity,
                 multiplicity_modifiers,
                 subsets,
                 redefines,
                 value,
-                direction: prefix.direction,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -1778,8 +1782,19 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         || crate::parser::occurrence_prefix::starts_contended_prefix(after_visibility_input))
     .then(|| crate::parser::part::part_usage(input))
     .and_then(Result::ok);
+    // The same first refusal for a prefixed `CalculationUsage` (`individual calc c;`, `#Tag calc
+    // c;`, `ref individual calc r;`): without it `individual` matched no arm, and `#Tag` was
+    // claimed by the metadata arm and split from its calculation. A bare `calc c` keeps its own
+    // arm below; `calc def` is refused by `calc_usage` and reaches the definition arm.
+    let prefixed_calc_usage =
+        (crate::parser::occurrence_prefix::kind_keyword_follows(input, b"calc")
+            && !starts_with_keyword(after_visibility, b"calc"))
+        .then(|| calc_usage(input))
+        .and_then(Result::ok);
     let (input, elem) = if let Some((next, usage)) = part_usage_member {
         (next, CalcDefBodyElement::PartUsage(Box::new(usage)))
+    } else if let Some((next, usage)) = prefixed_calc_usage {
+        (next, CalcDefBodyElement::CalcUsage(Box::new(usage)))
     } else if let Some((next, annotation)) = prefixed_metadata_feature {
         (
             next,

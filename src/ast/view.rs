@@ -175,34 +175,29 @@ pub struct CalcDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcUsage {
+    /// The complete `OccurrenceUsagePrefix` this usage was written with (`CalculationUsage :
+    /// CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`,
+    /// SysML BNF 1388): direction, `derived`, `abstract`/`variation`, `constant`, `ref`,
+    /// `individual`, the portion kind and `#Tag` extension keywords. The same shared component
+    /// [`ConstraintUsage`] and `PartUsage` carry; it replaces the flattened `is_abstract`,
+    /// `direction` and `is_reference` fields, which covered only `RefPrefix` plus `ref`, so
+    /// `individual calc c;` was rejected.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub identification: Identification,
-    /// `abstract` keyword, e.g. `abstract calc subcalculations : Calculation :> calculations,
-    /// subactions { ... }` (Systems Library `Calculations.sysml`). Parsed and discarded until
-    /// this field existed, so emission dropped it.
-    pub is_abstract: bool,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// `Typings = TypedBy ( ',' FeatureTyping )*`: every authored type, in order. A single
+    /// `type_name` used to keep only the first, so `calc c : C1, C2;` lost `C2`.
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `MultiplicityPart`'s `ordered`/`nonunique` keyword slots after the multiplicity, e.g.
     /// `abstract calc calculations: Calculation[0..*] nonunique :> actions, evaluations { ... }`
     /// (Systems Library `Calculations.sysml`).
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
-    /// `:>` subsets clause, which may name several comma-separated targets. Also previously
-    /// parsed and discarded, with a comment claiming `CalcUsage` "doesn't model subsetting
-    /// separately from redefines" -- it does now, because they are different relationships.
+    /// `:>` subsets clause, which may name several comma-separated targets.
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Redefinition targets for `calc :>> name { … }` and multi-target trailing clauses.
     pub redefines: Option<Vec<QualifiedReferenceId>>,
     /// `= expr` / `:= expr` binding (`in calc scenario = cityScenario;`, validation `10c`).
     pub value: Option<Node<crate::ast::FeatureValue>>,
-    /// Set when parsed as `in`/`out`/`inout calc` (validation `10c`).
-    pub direction: Option<crate::ast::InOut>,
-    /// The `ref` of `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`, e.g. `ref calc
-    /// self : Calculation :>> Action::self;` (Systems Library `Calculations.sysml`). The keyword
-    /// was not accepted at all, so a calculation body fell through to its expression parser and
-    /// kept the bare word `ref` as a standalone expression member -- emission then wrote
-    /// `'ref';` on its own line and the declaration lost its prefix. Parallel to
-    /// `ActionUsage::is_reference` and `PartUsage::is_reference`.
-    pub is_reference: bool,
     pub body: CalcDefBody,
     pub membership: Membership,
 }

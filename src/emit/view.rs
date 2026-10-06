@@ -174,15 +174,9 @@ pub(crate) fn emit_calc_usage(
     usage: &CalcUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if let Some(dir) = usage.direction {
-        super::structure::emit_direction(w, dir);
-    }
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
-    if usage.is_reference {
-        w.push_str("ref ");
-    }
+    // `CalculationUsage = OccurrenceUsagePrefix 'calc' …`: the same typed prefix boundary the
+    // other migrated families stream through.
+    crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("calc ");
     let leading_target = usage.redefines.as_ref().and_then(|targets| {
         (targets.len() == 1
@@ -196,9 +190,8 @@ pub(crate) fn emit_calc_usage(
     } else {
         emit_identification(w, &usage.identification)?;
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &multiplicity.value)?;

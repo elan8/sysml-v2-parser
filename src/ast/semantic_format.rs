@@ -2957,28 +2957,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// `CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
     /// (SysML BNF 1354).
     ///
-    /// `CalcUsage` has not migrated onto the shared `OccurrenceUsagePrefix` component yet, so the
-    /// prefix slots it does carry are shown individually rather than through
-    /// `write_occurrence_usage_prefix`.
     fn write_calculation_usage(&mut self, usage: &super::CalcUsage) -> io::Result<()> {
         self.writer.write_str("(calc-usage (name ")?;
         self.write_optional_name(usage.identification.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.identification.short_name)?;
-        self.writer.write_str(") (direction ")?;
-        match usage.direction {
-            Some(InOut::In) => self.writer.write_str("in")?,
-            Some(InOut::Out) => self.writer.write_str("out")?,
-            Some(InOut::InOut) => self.writer.write_str("inout")?,
-            None => self.writer.write_str("none")?,
-        }
-        write!(
-            self.writer,
-            ") (abstract {}) (reference {}) (type ",
-            usage.is_abstract, usage.is_reference
-        )?;
-        match usage.type_name {
-            Some(reference) => self.write_reference(reference)?,
+        self.writer.write_str(") ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (typing ")?;
+        match &usage.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (multiplicity ")?;
@@ -3108,8 +3096,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_expression(expression)?;
                             self.writer.write_char(')')?;
                         }
-                        super::CalcDefBodyElement::CalcUsage(_member) => {
-                            self.write_marker(&mut first, "calc-usage")?;
+                        super::CalcDefBodyElement::CalcUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_calculation_usage(&member.value)?;
                         }
                         super::CalcDefBodyElement::CalcDef(_member) => {
                             self.write_marker(&mut first, "calc-def")?;
@@ -3284,7 +3273,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::AttributeUsage(_usage) => {
                 self.writer.write_str("(attribute-usage)")
             }
-            ActionDefBodyElement::CalcUsage(_usage) => self.writer.write_str("(calc-usage)"),
+            ActionDefBodyElement::CalcUsage(usage) => self.write_calculation_usage(&usage.value),
             ActionDefBodyElement::ActionDef(_def) => self.writer.write_str("(action-def)"),
             ActionDefBodyElement::DefaultReferenceUsage(usage) => {
                 self.write_default_reference_usage(&usage.value)

@@ -840,11 +840,22 @@ fn is_use_case_statement_keyword(frag: &[u8]) -> bool {
         || crate::parser::lex::starts_with_keyword(frag, b"flow")
 }
 
+/// A `calc` usage whose `OccurrenceUsagePrefix` carries a direction (`in calc eval : F;`);
+/// `calc_usage` owns the whole prefix, so this only refuses the undirected spelling.
 fn directed_calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
-    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
-    let (input, mut usage) = crate::parser::constraint::calc_usage(input)?;
-    usage.value.direction = Some(direction);
-    Ok((input, usage))
+    let (rest, usage) = crate::parser::constraint::calc_usage(input)?;
+    let directed = usage
+        .value
+        .prefix
+        .basic()
+        .is_some_and(|basic| basic.ref_prefix.direction.is_some());
+    if !directed {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((rest, usage))
 }
 
 fn directed_requirement_usage(

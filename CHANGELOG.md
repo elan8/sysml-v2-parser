@@ -136,6 +136,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `CalcUsage` gains `multiplicity_modifiers`.
   `connection X;` was already a `ConnectionUsage`.
 
+- **`CalcUsage` carries the full `OccurrenceUsagePrefix` and every authored type (breaking AST
+  change, `PARSE_AST_VERSION` 265).** `CalculationUsage = OccurrenceUsagePrefix 'calc' ...`
+  (SysML BNF 1388), but `calc_usage` read only `RefPrefix` plus `ref`, so `individual calc c;`,
+  `snapshot calc s;` and `#Tag calc c;` were rejected or split, and its single `type_name` kept
+  only the first of `calc c : C1, C2;`. Once namespace-level `calc X;` became a usage, both
+  regressed from silent misparses (`calc def c : C1;`) to errors.
+  - `CalcUsage::prefix: OccurrenceUsagePrefix` replaces `is_abstract`, `direction` and
+    `is_reference`; `CalcUsage::typing: Option<Node<TypingRelationship>>` replaces `type_name`.
+  - `calc_usage` refuses by lookahead (`kind_keyword_follows`) and parses in a reference
+    transaction, like `constraint_usage`. A calculation body gives a prefixed calculation usage
+    first refusal, so `#Tag calc c;` is one prefixed usage rather than a metadata member and a
+    calculation, and `in calculationParameter` in a KerML type body is no longer read as
+    `in calc ulationParameter`.
+  - The semantic projection writes calculation usages in calculation and action bodies in full
+    instead of a bare `(calc-usage)` marker.
+
+- **Constraint bodies parse action-body members, control nodes included.** `ConstraintDefinition`
+  and `ConstraintUsage` end in `CalculationBody`, whose `CalculationBodyItem = ActionBodyItem |
+  ReturnParameterMember`, so `constraint def C { fork f; }` is grammatical; only the semantic rule
+  `validateControlNodeOwningType` rejects it. New `ConstraintDefBodyElement::ActionMember`,
+  dispatched like `CalcDefBodyElement::ActionMember`. `ref` members keep the constraint scope's
+  own route, because the action-body `ref` parser drops a `default` feature value.
+
 ## [0.57.0] - 2026-09-30
 
 ### Changed
