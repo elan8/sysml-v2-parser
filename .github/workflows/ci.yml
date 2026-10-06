@@ -59,6 +59,33 @@ jobs:
           SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
           CI: true
 
+  parser-oracle:
+    name: Parser oracle (sysml-toolkit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/parser_oracle
+
+      - name: Fetch SysML v2 Release (pinned)
+        run: bash ./scripts/fetch-sysml-v2-release.sh
+
+      - name: Differential parse against the pinned oracle
+        run: bash ./scripts/parser-oracle.sh
+
+      - name: Upload oracle reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: parser-oracle-reports
+          path: conformance-out/parser-oracle-*.md
+
   msrv:
     name: MSRV (1.88)
     runs-on: ubuntu-24.04
