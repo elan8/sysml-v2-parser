@@ -129,6 +129,9 @@ pub(crate) fn emit_constraint_body_element(
         // The same `ReturnParameterMember` emitter the calculation scope uses; both scopes end
         // in the one `CalculationBody`.
         ConstraintDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
+        ConstraintDefBodyElement::ActionMember(n) => {
+            super::behavior::emit_action_def_body_element(w, path, &n.value)
+        }
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
@@ -171,15 +174,9 @@ pub(crate) fn emit_calc_usage(
     usage: &CalcUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if let Some(dir) = usage.direction {
-        super::structure::emit_direction(w, dir);
-    }
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
-    if usage.is_reference {
-        w.push_str("ref ");
-    }
+    // `CalculationUsage = OccurrenceUsagePrefix 'calc' …`: the same typed prefix boundary the
+    // other migrated families stream through.
+    crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("calc ");
     let leading_target = usage.redefines.as_ref().and_then(|targets| {
         (targets.len() == 1
@@ -193,13 +190,13 @@ pub(crate) fn emit_calc_usage(
     } else {
         emit_identification(w, &usage.identification)?;
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &multiplicity.value)?;
     }
+    super::structure::emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if leading_target.is_none() {
         if let Some(redefines) = &usage.redefines {
             w.push_str(" :>> ");
@@ -418,7 +415,26 @@ pub(crate) fn emit_kerml_feature(
         }
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    for specialization in &feature.specializations {
+    emit_feature_specializations(w, &feature.specializations)?;
+    if let Some(multiplicity) = &feature.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
+    for (index, part) in feature.relationship_parts.iter().enumerate() {
+        emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
+    }
+    if let Some(value) = &feature.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_calc_body(w, path, &feature.body)
+}
+
+/// Emit ordered KerML `FeatureSpecialization` alternatives, each with its authored spelling.
+fn emit_feature_specializations(
+    w: &mut EmitWriter<'_>,
+    specializations: &[crate::ast::FeatureSpecialization],
+) -> Result<(), EmitError> {
+    for specialization in specializations {
         match specialization {
             crate::ast::FeatureSpecialization::Typing(typing) => {
                 emit_typing_clause(w, &typing.value)?
@@ -440,17 +456,7 @@ pub(crate) fn emit_kerml_feature(
             }
         }
     }
-    if let Some(multiplicity) = &feature.multiplicity {
-        emit_multiplicity(w, &multiplicity.value)?;
-    }
-    emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
-    for (index, part) in feature.relationship_parts.iter().enumerate() {
-        emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
-    }
-    if let Some(value) = &feature.value {
-        emit_feature_value(w, value)?;
-    }
-    emit_calc_body(w, path, &feature.body)
+    Ok(())
 }
 
 fn emit_feature_relationship_part(
@@ -539,22 +545,15 @@ pub(crate) fn emit_kerml_connector_member(
         w.push_char(' ');
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(typing) = connector.typing {
-        if connector.name.is_none() {
-            // The anonymous library form is spelled with no space: `connector :HappensDuring`.
-            w.push_str(" :");
-        } else {
-            w.push_str(": ");
-        }
-        w.push_qualified_reference(&format!("{path}/type"), typing)?;
-    }
+    emit_feature_specializations(w, &connector.specializations)?;
     if let Some(multiplicity) = &connector.multiplicity {
-        if connector.name.is_none() && connector.typing.is_none() {
+        if connector.name.is_none() && connector.specializations.is_empty() {
             // `connector [0..1] ...` -- keep the keyword and the multiplicity separated.
             w.push_char(' ');
         }
         emit_multiplicity(w, &multiplicity.value)?;
     }
+    emit_multiplicity_modifiers(w, &connector.multiplicity_modifiers);
     if let (Some(from), Some(to)) = (&connector.from, &connector.to) {
         w.push_str(" from ");
         emit_kerml_connector_end(w, &format!("{path}/from"), &from.value)?;

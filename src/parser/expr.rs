@@ -191,7 +191,26 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
     ))
 }
 
-/// Literal only (no unit): integer, real, string, boolean.
+/// KerML `LiteralInfinity`: `'*'` written where a primary expression is expected, e.g. a
+/// multiplicity bound (`[1..*]`) or a feature value (`feature x = *;`). `**` is the exponent
+/// operator, never two infinities, so a following `*` rejects the literal.
+fn literal_infinity(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().get(1) == Some(&b'*') {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, _) = tag(&b"*"[..]).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, Expression::LiteralInfinity),
+    ))
+}
+
+/// Literal only (no unit): integer, real, string, boolean, infinity.
 fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
@@ -199,6 +218,7 @@ fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         literal_real,
         literal_integer,
         literal_string,
+        literal_infinity,
     ))
     .parse(input)
 }

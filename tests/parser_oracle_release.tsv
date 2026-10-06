@@ -2,9 +2,6 @@
 # Regenerate with `scripts/parser-oracle.sh --update` after triaging the change.
 ours-rejects	kerml/src/examples/Association Examples/ProductSelection_N_ary.kerml
 ours-rejects	kerml/src/examples/Behavior Examples/TakePicture.kerml
-ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-3-OneToOneConnectors.kerml
-ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-4-OneToUnrestrictedConnectors.kerml
-ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-5-TimingForStructures.kerml
 ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-6-Sequences.kerml
 ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-7-DecisionsAndMerges.kerml
 ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-8-ChangingFeatureValues.kerml
@@ -41,7 +38,6 @@ ours-rejects	sysml/src/examples/State Space Representation Examples/CartSample.s
 ours-rejects	sysml/src/examples/State Space Representation Examples/EVSample.sysml
 ours-rejects	sysml/src/examples/Variability Examples/VehicleVariabilityModel.sysml
 ours-rejects	sysml/src/examples/Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml
-ours-rejects	sysml/src/examples/v1 Spec Examples/D.4.7.8 Dynamics/HSUVDynamics.sysml
 ours-rejects	sysml/src/training/13. Flows/Flow Definition Example.sysml
 ours-rejects	sysml/src/training/19. Terminate Actions/Terminate Actions Example-1.sysml
 ours-rejects	sysml/src/training/27. Occurrences/Interaction Example-2.sysml

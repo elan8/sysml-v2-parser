@@ -100,6 +100,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_qualified_reference("collect", *selector)?;
         }
         Expression::Null => w.push_str("null"),
+        Expression::LiteralInfinity => w.push_char('*'),
         Expression::Constructor { type_name, args } => {
             w.push_str("new ");
             w.push_qualified_reference("constructor", *type_name)?;

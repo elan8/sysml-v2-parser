@@ -719,6 +719,8 @@ pub enum ControlNodeDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MergeStmt {
+    /// `ControlNodePrefix`, authored before the node keyword.
+    pub prefix: crate::ast::ControlNodePrefix,
     pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
@@ -727,6 +729,8 @@ pub struct MergeStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DecisionStmt {
+    /// `ControlNodePrefix`, authored before the node keyword.
+    pub prefix: crate::ast::ControlNodePrefix,
     pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
@@ -735,6 +739,8 @@ pub struct DecisionStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JoinStmt {
+    /// `ControlNodePrefix`, authored before the node keyword.
+    pub prefix: crate::ast::ControlNodePrefix,
     pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
@@ -743,6 +749,8 @@ pub struct JoinStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForkStmt {
+    /// `ControlNodePrefix`, authored before the node keyword.
+    pub prefix: crate::ast::ControlNodePrefix,
     pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }

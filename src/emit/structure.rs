@@ -1111,14 +1111,18 @@ pub(crate) fn emit_interface_usage(
 ) -> Result<(), EmitError> {
     match usage {
         InterfaceUsage::TypedConnect {
+            prefix,
             name,
             short_name,
             interface_type,
+            multiplicity,
+            multiplicity_modifiers,
             subsets,
             redefines,
             part,
             body,
         } => {
+            emit_occurrence_usage_prefix(w, path, prefix)?;
             w.push_str("interface");
             if short_name.is_some() || name.is_some() {
                 w.push_char(' ');
@@ -1131,6 +1135,10 @@ pub(crate) fn emit_interface_usage(
                 w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
             }
+            if let Some(multiplicity) = multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            emit_multiplicity_modifiers(w, multiplicity_modifiers);
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
             }
@@ -1143,11 +1151,13 @@ pub(crate) fn emit_interface_usage(
             emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Connection {
+            prefix,
             subsets,
             redefines,
             part,
             body,
         } => {
+            emit_occurrence_usage_prefix(w, path, prefix)?;
             w.push_str("interface");
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
@@ -1160,13 +1170,17 @@ pub(crate) fn emit_interface_usage(
             emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Declaration {
+            prefix,
             name,
             short_name,
             interface_type,
+            multiplicity,
+            multiplicity_modifiers,
             subsets,
             redefines,
             body,
         } => {
+            emit_occurrence_usage_prefix(w, path, prefix)?;
             w.push_str("interface");
             if short_name.is_some() || name.is_some() {
                 w.push_char(' ');
@@ -1179,6 +1193,10 @@ pub(crate) fn emit_interface_usage(
                 w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
             }
+            if let Some(multiplicity) = multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            emit_multiplicity_modifiers(w, multiplicity_modifiers);
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
             }
@@ -1594,6 +1612,33 @@ pub(crate) fn emit_basic_usage_prefix(
     }
 }
 
+/// `ControlNodePrefix`: `RefPrefix ('individual')? PortionKind? UsageExtensionKeyword*`, each
+/// authored slot followed by one space.
+pub(crate) fn emit_control_node_prefix(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    prefix: &crate::ast::ControlNodePrefix,
+) -> Result<(), EmitError> {
+    let ref_prefix = &prefix.ref_prefix;
+    if let Some(direction) = &ref_prefix.direction {
+        emit_direction(w, direction.value);
+    }
+    emit_ref_prefix(
+        w,
+        ref_prefix.derived_span.is_some(),
+        ref_prefix.variance.as_ref().map(|node| &node.value),
+        ref_prefix.constant_span.is_some(),
+    );
+    if prefix.individual_span.is_some() {
+        w.push_str("individual ");
+    }
+    if let Some(portion) = &prefix.portion {
+        w.push_str(portion.value.keyword());
+        w.push_char(' ');
+    }
+    emit_extension_keywords(w, &format!("{path}/prefix"), &prefix.extension_keywords)
+}
+
 pub(crate) fn emit_occurrence_usage_prefix(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -1737,13 +1782,11 @@ pub(crate) fn emit_multiplicity(
     mult: &Multiplicity,
 ) -> Result<(), EmitError> {
     w.push_char('[');
-    if mult.lower == mult.upper {
-        emit_bound(w, &mult.lower)?;
-    } else {
-        emit_bound(w, &mult.lower)?;
+    if let Some(lower) = &mult.lower {
+        emit_bound(w, lower)?;
         w.push_str("..");
-        emit_bound(w, &mult.upper)?;
     }
+    emit_bound(w, &mult.upper)?;
     w.push_char(']');
     Ok(())
 }
@@ -1777,15 +1820,9 @@ pub(crate) fn emit_multiplicity_modifiers(
 
 fn emit_bound(
     w: &mut EmitWriter<'_>,
-    bound: &Option<Box<Node<crate::ast::Expression>>>,
+    bound: &Node<crate::ast::Expression>,
 ) -> Result<(), EmitError> {
-    match bound {
-        None => {
-            w.push_char('*');
-            Ok(())
-        }
-        Some(expr) => emit_expression(w, &expr.value),
-    }
+    emit_expression(w, &bound.value)
 }
 
 pub(crate) fn emit_alias_def(

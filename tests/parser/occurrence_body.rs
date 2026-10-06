@@ -250,9 +250,8 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
         .as_ref()
         .expect("succession multiplicity")
         .value;
-    let Some(Expression::FeatureRef(reference)) =
-        multiplicity.lower.as_deref().map(|node| &node.value)
-    else {
+    assert!(multiplicity.lower.is_none());
+    let Expression::FeatureRef(reference) = &multiplicity.upper.value else {
         panic!("expected feature-reference multiplicity bound");
     };
     assert_eq!(
@@ -262,7 +261,6 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
             .authored_text(),
         "seBeforeNum"
     );
-    assert_eq!(multiplicity.lower, multiplicity.upper);
 
     for multiplicity in [
         succession
@@ -279,8 +277,8 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
             Some(Expression::LiteralInteger(0))
         ));
         assert!(matches!(
-            multiplicity.value.upper.as_deref().map(|node| &node.value),
-            Some(Expression::LiteralInteger(1))
+            multiplicity.value.upper.value,
+            Expression::LiteralInteger(1)
         ));
     }
     assert!(matches!(

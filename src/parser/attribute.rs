@@ -1587,7 +1587,10 @@ mod attribute_body_tests {
             multiplicity.value.lower.as_deref().map(|node| &node.value),
             Some(Expression::LiteralInteger(0))
         ));
-        assert!(multiplicity.value.upper.is_none());
+        assert!(matches!(
+            multiplicity.value.upper.value,
+            Expression::LiteralInfinity
+        ));
     }
 
     #[test]
@@ -1602,7 +1605,10 @@ mod attribute_body_tests {
             multiplicity.value.lower.as_deref().map(|node| &node.value),
             Some(Expression::LiteralInteger(0))
         ));
-        assert!(multiplicity.value.upper.is_none());
+        assert!(matches!(
+            multiplicity.value.upper.value,
+            Expression::LiteralInfinity
+        ));
     }
 
     #[test]
@@ -1617,8 +1623,8 @@ mod attribute_body_tests {
             Some(Expression::LiteralInteger(0))
         ));
         assert!(matches!(
-            multiplicity.value.upper.as_deref().map(|node| &node.value),
-            Some(Expression::LiteralInteger(1))
+            multiplicity.value.upper.value,
+            Expression::LiteralInteger(1)
         ));
     }
 

@@ -228,6 +228,9 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // body is a structured member instead of a recovered parse error, so the file reparses to
     // the same AST.
     "Simple Tests/ViewTest.sysml",
+    // Promoted by `redefines` members in constraint usage bodies: `attribute redefines tp;`-style
+    // members no longer fall to recovery, so the dynamics constraints reparse to the same AST.
+    "v1 Spec Examples/D.4.7.8 Dynamics/HSUVDynamics.sysml",
 ];
 
 fn release_root() -> PathBuf {

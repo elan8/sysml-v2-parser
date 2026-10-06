@@ -1592,7 +1592,14 @@ fn emit_merge_stmt(
     path: &str,
     merge: &crate::ast::MergeStmt,
 ) -> Result<(), EmitError> {
-    emit_control_node(w, path, "merge", &merge.declaration, &merge.body)
+    emit_control_node(
+        w,
+        path,
+        "merge",
+        &merge.prefix,
+        &merge.declaration,
+        &merge.body,
+    )
 }
 
 fn emit_decision_stmt(
@@ -1600,7 +1607,14 @@ fn emit_decision_stmt(
     path: &str,
     decision: &crate::ast::DecisionStmt,
 ) -> Result<(), EmitError> {
-    emit_control_node(w, path, "decide", &decision.declaration, &decision.body)
+    emit_control_node(
+        w,
+        path,
+        "decide",
+        &decision.prefix,
+        &decision.declaration,
+        &decision.body,
+    )
 }
 
 fn emit_join_stmt(
@@ -1608,7 +1622,7 @@ fn emit_join_stmt(
     path: &str,
     join: &crate::ast::JoinStmt,
 ) -> Result<(), EmitError> {
-    emit_control_node(w, path, "join", &join.declaration, &join.body)
+    emit_control_node(w, path, "join", &join.prefix, &join.declaration, &join.body)
 }
 
 fn emit_fork_stmt(
@@ -1616,7 +1630,7 @@ fn emit_fork_stmt(
     path: &str,
     fork: &crate::ast::ForkStmt,
 ) -> Result<(), EmitError> {
-    emit_control_node(w, path, "fork", &fork.declaration, &fork.body)
+    emit_control_node(w, path, "fork", &fork.prefix, &fork.declaration, &fork.body)
 }
 
 /// All four `ControlNode` productions share an empty-or-named declaration followed by their
@@ -1626,9 +1640,11 @@ fn emit_control_node(
     w: &mut EmitWriter<'_>,
     path: &str,
     keyword: &str,
+    prefix: &crate::ast::ControlNodePrefix,
     declaration: &crate::ast::ControlNodeDeclaration,
     body: &crate::ast::FirstMergeBody,
 ) -> Result<(), EmitError> {
+    crate::emit::structure::emit_control_node_prefix(w, path, prefix)?;
     w.push_str(keyword);
     match declaration {
         crate::ast::ControlNodeDeclaration::Anonymous => {}

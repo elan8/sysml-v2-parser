@@ -365,6 +365,9 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::ReturnDecl(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
+            ConstraintDefBodyElement::ActionMember(n) => {
+                walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
+            }
             ConstraintDefBodyElement::Expression(_) => {}
         }
     }
@@ -1678,6 +1681,9 @@ fn walk_constraint_body_elements(
             }
             ConstraintDefBodyElement::ReturnDecl(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
+            }
+            ConstraintDefBodyElement::ActionMember(n) => {
+                walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
             ConstraintDefBodyElement::Expression(_) => {}
         }

@@ -230,6 +230,36 @@ impl OccurrenceUsagePrefixHead {
     }
 }
 
+/// `ControlNodePrefix : OccurrenceUsage = RefPrefix ( 'individual' )? ( PortionKind )?
+/// UsageExtensionKeyword*` (reference `SysML.xtext:1657-1662`), the prefix of `merge`, `decide`,
+/// `join` and `fork`.
+///
+/// It is `OccurrenceUsagePrefix` without the `end` alternative and without `ref`, so it is its own
+/// value rather than an [`OccurrenceUsagePrefix`] whose illegal slots would have to be refused
+/// after parsing. A `FeatureDirection` here (`in fork g;`) makes the node referential.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ControlNodePrefix {
+    /// `RefPrefix`: direction, `derived`, `abstract`|`variation`, `constant`.
+    pub ref_prefix: RefPrefix,
+    /// `isIndividual ?= 'individual'`, as the authored keyword's span.
+    pub individual_span: Option<Span>,
+    /// `portionKind = PortionKind`.
+    pub portion: Option<Node<OccurrencePortionKind>>,
+    /// `UsageExtensionKeyword*` in authored order.
+    pub extension_keywords: Vec<Node<UsageExtensionKeyword>>,
+}
+
+impl ControlNodePrefix {
+    /// Whether the author wrote any part of this prefix.
+    pub fn is_authored(&self) -> bool {
+        self.ref_prefix.is_authored()
+            || self.individual_span.is_some()
+            || self.portion.is_some()
+            || !self.extension_keywords.is_empty()
+    }
+}
+
 /// `OccurrenceUsagePrefix : OccurrenceUsage = ( EndUsagePrefix | BasicUsagePrefix ('individual')?
 /// PortionKind? ) UsageExtensionKeyword*` (SysML BNF 564; reference `SysML.xtext:836`).
 ///

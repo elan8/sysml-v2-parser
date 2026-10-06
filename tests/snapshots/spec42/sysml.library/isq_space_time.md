@@ -1365,7 +1365,7 @@ standard library package ISQSpaceTime {
              * By default, the universalCartesianSpatial3dCoordinateFrame uses meters as the units on all three axes.
              */
         }
-        attribute :>> transformation[0] {
+        attribute :>> transformation[0..0] {
             doc
             /*
              * The universalCartesianSpatial3dCoordinateFrame is the "top-level" coordinate frame, not nested in any other frame.

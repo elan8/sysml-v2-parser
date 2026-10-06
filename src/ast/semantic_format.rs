@@ -405,6 +405,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str("))")
             }
             Expression::Null => self.writer.write_str("(null)"),
+            Expression::LiteralInfinity => self.writer.write_str("(infinity)"),
             Expression::Constructor { type_name, args } => {
                 self.writer.write_str("(constructor (type ")?;
                 self.write_reference(*type_name)?;
@@ -816,13 +817,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("(lower ")?;
         match &multiplicity.value.lower {
             Some(lower) => self.write_expression(lower)?,
-            None => self.writer.write_str("unbounded")?,
+            None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (upper ")?;
-        match &multiplicity.value.upper {
-            Some(upper) => self.write_expression(upper)?,
-            None => self.writer.write_str("unbounded")?,
-        }
+        self.write_expression(&multiplicity.value.upper)?;
         self.writer.write_char(')')
     }
 
@@ -1306,8 +1304,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_analysis_case_usage(&usage.value)?;
                         }
-                        UseCaseDefBodyElement::CalcUsage(_usage) => {
-                            self.write_marker(&mut first, "calc-usage")?;
+                        UseCaseDefBodyElement::CalcUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_calculation_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::AttributeUsage(_usage) => {
                             self.write_marker(&mut first, "attribute-usage")?;
@@ -2148,11 +2147,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_control_node(
         &mut self,
         keyword: &str,
+        prefix: &super::ControlNodePrefix,
         declaration: &super::ControlNodeDeclaration,
         body: &FirstMergeBody,
     ) -> io::Result<()> {
         self.writer.write_char('(')?;
         self.writer.write_str(keyword)?;
+        self.writer.write_char(' ')?;
+        self.write_control_node_prefix(prefix)?;
         self.writer.write_str(" (declaration ")?;
         self.write_control_node_declaration(declaration)?;
         self.writer.write_str(") ")?;
@@ -2164,18 +2166,29 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         match &action.target {
             super::ThenTarget::Merge(merge) => {
                 self.writer.write_str("(then-control ")?;
-                self.write_control_node("merge", &merge.value.declaration, &merge.value.body)?;
+                self.write_control_node(
+                    "merge",
+                    &merge.value.prefix,
+                    &merge.value.declaration,
+                    &merge.value.body,
+                )?;
                 self.writer.write_char(')')
             }
             super::ThenTarget::Fork(fork) => {
                 self.writer.write_str("(then-control ")?;
-                self.write_control_node("fork", &fork.value.declaration, &fork.value.body)?;
+                self.write_control_node(
+                    "fork",
+                    &fork.value.prefix,
+                    &fork.value.declaration,
+                    &fork.value.body,
+                )?;
                 self.writer.write_char(')')
             }
             super::ThenTarget::Decide(decision) => {
                 self.writer.write_str("(then-control ")?;
                 self.write_control_node(
                     "decide",
+                    &decision.value.prefix,
                     &decision.value.declaration,
                     &decision.value.body,
                 )?;
@@ -2183,7 +2196,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             super::ThenTarget::Join(join) => {
                 self.writer.write_str("(then-control ")?;
-                self.write_control_node("join", &join.value.declaration, &join.value.body)?;
+                self.write_control_node(
+                    "join",
+                    &join.value.prefix,
+                    &join.value.declaration,
+                    &join.value.body,
+                )?;
                 self.writer.write_char(')')
             }
             super::ThenTarget::If(if_stmt) => {
@@ -2576,6 +2594,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             declaration.is_abstract
         )?;
         self.write_optional_name(declaration.identification.name)?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(declaration.multiplicity.as_ref())?;
         self.writer.write_str(") (specializes ")?;
         match &declaration.specializes {
             Some(typing) => self.write_typing(&typing.value)?,
@@ -2616,47 +2636,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             feature.is_member, feature.is_all
         )?;
         self.write_usage_declaration_name(feature.name)?;
-        self.writer.write_str(") (specializations")?;
-        for specialization in &feature.specializations {
-            self.writer.write_char(' ')?;
-            match specialization {
-                super::FeatureSpecialization::Typing(typing) => {
-                    self.writer.write_str("(typing ")?;
-                    self.write_typing(&typing.value)?;
-                    self.writer.write_char(')')?;
-                }
-                super::FeatureSpecialization::Subsetting {
-                    relationship,
-                    value,
-                } => {
-                    self.writer.write_str("(subsetting ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_str(" (value ")?;
-                    if let Some(value) = value {
-                        self.write_expression(value)?;
-                    } else {
-                        self.writer.write_str("none")?;
-                    }
-                    self.writer.write_str("))")?;
-                }
-                super::FeatureSpecialization::ReferenceSubsetting(relationship) => {
-                    self.writer.write_str("(reference-subsetting ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_char(')')?;
-                }
-                super::FeatureSpecialization::CrossSubsetting(relationship) => {
-                    self.writer.write_str("(cross-subsetting ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_char(')')?;
-                }
-                super::FeatureSpecialization::Redefinition(relationship) => {
-                    self.writer.write_str("(redefinition ")?;
-                    self.write_subsetting(&relationship.value)?;
-                    self.writer.write_char(')')?;
-                }
-            }
-        }
-        self.writer.write_str(") (multiplicity ")?;
+        self.writer.write_str(") ")?;
+        self.write_feature_specializations(&feature.specializations)?;
+        self.writer.write_str(" (multiplicity ")?;
         self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
@@ -2702,6 +2684,82 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&feature.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// Ordered KerML `FeatureSpecialization` alternatives as `(specializations ...)`.
+    fn write_feature_specializations(
+        &mut self,
+        specializations: &[super::FeatureSpecialization],
+    ) -> io::Result<()> {
+        self.writer.write_str("(specializations")?;
+        for specialization in specializations {
+            self.writer.write_char(' ')?;
+            match specialization {
+                super::FeatureSpecialization::Typing(typing) => {
+                    self.writer.write_str("(typing ")?;
+                    self.write_typing(&typing.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Subsetting {
+                    relationship,
+                    value,
+                } => {
+                    self.writer.write_str("(subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_str(" (value ")?;
+                    if let Some(value) = value {
+                        self.write_expression(value)?;
+                    } else {
+                        self.writer.write_str("none")?;
+                    }
+                    self.writer.write_str("))")?;
+                }
+                super::FeatureSpecialization::ReferenceSubsetting(relationship) => {
+                    self.writer.write_str("(reference-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::CrossSubsetting(relationship) => {
+                    self.writer.write_str("(cross-subsetting ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::FeatureSpecialization::Redefinition(relationship) => {
+                    self.writer.write_str("(redefinition ")?;
+                    self.write_subsetting(&relationship.value)?;
+                    self.writer.write_char(')')?;
+                }
+            }
+        }
+        self.writer.write_char(')')
+    }
+
+    fn write_kerml_connector(&mut self, connector: &super::KermlConnectorMember) -> io::Result<()> {
+        write!(
+            self.writer,
+            "(kerml-connector (all {}) (name ",
+            connector.is_all
+        )?;
+        self.write_optional_name(connector.name)?;
+        self.writer.write_str(") ")?;
+        self.write_feature_specializations(&connector.specializations)?;
+        self.writer.write_str(" (multiplicity ")?;
+        self.write_multiplicity_clause(connector.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&connector.multiplicity_modifiers)?;
+        self.writer.write_str(" (from ")?;
+        match &connector.from {
+            Some(end) => self.write_kerml_connector_end(&end.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (to ")?;
+        match &connector.to {
+            Some(end) => self.write_kerml_connector_end(&end.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&connector.body)?;
         self.writer.write_char(')')
     }
 
@@ -2814,6 +2872,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_return_declaration(&member.value)?;
                         }
+                        super::ConstraintDefBodyElement::ActionMember(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_merge_member(&member.value, &member.span)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -2896,33 +2958,23 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// `CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
     /// (SysML BNF 1354).
     ///
-    /// `CalcUsage` has not migrated onto the shared `OccurrenceUsagePrefix` component yet, so the
-    /// prefix slots it does carry are shown individually rather than through
-    /// `write_occurrence_usage_prefix`.
     fn write_calculation_usage(&mut self, usage: &super::CalcUsage) -> io::Result<()> {
         self.writer.write_str("(calc-usage (name ")?;
         self.write_optional_name(usage.identification.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.identification.short_name)?;
-        self.writer.write_str(") (direction ")?;
-        match usage.direction {
-            Some(InOut::In) => self.writer.write_str("in")?,
-            Some(InOut::Out) => self.writer.write_str("out")?,
-            Some(InOut::InOut) => self.writer.write_str("inout")?,
-            None => self.writer.write_str("none")?,
-        }
-        write!(
-            self.writer,
-            ") (abstract {}) (reference {}) (type ",
-            usage.is_abstract, usage.is_reference
-        )?;
-        match usage.type_name {
-            Some(reference) => self.write_reference(reference)?,
+        self.writer.write_str(") ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (typing ")?;
+        match &usage.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_str(" (redefines")?;
         match &usage.redefines {
@@ -2998,8 +3050,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Invariant(_member) => {
                             self.write_marker(&mut first, "invariant")?;
                         }
-                        super::CalcDefBodyElement::Connector(_member) => {
-                            self.write_marker(&mut first, "connector")?;
+                        super::CalcDefBodyElement::Connector(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_connector(&member.value)?;
                         }
                         super::CalcDefBodyElement::Binding(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -3044,8 +3097,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_expression(expression)?;
                             self.writer.write_char(')')?;
                         }
-                        super::CalcDefBodyElement::CalcUsage(_member) => {
-                            self.write_marker(&mut first, "calc-usage")?;
+                        super::CalcDefBodyElement::CalcUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_calculation_usage(&member.value)?;
                         }
                         super::CalcDefBodyElement::CalcDef(_member) => {
                             self.write_marker(&mut first, "calc-def")?;
@@ -3112,23 +3166,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.writer.write_str("none")?;
                 }
                 self.writer.write_str(") (multiplicity ")?;
-                if let Some(multiplicity) = &declaration.value.multiplicity {
-                    self.writer.write_str("(lower ")?;
-                    if let Some(lower) = &multiplicity.value.lower {
-                        self.write_expression(lower)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_str(") (upper ")?;
-                    if let Some(upper) = &multiplicity.value.upper {
-                        self.write_expression(upper)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_char(')')?;
-                } else {
-                    self.writer.write_str("none")?;
-                }
+                self.write_multiplicity_clause(declaration.value.multiplicity.as_ref())?;
                 self.writer.write_str(") ")?;
                 self.write_multiplicity_modifiers(&declaration.value.multiplicity_modifiers)?;
                 self.writer.write_char(' ')?;
@@ -3173,18 +3211,30 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_guarded_succession(&succession.value)
             }
             ActionDefBodyElement::FirstStmt(first) => self.write_first_statement(&first.value),
-            ActionDefBodyElement::MergeStmt(merge) => {
-                self.write_control_node("merge", &merge.value.declaration, &merge.value.body)
-            }
-            ActionDefBodyElement::DecisionStmt(decision) => {
-                self.write_control_node("decide", &decision.value.declaration, &decision.value.body)
-            }
-            ActionDefBodyElement::JoinStmt(join) => {
-                self.write_control_node("join", &join.value.declaration, &join.value.body)
-            }
-            ActionDefBodyElement::ForkStmt(fork) => {
-                self.write_control_node("fork", &fork.value.declaration, &fork.value.body)
-            }
+            ActionDefBodyElement::MergeStmt(merge) => self.write_control_node(
+                "merge",
+                &merge.value.prefix,
+                &merge.value.declaration,
+                &merge.value.body,
+            ),
+            ActionDefBodyElement::DecisionStmt(decision) => self.write_control_node(
+                "decide",
+                &decision.value.prefix,
+                &decision.value.declaration,
+                &decision.value.body,
+            ),
+            ActionDefBodyElement::JoinStmt(join) => self.write_control_node(
+                "join",
+                &join.value.prefix,
+                &join.value.declaration,
+                &join.value.body,
+            ),
+            ActionDefBodyElement::ForkStmt(fork) => self.write_control_node(
+                "fork",
+                &fork.value.prefix,
+                &fork.value.declaration,
+                &fork.value.body,
+            ),
             ActionDefBodyElement::TerminateStmt(terminate) => {
                 self.write_terminate_statement(&terminate.value)
             }
@@ -3224,7 +3274,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::AttributeUsage(_usage) => {
                 self.writer.write_str("(attribute-usage)")
             }
-            ActionDefBodyElement::CalcUsage(_usage) => self.writer.write_str("(calc-usage)"),
+            ActionDefBodyElement::CalcUsage(usage) => self.write_calculation_usage(&usage.value),
             ActionDefBodyElement::ActionDef(_def) => self.writer.write_str("(action-def)"),
             ActionDefBodyElement::DefaultReferenceUsage(usage) => {
                 self.write_default_reference_usage(&usage.value)
@@ -3936,6 +3986,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "merge",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -3944,6 +3995,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "decide",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -3952,6 +4004,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "join",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -3960,6 +4013,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_control_node(
                                 "fork",
+                                &member.value.prefix,
                                 &member.value.declaration,
                                 &member.value.body,
                             )?;
@@ -4492,8 +4546,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::AttributeBodyElement::Invariant(_member) => {
                 self.write_marker(first, "invariant")?;
             }
-            super::AttributeBodyElement::KermlConnector(_member) => {
-                self.write_marker(first, "kerml-connector")?;
+            super::AttributeBodyElement::KermlConnector(member) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_connector(&member.value)?;
             }
             super::AttributeBodyElement::KermlClassifier(declaration) => {
                 self.write_item_prefix(first)?;
@@ -5121,21 +5176,81 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// Project the form and typed body so a regular comment cannot be invisible in a snapshot.
     fn write_interface_usage(&mut self, usage: &super::InterfaceUsage) -> io::Result<()> {
         self.writer.write_str("(interface-usage (form ")?;
-        let (part, body) = match usage {
-            super::InterfaceUsage::TypedConnect { part, body, .. } => {
+        let (prefix, declaration, part, body) = match usage {
+            super::InterfaceUsage::TypedConnect {
+                prefix,
+                name,
+                short_name,
+                interface_type,
+                multiplicity,
+                multiplicity_modifiers,
+                part,
+                body,
+                ..
+            } => {
                 self.writer.write_str("typed-connect")?;
-                (Some(part), body)
+                (
+                    prefix,
+                    Some((
+                        *name,
+                        *short_name,
+                        *interface_type,
+                        multiplicity,
+                        multiplicity_modifiers,
+                    )),
+                    Some(part),
+                    body,
+                )
             }
-            super::InterfaceUsage::Connection { part, body, .. } => {
+            super::InterfaceUsage::Connection {
+                prefix, part, body, ..
+            } => {
                 self.writer.write_str("connection")?;
-                (Some(part), body)
+                (prefix, None, Some(part), body)
             }
-            super::InterfaceUsage::Declaration { body, .. } => {
+            super::InterfaceUsage::Declaration {
+                prefix,
+                name,
+                short_name,
+                interface_type,
+                multiplicity,
+                multiplicity_modifiers,
+                body,
+                ..
+            } => {
                 self.writer.write_str("declaration")?;
-                (None, body)
+                (
+                    prefix,
+                    Some((
+                        *name,
+                        *short_name,
+                        *interface_type,
+                        multiplicity,
+                        multiplicity_modifiers,
+                    )),
+                    None,
+                    body,
+                )
             }
         };
-        self.writer.write_str(") (part ")?;
+        self.writer.write_str(") ")?;
+        self.write_occurrence_usage_prefix(prefix)?;
+        if let Some((name, short_name, interface_type, multiplicity, modifiers)) = declaration {
+            self.writer.write_str(" (name ")?;
+            self.write_optional_name(name)?;
+            self.writer.write_str(") (short-name ")?;
+            self.write_optional_name(short_name)?;
+            self.writer.write_str(") (type ")?;
+            match interface_type {
+                Some(reference) => self.write_reference(reference)?,
+                None => self.writer.write_str("none")?,
+            }
+            self.writer.write_str(") (multiplicity ")?;
+            self.write_multiplicity_clause(multiplicity.as_deref())?;
+            self.writer.write_str(") ")?;
+            self.write_multiplicity_modifiers(modifiers)?;
+        }
+        self.writer.write_str(" (part ")?;
         if let Some(part) = part {
             self.write_interface_part(&part.value)?;
         } else {
@@ -6076,9 +6191,40 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("))")
     }
 
+    /// `ControlNodePrefix`'s slots, each naming the alternative that was authored.
+    fn write_control_node_prefix(&mut self, prefix: &super::ControlNodePrefix) -> io::Result<()> {
+        self.writer.write_str("(prefix ")?;
+        self.write_ref_prefix(&prefix.ref_prefix)?;
+        write!(
+            self.writer,
+            " (individual {}) (portion ",
+            prefix.individual_span.is_some()
+        )?;
+        match prefix.portion.as_ref().map(|node| node.value) {
+            Some(super::OccurrencePortionKind::Snapshot) => self.writer.write_str("snapshot")?,
+            Some(super::OccurrencePortionKind::Timeslice) => self.writer.write_str("timeslice")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (extensions")?;
+        for keyword in &prefix.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str("))")
+    }
+
     /// `BasicUsagePrefix`'s slots, each naming the alternative that was authored.
     fn write_basic_usage_prefix(&mut self, basic: &super::BasicUsagePrefix) -> io::Result<()> {
-        let ref_prefix = &basic.ref_prefix;
+        self.write_ref_prefix(&basic.ref_prefix)?;
+        write!(
+            self.writer,
+            " (reference {})",
+            basic.reference_span.is_some()
+        )
+    }
+
+    /// `RefPrefix`'s slots, each naming the alternative that was authored.
+    fn write_ref_prefix(&mut self, ref_prefix: &super::RefPrefix) -> io::Result<()> {
         self.writer.write_str("(direction ")?;
         self.write_direction(ref_prefix.direction.as_ref().map(|node| node.value))?;
         write!(
@@ -6093,9 +6239,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         write!(
             self.writer,
-            ") (constant {}) (reference {})",
-            ref_prefix.constant_span.is_some(),
-            basic.reference_span.is_some(),
+            ") (constant {})",
+            ref_prefix.constant_span.is_some()
         )
     }
 
@@ -6788,8 +6933,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
-            PackageBodyElement::KermlConnector(_connector) => {
-                self.write_marker(first, "kerml-connector")
+            PackageBodyElement::KermlConnector(connector) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_connector(&connector.value)
             }
             PackageBodyElement::KermlRelationship(relationship) => {
                 self.write_item_prefix(first)?;
@@ -6822,23 +6968,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str(") (name ")?;
                 self.write_optional_name(declaration.value.name)?;
                 self.writer.write_str(") (multiplicity ")?;
-                if let Some(multiplicity) = &declaration.value.multiplicity {
-                    self.writer.write_str("(lower ")?;
-                    if let Some(lower) = &multiplicity.value.lower {
-                        self.write_expression(lower)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_str(") (upper ")?;
-                    if let Some(upper) = &multiplicity.value.upper {
-                        self.write_expression(upper)?;
-                    } else {
-                        self.writer.write_str("unbounded")?;
-                    }
-                    self.writer.write_char(')')?;
-                } else {
-                    self.writer.write_str("none")?;
-                }
+                self.write_multiplicity_clause(declaration.value.multiplicity.as_ref())?;
                 self.writer.write_str("))")
             }
             PackageBodyElement::KermlFeatureDecl(_declaration) => {

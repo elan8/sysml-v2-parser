@@ -73,6 +73,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     bodies): the source without the short name parses cleanly, the source with it parses without
     diagnostics, the AST retains it (via the structural visitor), and it round-trips through the
     emitter.
+- **KerML connectors own the full `FeatureSpecializationPart` (breaking AST change,
+  `PARSE_AST_VERSION` 265).** `KermlConnectorMember::typing` is replaced by ordered
+  `specializations: Vec<FeatureSpecialization>` plus `multiplicity_modifiers`, so
+  `connector tern subsets links [1] { end feature e1; ... }`, `connector c :> a redefines b from x
+  to y;` and `connector typed by T references r;` parse instead of falling into recovery. The
+  multiplicity positions are read by the parser shared with `KermlFeature`. Semantic snapshots now
+  project the connector (`kerml-connector`) instead of an opaque marker, and the anonymous typed
+  form formats as `connector : T`. `specializes` remains rejected: KerML `FeatureSpecialization`
+  has no such spelling.
+
+- **`*` is a `LiteralInfinity` expression, and a multiplicity's lower bound is only the one
+  authored (breaking AST change, `PARSE_AST_VERSION` 265).** KerML `LiteralExpression` includes
+  `LiteralInfinity`, so `Expression::LiteralInfinity` is now parsed wherever a primary expression
+  is written: `feature x = *;` parses instead of falling to the opaque feature fallback.
+  `Multiplicity` follows KerML `MultiplicityRange` (`'[' (lowerBound '..')? upperBound ']'`):
+  `upper` is a required `Box<Node<Expression>>` (`*` is `LiteralInfinity`), and `lower` is
+  `Some` only when `lowerBound '..'` was written. `[3]` used to duplicate its bound into both
+  sides, so the emitter rewrote an authored `[1..1]` as `[1]`; both spellings now round-trip.
+  The semantic projection writes `(lower none)` and `(infinity)` instead of `unbounded`.
+
+- **Control nodes own `ControlNodePrefix` (breaking AST change, `PARSE_AST_VERSION` 265).**
+  `MergeStmt`, `DecisionStmt`, `JoinStmt` and `ForkStmt` gain `prefix: ControlNodePrefix`
+  (`RefPrefix`, `individual`, `PortionKind`, `UsageExtensionKeyword*`; `SysML.xtext:1657-1686`),
+  so `in fork g;`, `out derived join j;` and `timeslice #Tag fork t;` parse in action bodies and
+  as `then` targets instead of being recovered. The semantic projection writes the prefix on
+  every control node.
+
+- **`multiplicity` members in KerML type bodies.** `TypeBodyElement` reaches `NonFeatureMember
+  -> NonFeatureElement -> Multiplicity` (`KerML.xtext:153-155, 234-239, 754-764`), so
+  `classifier Two[1] { multiplicity extra [2]; }` yields a `CalcDefBodyElement::KermlClassifier`
+  with keyword `multiplicity` and its bounds -- the node a package body already produces --
+  instead of two shredded result expressions. The semantic projection of `kerml-classifier` now
+  writes its `(multiplicity …)`.
+
+- **Calculation, constraint and KerML type bodies no longer shred unmodeled members into result
+  expressions.** `attribute a : T;` in a `constraint def` body is a
+  `ConstraintDefBodyElement::AttributeUsage`, and `protected in c : C;` in a KerML `class` body is
+  one directed `KermlFeature` (the direction is looked for past `MemberPrefix`). A member that,
+  after its optional visibility, opens with a reserved keyword no arm models and no expression can
+  start with is refused by the terminal expression arm and recovered as one node
+  (`unexpected_keyword_in_scope`), so `Expression` body elements are exactly authored
+  `ResultExpressionMember`s. `calc def K { objective o; }` reported
+  `recovered_calc_body_element`; it now reports `unexpected_keyword_in_scope`. A constraint body
+  accepts the keyword spelling `redefines partMasses = (…);` of its `:>>` member, which that
+  refusal had sent to recovery. `end 'bool' g;` in a type body is recovered as one member rather
+  than three silent expressions: a quoted name followed by another name is neither an owned cross
+  feature (which needs a following `feature` keyword) nor a `FeatureDeclaration`; the library's
+  `end bool constrainedGuard;` and `end y;` are features.
+
+- **Namespace-level `interface X;` and `calc X;` are usages (breaking AST change,
+  `PARSE_AST_VERSION` 265).** `InterfaceDefKeyword` and `CalculationDefKeyword` are `interface
+  def` and `calc def` (`SysML.xtext:1101-1107, 1938-1945`), but the package-body dispatcher kept
+  `def` optional and returned `InterfaceDef`/`CalcDef`, so the usage form was unrepresentable and
+  the emitter rewrote `calc ms : MassSum;` as `calc def ms : MassSum;`. `def` is now required in
+  every scope (the `def`-optional `calc_def`/`interface_def` parsers are removed), so these are
+  `PackageBodyElement::InterfaceUsage`/`CalcUsage`. To carry the Systems Library usage forms
+  (`abstract interface interfaces : Interface[0..*] nonunique :> connections { ... }`):
+  - every `InterfaceUsage` variant gains `prefix: OccurrenceUsagePrefix`, and `TypedConnect` and
+    `Declaration` gain `multiplicity` and `multiplicity_modifiers` (the multiplicity was parsed
+    and discarded); the projection writes them.
+  - `CalcUsage` gains `multiplicity_modifiers`.
+  `connection X;` was already a `ConnectionUsage`.
+
+- **`CalcUsage` carries the full `OccurrenceUsagePrefix` and every authored type (breaking AST
+  change, `PARSE_AST_VERSION` 265).** `CalculationUsage = OccurrenceUsagePrefix 'calc' ...`
+  (SysML BNF 1388), but `calc_usage` read only `RefPrefix` plus `ref`, so `individual calc c;`,
+  `snapshot calc s;` and `#Tag calc c;` were rejected or split, and its single `type_name` kept
+  only the first of `calc c : C1, C2;`. Once namespace-level `calc X;` became a usage, both
+  regressed from silent misparses (`calc def c : C1;`) to errors.
+  - `CalcUsage::prefix: OccurrenceUsagePrefix` replaces `is_abstract`, `direction` and
+    `is_reference`; `CalcUsage::typing: Option<Node<TypingRelationship>>` replaces `type_name`.
+  - `calc_usage` refuses by lookahead (`kind_keyword_follows`) and parses in a reference
+    transaction, like `constraint_usage`. A calculation body gives a prefixed calculation usage
+    first refusal, so `#Tag calc c;` is one prefixed usage rather than a metadata member and a
+    calculation, and `in calculationParameter` in a KerML type body is no longer read as
+    `in calc ulationParameter`.
+  - The semantic projection writes calculation usages in calculation and action bodies in full
+    instead of a bare `(calc-usage)` marker.
+
+- **Constraint bodies parse action-body members, control nodes included.** `ConstraintDefinition`
+  and `ConstraintUsage` end in `CalculationBody`, whose `CalculationBodyItem = ActionBodyItem |
+  ReturnParameterMember`, so `constraint def C { fork f; }` is grammatical; only the semantic rule
+  `validateControlNodeOwningType` rejects it. New `ConstraintDefBodyElement::ActionMember`,
+  dispatched like `CalcDefBodyElement::ActionMember`. `ref` members keep the constraint scope's
+  own route, because the action-body `ref` parser drops a `default` feature value.
 
 ## [0.57.0] - 2026-09-30
 

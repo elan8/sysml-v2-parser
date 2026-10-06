@@ -497,19 +497,24 @@ pub struct KermlConnectorEnd {
     pub references: Option<crate::ast::QualifiedReferenceId>,
 }
 
-/// KerML connector member in a type body: `connector` `all`? name? `:` type multiplicity?
-/// (`from` end `to` end)? body, e.g. `connector :HappensDuring from [1] self to [1] this;` or
+/// KerML connector member in a type body: `connector` `all`? name? `FeatureSpecializationPart`?
+/// (`from` end `to` end)? body, e.g. `connector :HappensDuring from [1] self to [1] this;`,
 /// `private connector all during: HappensDuring[0..1] from self to occ;` (Kernel Semantic
-/// Library `Occurrences.kerml`).
+/// Library `Occurrences.kerml`), or `connector pair :> links { end feature e1; ... }` (KerML BNF
+/// `Connector`, Pilot `KerML.xtext` 824-830).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlConnectorMember {
     pub is_all: bool,
     /// Declared name; empty for the anonymous `connector :Type` form.
     pub name: Option<DeclarationName>,
-    /// `:` type target.
-    pub typing: Option<crate::ast::QualifiedReferenceId>,
+    /// Ordered `FeatureSpecialization` alternatives of the connector's `FeatureDeclaration`
+    /// (`:`/`typed by`, `:>`/`subsets`, `::>`/`references`, `=>`/`crosses`, `:>>`/`redefines`),
+    /// in authored order. Empty when the declaration has none.
+    pub specializations: Vec<FeatureSpecialization>,
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    /// `MultiplicityPart`'s `ordered`/`nonunique` keyword slots.
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `from`/`to` ends when written.
     pub from: Option<Node<KermlConnectorEnd>>,
     pub to: Option<Node<KermlConnectorEnd>>,

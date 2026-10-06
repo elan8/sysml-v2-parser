@@ -265,7 +265,22 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::InOutDecl(Box::new(n))
         })
         .parse(input)?
-    } else if input.fragment().starts_with(b":>>") || input.fragment().starts_with(b":>") {
+    } else if starts_with_keyword(after_visibility.fragment(), b"attribute") {
+        // `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem ->
+        // NonOccurrenceUsageMember -> AttributeUsage` (SysML BNF 1359-1368, 901-917): the same
+        // `attribute_usage` a calculation body dispatches. Without this arm the terminal
+        // expression arm split `attribute a : T;` into an `attribute` expression and a feature.
+        map(crate::parser::attribute::attribute_usage, |n| {
+            ConstraintDefBodyElement::AttributeUsage(Box::new(n))
+        })
+        .parse(input)?
+    } else if input.fragment().starts_with(b":>>")
+        || input.fragment().starts_with(b":>")
+        || starts_with_keyword(input.fragment(), b"redefines")
+    {
+        // `redefines partMasses = (…);` is the keyword spelling of the same `:>>` member
+        // (`Redefinitions = ( ':>>' | 'redefines' ) OwnedRedefinition`, SysML BNF); without it the
+        // reserved word reached the terminal arm's refusal and the member became recovery.
         map(
             crate::parser::attribute::redefinition_feature_binding,
             |n| ConstraintDefBodyElement::AttributeUsage(Box::new(n)),
@@ -305,6 +320,34 @@ pub(crate) fn constraint_def_body_element(
             )?;
             (next, ConstraintDefBodyElement::Error(node))
         }
+    } else if let Some((next, member)) =
+        (starts_with_any_keyword(
+            after_visibility.fragment(),
+            crate::parser::lex::CALCULATION_ACTION_STARTERS,
+        ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
+        .then(|| {
+            // Transactional: when the action parser declines (`if a ? b else c` is a result
+            // expression), the references it allocated must not stay in the arena.
+            crate::parser::span::reference_transaction(
+                input,
+                crate::parser::action::action_def_body_element,
+            )
+        })
+        .and_then(Result::ok)
+    {
+        // `CalculationBodyItem = ActionBodyItem | ...` (SysML BNF 1366-1368): the same action-body
+        // dispatch `calculation_body_element` makes for the one `CalculationBody` production, and
+        // ahead of the keyword-less binding below for the same reason -- it reads `fork` as a
+        // feature name. When the action parser declines (`if c ? a else b` is a result
+        // expression, not an `if` action), the remaining arms decide as before.
+        //
+        // `ref` members keep this scope's own route below: the action-body `ref` parser drops a
+        // `default` feature value (`ref :>> a, b default that.that;` would lose `default
+        // that.that`), which the keyword-less binding retains.
+        (
+            next,
+            ConstraintDefBodyElement::ActionMember(Box::new(member)),
+        )
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.
@@ -312,6 +355,11 @@ pub(crate) fn constraint_def_body_element(
             rest,
             ConstraintDefBodyElement::FeatureDecl(Box::new(binding)),
         )
+    } else if refuses_result_expression_fallback(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     } else {
         map(expression, ConstraintDefBodyElement::Expression).parse(input)?
     };
@@ -319,24 +367,29 @@ pub(crate) fn constraint_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Calculation usage: `calc` Identification (`:` type)? (`=` value)? body (SysML §7.19.2).
+/// Calculation usage: `OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
+/// (SysML BNF 1388).
 pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
+    // Speculated at member starts it does not own (a prefixed `individual calc c;` is tried
+    // ahead of a scope's other arms); refuse by lookahead before entering an arena transaction,
+    // as `constraint_usage` does, so a refused `#Tag` prefix leaves no arena entry behind.
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"calc") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, calc_usage_inner)
+}
+
+fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    // `BasicUsagePrefix`'s `RefPrefix`: the direction (`in calc eval : EvaluationFunction { ... }`,
-    // `sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`) and `abstract` (`abstract
-    // calc subcalculations: Calculation :> calculations, subactions { ... }`, Systems Library
-    // `Calculations.sysml`) are slots of one production. `CalcUsage::direction` existed but was
-    // never populated, and `abstract` was consumed and dropped.
-    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
-    // `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`. Without this the keyword was
-    // never consumed, `tag("calc")` failed on `ref calc ...`, and the enclosing calculation body
-    // fell through to its expression parser, which happily took the bare word `ref` as an
-    // expression statement of its own.
-    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1))
-        .parse(input)
-        .map(|(input, found)| (input, found.is_some()))?;
+    // The whole `OccurrenceUsagePrefix` (SysML BNF 1388): `in calc eval : EvaluationFunction`
+    // (`TradeStudies.sysml:61`), `abstract calc subcalculations` and `ref calc self`
+    // (`Calculations.sysml`), `individual calc c`, `#Tag calc c`.
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
@@ -359,16 +412,14 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         let (input, identification) = identification(input)?;
         (input, (identification, None))
     };
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
+    let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
     // `calc self: Calculation :>> Action::self, Evaluation::self;` (Systems Library
     // `Calculations.sysml`) -- only retry if the earlier attempt (right after `calc`) didn't
@@ -397,15 +448,14 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
             start,
             input,
             CalcUsage {
-                is_reference,
+                prefix,
                 identification,
-                is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
-                type_name,
+                typing,
                 multiplicity,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 value,
-                direction: prefix.direction,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -413,34 +463,19 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     ))
 }
 
-/// `def` is intentionally optional: the standard library uses bare, `def`-less `calc` usages at
-/// namespace level (e.g. `abstract calc calculations: Calculation[0..*] nonunique :> actions,
-/// evaluations { ... }` in `Systems Library/Calculations.sysml`). `calc_def` and `calc_usage` are
-/// never dispatched together in the same alt today (`calc_usage` is only used standalone in part
-/// bodies), so this is not the PAR-001 bug class, but do not add `.def_required()` here without
-/// checking package-level content first.
-pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
-    parse_calc_def(input, false)
-}
-
-/// Calc definition with required `def` keyword, for contexts (e.g. nested inside a part
-/// definition body) where `calc_usage` is already dispatched in the same `alt(...)` -- requiring
-/// `def` here prevents a `def`-less calc usage from being misclassified as a definition, the same
-/// bug class as PAR-001 in `attribute_def`. Unlike [`calc_def`] (kept `def`-optional for the
-/// namespace-level bare form documented on that function), this variant is safe to stack ahead of
-/// `calc_usage`.
+/// `CalculationDefinition = OccurrenceDefinitionPrefix 'calc' 'def' DefinitionDeclaration
+/// CalculationBody` (`SysML.xtext:1938-1945`). `def` is required in every scope: without it the
+/// member is a `CalculationUsage` (`calc ms : MassSum;`), which [`calc_usage`] owns.
 pub(crate) fn calc_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
-    parse_calc_def(input, true)
+    parse_calc_def(input)
 }
 
-fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<CalcDef>> {
+fn parse_calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"calc")
+    let options = DefinitionPrefixOptions::new(b"calc")
         .with_captured_visibility()
-        .individual_allowed();
-    if require_def {
-        options = options.def_required();
-    }
+        .individual_allowed()
+        .def_required();
     let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = calculation_body(input)?;
     Ok((
@@ -573,7 +608,12 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) {
         let start = input;
-        match crate::parser::action::action_def_body_element(peek) {
+        // Transactional for the same reason as the constraint-body probe: a declined attempt
+        // (`if a ? b else c` is a result expression) must leave no arena entries behind.
+        match crate::parser::span::reference_transaction(
+            peek,
+            crate::parser::action::action_def_body_element,
+        ) {
             Ok((next, member)) => {
                 return Ok((
                     next,
@@ -801,8 +841,9 @@ fn kerml_connector_member_inner(
                 crate::ast::KermlConnectorMember {
                     is_all: is_all.is_some(),
                     name: None,
-                    typing: None,
+                    specializations: Vec::new(),
                     multiplicity: None,
+                    multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                     from: Some(from),
                     to: Some(to),
                     body,
@@ -814,25 +855,29 @@ fn kerml_connector_member_inner(
     // Name is optional: the common library shapes are the anonymous `connector :Type` and the
     // declaration-less `connector (all)? from a to b;`.
     let (peek, _) = ws_and_comments(input)?;
+    // The keyword spellings of `FeatureSpecialization` are reserved words, so one leading the
+    // declaration means `Identification` was omitted (`connector typed by T from a to b;`).
     let (input, name_str) = if peek.fragment().starts_with(b":")
         || peek.fragment().starts_with(b"[")
         || from_keyword_next
-    {
+        || starts_with_any_keyword(
+            peek.fragment(),
+            &[
+                b"typed",
+                b"subsets",
+                b"references",
+                b"crosses",
+                b"redefines",
+            ],
+        ) {
         (input, None)
     } else {
         let (input, n) = preceded(ws_and_comments, name).parse(input)?;
         (input, Some(n))
     };
-    let (input, typing) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::multiplicity_node,
-    ))
-    .parse(input)?;
+    // The rest of `FeatureDeclaration`: `FeatureSpecializationPart` (typing, subsetting,
+    // reference/cross subsetting, redefinition, and multiplicity in any grammatical position).
+    let (input, part) = kerml_feature_specialization_part(input)?;
     // Ends: `from end to end`, or the `from`-less binary shorthand `connector [0..1]
     // transitionLink to [1..*] trigger;` (`TransitionPerformances.kerml`).
     let (input, ends) = opt(map(
@@ -858,8 +903,9 @@ fn kerml_connector_member_inner(
             crate::ast::KermlConnectorMember {
                 is_all: is_all.is_some(),
                 name: name_str,
-                typing,
-                multiplicity,
+                specializations: part.specializations,
+                multiplicity: part.multiplicity,
+                multiplicity_modifiers: part.multiplicity_modifiers,
                 from,
                 to,
                 body,
@@ -1539,6 +1585,55 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
             (input, Some(n))
         }
     };
+    let (input, part) = kerml_feature_specialization_part(input)?;
+    let mut specializations =
+        Vec::with_capacity(usize::from(leading_redefines.is_some()) + part.specializations.len());
+    if let Some(relationship) = leading_redefines {
+        specializations.push(crate::ast::FeatureSpecialization::Redefinition(
+            relationship,
+        ));
+    }
+    specializations.extend(part.specializations);
+    let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlFeature {
+                is_member: is_member.is_some(),
+                prefix,
+                kind,
+                is_all: is_all.is_some(),
+                name: name_str,
+                specializations,
+                multiplicity: part.multiplicity,
+                multiplicity_modifiers: part.multiplicity_modifiers,
+                relationship_parts,
+                value,
+                body,
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// The parsed KerML `FeatureSpecializationPart` (KerML BNF 573-576): ordered
+/// `FeatureSpecialization` alternatives plus the single `MultiplicityPart` that may precede,
+/// interleave, or follow them. Shared by every KerML owner whose `FeatureDeclaration` admits the
+/// part (`KermlFeature`, `KermlConnectorMember`), so the multiplicity positions are read once.
+struct KermlFeatureSpecializationPart {
+    specializations: Vec<crate::ast::FeatureSpecialization>,
+    multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    multiplicity_modifiers: crate::ast::MultiplicityModifiers,
+}
+
+/// Parse an optional KerML `FeatureSpecializationPart`; every component may be absent.
+fn kerml_feature_specialization_part(
+    input: Input<'_>,
+) -> IResult<Input<'_>, KermlFeatureSpecializationPart> {
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -1576,43 +1671,17 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // whichever position lost.
     let (input, modifiers) =
         crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
-    let mut specializations = Vec::with_capacity(
-        usize::from(leading_redefines.is_some())
-            + early_specializations.len()
-            + trailing_specializations.len(),
-    );
-    if let Some(relationship) = leading_redefines {
-        specializations.push(crate::ast::FeatureSpecialization::Redefinition(
-            relationship,
-        ));
-    }
-    specializations.extend(early_specializations);
+    let mut specializations = early_specializations;
     specializations.extend(trailing_specializations);
-    let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
-    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, body) = calc_def_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::KermlFeature {
-                is_member: is_member.is_some(),
-                prefix,
-                kind,
-                is_all: is_all.is_some(),
-                name: name_str,
-                specializations,
-                multiplicity: leading_multiplicity
-                    .or(trailing_multiplicity)
-                    .or(post_specialization_multiplicity),
-                multiplicity_modifiers: modifiers,
-                relationship_parts,
-                value,
-                body,
-                membership: Membership::feature(visibility, visibility_span),
-            },
-        ),
+        KermlFeatureSpecializationPart {
+            specializations,
+            multiplicity: leading_multiplicity
+                .or(trailing_multiplicity)
+                .or(post_specialization_multiplicity),
+            multiplicity_modifiers: modifiers,
+        },
     ))
 }
 
@@ -1725,8 +1794,25 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         || crate::parser::occurrence_prefix::starts_contended_prefix(after_visibility_input))
     .then(|| crate::parser::part::part_usage(input))
     .and_then(Result::ok);
+    // The same first refusal for a prefixed `CalculationUsage` (`individual calc c;`, `#Tag calc
+    // c;`, `ref individual calc r;`): without it `individual` matched no arm, and `#Tag` was
+    // claimed by the metadata arm and split from its calculation. A bare `calc c` keeps its own
+    // arm below; `calc def` is refused by `calc_usage` and reaches the definition arm.
     let (input, elem) = if let Some((next, usage)) = part_usage_member {
         (next, CalcDefBodyElement::PartUsage(Box::new(usage)))
+    } else if let Some((next, usage)) =
+        (crate::parser::occurrence_prefix::kind_keyword_follows(input, b"calc")
+            && !starts_with_keyword(after_visibility, b"calc"))
+        .then(|| calc_usage(input))
+        .and_then(Result::ok)
+    {
+        // A prefixed `CalculationUsage` (`individual calc c;`, `#Tag calc c;`, `ref individual
+        // calc r;`) gets first refusal after the part-usage arm and ahead of the metadata arm:
+        // without it `individual` matched no arm, and `#Tag` was claimed by the metadata arm and
+        // split from its calculation. A bare `calc c` keeps its own arm below; `calc def` is
+        // refused by `calc_usage` and reaches the definition arm. Tried only here, after the
+        // part-usage arm has declined, so no member pays for both attempts.
+        (next, CalcDefBodyElement::CalcUsage(Box::new(usage)))
     } else if let Some((next, annotation)) = prefixed_metadata_feature {
         (
             next,
@@ -1930,6 +2016,10 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"behavior",
             b"predicate",
             b"interaction",
+            // `TypeBodyElement -> NonFeatureMember -> MemberElement -> NonFeatureElement ->
+            // Multiplicity` (KerML.xtext 153-155, 234-239, 754-764): `multiplicity extra [2];`
+            // is a `MultiplicityRange` member, the same production a package body reaches.
+            b"multiplicity",
         ],
     ) {
         // Nested classifier declarations inside a type body (`struct StructuredSurface
@@ -1938,13 +2028,12 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::KermlClassifier(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"in")
-        || starts_with_keyword(input.fragment(), b"out")
-        || starts_with_keyword(input.fragment(), b"inout")
-    {
+    } else if starts_with_any_keyword(after_visibility, &[b"in", b"out", b"inout"]) {
         // A directed `in part …` was claimed here before the scope had a `PartUsage` arm at all;
-        // the arm above owns every part usage now, directed or not.
-        match directed_member_keyword(input) {
+        // the arm above owns every part usage now, directed or not. The direction is looked for
+        // past `MemberPrefix`, which every arm's parser re-reads: `protected in c : C;` is one
+        // feature, not a `protected` expression followed by a feature.
+        match directed_member_keyword(after_visibility_input) {
             // `in calc scenario : NominalScenario;` (validation `10c-Fuel Economy Analysis`) is a
             // SysML `CalculationUsage = OccurrenceUsagePrefix 'calc' …` (SysML BNF 1355), not a
             // KerML `Feature`. It reached the directed-parameter node only because this arm ran
@@ -2022,11 +2111,52 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             next,
             CalcDefBodyElement::DefaultReferenceUsage(Box::new(binding)),
         )
+    } else if refuses_result_expression_fallback(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     } else {
         map(expression, CalcDefBodyElement::Expression).parse(input)?
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// Whether a member that no keyword arm claimed must not reach the terminal result-expression
+/// arm of a calculation, constraint or KerML type body.
+///
+/// That arm models `ResultExpressionMember`'s `OwnedExpression` only. A member that opens --
+/// after its optional `MemberPrefix` -- with a reserved keyword no expression can start with is a
+/// member this scope does not model; the expression parser would read its first word as a feature reference
+/// and the rest as further members (`attribute a : T;` became an `attribute` expression beside a
+/// feature). Refusing hands the whole member to the body's recovery as one node, so `Expression`
+/// elements are exactly the authored result expressions.
+fn refuses_result_expression_fallback(input: Input<'_>) -> bool {
+    /// Reserved words of the expression grammar: those that begin an `OwnedExpression`, and the
+    /// operator words, which this refusal leaves to the expression arm's own handling rather than
+    /// reclassifying as misplaced member keywords.
+    const EXPRESSION_KEYWORDS: &[&[u8]] = &[
+        b"if", b"not", b"all", b"new", b"true", b"false", b"null", b"and", b"or", b"xor",
+        b"implies", b"istype", b"hastype", b"as", b"meta",
+    ];
+    let Ok((input, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    // `ResultExpressionMember = MemberPrefix OwnedExpression`, so a visibility keyword alone
+    // does not disqualify the member; the word after it decides.
+    let input = crate::parser::lex::visibility_prefix(input)
+        .map(|(rest, _)| rest)
+        .unwrap_or(input);
+    let fragment = input.fragment();
+    let word_len = fragment
+        .iter()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+        .count();
+    let word = &fragment[..word_len];
+    word_len > 0
+        && crate::parser::lex::is_reserved_keyword(word)
+        && !EXPRESSION_KEYWORDS.contains(&word)
 }
 
 /// Whether a reserved `FeaturePrefix` head is immediately followed by a token which makes its
@@ -2484,7 +2614,7 @@ mod membership_tests {
 
     #[test]
     fn calc_def_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) = calc_def(input("protected calc def C1;")).expect("calc def");
+        let (rest, node) = calc_def_required(input("protected calc def C1;")).expect("calc def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -2498,7 +2628,7 @@ mod membership_tests {
 
     #[test]
     fn calc_def_without_visibility_prefix_has_no_membership_visibility() {
-        let (rest, node) = calc_def(input("calc def C1;")).expect("calc def");
+        let (rest, node) = calc_def_required(input("calc def C1;")).expect("calc def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.membership.visibility, None);
     }

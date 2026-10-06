@@ -20,9 +20,9 @@
 //! input it does not record.
 
 use crate::ast::{
-    BasicUsagePrefix, DefinitionPrefix, EndUsagePrefix, InOut, Node, OccurrencePortionKind,
-    OccurrenceUsagePrefix, OccurrenceUsagePrefixHead, OwnedCrossUsage, RefPrefix, Span,
-    UsageExtensionKeyword,
+    BasicUsagePrefix, ControlNodePrefix, DefinitionPrefix, EndUsagePrefix, InOut, Node,
+    OccurrencePortionKind, OccurrenceUsagePrefix, OccurrenceUsagePrefixHead, OwnedCrossUsage,
+    RefPrefix, Span, UsageExtensionKeyword,
 };
 use crate::parser::lex::{starts_with_keyword, ws_and_comments};
 use crate::parser::span::with_span;
@@ -647,7 +647,18 @@ pub(crate) fn occurrence_usage_prefix(
             )
         }
     };
-    let mut input = input;
+    let (input, extension_keywords) = usage_extension_keywords(input);
+    Ok((
+        input,
+        OccurrenceUsagePrefix {
+            head,
+            extension_keywords,
+        },
+    ))
+}
+
+/// `UsageExtensionKeyword*`, in authored order. Takes and returns trivia-free input.
+fn usage_extension_keywords(mut input: Input<'_>) -> (Input<'_>, Vec<Node<UsageExtensionKeyword>>) {
     let mut extension_keywords = Vec::new();
     while input.fragment().starts_with(b"#") {
         let Ok((rest, keyword)) = usage_extension_keyword(input) else {
@@ -659,10 +670,40 @@ pub(crate) fn occurrence_usage_prefix(
         };
         input = rest;
     }
+    (input, extension_keywords)
+}
+
+/// `ControlNodePrefix : OccurrenceUsage = RefPrefix ( 'individual' )? ( PortionKind )?
+/// UsageExtensionKeyword*` (reference `SysML.xtext:1657-1662`).
+///
+/// Never fails, like [`occurrence_usage_prefix`]; the owning control-node production fails when
+/// its keyword does not follow. Extension keywords allocate arena entries, so callers run this
+/// inside a [`reference_transaction`](crate::parser::span::reference_transaction). Returns
+/// trivia-free input.
+pub(crate) fn control_node_prefix(input: Input<'_>) -> IResult<Input<'_>, ControlNodePrefix> {
+    let (input, _) = ws_and_comments(input)?;
+    if !starts_a_prefix_slot(input.fragment()) {
+        return Ok((input, ControlNodePrefix::default()));
+    }
+    let (input, ref_prefix) = ref_prefix(input);
+    let (input, individual_span) = match slot_keyword(input, b"individual") {
+        Some((rest, span)) => (rest, Some(span)),
+        None => (input, None),
+    };
+    let (input, portion) = optional_alternative(
+        input,
+        [
+            (&b"snapshot"[..], OccurrencePortionKind::Snapshot),
+            (&b"timeslice"[..], OccurrencePortionKind::Timeslice),
+        ],
+    );
+    let (input, extension_keywords) = usage_extension_keywords(input);
     Ok((
         input,
-        OccurrenceUsagePrefix {
-            head,
+        ControlNodePrefix {
+            ref_prefix,
+            individual_span,
+            portion,
             extension_keywords,
         },
     ))

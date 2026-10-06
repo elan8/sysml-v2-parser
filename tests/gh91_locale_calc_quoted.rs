@@ -122,5 +122,5 @@ fn gh91_2_quoted_calc_usage_name_and_type() {
             .as_deref(),
         Some("Solve for Pressure1")
     );
-    assert!(calc.type_name.is_some());
+    assert!(calc.typing.is_some());
 }
