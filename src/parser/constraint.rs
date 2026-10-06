@@ -320,6 +320,23 @@ pub(crate) fn constraint_def_body_element(
             )?;
             (next, ConstraintDefBodyElement::Error(node))
         }
+    } else if let Some((next, member)) = (starts_with_any_keyword(
+        after_visibility.fragment(),
+        crate::parser::lex::CALCULATION_ACTION_STARTERS,
+    ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
+    .then(|| crate::parser::action::action_def_body_element(input))
+    .and_then(Result::ok)
+    {
+        // `CalculationBodyItem = ActionBodyItem | ...` (SysML BNF 1366-1368): the same action-body
+        // dispatch `calculation_body_element` makes for the one `CalculationBody` production, and
+        // ahead of the keyword-less binding below for the same reason -- it reads `fork` as a
+        // feature name. When the action parser declines (`if c ? a else b` is a result
+        // expression, not an `if` action), the remaining arms decide as before.
+        //
+        // `ref` members keep this scope's own route below: the action-body `ref` parser drops a
+        // `default` feature value (`ref :>> a, b default that.that;` would lose `default
+        // that.that`), which the keyword-less binding retains.
+        (next, ConstraintDefBodyElement::ActionMember(Box::new(member)))
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.

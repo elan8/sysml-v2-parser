@@ -133,6 +133,13 @@ pub enum ConstraintDefBodyElement {
     /// whose membership in a calculation body is its own question. Unifying them is follow-up
     /// work; this variant closes the member gap without deciding it.
     ReturnDecl(Box<Node<ReturnDecl>>),
+    /// An `ActionBodyItem`, the first alternative of `CalculationBodyItem = ActionBodyItem |
+    /// ReturnParameterMember` (SysML BNF 1366-1368), dispatched exactly as
+    /// [`CalcDefBodyElement::ActionMember`] is: the two enums model the one `CalculationBody`
+    /// (see [`Self::ReturnDecl`]). Control nodes are the case that matters -- `constraint def C {
+    /// fork f; }` is grammatical, and only `validateControlNodeOwningType` rejects it, which is
+    /// a semantic rule, not a parse error.
+    ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
 }
 
 /// constraint body {}

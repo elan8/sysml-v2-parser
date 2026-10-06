@@ -2871,6 +2871,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_return_declaration(&member.value)?;
                         }
+                        super::ConstraintDefBodyElement::ActionMember(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_merge_member(&member.value, &member.span)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
