@@ -1984,17 +1984,19 @@ pub(crate) fn emit_metadata_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("metadata ");
-    emit_identification(
-        w,
-        &crate::ast::Identification {
-            short_name: usage.short_name,
-            name: usage.name,
-        },
-    )?;
-    if let Some(ty) = usage.type_reference {
+    // `Identification ( ':' | 'typed' 'by' )` is written only when a name was declared; the
+    // typing always follows (`metadata Tag about x;` declares nothing and is typed by `Tag`).
+    if usage.short_name.is_some() || usage.name.is_some() {
+        emit_identification(
+            w,
+            &crate::ast::Identification {
+                short_name: usage.short_name,
+                name: usage.name,
+            },
+        )?;
         w.push_str(" : ");
-        w.push_qualified_reference("metadata type", ty)?;
     }
+    w.push_qualified_reference("metadata type", usage.type_reference)?;
     if !usage.about_targets.is_empty() {
         w.push_str(" about ");
         for (i, target) in usage.about_targets.iter().enumerate() {

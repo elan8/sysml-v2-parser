@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`metadata` usages parse `MetadataUsageDeclaration` per the grammar (breaking AST change,
+  `PARSE_AST_VERSION` 264).** `metadata Tag about x;` and `metadata Tag { ... }` read the lone name
+  as a *declared name* with no typing. Per `( Identification ( ':' | 'typed' 'by' ) )?
+  OwnedFeatureTyping`, it is the metadata type, and a name is declared only when `:` or `typed by`
+  follows it, the same rule the `@` / `metadata` annotation member already applied.
+  `MetadataUsage::type_reference` is now a required `QualifiedReferenceId`, and the emitter writes
+  `name : ` only for a declared name.
+
 - **Every `Identification` accepts a short name without a regular name, and `concern`/`case`
   usages are accepted in part bodies (breaking AST change, `PARSE_AST_VERSION` 263; #158, #159).**
   - `UseCaseUsage::name` and `ReturnRef::name` are now `Option<DeclarationName>`, and `ReturnRef`
@@ -66,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     diagnostics, the AST retains it (via the structural visitor), and it round-trips through the
     emitter.
 - **KerML connectors own the full `FeatureSpecializationPart` (breaking AST change,
-  `PARSE_AST_VERSION` 264).** `KermlConnectorMember::typing` is replaced by ordered
+  `PARSE_AST_VERSION` 265).** `KermlConnectorMember::typing` is replaced by ordered
   `specializations: Vec<FeatureSpecialization>` plus `multiplicity_modifiers`, so
   `connector tern subsets links [1] { end feature e1; ... }`, `connector c :> a redefines b from x
   to y;` and `connector typed by T references r;` parse instead of falling into recovery. The

@@ -4247,9 +4247,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_reference {
-                visitor.visit_qualified_reference(inner);
-            }
+            visitor.visit_qualified_reference(type_reference);
             for inner in about_targets {
                 visitor.visit_qualified_reference(inner);
             }

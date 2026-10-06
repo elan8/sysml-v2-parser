@@ -1,0 +1,9 @@
+# Independent parser used as a differential oracle (scripts/parser-oracle.sh, docs/PARSER-ORACLE.md).
+#
+# Bump oracle_rev deliberately: run the oracle, triage the changed files against the pinned OMG
+# grammar (docs/conformance-target), then refresh tests/parser_oracle_baseline.tsv.
+
+oracle_repo=https://github.com/Open-MBEE/sysml-toolkit
+oracle_rev=821221767c3c56cb1ebe7da22666197a47c9c645
+oracle_crate=crates/sysmlv2-syntax
+oracle_fixtures=crates/sysmlv2-parser/tests/fixtures/opensysml

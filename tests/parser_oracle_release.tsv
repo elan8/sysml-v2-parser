@@ -1,0 +1,51 @@
+# Parser-oracle ratchet: every corpus file the two parsers do not both accept.
+# Regenerate with `scripts/parser-oracle.sh --update` after triaging the change.
+ours-rejects	kerml/src/examples/Association Examples/ProductSelection_N_ary.kerml
+ours-rejects	kerml/src/examples/Behavior Examples/TakePicture.kerml
+ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-3-OneToOneConnectors.kerml
+ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-4-OneToUnrestrictedConnectors.kerml
+ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-5-TimingForStructures.kerml
+ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-6-Sequences.kerml
+ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-7-DecisionsAndMerges.kerml
+ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-8-ChangingFeatureValues.kerml
+ours-rejects	kerml/src/examples/Simple Tests/Comments.kerml
+ours-rejects	kerml/src/examples/Simple Tests/Conjugation.kerml
+ours-rejects	kerml/src/examples/Simple Tests/Connectors.kerml
+ours-rejects	kerml/src/examples/Simple Tests/FeatureChains.kerml
+ours-rejects	kerml/src/examples/Simple Tests/Features.kerml
+ours-rejects	kerml/src/examples/Simple Tests/Imports.kerml
+ours-rejects	kerml/src/examples/Simple Tests/MetadataTest.kerml
+ours-rejects	kerml/src/examples/Simple Tests/Redefinition.kerml
+ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/ExtendedOccurrences.kerml
+ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingFeaturesEnhanced.kerml
+ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingSteps.kerml
+ours-rejects	kerml/src/examples/Variable Feature Examples/TimeVaryingCarDriver.kerml
+ours-rejects	sysml/src/examples/Analysis Examples/Vehicle Analysis Demo.sysml
+ours-rejects	sysml/src/examples/Arrowhead Framework Example/AHFSequences.sysml
+ours-rejects	sysml/src/examples/Association Examples/ProductSelection_OwnedEnds.sysml
+ours-rejects	sysml/src/examples/Association Examples/ProductSelection_UnownedEnds.sysml
+ours-rejects	sysml/src/examples/Cause and Effect Examples/CauseAndEffectExample.sysml
+ours-rejects	sysml/src/examples/Geometry Examples/VehicleGeometryAndCoordinateFrames.sysml
+ours-rejects	sysml/src/examples/Individuals Examples/AnalysisIndividualExample.sysml
+ours-rejects	sysml/src/examples/Metadata Examples/RequirementMetadataExample.sysml
+ours-rejects	sysml/src/examples/Simple Tests/ActionTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/AllocationTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/AssignmentTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/ConnectionTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/EnumerationTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/RequirementTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/StructuredControlTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/UseCaseTest.sysml
+ours-rejects	sysml/src/examples/Simple Tests/VariabilityTest.sysml
+ours-rejects	sysml/src/examples/State Space Representation Examples/CartSample.sysml
+ours-rejects	sysml/src/examples/State Space Representation Examples/EVSample.sysml
+ours-rejects	sysml/src/examples/Variability Examples/VehicleVariabilityModel.sysml
+ours-rejects	sysml/src/examples/Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml
+ours-rejects	sysml/src/examples/v1 Spec Examples/D.4.7.8 Dynamics/HSUVDynamics.sysml
+ours-rejects	sysml/src/training/13. Flows/Flow Definition Example.sysml
+ours-rejects	sysml/src/training/19. Terminate Actions/Terminate Actions Example-1.sysml
+ours-rejects	sysml/src/training/27. Occurrences/Interaction Example-2.sysml
+ours-rejects	sysml/src/training/27. Occurrences/Message Payload Example.sysml
+ours-rejects	sysml/src/training/34. Verification/Verification Case Definition Example.sysml
+ours-rejects	sysml/src/training/34. Verification/Verification Case Usage Example.sysml
+ours-rejects	sysml/src/training/35. Use Cases/Use Case Usage Example.sysml

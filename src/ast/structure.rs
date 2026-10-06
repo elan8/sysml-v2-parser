@@ -1802,14 +1802,17 @@ pub struct MetadataDef {
     pub membership: Membership,
 }
 
-/// Metadata usage: `metadata` name (`:` type)? (`about` targets)? body (BNF MetadataUsage).
+/// Metadata usage: `metadata` ( Identification ( `:` | `typed by` ) )? type (`about` targets)?
+/// body (BNF MetadataUsage / MetadataUsageDeclaration).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
+    /// Declared name; present only when a `:` / `typed by` separator follows it.
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_reference: Option<QualifiedReferenceId>,
+    /// `OwnedFeatureTyping` -- the metadata type. Required by the production.
+    pub type_reference: QualifiedReferenceId,
     pub about_targets: Vec<QualifiedReferenceId>,
     pub body: MetadataBody,
     pub membership: Membership,

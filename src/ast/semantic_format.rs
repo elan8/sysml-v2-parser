@@ -4698,10 +4698,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
-        match usage.type_reference {
-            Some(reference) => self.write_reference(reference)?,
-            None => self.writer.write_str("none")?,
-        }
+        self.write_reference(usage.type_reference)?;
         self.writer.write_str(") (about")?;
         for target in &usage.about_targets {
             self.writer.write_char(' ')?;

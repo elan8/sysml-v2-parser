@@ -1,0 +1,14 @@
+[package]
+name = "parser_oracle"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Differential parse of a SysML v2 corpus against OpenMBEE sysml-toolkit's parser"
+
+# Standalone: the oracle parser must never enter sysml-v2-parser's own dependency graph.
+[workspace]
+
+[dependencies]
+sysml-v2-parser = { path = "../.." }
+# Checked out by scripts/parser-oracle.sh at the revision pinned in docs/parser-oracle-target.
+sysmlv2-syntax = { path = "../../.oracle/sysml-toolkit/crates/sysmlv2-syntax" }
