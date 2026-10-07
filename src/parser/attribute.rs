@@ -1172,110 +1172,6 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     ))
 }
 
-/// Metadata usage body binding: `ref`? (`:>` | `:>>`)? name (`:` type)? (`=` value)? `;`
-///
-/// Covers §7.27.2 forms such as `approved = true;`, `ref :>> approved = true;`,
-/// `:> annotatedElement : Type;`, and `:>> baseType = expr meta Type;`.
-fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, tag(&b"ref"[..]))).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, prefix) = nom::combinator::opt(alt((
-        map(preceded(ws_and_comments, tag(&b":>>"[..])), |_| {
-            MetadataBindingPrefix::Redefines
-        }),
-        map(preceded(ws_and_comments, subset_operator), |_| {
-            MetadataBindingPrefix::Subsets
-        }),
-    )))
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (_, target_spelling) = name(input)?;
-    let target_bytes = crate::parser::lex::name_bytes(input, target_spelling);
-    // The prefixed forms take the same comma-separated multi-target list as every other
-    // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
-    // Gap 49b); the unprefixed binding keeps its single name-reference.
-    let (input, targets) = if prefix.is_some() {
-        crate::parser::usage::specialization_targets(input)?
-    } else {
-        let (input, target) = qualified_reference(input)?;
-        (input, vec![target])
-    };
-    if is_reserved_shorthand_starter(target_bytes) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            start,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    // See attribute_feature_binding's identical comment: covers the whole
-    // `(':>>' | ':>')? name` fragment, not just the operator token.
-    let prefix_span = crate::parser::span_from_to(start, input);
-    let (input, typing_result) = optional_typings(input)?;
-    let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s, sp)| (Some(span), Some(typing_node(span, is_conj, s, sp))))
-        .unwrap_or((None, None));
-    let (input, mods) = feature_modifiers(input)?;
-    let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
-            .parse(input)?;
-    let (semicolon_start, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
-    let semicolon_span = crate::parser::span::span_from_to(semicolon_start, input);
-    let (subsets, redefines) = match prefix {
-        Some(MetadataBindingPrefix::Subsets) => (
-            Some(crate::parser::usage::subsetting_relationship_node(
-                targets,
-                SubsettingKind::Subsets,
-                prefix_span,
-            )),
-            None,
-        ),
-        Some(MetadataBindingPrefix::Redefines) => (
-            None,
-            Some(crate::parser::usage::subsetting_relationship_node(
-                targets,
-                SubsettingKind::Redefines,
-                prefix_span,
-            )),
-        ),
-        None => (None, None),
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            AttributeUsage {
-                name: prefix.is_none().then_some(target_spelling),
-                short_name: None,
-                typing,
-                subsets,
-                redefines,
-                references: None,
-                crosses: None,
-                intersects: None,
-                value,
-                body: AttributeBody::Semicolon { semicolon_span },
-                typing_span,
-                redefines_span: None,
-                direction: None,
-                multiplicity: mods.multiplicity,
-                multiplicity_modifiers: mods.modifiers.clone(),
-                is_derived: false,
-                usage_prefix: None,
-                is_constant: false,
-                is_reference: false,
-                is_end: false,
-                // No visibility prefix on a metadata binding shape either (see
-                // `attribute_feature_binding`'s identical note above).
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
-            },
-        ),
-    ))
-}
-
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
@@ -1299,7 +1195,14 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
         ),
         map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
-        map(metadata_binding, AttributeBodyElement::AttributeUsage),
+        // A member with no kind keyword is a `DefaultReferenceUsage` (SysML BNF 332--333), as in
+        // every other definition body: `:> annotatedElement : SysML::Usage;`, `approved = true;`.
+        // It is a reference usage, not an attribute, so it is never read as an `AttributeUsage`.
+        // The `ref`-led spelling of the same member is the `RefDecl` arm below.
+        map(
+            default_reference_usage,
+            AttributeBodyElement::DefaultReferenceUsage,
+        ),
         // The same structured members `attribute_body_element` already dispatches (spec42
         // Gap 40): previously this narrower grammar dropped e.g. `ref self : MetadataItem
         // redefines Metaobject::self, Item::self;` (Systems Library `Metadata.sysml`) to
@@ -1465,18 +1368,58 @@ mod attribute_body_tests {
     }
 
     #[test]
-    fn metadata_subsetting_binding_has_no_declared_name() {
-        let source = input(":> annotatedElement : SysML::Usage;");
-        let (rest, node) = metadata_binding(source).expect("metadata subsetting binding");
-        assert!(rest.fragment().is_empty());
-        assert!(node.value.name.is_none());
-        assert_eq!(
-            node.value
+    fn metadata_def_keyword_less_member_is_a_default_reference_usage() {
+        for text in [
+            "{ :> annotatedElement : SysML::Usage; }",
+            "{ :>> annotatedElement : SysML::Usage; }",
+        ] {
+            let source = input(text);
+            let (rest, body) = metadata_body(source).expect("metadata def body");
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            let AttributeBody::Brace { elements, .. } = body else {
+                panic!("expected a brace body for {text}");
+            };
+            let [element] = elements.as_slice() else {
+                panic!("expected one member for {text}, got {elements:?}");
+            };
+            let AttributeBodyElement::DefaultReferenceUsage(usage) = &element.value else {
+                panic!("expected a DefaultReferenceUsage for {text}, got {element:?}");
+            };
+            assert!(usage.value.name.is_none());
+            let relationship = usage
+                .value
                 .subsets
                 .as_ref()
-                .map(|relationship| target_texts(source, &relationship.value.target)),
-            Some(vec!["annotatedElement".to_string()])
-        );
+                .or(usage.value.redefines.as_ref())
+                .expect("the authored specialization");
+            assert_eq!(
+                target_texts(source, &relationship.value.target),
+                vec!["annotatedElement".to_string()]
+            );
+        }
+    }
+
+    #[test]
+    fn metadata_def_ref_member_is_a_ref_decl() {
+        for text in [
+            "{ ref :>> annotatedElement : SysML::Usage; }",
+            "{ ref :> annotatedElement : SysML::ConnectionUsage; }",
+        ] {
+            let source = input(text);
+            let (rest, body) = metadata_body(source).expect("metadata def body");
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            let AttributeBody::Brace { elements, .. } = body else {
+                panic!("expected a brace body for {text}");
+            };
+            let [Node {
+                value: AttributeBodyElement::RefDecl(decl),
+                ..
+            }] = elements.as_slice()
+            else {
+                panic!("expected one RefDecl for {text}, got {elements:?}");
+            };
+            assert!(decl.value.typing.is_some(), "typing is kept for {text}");
+        }
     }
 
     #[test]

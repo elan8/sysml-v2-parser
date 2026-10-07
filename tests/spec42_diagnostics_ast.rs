@@ -622,7 +622,10 @@ fn metadata_def_shorthand_annotated_element() {
     let attr = elements
         .iter()
         .find_map(|e| match &e.value {
-            AttributeBodyElement::AttributeUsage(a) if a.value.subsets.is_some() => Some(&a.value),
+            // A member with no kind keyword is a `DefaultReferenceUsage`, not an attribute.
+            AttributeBodyElement::DefaultReferenceUsage(a) if a.value.subsets.is_some() => {
+                Some(&a.value)
+            }
             _ => None,
         })
         .expect("annotatedElement shorthand binding");
@@ -630,7 +633,13 @@ fn metadata_def_shorthand_annotated_element() {
         attr.name.is_none(),
         "the target is not an authored declaration name"
     );
-    assert!(attr.name.is_none());
+    assert!(
+        elements.iter().any(|e| matches!(
+            &e.value,
+            AttributeBodyElement::AttributeUsage(a) if a.value.name.is_some()
+        )),
+        "`attribute role;` keeps its `attribute` keyword"
+    );
     assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.len()), Some(1));
     assert_eq!(attr.typing.as_ref().map(|n| n.value.target.len()), Some(1));
 }
@@ -653,7 +662,7 @@ fn metadata_def_shorthand_base_type_meta_cast() {
     let attr = metadata_def_body_elements(metadata_def)
         .iter()
         .find_map(|e| match &e.value {
-            AttributeBodyElement::AttributeUsage(a) => Some(&a.value),
+            AttributeBodyElement::DefaultReferenceUsage(a) => Some(&a.value),
             _ => None,
         })
         .expect("baseType shorthand binding");
