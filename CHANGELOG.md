@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A keyword-less member of a `metadata def` body is a `DefaultReferenceUsage`, not an
+  `AttributeUsage` (breaking AST change, `PARSE_AST_VERSION` 266).** `metadata def M { :>
+  annotatedElement : SysML::RequirementUsage; }`, `:>> baseType = ...;` and `approved = true;`
+  were parsed by a metadata-only `metadata_binding` rule that produced an `AttributeUsage`, the
+  node `attribute x;` produces. A consumer could not tell the two apart, and the formatter wrote
+  the `attribute` keyword into source that did not have it. A `metadata def` body is a
+  `DefinitionBody`, so such a member is the `DefaultReferenceUsage` every other definition body
+  already produces (`RefPrefix Usage`, SysML BNF 332--333). `ref :>> annotatedElement : T;` is a
+  `RefDecl`; the old rule dropped its `ref`. `metadata_binding` is removed. The same body parser
+  serves `#Tag { ... }`, whose members are reference usages as well (`MetadataBodyUsage :
+  ReferenceUsage`).
+
 - **`metadata` usages parse `MetadataUsageDeclaration` per the grammar (breaking AST change,
   `PARSE_AST_VERSION` 264).** `metadata Tag about x;` and `metadata Tag { ... }` read the lone name
   as a *declared name* with no typing. Per `( Identification ( ':' | 'typed' 'by' ) )?

@@ -397,6 +397,25 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             }
         }
     };
+    // `FeatureSpecialization+` puts no order on its clauses, so the typing may also follow a
+    // leading `:>`: `ref :> annotatedElement : SysML::ConnectionDefinition;` (Domain Libraries
+    // `CauseAndEffect.sysml`). The position before the specializations is read above.
+    let (input, type_ref_span, typing) = if typing.is_none() {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let (input, (type_ref_span, type_name)) = preceded(
+                ws_and_comments,
+                preceded(tag(&b":"[..]), with_span(qualified_reference)),
+            )
+            .parse(input)?;
+            let typing = Some(single_target_typing(type_ref_span, type_name));
+            (input, Some(type_ref_span), typing)
+        } else {
+            (input, type_ref_span, typing)
+        }
+    } else {
+        (input, type_ref_span, typing)
+    };
     // `nonunique`/`ordered` feature modifiers may also follow the specialization clauses
     // (real usage: `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique
     // ordered { ... }`).

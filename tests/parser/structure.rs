@@ -138,13 +138,11 @@ fn test_flow_and_allocation_brace_bodies_parse() {
 
 #[test]
 fn test_metadata_def_brace_body_parse() {
-    // `level = high;`/`nested { .. }` aren't real metadata body members, so parse_root now
-    // rejects this (GH-2: it no longer silently drops unmatched body content). The
-    // container-structure guarantee this test checks for is exercised via
-    // parse_with_diagnostics's partial AST instead.
-    let input = "package P { metadata def SecurityTag { doc /* classification */ level = high; nested { key = value; } } }";
-    assert!(parse(input).is_err());
-    let result = parse_with_diagnostics(input).document.root;
+    // A `metadata def` body is a `DefinitionBody`, so a member with no kind keyword is a
+    // `DefaultReferenceUsage` (SysML BNF 332--333): `level = high;` binds a value and `nested { ..
+    // }` owns a body. Neither is an attribute, which only the `attribute` keyword declares.
+    let input = "package P { metadata def SecurityTag { doc /* classification */ level = high; nested { key = value; } attribute owner; } }";
+    let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
@@ -154,15 +152,30 @@ fn test_metadata_def_brace_body_parse() {
         _ => panic!("expected brace body"),
     };
 
-    match &elements[0].value {
-        PackageBodyElement::MetadataDef(metadata) => {
-            assert!(matches!(
-                metadata.body,
-                sysml_v2_parser::ast::AttributeBody::Brace { .. }
-            ));
-        }
+    let members = match &elements[0].value {
+        PackageBodyElement::MetadataDef(metadata) => match &metadata.body {
+            sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } => elements,
+            _ => panic!("expected brace body"),
+        },
         _ => panic!("expected MetadataDef"),
-    }
+    };
+    use sysml_v2_parser::ast::AttributeBodyElement;
+    assert!(
+        matches!(
+            members
+                .iter()
+                .map(|member| &member.value)
+                .collect::<Vec<_>>()
+                .as_slice(),
+            [
+                AttributeBodyElement::Annotating(_),
+                AttributeBodyElement::DefaultReferenceUsage(_),
+                AttributeBodyElement::DefaultReferenceUsage(_),
+                AttributeBodyElement::AttributeUsage(_),
+            ]
+        ),
+        "got {members:?}"
+    );
 }
 
 #[test]
