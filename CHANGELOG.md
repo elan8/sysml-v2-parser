@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`ref x :> y` in an action body is a subsetting, not a typing (`PARSE_AST_VERSION` 267).**
+  `action_ref_decl` kept a legacy branch that read a leading `:>` as `RefDecl::typing`, so
+  `protected ref var[0..1] :> seq { ... }` (Systems Library `Actions.sysml`, `ForLoopAction`) was
+  a feature *typed by* the feature `seq`. The clause is now `RefDecl::subsets`, as
+  `connector::ref_decl` already read it in every other body. The AST types are unchanged.
+
 - **A keyword-less member of a `metadata def` body is a `DefaultReferenceUsage`, not an
   `AttributeUsage` (breaking AST change, `PARSE_AST_VERSION` 266).** `metadata def M { :>
   annotatedElement : SysML::RequirementUsage; }`, `:>> baseType = ...;` and `approved = true;`

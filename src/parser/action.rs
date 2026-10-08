@@ -126,8 +126,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
 fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
     use crate::parser::expr::expression;
     use crate::parser::usage::{
-        optional_redefinition, optional_typings, single_target_typing,
-        typing_reference_fields_from_result,
+        optional_redefinition, optional_typings, typing_reference_fields_from_result,
     };
 
     let start = input;
@@ -175,21 +174,12 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
         (input, type_ref_span, typing)
     } else {
-        // No `:>>` redefines clause seen: bare `:` (multi-target aware) or legacy `:>`
-        // (single-target only; kept for backward compatibility -- no confirmed real usage of
-        // this spelling in action-def bodies, unlike `:>>`/`:` above).
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":>") && !peek.fragment().starts_with(b":>>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":>"[..])).parse(input)?;
-            let (input, (span, target)) =
-                preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
-            let typing = Some(single_target_typing(span, target));
-            (input, Some(span), typing)
-        } else {
-            let (input, typing_result) = optional_typings(input)?;
-            let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
-            (input, type_ref_span, typing)
-        }
+        // No `:>>` redefines clause seen: an optional `:` typing clause (multi-target aware).
+        // A `:>` here is a Subsetting, read by the `subsets` clause below: `ref var[0..1] :>
+        // seq { ... }` (Systems Library `Actions.sysml`) subsets `seq`, it is not typed by it.
+        let (input, typing_result) = optional_typings(input)?;
+        let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
+        (input, type_ref_span, typing)
     };
 
     // The ordinary `Usage` ordering also permits the redefinition after the typing clause:
@@ -2857,6 +2847,34 @@ mod ref_decl_kind_keyword_tests {
 
     fn input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
+    }
+
+    /// `:>` on a `ref` member is a Subsetting, not a typing: `protected ref var[0..1] :> seq {
+    /// ... }` (Systems Library `Actions.sysml`, `ForLoopAction`) subsets `seq`. A legacy branch
+    /// read the clause as `RefDecl::typing`, so consumers saw a feature typed by a feature.
+    #[test]
+    fn action_body_ref_decl_reads_a_subsetting_as_subsets() {
+        for text in [
+            "protected ref var[0..1] :> seq { }",
+            "ref thing :> seq;",
+            "ref typed : T :> seq;",
+        ] {
+            let src = input(text);
+            let (rest, node) = action_def_body_element(src).expect("ref member");
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            let ActionDefBodyElement::RefDecl(decl) = node.value else {
+                panic!("expected RefDecl for {text}, got {:?}", node.value);
+            };
+            assert_eq!(
+                decl.value.typing.is_some(),
+                text.contains(" : T"),
+                "only an authored `:` clause is a typing, in {text}"
+            );
+            assert!(
+                decl.value.subsets.is_some(),
+                "the `:>` clause is the subsets relationship, in {text}"
+            );
+        }
     }
 
     /// Review comment 2: `ref concern foo : Foo;` used to fall through with `kind_keyword`
