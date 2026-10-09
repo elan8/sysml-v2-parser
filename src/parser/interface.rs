@@ -57,6 +57,11 @@ fn interface_def_body_element(
         map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
+        // A nested interface usage; `interface_usage` refuses by lookahead unless `interface`
+        // follows the prefix.
+        map(crate::parser::part::interface_usage, |usage| {
+            InterfaceDefBodyElement::InterfaceUsage(Box::new(usage))
+        }),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
         // `item_def_required`/`port_def` tried before their usage siblings, same
         // def-before-usage discipline as the other body enums wired in prior increments (their

@@ -91,11 +91,11 @@ standard library package ISQ {
     attribute temperatureDifference : TemperatureDifferenceValue[*] nonunique :> scalarQuantities;
     attribute def TemperatureDifferenceUnit :> SimpleUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
-             :>> quantity = isq.'Θ';
-             :>> exponent = 1;
+            :>> quantity = isq.'Θ';
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = thermodynamicTemperaturePF;
+            :>> quantityPowerFactors = thermodynamicTemperaturePF;
         }
     }
 }

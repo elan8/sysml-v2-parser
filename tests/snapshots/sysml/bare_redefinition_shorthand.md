@@ -23,15 +23,8 @@ package BareRedefinitionShorthand {
 )
 ~~~
 # FORMAT
-~~~sysml
-package BareRedefinitionShorthand {
-    attribute def kelvin {
-         :>> ThermodynamicTemperatureUnit::quantityDimension::quantityPowerFactors, TemperatureDifferenceUnit::quantityDimension::quantityPowerFactors;
-    }
-    item def I {
-        private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

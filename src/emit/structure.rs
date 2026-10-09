@@ -984,6 +984,7 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         InterfaceDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         InterfaceDefBodyElement::PortDef(p) => emit_port_def(w, path, &p.value),
+        InterfaceDefBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
         InterfaceDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
         InterfaceDefBodyElement::FlowUsage(f) => {
             super::behavior::emit_flow_usage(w, path, &f.value)
@@ -1317,6 +1318,8 @@ fn emit_interface_usage_body_element(
             emit_ref_body(w, path, body)
         }
         InterfaceUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
+        InterfaceUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        InterfaceUsageBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
         InterfaceUsageBodyElement::PortUsage(port) => emit_port_usage(w, path, &port.value),
         InterfaceUsageBodyElement::FlowUsage(flow) => emit_flow_usage(w, path, &flow.value),
         InterfaceUsageBodyElement::Perform(perform) => emit_perform(w, path, &perform.value),
@@ -1697,7 +1700,7 @@ pub(crate) fn emit_occurrence_usage_prefix(
 
 /// A `'#' QualifiedName` run -- `DefinitionExtensionKeyword*` on a definition, or the
 /// `UsageExtensionKeyword+` of an end declaration -- each followed by one space.
-fn emit_extension_keywords(
+pub(crate) fn emit_extension_keywords(
     w: &mut EmitWriter<'_>,
     path: &str,
     keywords: &[crate::ast::Node<crate::ast::UsageExtensionKeyword>],
@@ -1929,6 +1932,9 @@ pub(crate) fn emit_default_reference_usage(
     w.push_short_name_prefix("item-usage/short_name", usage.short_name)?;
     if let Some(name) = usage.name {
         w.push_declaration_name("item-usage/name", name)?;
+    }
+    if usage.name.is_none() && usage.short_name.is_none() {
+        w.begin_anonymous_declaration();
     }
     // `FeatureSpecializationPart` is one ordered sequence, so `:>> stateSpace : CartState` and
     // `stateSpace : CartState :>> other` are different declarations. The clauses are written in
@@ -2355,6 +2361,9 @@ fn emit_connection_def_body_element(
             emit_metadata_keyword_usage(w, path, &usage.value)
         }
         crate::ast::ConnectionDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
+        crate::ast::ConnectionDefBodyElement::DefaultReferenceUsage(d) => {
+            emit_default_reference_usage(w, path, &d.value)
+        }
         crate::ast::ConnectionDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         crate::ast::ConnectionDefBodyElement::ConnectStmt(c) => {
             emit_connect_stmt(w, path, &c.value)

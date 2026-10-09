@@ -23,14 +23,8 @@ package DefaultReferenceUsageLeadingRedefinitionRecovery {
 )
 ~~~
 # FORMAT
-~~~sysml
-package DefaultReferenceUsageLeadingRedefinitionRecovery {
-    attribute def Outer :> Unit {
-        ??? malformed;
-         :>> elements : Real[3];
-        attribute later : Real;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

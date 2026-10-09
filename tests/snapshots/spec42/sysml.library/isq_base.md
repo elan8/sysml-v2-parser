@@ -254,11 +254,11 @@ standard library package ISQBase {
     attribute length : LengthValue[*] nonunique :> scalarQuantities;
     attribute def LengthUnit :> SimpleUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-3 item 3-9 duration, time */
@@ -281,11 +281,11 @@ standard library package ISQBase {
     attribute duration : DurationValue[*] nonunique :> scalarQuantities;
     attribute def DurationUnit :> SimpleUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 1;
+            :>> quantity = isq.T;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-4 item 4-1 mass */
@@ -308,11 +308,11 @@ standard library package ISQBase {
     attribute mass : MassValue[*] nonunique :> scalarQuantities;
     attribute def MassUnit :> SimpleUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = massPF;
+            :>> quantityPowerFactors = massPF;
         }
     }
     /* ISO-80000-5 item 5-1 thermodynamic temperature, temperature */
@@ -335,11 +335,11 @@ standard library package ISQBase {
     attribute thermodynamicTemperature : ThermodynamicTemperatureValue[*] nonunique :> scalarQuantities;
     attribute def ThermodynamicTemperatureUnit :> SimpleUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
-             :>> quantity = isq.'Θ';
-             :>> exponent = 1;
+            :>> quantity = isq.'Θ';
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = thermodynamicTemperaturePF;
+            :>> quantityPowerFactors = thermodynamicTemperaturePF;
         }
     }
     /* IEC-80000-6 item 6-1 electric current */
@@ -362,11 +362,11 @@ standard library package ISQBase {
     attribute electricCurrent : ElectricCurrentValue[*] nonunique :> scalarQuantities;
     attribute def ElectricCurrentUnit :> SimpleUnit {
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = electricCurrentPF;
+            :>> quantityPowerFactors = electricCurrentPF;
         }
     }
     /* ISO-80000-7 item 7-14 luminous intensity */
@@ -389,11 +389,11 @@ standard library package ISQBase {
     attribute luminousIntensity : LuminousIntensityValue[*] nonunique :> scalarQuantities;
     attribute def LuminousIntensityUnit :> SimpleUnit {
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = luminousIntensityPF;
+            :>> quantityPowerFactors = luminousIntensityPF;
         }
     }
     /* ISO-80000-9 item 9-2 amount of substance, number of moles */
@@ -416,11 +416,11 @@ standard library package ISQBase {
     attribute amountOfSubstance : AmountOfSubstanceValue[*] nonunique :> scalarQuantities;
     attribute def AmountOfSubstanceUnit :> SimpleUnit {
         private attribute amountOfSubstancePF : QuantityPowerFactor[1] {
-             :>> quantity = isq.N;
-             :>> exponent = 1;
+            :>> quantity = isq.N;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = amountOfSubstancePF;
+            :>> quantityPowerFactors = amountOfSubstancePF;
         }
     }
     attribute <isq> 'International System of Quantities' : SystemOfQuantities {
