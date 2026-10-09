@@ -859,6 +859,22 @@ fn interface_usage_other_body_element(
     alt((
         interface_usage_perform,
         interface_usage_flow,
+        map(attribute_usage, |usage| {
+            let span = usage.span;
+            Node::new(
+                span,
+                InterfaceUsageBodyElement::AttributeUsage(Box::new(usage)),
+            )
+        }),
+        // A nested interface usage; `interface_usage` refuses by lookahead unless `interface`
+        // follows the prefix.
+        map(interface_usage, |usage| {
+            let span = usage.span;
+            Node::new(
+                span,
+                InterfaceUsageBodyElement::InterfaceUsage(Box::new(usage)),
+            )
+        }),
         interface_usage_annotating,
     ))
     .parse(input)

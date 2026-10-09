@@ -322,6 +322,11 @@ fn requirement_def_body_element(
                 crate::parser::part::connect_,
                 RequirementDefBodyElement::Connect,
             ),
+            // Last, so every keyword-led member above keeps priority over the keyword-less usage.
+            map(
+                crate::parser::attribute::default_reference_member,
+                |usage| RequirementDefBodyElement::DefaultReferenceUsage(Box::new(usage)),
+            ),
         )),
         other_requirement_body_element,
     ))
@@ -824,34 +829,55 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
     )
     .parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, has_constraint_keyword) =
-        opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
-    let has_constraint_keyword = has_constraint_keyword.is_some();
+    // `( UsageExtensionKeyword* ConstraintUsageKeyword | UsageExtensionKeyword+ )
+    // ConstraintUsageDeclaration CalculationBody`: extension keywords come before the optional
+    // `constraint`, and on their own still select the declared form.
+    let (input, extension_keywords) =
+        crate::parser::occurrence_prefix::usage_extension_keywords(input);
+    let has_constraint_keyword =
+        crate::parser::lex::starts_with_keyword(input.fragment(), b"constraint");
+    let (input, _) = if has_constraint_keyword {
+        nom::bytes::complete::take(b"constraint".len()).parse(input)?
+    } else {
+        (input, input)
+    };
+    let declares = has_constraint_keyword || !extension_keywords.is_empty();
     let (input, _) = ws_and_comments(input)?;
     // `#73` / validation `08`: `assume constraint fuelConstraint { … }` — optional name before
     // body. The keyword-less `require <name>;` form instead *references* an existing
     // constraint, so it captures an arena-backed qualified reference (spec42 gap 29); the
-    // `constraint`-keyword form declares a fresh name.
-    let (input, name, target) =
-        if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";") {
-            (input, None, None)
-        } else if has_constraint_keyword {
-            let (input, n) = name(input)?;
-            (input, Some(n), None)
-        } else {
-            let (input, reference) = qualified_reference(input)?;
-            (input, None, Some(reference))
-        };
+    // declared form declares a fresh name, which may be absent (`require constraint :>> c;`).
+    let (input, name, target) = if input.fragment().starts_with(b"{")
+        || input.fragment().starts_with(b";")
+        || (declares && input.fragment().starts_with(b":"))
+    {
+        (input, None, None)
+    } else if declares {
+        let (input, n) = name(input)?;
+        (input, Some(n), None)
+    } else {
+        let (input, reference) = qualified_reference(input)?;
+        (input, None, Some(reference))
+    };
     // `ConstraintUsageDeclaration` is an ordinary `UsageDeclaration`, so the declared form may
-    // carry a typing clause: `require constraint c : C;`. Only reachable behind the keyword --
-    // the shorthand's qualified reference has already consumed the name position.
-    let (input, typing) = if has_constraint_keyword {
+    // carry a typing and specialization clauses: `require constraint c : C;`, `require
+    // constraint c1 :>> c;`. Only reachable for the declared form -- the shorthand's qualified
+    // reference has already consumed the name position.
+    let (input, typing, clauses) = if declares {
+        let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
         let (input, result) = crate::parser::usage::optional_typings(input)?;
         let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(result);
-        (input, typing)
+        let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
+        let subsets = trailing
+            .subsets
+            .or(leading.subsets)
+            .map(|(relationship, _)| relationship);
+        let redefines = trailing.redefines.or(leading.redefines);
+        (input, typing, (subsets, redefines))
     } else {
-        (input, None)
+        (input, None, (None, None))
     };
+    let (subsets, redefines) = clauses;
     let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
@@ -864,6 +890,9 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
                 name,
                 target,
                 typing,
+                extension_keywords,
+                subsets,
+                redefines,
                 body,
             },
         ),

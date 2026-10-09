@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Body members from the release corpus that their bodies rejected (breaking AST change,
+  `PARSE_AST_VERSION` 269).** New variants and fields; consumers with exhaustive matches need
+  arms (#165, #168).
+  - `actor user = UseSystem::user;`: `ActorUsage::value`.
+  - Keyword-less and directed usages in connection definition, occurrence and requirement
+    bodies (`:>> info = info1;`, `out :>> fuelEconomy = 35[mph];`, `in massActual :>
+    ISQ::mass;`): `DefaultReferenceUsage` on `ConnectionDefBodyElement`,
+    `OccurrenceBodyElement` and `RequirementDefBodyElement`.
+  - `require constraint c1 :>> c;`, `assume #goal constraint c;` and `require #goal c;`:
+    `RequireConstraint::extension_keywords`, `::subsets`, `::redefines`. Extension keywords
+    without the `constraint` keyword still select the declared form.
+  - `private import X::*;` in a case-family body: `UseCaseDefBodyElement::Import`.
+  - `end port p : P;` in a flow definition: `OccurrenceBodyElement::PortUsage`.
+  - An interface usage nested in an interface definition or usage body, and `attribute` in an
+    interface usage body: `InterfaceDefBodyElement::InterfaceUsage`,
+    `InterfaceUsageBodyElement::InterfaceUsage` and `::AttributeUsage`.
+  - `port nut :>> nut [5];`: a port's multiplicity may follow its specialization clauses.
+  - `.6`: a real literal needs no integer part (KerML `RealValue`).
+  - An anonymous keyword-less usage is emitted without the stray space before its first
+    clause (`:>> info = info1;`, was ` :>> info = info1;`).
+
 - **Body gates reach five members they used to miss.** No AST type changes.
   - `calc c[2] : C;`: a calculation usage takes its multiplicity before the typing as well as
     after (#181).

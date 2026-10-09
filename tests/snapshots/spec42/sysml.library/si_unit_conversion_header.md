@@ -21,9 +21,9 @@ standard library package SI {
 ~~~sysml
 standard library package SI {
     attribute <kg> kilogram : MassUnit {
-         :>> unitConversion : ConversionByPrefix {
-             :>> prefix = kilo;
-             :>> referenceUnit = g;
+        :>> unitConversion : ConversionByPrefix {
+            :>> prefix = kilo;
+            :>> referenceUnit = g;
         }
     }
 }

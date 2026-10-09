@@ -51,8 +51,8 @@ package 'Metadata Example-1' {
 package 'Metadata Example-1' {
     metadata def SafetyFeature;
     metadata def SecurityFeature {
-         :> annotatedElement : SysML::PartDefinition;
-         :> annotatedElement : SysML::PartUsage;
+        :> annotatedElement : SysML::PartDefinition;
+        :> annotatedElement : SysML::PartUsage;
     }
     metadata SafetyFeature about vehicle::interior::seatBelt, vehicle::interior::driverAirBag, vehicle::bodyAssy::bumper;
     metadata SecurityFeature about vehicle::interior::alarm, vehicle::bodyAssy::keylessEntry;

@@ -119,6 +119,9 @@ fn emit_requirement_body_element(
         RequirementDefBodyElement::CalcUsage(c) => {
             crate::emit::view::emit_calc_usage(w, path, &c.value)
         }
+        RequirementDefBodyElement::DefaultReferenceUsage(d) => {
+            crate::emit::structure::emit_default_reference_usage(w, path, &d.value)
+        }
         RequirementDefBodyElement::RefDecl(r) => {
             crate::emit::structure::emit_ref_decl(w, path, &r.value)
         }
@@ -384,6 +387,11 @@ pub(crate) fn emit_require_constraint(
     } else {
         w.push_str("require");
     }
+    if !req.extension_keywords.is_empty() {
+        w.push_char(' ');
+        super::structure::emit_extension_keywords(w, path, &req.extension_keywords)?;
+        w.trim_trailing_space();
+    }
     if req.has_constraint_keyword {
         w.push_str(" constraint");
     }
@@ -398,6 +406,12 @@ pub(crate) fn emit_require_constraint(
     // `ConstraintUsageDeclaration`'s specialization part, authored between the name and the body.
     if let Some(typing) = &req.typing {
         super::structure::emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(subsets) = &req.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &req.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
     }
     match &req.body {
         crate::ast::ConstraintDefBody::Semicolon { .. } => {
@@ -787,6 +801,7 @@ fn emit_use_case_body_element(
 ) -> Result<(), EmitError> {
     match el {
         UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        UseCaseDefBodyElement::Import(i) => emit_import(w, &i.value),
         UseCaseDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
@@ -813,6 +828,9 @@ fn emit_use_case_body_element(
             }
             if let Some(mult) = &a.value.multiplicity {
                 emit_multiplicity(w, &mult.value)?;
+            }
+            if let Some(value) = &a.value.value {
+                super::expr::emit_feature_value(w, value)?;
             }
             w.push_char(';');
             Ok(())

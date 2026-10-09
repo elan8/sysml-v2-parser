@@ -706,6 +706,23 @@ pub(crate) fn default_reference_value_binding(
     Ok((input, usage))
 }
 
+/// [`default_reference_value_binding`] for the bodies that also own a directed keyword-less usage
+/// (`out :>> fuelEconomy = 35[mph];`, `in massActual :> ISQ::mass;`). A direction, like a leading
+/// specialization operator, is not a bare identifier, so such a member needs no value.
+pub(crate) fn default_reference_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    let (peek, _) = ws_and_comments(input)?;
+    let directed = [&b"in"[..], b"out", b"inout"]
+        .iter()
+        .any(|keyword| starts_with_keyword(peek.fragment(), keyword));
+    if directed {
+        default_reference_usage(input)
+    } else {
+        default_reference_value_binding(input)
+    }
+}
+
 /// §6 G15: the same feature binding as [`attribute_feature_binding`], but with the `:>>` / `:>`
 /// prefix *required*, so it can be offered in body dispatchers whose members are otherwise
 /// keyword-led. Without the mandatory prefix the underlying parser would also swallow bare

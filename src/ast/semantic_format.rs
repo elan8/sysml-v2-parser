@@ -1019,6 +1019,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 usage.value.multiplicity.as_ref(),
                             )?;
                         }
+                        RequirementDefBodyElement::DefaultReferenceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&usage.value)?;
+                        }
                         RequirementDefBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
@@ -1128,6 +1132,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
+                        UseCaseDefBodyElement::Import(import) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(import ")?;
+                            self.write_import_target(&import.value.target)?;
+                            self.writer.write_char(')')?;
+                        }
                         UseCaseDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
@@ -1160,7 +1170,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             }
                             self.writer.write_str(") (multiplicity ")?;
                             self.write_multiplicity_clause(actor.value.multiplicity.as_ref())?;
-                            self.writer.write_str("))")?;
+                            self.writer.write_char(')')?;
+                            // Written only when present, so actors without a value keep
+                            // their projection.
+                            if let Some(value) = &actor.value.value {
+                                self.writer.write_str(" (value ")?;
+                                self.write_feature_value(&value.value)?;
+                                self.writer.write_char(')')?;
+                            }
+                            self.writer.write_char(')')?;
                         }
                         UseCaseDefBodyElement::ActorRedefinitionAssignment(actor) => {
                             self.write_item_prefix(&mut first)?;
@@ -2934,7 +2952,20 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
-        self.writer.write_str(") ")?;
+        self.writer.write_char(')')?;
+        // Written only when present, so existing members keep their projection.
+        if !constraint.extension_keywords.is_empty() {
+            self.write_extension_keywords(&constraint.extension_keywords)?;
+        }
+        if constraint.subsets.is_some() {
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("subsets", constraint.subsets.as_ref())?;
+        }
+        if constraint.redefines.is_some() {
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("redefines", constraint.redefines.as_ref())?;
+        }
+        self.writer.write_char(' ')?;
         self.write_constraint_def_body(&constraint.body)?;
         self.writer.write_char(')')
     }
@@ -3621,6 +3652,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_port_definition(&definition.value)?;
                         }
+                        InterfaceDefBodyElement::InterfaceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_interface_usage(&usage.value)?;
+                        }
                         InterfaceDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
@@ -3649,6 +3684,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
+                        }
+                        ConnectionDefBodyElement::DefaultReferenceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&usage.value)?;
                         }
                         ConnectionDefBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
@@ -5383,6 +5422,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
                         }
+                        super::InterfaceUsageBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::InterfaceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_interface_usage(&usage.value)?;
+                        }
                         super::InterfaceUsageBodyElement::PortUsage(port) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_port_usage(&port.value)?;
@@ -5565,6 +5612,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::OccurrenceBodyElement::Satisfy(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_satisfy_requirement_usage(&usage.value)
+            }
+            super::OccurrenceBodyElement::PortUsage(usage) => {
+                self.write_port_usage_member(first, &usage.value)
+            }
+            super::OccurrenceBodyElement::DefaultReferenceUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_default_reference_usage(&usage.value)
             }
             super::OccurrenceBodyElement::RefDecl(declaration) => {
                 self.write_item_prefix(first)?;

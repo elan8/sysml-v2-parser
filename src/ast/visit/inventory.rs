@@ -3962,6 +3962,9 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::PortDef(field_0) => {
                     visitor.visit_port_def(field_0);
                 }
+                InterfaceDefBodyElement::InterfaceUsage(field_0) => {
+                    visitor.visit_interface_usage(&$($mutability)? **field_0);
+                }
                 InterfaceDefBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
@@ -4173,6 +4176,9 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 ConnectionDefBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(field_0);
+                }
+                ConnectionDefBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
                 }
                 ConnectionDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -4736,6 +4742,12 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
                 }
+                OccurrenceBodyElement::PortUsage(field_0) => {
+                    visitor.visit_port_usage(&$($mutability)? **field_0);
+                }
+                OccurrenceBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
+                }
                 OccurrenceBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
@@ -4970,6 +4982,12 @@ macro_rules! ast_traversal {
                 }
                 InterfaceUsageBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(&$($mutability)? **field_0);
+                }
+                InterfaceUsageBodyElement::AttributeUsage(field_0) => {
+                    visitor.visit_attribute_usage(&$($mutability)? **field_0);
+                }
+                InterfaceUsageBodyElement::InterfaceUsage(field_0) => {
+                    visitor.visit_interface_usage(&$($mutability)? **field_0);
                 }
                 InterfaceUsageBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
@@ -6382,6 +6400,9 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                RequirementDefBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
+                }
                 RequirementDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
@@ -6512,7 +6533,7 @@ macro_rules! ast_traversal {
         pub fn walk_require_constraint<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequireConstraint>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequireConstraint { is_assume, has_constraint_keyword, name, target, typing, body } = &$($mutability)? node.value;
+            let RequireConstraint { is_assume, has_constraint_keyword, name, target, typing, extension_keywords, subsets, redefines, body } = &$($mutability)? node.value;
             let _ = is_assume;
             let _ = has_constraint_keyword;
             if let Some(inner) = name {
@@ -6523,6 +6544,15 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = typing {
                 visitor.visit_typing_relationship(inner);
+            }
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
             }
             visitor.visit_constraint_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
@@ -7210,6 +7240,9 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::AttributeDef(field_0) => {
                     visitor.visit_attribute_def(field_0);
                 }
+                UseCaseDefBodyElement::Import(field_0) => {
+                    visitor.visit_import(field_0);
+                }
                 UseCaseDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
@@ -7310,7 +7343,7 @@ macro_rules! ast_traversal {
         pub fn walk_actor_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActorUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActorUsage { name, short_name, type_name, multiplicity, membership } = &$($mutability)? node.value;
+            let ActorUsage { name, short_name, type_name, multiplicity, value, membership } = &$($mutability)? node.value;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
@@ -7322,6 +7355,9 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);

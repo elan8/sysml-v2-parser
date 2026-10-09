@@ -220,6 +220,13 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     // clause: `port ports : Port[0..*] nonunique :> objects;` (`Systems Library/Ports.sysml:48`).
     let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = specialization_clauses(input)?;
+    // `FeatureSpecialization+ MultiplicityPart?`: the multiplicity may follow the clauses,
+    // `port lugNutPort :>> lugNutPort [5];` (SysML v2 Spec Annex A SimpleVehicleModel.sysml).
+    let (input, multiplicity) = if multiplicity.is_none() {
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+    } else {
+        (input, multiplicity)
+    };
     let (input, modifiers) =
         crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
