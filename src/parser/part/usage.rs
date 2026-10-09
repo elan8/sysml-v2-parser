@@ -1615,6 +1615,16 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             let elem = PartUsageBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        // `InterfaceUsage` and `CalculationUsage` own their `#Tag` too (#180). Both refuse by
+        // lookahead unless their kind keyword follows the prefix.
+        if let Ok((next, usage)) = interface_usage(start) {
+            let elem = PartUsageBodyElement::InterfaceUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::constraint::calc_usage(start) {
+            let elem = PartUsageBodyElement::CalcUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
         if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
             let elem = PartUsageBodyElement::PortUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));

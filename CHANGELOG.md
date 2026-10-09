@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Body gates reach five members they used to miss.** No AST type changes.
+  - `calc c[2] : C;`: a calculation usage takes its multiplicity before the typing as well as
+    after (#181).
+  - `individual calc def D;` in a calculation body: the nested-definition gate looks past the
+    whole `OccurrenceDefinitionPrefix` (#175).
+  - `individual fork f;` and `in fork f;` in calculation and constraint bodies: the action-member
+    arm is admitted for a prefixed control node, and a constraint body no longer reads `in fork
+    f;` as a parameter named `fork` (#179).
+  - `ref :>> x default y;` in action and calculation bodies keeps its value. Only `= expr` was
+    read; `default`, `:=` and `default :=` were dropped without a diagnostic, as was the value of
+    `ref r :> s = y;` (#173).
+  - `#Tag merge m;`, `#Tag interface i ...;` and `#Tag calc c;` stay one member in action, part
+    and use case bodies. The `#` metadata arm claimed the tag first and split the member in two
+    (#180).
+
 - **An action usage body owns `perform` members, and an action usage carries a value (breaking
   AST change, `PARSE_AST_VERSION` 268).** `ActionUsage` and `ActionDefinition` share one
   `ActionBody`, whose `BehaviorUsageElement` includes `PerformActionUsage`, but only the definition

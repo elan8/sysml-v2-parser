@@ -124,7 +124,6 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
 }
 
 fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
-    use crate::parser::expr::expression;
     use crate::parser::usage::{
         optional_redefinition, optional_typings, typing_reference_fields_from_result,
     };
@@ -196,16 +195,16 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     // `:>` subsets, independent of the `:>>` redefinition above: `derived ref action deferred :
     // ActionUsage :> Metadata::metadataItems;`. Without this the clause reached the
     // skip-to-terminator below and was swallowed whole.
-    let (input, subsets) = opt(preceded(ws_and_comments, crate::parser::usage::subsetting))
-        .parse(input)
-        .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
-    let (input, _) = ws_and_comments(input)?;
-    let (mut input, value) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"="[..])),
-        preceded(ws_and_comments, expression),
+    let (input, subsets) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::subsetting_before_value,
     ))
     .parse(input)?;
-    let value = value.map(crate::parser::feature_value::wrap_bind_expression);
+    // The whole `ValuePart` (`=`, `:=`, `default`, `default :=`), as the part-body route keeps
+    // it. Only `= expr` was read here, so `ref :>> x default y;` lost its value to the skip
+    // below with no diagnostic (#173).
+    let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
+    let (mut input, _) = ws_and_comments(input)?;
 
     // Accept and skip any remaining unmodeled shorthand before the body/terminator.
     if !input.fragment().is_empty()
@@ -858,6 +857,22 @@ pub(crate) fn action_def_body_element(
         }
         if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
             let elem = ActionDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        // A control node owns its `ControlNodePrefix`, `#Tag` included (`#Tag merge m;`,
+        // #180). Each parser refuses by lookahead unless its keyword follows the prefix.
+        if let Ok((next, elem)) = alt((
+            map(merge_stmt, ActionDefBodyElement::MergeStmt),
+            map(decision_stmt, ActionDefBodyElement::DecisionStmt),
+            map(join_stmt, ActionDefBodyElement::JoinStmt),
+            map(fork_stmt, ActionDefBodyElement::ForkStmt),
+        ))
+        .parse(start)
+        {
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::constraint::calc_usage(start) {
+            let elem = ActionDefBodyElement::CalcUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
@@ -1802,6 +1817,22 @@ pub(crate) fn action_usage_body_element(
         }
         if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
             let elem = ActionUsageBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        // A control node owns its `ControlNodePrefix`, `#Tag` included (`#Tag merge m;`,
+        // #180). Each parser refuses by lookahead unless its keyword follows the prefix.
+        if let Ok((next, elem)) = alt((
+            map(merge_stmt, ActionUsageBodyElement::MergeStmt),
+            map(decision_stmt, ActionUsageBodyElement::DecisionStmt),
+            map(join_stmt, ActionUsageBodyElement::JoinStmt),
+            map(fork_stmt, ActionUsageBodyElement::ForkStmt),
+        ))
+        .parse(start)
+        {
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::constraint::calc_usage(start) {
+            let elem = ActionUsageBodyElement::CalcUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
