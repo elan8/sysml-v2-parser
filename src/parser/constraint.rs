@@ -251,9 +251,12 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::AliasDef,
         )
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"in")
+    } else if (starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
-        || starts_with_keyword(input.fragment(), b"inout")
+        || starts_with_keyword(input.fragment(), b"inout"))
+        // `in fork f;` is a control node with a directed `ControlNodePrefix`, owned by the
+        // action-member arm below, not a directed parameter named `fork`.
+        && !prefixed_control_node_follows(input)
     {
         if named_in_out_missing_type(input) {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -321,10 +324,11 @@ pub(crate) fn constraint_def_body_element(
             (next, ConstraintDefBodyElement::Error(node))
         }
     } else if let Some((next, member)) =
-        (starts_with_any_keyword(
+        ((starts_with_any_keyword(
             after_visibility.fragment(),
             crate::parser::lex::CALCULATION_ACTION_STARTERS,
         ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
+            || prefixed_control_node_follows(input))
         .then(|| {
             // Transactional: when the action parser declines (`if a ? b else c` is a result
             // expression), the references it allocated must not stay in the arena.
@@ -412,13 +416,25 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
         let (input, identification) = identification(input)?;
         (input, (identification, None))
     };
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
-    let (input, multiplicity) = opt(preceded(
+    // `FeatureSpecializationPart = ... | MultiplicityPart FeatureSpecialization*`: the
+    // multiplicity may precede the typing (`calc c[2] : C;`, #181), as on the other usages.
+    let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
     let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
     // `calc self: Calculation :>> Action::self, Evaluation::self;` (Systems Library
@@ -606,7 +622,8 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
     if crate::parser::lex::starts_with_any_keyword(
         action_peek.fragment(),
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
-    ) {
+    ) || prefixed_control_node_follows(peek)
+    {
         let start = input;
         // Transactional for the same reason as the constraint-body probe: a declined attempt
         // (`if a ? b else c` is a result expression) must leave no arena entries behind.
@@ -700,6 +717,15 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
     calc_def_body_element(input)
 }
 
+/// Whether a control node follows its `ControlNodePrefix` (`individual fork f;`, `in fork f;`,
+/// #179). The bare keywords are in `CALCULATION_ACTION_STARTERS`; this admits the prefixed
+/// spellings to the same action-member arm.
+fn prefixed_control_node_follows(input: Input<'_>) -> bool {
+    [&b"fork"[..], b"join", b"merge", b"decide"]
+        .iter()
+        .any(|keyword| crate::parser::occurrence_prefix::kind_keyword_follows(input, keyword))
+}
+
 /// Skips an optional `(private|protected|public)?` `abstract`? prefix and reports whether either
 /// was present, for the dispatch-gate peeks below (`calc_usage`/`parse_calc_def` themselves also
 /// consume `abstract`/visibility, so this only needs to decide *which* branch to try).
@@ -722,13 +748,9 @@ fn skip_calc_modifiers(input: Input<'_>) -> IResult<Input<'_>, bool> {
 /// `starts_with_keyword(.., b"calc")` alone can't tell apart from this one (both start with
 /// `calc`).
 fn calc_def_follows_visibility(input: Input<'_>) -> bool {
-    let Ok((after_mods, _)) = skip_calc_modifiers(input) else {
-        return false;
-    };
-    let Ok((after_calc, _)) = preceded(tag(&b"calc"[..]), ws1).parse(after_mods) else {
-        return false;
-    };
-    starts_with_keyword(after_calc.fragment(), b"def")
+    // Past the whole `OccurrenceDefinitionPrefix`, not only visibility, `abstract` and `ref`:
+    // `individual calc def D;` (#175).
+    crate::parser::occurrence_prefix::kind_keyword_pair_follows(input, b"calc", b"def")
 }
 
 /// True when `input` is a modifier-prefixed, `def`-less `calc` usage (e.g. `abstract calc
