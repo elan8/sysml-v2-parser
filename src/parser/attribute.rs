@@ -692,7 +692,10 @@ pub(crate) fn default_reference_value_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
     let (peek, _) = ws_and_comments(input)?;
-    let specialization_led = peek.fragment().starts_with(b":");
+    // `:`, `:>` and `:>>` only: `::>`, `::` and `:=` start no declaration this entry point owns.
+    let fragment = peek.fragment();
+    let specialization_led =
+        fragment.starts_with(b":") && !fragment.starts_with(b"::") && !fragment.starts_with(b":=");
     let (input, usage) = default_reference_usage(input)?;
     if usage.value.value.is_none() && !specialization_led {
         return Err(nom::Err::Error(nom::error::Error::new(

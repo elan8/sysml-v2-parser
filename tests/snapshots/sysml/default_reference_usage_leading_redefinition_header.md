@@ -27,11 +27,11 @@ package DefaultReferenceUsageLeadingRedefinitionHeader {
 ~~~sysml
 package DefaultReferenceUsageLeadingRedefinitionHeader {
     attribute def Outer :> Unit {
-         : ConversionByConvention :>> unitConversion {
+         :>> unitConversion : ConversionByConvention {
              :>> referenceUnit = metre;
              :>> conversionFactor = 1;
         }
-         : Real[3] ordered nonunique :>> elements;
+         :>> elements : Real[3] ordered nonunique;
     }
 }
 ~~~

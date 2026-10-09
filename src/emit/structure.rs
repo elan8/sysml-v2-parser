@@ -1930,27 +1930,55 @@ pub(crate) fn emit_default_reference_usage(
     if let Some(name) = usage.name {
         w.push_declaration_name("item-usage/name", name)?;
     }
-    if let Some(typing) = &usage.typing {
-        emit_typing_clause(w, &typing.value)?;
+    // `FeatureSpecializationPart` is one ordered sequence, so `:>> stateSpace : CartState` and
+    // `stateSpace : CartState :>> other` are different declarations. The clauses are written in
+    // authored order, around the multiplicity. A typing sorts first among equal offsets, which
+    // keeps the canonical order for an AST built without source spans.
+    let specializations = [
+        &usage.subsets,
+        &usage.redefines,
+        &usage.references,
+        &usage.crosses,
+        &usage.intersects,
+    ];
+    let mut clauses: Vec<(usize, u8)> = usage
+        .typing
+        .as_ref()
+        .map(|typing| (typing.span.offset, 0u8))
+        .into_iter()
+        .chain(
+            specializations
+                .iter()
+                .zip(1u8..)
+                .filter_map(|(clause, rank)| clause.as_ref().map(|c| (c.span.offset, rank))),
+        )
+        .collect();
+    clauses.sort_unstable();
+    let multiplicity_offset = usage.multiplicity.as_ref().map(|m| m.span.offset);
+    let leads_multiplicity = |(offset, rank): (usize, u8)| {
+        multiplicity_offset.is_none_or(|at| offset < at || (rank == 0 && offset == at))
+    };
+    let emit_clause = |w: &mut EmitWriter<'_>, rank: u8| -> Result<(), EmitError> {
+        match rank.checked_sub(1) {
+            None => match &usage.typing {
+                Some(typing) => emit_typing_clause(w, &typing.value),
+                None => Ok(()),
+            },
+            Some(index) => match specializations[usize::from(index)] {
+                Some(clause) => emit_subsetting_clause(w, &clause.value),
+                None => Ok(()),
+            },
+        }
+    };
+    for (_, rank) in clauses.iter().copied().filter(|c| leads_multiplicity(*c)) {
+        emit_clause(w, rank)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
     emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
-    if let Some(subsets) = &usage.subsets {
-        emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(redefines) = &usage.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
-    }
-    if let Some(references) = &usage.references {
-        emit_subsetting_clause(w, &references.value)?;
-    }
-    if let Some(crosses) = &usage.crosses {
-        emit_subsetting_clause(w, &crosses.value)?;
-    }
-    if let Some(intersects) = &usage.intersects {
-        emit_subsetting_clause(w, &intersects.value)?;
+    for (_, rank) in clauses.iter().copied().filter(|c| !leads_multiplicity(*c)) {
+        emit_clause(w, rank)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;

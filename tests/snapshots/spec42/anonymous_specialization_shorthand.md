@@ -23,8 +23,8 @@ metadata def M {
 # FORMAT
 ~~~sysml
 metadata def M {
-     : SysML::Usage :> annotatedElement;
-     : SysML::Definition :> annotatedElement;
+     :> annotatedElement : SysML::Usage;
+     :> annotatedElement : SysML::Definition;
      :>> baseType = SysML::PartUsage;
     attribute named :> annotatedElement;
 }

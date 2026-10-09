@@ -66,7 +66,7 @@ standard library package RequirementDerivation {
 		 * OriginalRequirementMetadata identifies a usage as an original requirement.
 		 * It is intended to be used to tag the original requirement end of a Derivation.
 		 */
-         : SysML::Usage :> annotatedElement;
+         :> annotatedElement : SysML::Usage;
          :>> baseType = originalRequirements meta SysML::Usage;
     }
     metadata def <derive> DerivedRequirementMetadata :> SemanticMetadata {
@@ -75,7 +75,7 @@ standard library package RequirementDerivation {
 		 * DerivedRequirementMetadata identifies a usage as a derived requirement.
 		 * It is intended to be used to tag the derived requirement ends of a Derivation.
 		 */
-         : SysML::Usage :> annotatedElement;
+         :> annotatedElement : SysML::Usage;
          :>> baseType = derivedRequirements meta SysML::Usage;
     }
     metadata def <derivation> DerivationMetadata :> SemanticMetadata {
@@ -83,8 +83,8 @@ standard library package RequirementDerivation {
         /*
 		 * DerivationMetadata is SemanticMetadata for a Derivation connection.
 		 */
-         : SysML::ConnectionDefinition :> annotatedElement;
-         : SysML::ConnectionUsage :> annotatedElement;
+         :> annotatedElement : SysML::ConnectionDefinition;
+         :> annotatedElement : SysML::ConnectionUsage;
          :>> baseType = derivations meta SysML::Usage;
     }
 }

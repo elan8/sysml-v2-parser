@@ -732,40 +732,27 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         map(crate::parser::part::perform_usage, |perform| {
             ThenTarget::Perform(Box::new(perform))
         }),
+        // `WhileLoopNode` and `ForLoopNode` are `ActionNode`s like `IfNode`, and both own an
+        // `ActionNodePrefix` (`then action a while ...`). They precede `action_usage`, whose
+        // body is optional: it would take `action a` alone and leave the node keyword to start
+        // a second member. Each refuses a plain `action a;` at the missing node keyword.
+        map(while_or_loop_stmt, |node| match node {
+            WhileOrLoop::While(stmt) => ThenTarget::While(Box::new(stmt)),
+            WhileOrLoop::Loop(stmt) => ThenTarget::Loop(Box::new(stmt)),
+        }),
+        map(for_loop, |stmt| ThenTarget::For(Box::new(stmt))),
         // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
         // `IfNode` is itself an `ActionNode`, including its mandatory action-body parameter.
         // It must precede the feature fallback so `then if ...` retains its condition and branch
         // structure instead of being recovered as an unrecognized succession target.
         map(if_stmt, ThenTarget::If),
-        // `WhileLoopNode` and `ForLoopNode` are `ActionNode`s like `IfNode`. They refuse by
-        // keyword lookahead, so `then action a;` above keeps its arm.
-        map(then_loop_target, |node| match node {
-            WhileOrLoop::While(stmt) => ThenTarget::While(Box::new(stmt)),
-            WhileOrLoop::Loop(stmt) => ThenTarget::Loop(Box::new(stmt)),
-        }),
-        map(for_loop, |stmt| ThenTarget::For(Box::new(stmt))),
         map(
             nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
             ThenTarget::Feature,
         ),
     ))
     .parse(input)
-}
-
-/// `while ...` / `loop ...` as a `then` succession target -- only when the node keyword leads,
-/// so an `action`-led target stays with `action_usage`.
-fn then_loop_target(input: Input<'_>) -> IResult<Input<'_>, WhileOrLoop> {
-    let (peek, _) = ws_and_comments(input)?;
-    if !starts_with_keyword(peek.fragment(), b"while")
-        && !starts_with_keyword(peek.fragment(), b"loop")
-    {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    while_or_loop_stmt(input)
 }
 
 /// `send ...` as a `then` succession target -- only the `send` control-node form, so the other
@@ -2133,7 +2120,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     };
     // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
     // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).
-    let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, leading) = crate::parser::usage::specialization_clauses_before_value(input)?;
     let (input, leading_type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =
         nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
@@ -2147,7 +2134,9 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     } else {
         (input, None)
     };
-    let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
+    // The trailing clauses stop before a `= expr`: that is this usage's `ValuePart`, parsed
+    // below, not part of a subsetting.
+    let (input, trailing) = crate::parser::usage::specialization_clauses_before_value(input)?;
     let type_result = leading_type_result.or(trailing_type_result);
     let (type_ref_span, type_name, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);

@@ -5458,8 +5458,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_variant_usage(&usage.value)?;
                         }
-                        PerformBodyElement::Action(_action) => {
-                            self.write_marker(&mut first, "action")?;
+                        // The variant holds any action-body member; an action usage is
+                        // projected in full so its declaration and value are part of the AST.
+                        PerformBodyElement::Action(action) => {
+                            if let super::ActionUsageBodyElement::ActionUsage(usage) = &action.value
+                            {
+                                self.write_item_prefix(&mut first)?;
+                                self.write_action_usage(&usage.value)?;
+                            } else {
+                                self.write_marker(&mut first, "action")?;
+                            }
                         }
                         PerformBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
