@@ -734,16 +734,26 @@ pub(crate) fn redefinition_feature_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let (peek, _) = ws_and_comments(input)?;
+    // `MemberPrefix` visibility: `private redefines b = 1;`, `protected :>> c = 2;` (#178).
+    let (after_visibility, (visibility_span, visibility)) =
+        crate::parser::lex::visibility_prefix(peek)?;
     // GH-92.1: bare `redefines <target> = <value>;` (the literal keyword, not just the `:>>`
     // symbol) with no `attribute`/`part` keyword at all, e.g. `redefines mass = 1000 [kg];`
     // (`Mass Roll-up Example/Vehicles.sysml:26`).
-    if !peek.fragment().starts_with(b":>") && !starts_with_keyword(peek.fragment(), b"redefines") {
+    if !after_visibility.fragment().starts_with(b":>")
+        && !starts_with_keyword(after_visibility.fragment(), b"redefines")
+    {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    attribute_feature_binding(input)
+    let (rest, mut usage) = attribute_feature_binding(after_visibility)?;
+    if visibility.is_some() {
+        usage.value.membership = Membership::feature(visibility, visibility_span);
+        usage.span = crate::parser::span::span_from_to(peek, rest);
+    }
+    Ok((rest, usage))
 }
 
 fn attribute_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBodyElement> {

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A constraint usage keeps all its types, and directed and redefinition members keep their
+  visibility (breaking AST change, `PARSE_AST_VERSION` 271).**
+  - `constraint c : A, B;` kept only `A`, with no diagnostic. `ConstraintUsage::type_name` is
+    replaced by `ConstraintUsage::typing: Option<Node<TypingRelationship>>`, the shape `CalcUsage`
+    and the other usages have, so every target and the clause's spelling (`:`, `defined by`)
+    survive (#174).
+  - `private in x : Real;` in a constraint body and `private redefines b = 1;` in constraint
+    and calculation bodies were rejected: the nodes had no slot for `MemberPrefix` visibility.
+    `InOutDecl::membership` is new, and the keyword-less redefinition binding records its
+    visibility on the `AttributeUsage::membership` it already had (#178).
+
 - **Succession members and body expressions from the release corpus (breaking AST change,
   `PARSE_AST_VERSION` 270).** New variants and fields; consumers with exhaustive matches need
   arms (#166, #167).

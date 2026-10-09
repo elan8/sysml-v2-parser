@@ -3017,9 +3017,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_usage_declaration_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
+        // One type keeps the compact `(type <ref>)` projection. Several are written as the
+        // whole relationship, so every target is part of the AST contract.
         self.writer.write_str(") (type ")?;
-        match usage.type_name {
-            Some(reference) => self.write_reference(reference)?,
+        match &usage.typing {
+            Some(typing) if typing.value.target.len() > 1 => self.write_typing(&typing.value)?,
+            Some(typing) => match typing.value.target.first() {
+                Some(reference) => self.write_reference(*reference)?,
+                None => self.writer.write_str("none")?,
+            },
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (multiplicity ")?;
@@ -3212,7 +3218,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
             ActionDefBodyElement::InOutDecl(declaration) => {
-                self.writer.write_str("(in-out (direction ")?;
+                self.writer.write_str("(in-out ")?;
+                // Written only when authored, so undecorated parameters keep their projection.
+                if let Some(visibility) = declaration.value.membership.visibility {
+                    write!(self.writer, "(visibility {visibility:?}) ")?;
+                }
+                self.writer.write_str("(direction ")?;
                 match declaration.value.direction {
                     InOut::In => self.writer.write_str("in")?,
                     InOut::Out => self.writer.write_str("out")?,

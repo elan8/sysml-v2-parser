@@ -122,7 +122,7 @@ fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Constrain
                 prefix,
                 short_name,
                 name: name_str,
-                type_name: header.type_reference,
+                typing: header.typing,
                 multiplicity: header.multiplicity,
                 subsets: header.subsets,
                 redefines: header.redefines,
@@ -251,14 +251,14 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::AliasDef,
         )
         .parse(input)?
-    } else if (starts_with_keyword(input.fragment(), b"in")
-        || starts_with_keyword(input.fragment(), b"out")
-        || starts_with_keyword(input.fragment(), b"inout"))
+    } else if (starts_with_keyword(after_visibility.fragment(), b"in")
+        || starts_with_keyword(after_visibility.fragment(), b"out")
+        || starts_with_keyword(after_visibility.fragment(), b"inout"))
         // `in fork f;` is a control node with a directed `ControlNodePrefix`, owned by the
         // action-member arm below, not a directed parameter named `fork`.
         && !prefixed_control_node_follows(input)
     {
-        if named_in_out_missing_type(input) {
+        if named_in_out_missing_type(after_visibility) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
@@ -277,9 +277,9 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::AttributeUsage(Box::new(n))
         })
         .parse(input)?
-    } else if input.fragment().starts_with(b":>>")
-        || input.fragment().starts_with(b":>")
-        || starts_with_keyword(input.fragment(), b"redefines")
+    } else if after_visibility.fragment().starts_with(b":>>")
+        || after_visibility.fragment().starts_with(b":>")
+        || starts_with_keyword(after_visibility.fragment(), b"redefines")
     {
         // `redefines partMasses = (…);` is the keyword spelling of the same `:>>` member
         // (`Redefinitions = ( ':>>' | 'redefines' ) OwnedRedefinition`, SysML BNF); without it the
@@ -1953,8 +1953,9 @@ pub(crate) fn calc_def_body_element(
             CalcDefBodyElement::AttributeUsage(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"redefines") {
-        // Keyword-led, nameless redefinition: `redefines predecessors [0];`. A `Feature` (KerML
+    } else if starts_with_keyword(after_visibility, b"redefines") {
+        // Keyword-led, nameless redefinition: `redefines predecessors [0];`, with its
+        // `MemberPrefix` visibility if any (`private redefines b = 1;`, #178). A `Feature` (KerML
         // BNF 562) may be nothing but its `FeatureDeclaration` (601), and that declaration's
         // second alternative is a bare `FeatureSpecializationPart` (632) = `FeatureSpecialization+
         // MultiplicityPart?`, reaching `Redefinitions` (663) -> `Redefines` (666) = `REDEFINES
@@ -2714,7 +2715,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"c"[..])
         );
-        assert!(node.value.type_name.is_some());
+        assert!(node.value.typing.is_some());
         assert_eq!(
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
@@ -2732,7 +2733,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"mc"[..])
         );
-        assert!(node.value.type_name.is_some());
+        assert!(node.value.typing.is_some());
         assert!(matches!(node.value.body, ConstraintDefBody::Brace { .. }));
     }
 
@@ -2746,7 +2747,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"hasLegalProfileDepth"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
     }
 
     /// Regression: `Systems Library/Constraints.sysml`'s `constraintChecks` -- `abstract` +
@@ -2764,7 +2765,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"constraintChecks"[..])
         );
-        assert!(node.value.type_name.is_some());
+        assert!(node.value.typing.is_some());
     }
 
     /// Regression: `Systems Library/Constraints.sysml`'s `assertedConstraintChecks` -- `abstract`
@@ -2780,7 +2781,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"assertedConstraintChecks"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
     }
 
     /// Regression: `Systems Library/Requirements.sysml`'s `constraint assumptions[0..*] :>
@@ -2797,7 +2798,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"assumptions"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
     }
 
     /// Regression: `Systems Library/Requirements.sysml`'s `constraint assumptions :>>
@@ -2814,7 +2815,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"assumptions"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
         assert!(matches!(
             node.value.body,
             ConstraintDefBody::Semicolon { .. }
