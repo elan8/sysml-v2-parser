@@ -531,8 +531,16 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, action_reference) = perform_action_path(input)?;
+    // `:>>` and its keyword spelling `redefines` (`perform ActionTree::providePower redefines
+    // providePower;`, SysML v2 Spec Annex A SimpleVehicleModel.sysml).
     let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(
+            ws_and_comments,
+            alt((
+                tag(&b":>>"[..]),
+                nom::sequence::terminated(tag(&b"redefines"[..]), nom::combinator::peek(ws1)),
+            )),
+        ),
         preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;

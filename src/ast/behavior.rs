@@ -216,6 +216,13 @@ pub enum ThenTarget {
     /// condition and either braced or shorthand branches, so it cannot be represented as a
     /// feature succession without losing the action-body grammar (SysML textual BNF 1123-1141).
     If(Node<IfStmt>),
+    /// `then while condition { ... }` — an inline `WhileLoopNode` (`ActionNode`, SysML BNF
+    /// `TargetSuccession`; Simple Tests/StructuredControlTest.sysml).
+    While(Box<Node<WhileStmt>>),
+    /// `then loop { ... } until condition;` — the `loop` spelling of `WhileLoopNode`.
+    Loop(Box<Node<LoopStmt>>),
+    /// `then for n in seq { ... }` — an inline `ForLoopNode`.
+    For(Box<Node<ForLoop>>),
     /// `then continue;` — a reference to an already-declared node.
     Feature(Node<Expression>),
 }
@@ -428,6 +435,10 @@ pub struct ActionUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// `ValuePart` of `ActionUsageDeclaration = UsageDeclaration ValuePart?` (SysML BNF
+    /// `ActionUsageDeclaration`), e.g. `action :>> generateTorque = generateTorque4Cyl;`. The slot
+    /// was missing, so an action usage with a value was recovered as an unexpected token.
+    pub value: Option<Box<Node<crate::ast::FeatureValue>>>,
     /// For `action ... accept param : Type` or the pin-valid bare payload shorthand
     /// `action ... accept Type via port`. The `via` target belongs to this grammar-owned accept
     /// parameter part, not to [`Self::via`], which is reserved for `send`.
@@ -471,6 +482,7 @@ impl PartialEq for ActionUsage {
             && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
+            && self.value == other.value
             && self.accept == other.accept
             && self.send == other.send
             && self.via == other.via
@@ -503,6 +515,12 @@ pub enum ActionUsageBodyElement {
     MetadataUsage(Node<MetadataUsage>),
     InOutDecl(Node<InOutDecl>),
     RefDecl(Node<RefDecl>),
+    /// `PerformActionUsage`, a `BehaviorUsageElement` of `ActionBodyItem`. An action usage body is
+    /// the same `ActionBody` production as an action definition body (SysML BNF `ActionUsage`,
+    /// `ActionDefinition`), which carries [`ActionDefBodyElement::Perform`]; this variant was
+    /// missing, so `action g { perform a; }` was recovered while `action def G { perform a; }`
+    /// parsed.
+    Perform(Node<Perform>),
     Bind(Node<Bind>),
     FlowUsage(Node<FlowUsage>),
     /// See [`ActionDefBodyElement::GuardedSuccession`].

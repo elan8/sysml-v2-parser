@@ -738,12 +738,34 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         // It must precede the feature fallback so `then if ...` retains its condition and branch
         // structure instead of being recovered as an unrecognized succession target.
         map(if_stmt, ThenTarget::If),
+        // `WhileLoopNode` and `ForLoopNode` are `ActionNode`s like `IfNode`. They refuse by
+        // keyword lookahead, so `then action a;` above keeps its arm.
+        map(then_loop_target, |node| match node {
+            WhileOrLoop::While(stmt) => ThenTarget::While(Box::new(stmt)),
+            WhileOrLoop::Loop(stmt) => ThenTarget::Loop(Box::new(stmt)),
+        }),
+        map(for_loop, |stmt| ThenTarget::For(Box::new(stmt))),
         map(
             nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
             ThenTarget::Feature,
         ),
     ))
     .parse(input)
+}
+
+/// `while ...` / `loop ...` as a `then` succession target -- only when the node keyword leads,
+/// so an `action`-led target stays with `action_usage`.
+fn then_loop_target(input: Input<'_>) -> IResult<Input<'_>, WhileOrLoop> {
+    let (peek, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(peek.fragment(), b"while")
+        && !starts_with_keyword(peek.fragment(), b"loop")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    while_or_loop_stmt(input)
 }
 
 /// `send ...` as a `then` succession target -- only the `send` control-node form, so the other
@@ -1894,6 +1916,17 @@ fn action_usage_body_relationship_element(
             ActionUsageBodyElement::Dependency,
         ),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
+        // The two `PerformActionUsageDeclaration` alternatives, in the order the action definition
+        // body and the part body try them: `perform action ...`, then the keyword-less reference
+        // form `perform a.b;`.
+        map(
+            crate::parser::part::perform_action_decl,
+            ActionUsageBodyElement::Perform,
+        ),
+        map(
+            crate::parser::part::perform_usage,
+            ActionUsageBodyElement::Perform,
+        ),
         map(bind_, ActionUsageBodyElement::Bind),
         map(
             crate::parser::flow::flow_usage_member,
@@ -2124,6 +2157,10 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         .or(leading.subsets.clone())
         .map(|(target, _)| target);
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
+    // `ActionUsageDeclaration = UsageDeclaration ValuePart?`.
+    let (input, value) =
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
     let (input, accept) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"accept"[..])),
         crate::parser::payload::action_accept_parameter,
@@ -2223,6 +2260,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                value: value.map(Box::new),
                 accept,
                 send,
                 via,

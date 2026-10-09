@@ -4742,6 +4742,9 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::ConnectionUsage(field_0) => {
                     visitor.visit_connection_usage_member(&$($mutability)? **field_0);
                 }
+                OccurrenceBodyElement::Perform(field_0) => {
+                    visitor.visit_perform(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5276,6 +5279,15 @@ macro_rules! ast_traversal {
                 ThenTarget::If(field_0) => {
                     visitor.visit_if_stmt(field_0);
                 }
+                ThenTarget::While(field_0) => {
+                    visitor.visit_while_stmt(&$($mutability)? **field_0);
+                }
+                ThenTarget::Loop(field_0) => {
+                    visitor.visit_loop_stmt(&$($mutability)? **field_0);
+                }
+                ThenTarget::For(field_0) => {
+                    visitor.visit_for_loop(&$($mutability)? **field_0);
+                }
                 ThenTarget::Feature(field_0) => {
                     visitor.visit_expression(field_0);
                 }
@@ -5454,7 +5466,7 @@ macro_rules! ast_traversal {
         pub fn walk_action_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActionUsage { keyword, is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, accept, send, via, to, body, type_ref_span, membership } = &$($mutability)? node.value;
+            let ActionUsage { keyword, is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, value, accept, send, via, to, body, type_ref_span, membership } = &$($mutability)? node.value;
             visitor.visit_action_usage_keyword(keyword);
             let _ = is_abstract;
             let _ = is_variation;
@@ -5479,6 +5491,9 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             if let Some(inner) = accept {
                 visitor.visit_transition_accept_value(inner);
@@ -5588,6 +5603,9 @@ macro_rules! ast_traversal {
                 }
                 ActionUsageBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
+                }
+                ActionUsageBodyElement::Perform(field_0) => {
+                    visitor.visit_perform(field_0);
                 }
                 ActionUsageBodyElement::ActionUsage(field_0) => {
                     visitor.visit_action_usage(&$($mutability)? **field_0);

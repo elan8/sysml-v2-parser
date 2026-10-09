@@ -224,6 +224,7 @@ fn control_node_payload_stmt<'a>(
                 multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 subsets: None,
                 redefines: None,
+                value: None,
                 accept,
                 send,
                 via,

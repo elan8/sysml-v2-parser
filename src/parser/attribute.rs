@@ -685,11 +685,16 @@ fn default_reference_usage_inner(
 
 /// Narrow action/calc compatibility entry point: its owning scopes require a value to preserve
 /// their bare-identifier recovery contract, while all syntax and AST ownership stays shared.
+///
+/// A member led by a specialization operator (`:>> stateSpace : CartState;`, State Space
+/// Representation Examples/CartSample.sysml) is no bare identifier, so it needs no value.
 pub(crate) fn default_reference_value_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
+    let (peek, _) = ws_and_comments(input)?;
+    let specialization_led = peek.fragment().starts_with(b":");
     let (input, usage) = default_reference_usage(input)?;
-    if usage.value.value.is_none() {
+    if usage.value.value.is_none() && !specialization_led {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,

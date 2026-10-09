@@ -2209,6 +2209,33 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_if_stmt(&if_stmt.value)?;
                 self.writer.write_char(')')
             }
+            super::ThenTarget::While(member) => {
+                self.writer.write_str("(then-while ")?;
+                self.write_loop_node(
+                    "while-loop",
+                    &member.value.prefix,
+                    Some(&member.value.condition),
+                    &member.value.body,
+                    member.value.until.as_ref(),
+                )?;
+                self.writer.write_char(')')
+            }
+            super::ThenTarget::Loop(member) => {
+                self.writer.write_str("(then-loop ")?;
+                self.write_loop_node(
+                    "loop",
+                    &member.value.prefix,
+                    None,
+                    &member.value.body,
+                    member.value.until.as_ref(),
+                )?;
+                self.writer.write_char(')')
+            }
+            super::ThenTarget::For(for_loop) => {
+                self.writer.write_str("(then-for ")?;
+                self.write_for_loop(&for_loop.value)?;
+                self.writer.write_char(')')
+            }
             // Retain the established compact projection for unrelated alternatives while matching
             // them explicitly: a new target variant must decide whether it is a control node.
             super::ThenTarget::Action(action) => {
@@ -3852,6 +3879,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
+        if let Some(value) = &usage.value {
+            self.writer.write_str("(value ")?;
+            self.write_feature_value(&value.value)?;
+            self.writer.write_str(") ")?;
+        }
         if let Some(accept) = &usage.accept {
             self.writer.write_str("(accept ")?;
             self.write_transition_accept(accept)?;
@@ -4053,6 +4085,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::StateUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_state_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::Perform(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_perform(&member.value)?;
                         }
                         super::ActionUsageBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -5546,6 +5582,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::OccurrenceBodyElement::ConnectionUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_connection_usage(&usage.value)
+            }
+            super::OccurrenceBodyElement::Perform(member) => {
+                self.write_item_prefix(first)?;
+                self.write_perform(&member.value)
             }
         }
     }
