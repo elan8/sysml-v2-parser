@@ -27,7 +27,7 @@ package DefaultReferenceUsageLeadingRedefinitionRecovery {
 package DefaultReferenceUsageLeadingRedefinitionRecovery {
     attribute def Outer :> Unit {
         ??? malformed;
-         : Real[3] :>> elements;
+         :>> elements : Real[3];
         attribute later : Real;
     }
 }

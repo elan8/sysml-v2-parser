@@ -732,6 +732,15 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         map(crate::parser::part::perform_usage, |perform| {
             ThenTarget::Perform(Box::new(perform))
         }),
+        // `WhileLoopNode` and `ForLoopNode` are `ActionNode`s like `IfNode`, and both own an
+        // `ActionNodePrefix` (`then action a while ...`). They precede `action_usage`, whose
+        // body is optional: it would take `action a` alone and leave the node keyword to start
+        // a second member. Each refuses a plain `action a;` at the missing node keyword.
+        map(while_or_loop_stmt, |node| match node {
+            WhileOrLoop::While(stmt) => ThenTarget::While(Box::new(stmt)),
+            WhileOrLoop::Loop(stmt) => ThenTarget::Loop(Box::new(stmt)),
+        }),
+        map(for_loop, |stmt| ThenTarget::For(Box::new(stmt))),
         // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
         // `IfNode` is itself an `ActionNode`, including its mandatory action-body parameter.
@@ -1894,6 +1903,17 @@ fn action_usage_body_relationship_element(
             ActionUsageBodyElement::Dependency,
         ),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
+        // The two `PerformActionUsageDeclaration` alternatives, in the order the action definition
+        // body and the part body try them: `perform action ...`, then the keyword-less reference
+        // form `perform a.b;`.
+        map(
+            crate::parser::part::perform_action_decl,
+            ActionUsageBodyElement::Perform,
+        ),
+        map(
+            crate::parser::part::perform_usage,
+            ActionUsageBodyElement::Perform,
+        ),
         map(bind_, ActionUsageBodyElement::Bind),
         map(
             crate::parser::flow::flow_usage_member,
@@ -2100,7 +2120,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     };
     // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
     // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).
-    let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, leading) = crate::parser::usage::specialization_clauses_before_value(input)?;
     let (input, leading_type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =
         nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
@@ -2114,7 +2134,9 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     } else {
         (input, None)
     };
-    let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
+    // The trailing clauses stop before a `= expr`: that is this usage's `ValuePart`, parsed
+    // below, not part of a subsetting.
+    let (input, trailing) = crate::parser::usage::specialization_clauses_before_value(input)?;
     let type_result = leading_type_result.or(trailing_type_result);
     let (type_ref_span, type_name, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
@@ -2124,6 +2146,10 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         .or(leading.subsets.clone())
         .map(|(target, _)| target);
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
+    // `ActionUsageDeclaration = UsageDeclaration ValuePart?`.
+    let (input, value) =
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
     let (input, accept) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"accept"[..])),
         crate::parser::payload::action_accept_parameter,
@@ -2223,6 +2249,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                value: value.map(Box::new),
                 accept,
                 send,
                 via,

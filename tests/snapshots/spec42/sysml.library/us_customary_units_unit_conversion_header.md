@@ -21,7 +21,7 @@ standard library package <USCU> USCustomaryUnits {
 ~~~sysml
 standard library package <USCU> USCustomaryUnits {
     attribute 'acre (based on US survey foot)' : AreaUnit {
-         : ConversionByConvention :>> unitConversion {
+         :>> unitConversion : ConversionByConvention {
              :>> referenceUnit = m ^ 2;
              :>> conversionFactor = 4.046873E+03;
              :>> isExact = false;

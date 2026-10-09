@@ -62,7 +62,7 @@ package '15_11-Variable Length Collection Types' {
         ref part :>> elements : SparePart;
     }
     attribute def 'List<Integer>' :> List {
-        value : Integer :>> elements;
+        value :>> elements : Integer;
     }
     attribute def 'Set<String>' :> Set {
         attribute :>> elements : String;

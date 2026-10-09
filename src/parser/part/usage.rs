@@ -531,14 +531,10 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, action_reference) = perform_action_path(input)?;
-    let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, with_span(qualified_reference)),
-    ))
-    .parse(input)?;
-    let redefines = redefines.map(|(span, target)| {
-        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
-    });
+    // `:>>` or its keyword spelling (`perform ActionTree::providePower redefines providePower;`,
+    // SysML v2 Spec Annex A SimpleVehicleModel.sysml). `optional_redefinition` records which
+    // one was authored.
+    let (input, redefines) = crate::parser::usage::optional_redefinition(input)?;
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
