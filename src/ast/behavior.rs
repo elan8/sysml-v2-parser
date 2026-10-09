@@ -272,6 +272,9 @@ pub struct InOutDecl {
     /// `;`-terminated form. Parameter bodies share the action-body member grammar, matching the
     /// parser, which always dispatched brace terminators through the action-body machinery.
     pub body: Option<Vec<Node<ActionDefBodyElement>>>,
+    /// `MemberPrefix` visibility: `private in x : Real;`. Every body member may carry one; without
+    /// this slot the keyword had nowhere to go and the member was rejected or shredded (#178).
+    pub membership: crate::ast::Membership,
 }
 
 /// Usage kind explicitly authored on a direction-prefixed parameter declaration.
