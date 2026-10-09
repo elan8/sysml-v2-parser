@@ -947,7 +947,24 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
         .parse(input)?;
         (input, None, Some(locale))
     } else {
-        let (input, ident_parsed) = opt(identification).parse(input)?;
+        // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?`, read here one
+        // half at a time. The shared `identification` skips comments between the halves, so
+        // `doc <a> /* text */` walked past its own body and took the next member's first word
+        // as the declared name (#164, `Simple Tests/Comments.kerml`).
+        let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+        let (after_gap, _) = ws(input)?;
+        let (input, declared_name) = if short_name.is_some()
+            && (after_gap.fragment().starts_with(b"/*")
+                || starts_with_keyword(after_gap.fragment(), b"locale"))
+        {
+            (input, None)
+        } else {
+            opt(preceded(ws, name)).parse(input)?
+        };
+        let ident_parsed = Some(crate::ast::Identification {
+            short_name,
+            name: declared_name,
+        });
         // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
         // search for an optional `locale`. Skipping comments here walked straight past the body
         // and found the *next* member's `locale`, fusing two members into one and discarding

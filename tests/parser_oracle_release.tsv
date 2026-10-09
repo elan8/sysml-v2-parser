@@ -2,10 +2,7 @@
 # Regenerate with `scripts/parser-oracle.sh --update` after triaging the change.
 ours-rejects	kerml/src/examples/Association Examples/ProductSelection_N_ary.kerml
 ours-rejects	kerml/src/examples/Behavior Examples/TakePicture.kerml
-ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-6-Sequences.kerml
-ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-7-DecisionsAndMerges.kerml
 ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-8-ChangingFeatureValues.kerml
-ours-rejects	kerml/src/examples/Simple Tests/Comments.kerml
 ours-rejects	kerml/src/examples/Simple Tests/Conjugation.kerml
 ours-rejects	kerml/src/examples/Simple Tests/Connectors.kerml
 ours-rejects	kerml/src/examples/Simple Tests/FeatureChains.kerml
@@ -13,7 +10,6 @@ ours-rejects	kerml/src/examples/Simple Tests/Features.kerml
 ours-rejects	kerml/src/examples/Simple Tests/Imports.kerml
 ours-rejects	kerml/src/examples/Simple Tests/Redefinition.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingFeaturesEnhanced.kerml
-ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingSteps.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/TimeVaryingCarDriver.kerml
 ours-rejects	sysml/src/examples/Cause and Effect Examples/CauseAndEffectExample.sysml
 ours-rejects	sysml/src/examples/Simple Tests/AllocationTest.sysml

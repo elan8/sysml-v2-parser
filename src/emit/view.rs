@@ -609,12 +609,25 @@ pub(crate) fn emit_kerml_succession_member(
     if succession.is_all {
         w.push_str("all ");
     }
-    if let Some(name) = succession.name {
-        w.push_declaration_name(&format!("{path}/name"), name)?;
+    let declared = succession.name.is_some()
+        || !succession.specializations.is_empty()
+        || succession.multiplicity.is_some();
+    if declared {
+        w.trim_trailing_space();
+        if let Some(name) = succession.name {
+            w.push_char(' ');
+            w.push_declaration_name(&format!("{path}/name"), name)?;
+        }
+        emit_feature_specializations(w, &succession.specializations)?;
         if let Some(multiplicity) = &succession.multiplicity {
+            if succession.name.is_none() && succession.specializations.is_empty() {
+                w.push_char(' ');
+            }
             emit_multiplicity(w, &multiplicity.value)?;
         }
         w.push_str(" first ");
+    } else if succession.first_span.is_some() {
+        w.push_str("first ");
     }
     emit_kerml_connector_end(w, &format!("{path}/first"), &succession.first.value)?;
     w.push_str(" then ");
