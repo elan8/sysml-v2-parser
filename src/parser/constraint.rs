@@ -1088,28 +1088,60 @@ fn kerml_succession_member_inner(
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
-    // Named form, only with the `first` keyword: `succession triggerAfter [taNum] first
-    // [0..1] transitionLinkSource then ...;` (`TransitionPerformances.kerml`).
-    let (input, named) = opt(map(
-        (
-            preceded(ws_and_comments, name),
-            opt(preceded(
-                ws_and_comments,
-                crate::parser::usage::multiplicity_node,
-            )),
-            preceded(ws_and_comments, tag(&b"first"[..])),
-            ws1,
-        ),
-        |(n, m, _, _)| (n, m),
-    ))
+    // `SuccessionDeclaration = ( FeatureDeclaration? 'first' )? ...`. With the keyword, an
+    // optional declaration precedes it: a name (`succession triggerAfter [taNum] first ...`,
+    // `TransitionPerformances.kerml`), specializations alone (`succession redefines p : L [1]
+    // first paint then dry;`), or nothing (`succession first startShot then operated;`).
+    // Without it the ends follow directly. The declared attempt is transactional: its
+    // multiplicity may allocate references before `first` turns out to be absent.
+    let (input, declared) = opt(|input| {
+        crate::parser::span::reference_transaction(input, |input| {
+            let (peek, _) = ws_and_comments(input)?;
+            let (input, declared_name) = if starts_with_any_keyword(
+                peek.fragment(),
+                &[
+                    b"first",
+                    b"typed",
+                    b"subsets",
+                    b"references",
+                    b"crosses",
+                    b"redefines",
+                ],
+            ) || peek.fragment().starts_with(b":")
+                || peek.fragment().starts_with(b"[")
+            {
+                (input, None)
+            } else {
+                let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+                (input, Some(n))
+            };
+            let (input, part) = kerml_feature_specialization_part(input)?;
+            let (keyword_start, _) = ws_and_comments(input)?;
+            if !starts_with_keyword(keyword_start.fragment(), b"first") {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+            let (input, _) = tag(&b"first"[..]).parse(keyword_start)?;
+            let first_span = crate::parser::span::span_from_to(keyword_start, input);
+            let (input, _) = ws1(input)?;
+            Ok((input, (declared_name, part, first_span)))
+        })
+    })
     .parse(input)?;
-    let (name_str, decl_multiplicity) = match named {
-        Some((n, m)) => (Some(n), m),
-        None => (None, None),
+    let (name_str, decl_multiplicity, specializations, first_span) = match declared {
+        Some((n, part, span)) => (n, part.multiplicity, part.specializations, Some(span)),
+        None => (None, None, Vec::new(), None),
     };
     let (input, first) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // A multiplicity may follow the keyword directly: `then[0..1] endShot`.
+    let (input, _) = if input.fragment().starts_with(b"[") {
+        (input, ())
+    } else {
+        ws1(input)?
+    };
     let (input, then) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
@@ -1121,6 +1153,8 @@ fn kerml_succession_member_inner(
                 is_all: is_all.is_some(),
                 name: name_str,
                 multiplicity: decl_multiplicity,
+                specializations,
+                first_span,
                 first,
                 then,
                 membership: Membership::feature(visibility, visibility_span),

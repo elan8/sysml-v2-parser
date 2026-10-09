@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **KerML successions take their whole declaration, and named documentation keeps its body
+  (breaking AST change, `PARSE_AST_VERSION` 272).**
+  - `SuccessionDeclaration = ( FeatureDeclaration? 'first' )? ...`. Only the ends-only and the
+    named `first` forms were parsed; `succession first a then b;` and `succession redefines p :
+    L [1] first a then b;` were rejected. `KermlSuccessionMember::specializations` and
+    `::first_span` are new. A multiplicity may follow `then` directly (`then[0..1] endShot`)
+    (#163).
+  - `doc <a> /* text */` lost its text and took the next member's first word as its declared
+    name, with no diagnostic. The documentation's `Identification` is now read without
+    skipping the member's own body (#164).
+
 - **A constraint usage keeps all its types, and directed and redefinition members keep their
   visibility (breaking AST change, `PARSE_AST_VERSION` 271).**
   - `constraint c : A, B;` kept only `A`, with no diagnostic. `ConstraintUsage::type_name` is

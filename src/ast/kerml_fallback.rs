@@ -571,6 +571,14 @@ pub struct KermlSuccessionMember {
     pub name: Option<DeclarationName>,
     /// The succession's own multiplicity in the named `first` form (`[taNum]` above).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    /// The rest of the succession's `FeatureDeclaration`: `succession redefines p_before_d :
+    /// MyPaint_Before_Dry_Link [1] first paint then dry;` (KerML Spec Annex A
+    /// `A-3-6-Sequences.kerml`).
+    pub specializations: Vec<FeatureSpecialization>,
+    /// The authored `first` keyword. `SuccessionDeclaration = ( FeatureDeclaration? 'first' )?
+    /// ...`, so it may stand with no declaration at all: `succession first startShot then
+    /// operated;`.
+    pub first_span: Option<Span>,
     pub first: Node<KermlConnectorEnd>,
     pub then: Node<KermlConnectorEnd>,
     pub membership: crate::ast::Membership,
