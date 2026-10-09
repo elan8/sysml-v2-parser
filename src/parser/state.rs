@@ -695,6 +695,16 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
 /// vendored SysML v2 Systems Library / spec Annex examples).
 pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsage>> {
     let start = input;
+    // `( SourceSuccessionMember )? …UsageMember`: `then` precedes the membership. It is taken
+    // only when `state` follows the prefix, so `then stateful;` stays a `then` reference.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, then_span) = if starts_with_keyword(input.fragment(), b"then")
+        && crate::parser::occurrence_prefix::kind_keyword_follows(input, b"state")
+    {
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"then")?
+    } else {
+        (input, None)
+    };
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) =
@@ -759,6 +769,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
             start,
             input,
             StateUsage {
+                then_span,
                 direction,
                 is_derived: is_derived.is_some(),
                 is_abstract: is_abstract.is_some(),

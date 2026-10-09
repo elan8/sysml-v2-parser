@@ -242,7 +242,7 @@ pub(crate) fn emit_calc_body(
     }
 }
 
-fn emit_calc_body_element(
+pub(crate) fn emit_calc_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
     el: &CalcDefBodyElement,

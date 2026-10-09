@@ -1768,13 +1768,16 @@ macro_rules! ast_traversal {
         pub fn walk_collection_operator_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CollectionOperatorBody>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CollectionOperatorBody { open_brace_span, doc, parameters, result, close_brace_span } = &$($mutability)? node.value;
+            let CollectionOperatorBody { open_brace_span, doc, parameters, members, result, close_brace_span } = &$($mutability)? node.value;
             visitor.visit_span(open_brace_span);
             if let Some(inner) = doc {
                 visitor.visit_doc_comment(&$($mutability)? **inner);
             }
             for inner in parameters {
                 visitor.visit_collection_operator_parameter(inner);
+            }
+            for inner in members {
+                visitor.visit_calc_def_body_element(inner);
             }
             if let Some(inner) = result {
                 visitor.visit_expression(&$($mutability)? **inner);
@@ -4992,6 +4995,9 @@ macro_rules! ast_traversal {
                 InterfaceUsageBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
+                InterfaceUsageBodyElement::SuccessionUsage(field_0) => {
+                    visitor.visit_succession_usage(&$($mutability)? **field_0);
+                }
                 InterfaceUsageBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
@@ -5417,6 +5423,11 @@ macro_rules! ast_traversal {
                     visitor.visit_trigger_kind(field_0);
                     visitor.visit_expression(field_1);
                 }
+                TransitionAccept::NamedTimeTrigger(field_0, field_1, field_2) => {
+                    visitor.visit_declaration_name(field_0);
+                    visitor.visit_trigger_kind(field_1);
+                    visitor.visit_expression(field_2);
+                }
             }
         }
 
@@ -5692,7 +5703,7 @@ macro_rules! ast_traversal {
         pub fn walk_payload_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PayloadFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PayloadFeature { name, type_name, type_is_conjugated, multiplicity } = &$($mutability)? node.value;
+            let PayloadFeature { name, type_name, type_is_conjugated, multiplicity, value } = &$($mutability)? node.value;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
@@ -5702,6 +5713,9 @@ macro_rules! ast_traversal {
             let _ = type_is_conjugated;
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5718,7 +5732,10 @@ macro_rules! ast_traversal {
         pub fn walk_flow_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FlowUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let FlowUsage { kind, declaration, body, membership } = &$($mutability)? node.value;
+            let FlowUsage { then_span, kind, declaration, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = then_span {
+                visitor.visit_span(inner);
+            }
             visitor.visit_flow_usage_kind(kind);
             match declaration {
                 FlowDeclaration::Declared { declaration, value, payloads, endpoints } => {
@@ -6231,7 +6248,10 @@ macro_rules! ast_traversal {
         pub fn walk_state_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateUsage { direction, is_derived, is_abstract, is_reference, is_individual, name, short_name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
+            let StateUsage { then_span, direction, is_derived, is_abstract, is_reference, is_individual, name, short_name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
+            if let Some(inner) = then_span {
+                visitor.visit_span(inner);
+            }
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }

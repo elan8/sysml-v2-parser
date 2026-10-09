@@ -812,6 +812,9 @@ pub(crate) fn emit_state_usage(
     path: &str,
     usage: &StateUsage,
 ) -> Result<(), EmitError> {
+    if usage.then_span.is_some() {
+        w.push_str("then ");
+    }
     emit_visibility(w, usage.membership.visibility);
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
@@ -1263,6 +1266,9 @@ pub(crate) fn emit_flow_usage(
     path: &str,
     flow: &crate::ast::FlowUsage,
 ) -> Result<(), EmitError> {
+    if flow.then_span.is_some() {
+        w.push_str("then ");
+    }
     emit_visibility(w, flow.membership.visibility);
     match flow.kind {
         crate::ast::FlowUsageKind::Flow => w.push_str("flow"),
@@ -1329,6 +1335,9 @@ pub(crate) fn emit_flow_usage(
                 }
                 if let Some(mult) = &feature.multiplicity {
                     emit_multiplicity(w, &mult.value)?;
+                }
+                if let Some(value) = &feature.value {
+                    super::expr::emit_feature_value(w, value)?;
                 }
             }
             if let Some(endpoints) = &**endpoints {
@@ -1417,6 +1426,15 @@ fn emit_transition_accept(
                 w.push_str(" via ");
                 emit_expression(w, &v.value)?;
             }
+        }
+        crate::ast::TransitionAccept::NamedTimeTrigger(name, kind, e) => {
+            w.push_declaration_name(&format!("{path}/accept/name"), *name)?;
+            match kind {
+                crate::ast::TriggerKind::At => w.push_str(" at "),
+                crate::ast::TriggerKind::When => w.push_str(" when "),
+                crate::ast::TriggerKind::After => w.push_str(" after "),
+            }
+            emit_expression(w, &e.value)?;
         }
         crate::ast::TransitionAccept::TimeTrigger(kind, e) => {
             match kind {

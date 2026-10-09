@@ -1772,7 +1772,9 @@ const PART_USAGE_PREFIX_STARTERS: &[&[u8]] = &[
     b"variation",
 ];
 
-fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
+pub(crate) fn calc_def_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
