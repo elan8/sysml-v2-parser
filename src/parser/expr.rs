@@ -507,6 +507,23 @@ fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<Collect
             break;
         }
     }
+    // `FunctionBodyPart` members before the result expression. Only keyword-led ones: a
+    // visibility or `attribute` cannot start an expression, so the result is never read as a
+    // member.
+    let mut members = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        let leads_member = [&b"private"[..], b"protected", b"public", b"attribute"]
+            .iter()
+            .any(|keyword| starts_with_keyword(next.fragment(), keyword));
+        if !leads_member {
+            input = next;
+            break;
+        }
+        let (next, member) = crate::parser::constraint::calc_def_body_element(next)?;
+        members.push(member);
+        input = next;
+    }
     let (next, _) = ws_and_comments(input)?;
     let (input, result) = if next.fragment().starts_with(b"}") {
         (next, None)
@@ -525,6 +542,7 @@ fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<Collect
                 open_brace_span,
                 doc: doc.map(Box::new),
                 parameters,
+                members,
                 result,
                 close_brace_span,
             },

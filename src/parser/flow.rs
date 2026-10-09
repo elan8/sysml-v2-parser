@@ -103,6 +103,12 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
             let (rest, multiplicity) =
                 nom::combinator::opt(preceded(ws_and_comments, multiplicity_node))
                     .parse(after_typing)?;
+            // `ValuePart?` of the named alternative.
+            let (rest, value) = nom::combinator::opt(preceded(
+                ws_and_comments,
+                crate::parser::feature_value::feature_value_part,
+            ))
+            .parse(rest)?;
             return Ok((
                 rest,
                 node_from_to(
@@ -113,6 +119,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
                         type_name,
                         type_is_conjugated: is_conjugated,
                         multiplicity,
+                        value: value.map(Box::new),
                     },
                 ),
             ));
@@ -134,6 +141,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
                 type_name,
                 type_is_conjugated: is_conjugated,
                 multiplicity,
+                value: None,
             },
         ),
     ))
@@ -203,6 +211,7 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
     Ok((
         input,
         FlowUsage {
+            then_span: None,           // overwritten by caller
             kind: FlowUsageKind::Flow, // overwritten by caller
             declaration: FlowDeclaration::Declared {
                 declaration: Box::new(declaration),
@@ -229,6 +238,7 @@ fn flow_usage_endpoint_only(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
     Ok((
         input,
         FlowUsage {
+            then_span: None, // overwritten by caller
             kind: FlowUsageKind::Flow,
             declaration: FlowDeclaration::EndpointOnly {
                 endpoints: FlowEndpoints { from, to },
@@ -242,6 +252,10 @@ fn flow_usage_endpoint_only(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
 /// Unified FlowUsage parser for all structure-usage body contexts.
 pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>> {
     let start = input;
+    // `( SourceSuccessionMember )? …UsageMember`: `then message m of M from a to b;`.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, then_span) =
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"then")?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -253,6 +267,7 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
             |_| crate::parser::span::reference_transaction(input, flow_usage_with_declaration),
         )?;
     usage.kind = kind;
+    usage.then_span = then_span;
     usage.membership = Membership::feature(visibility, visibility_span);
     Ok((input, node_from_to(start, input, usage)))
 }

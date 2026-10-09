@@ -1321,6 +1321,9 @@ fn emit_interface_usage_body_element(
         InterfaceUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         InterfaceUsageBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
         InterfaceUsageBodyElement::PortUsage(port) => emit_port_usage(w, path, &port.value),
+        InterfaceUsageBodyElement::SuccessionUsage(s) => {
+            super::behavior::emit_succession_usage(w, path, &s.value)
+        }
         InterfaceUsageBodyElement::FlowUsage(flow) => emit_flow_usage(w, path, &flow.value),
         InterfaceUsageBodyElement::Perform(perform) => emit_perform(w, path, &perform.value),
     }

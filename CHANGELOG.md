@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Succession members and body expressions from the release corpus (breaking AST change,
+  `PARSE_AST_VERSION` 270).** New variants and fields; consumers with exhaustive matches need
+  arms (#166, #167).
+  - `then accept sig after 10[SI::s];`: `TransitionAccept::NamedTimeTrigger`, a time trigger
+    whose payload parameter is named.
+  - `then state wait;` and `then message m of M from a to b;`: `StateUsage::then_span` and
+    `FlowUsage::then_span`, the `SourceSuccessionMember` slot `PartUsage` already has. `then
+    stateful;` stays a reference to a state.
+  - `of fuelCommand : FuelCommand = msg.fuelCommand`: `PayloadFeature::value`.
+  - `succession first a.start then b.done;` in an interface usage body:
+    `InterfaceUsageBodyElement::SuccessionUsage`.
+  - `(1..n)->forAll { in i : Natural; private attribute f = frames#(i); f.valid }`:
+    `CollectionOperatorBody::members`, the `FunctionBodyPart` items between a body expression's
+    parameters and its result. A member is recognised by a leading visibility or `attribute`.
+
 - **Body members from the release corpus that their bodies rejected (breaking AST change,
   `PARSE_AST_VERSION` 269).** New variants and fields; consumers with exhaustive matches need
   arms (#165, #168).

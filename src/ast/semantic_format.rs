@@ -569,7 +569,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             self.writer.write_str("))")?;
         }
-        self.writer.write_str(") (result ")?;
+        self.writer.write_char(')')?;
+        // Written only when present, so bodies without members keep their projection.
+        if !body.value.members.is_empty() {
+            self.writer.write_str(" (members ")?;
+            self.write_calc_body_elements(&body.value.members)?;
+            self.writer.write_char(')')?;
+        }
+        self.writer.write_str(" (result ")?;
         if let Some(result) = &body.value.result {
             self.write_expression(result)?;
         } else {
@@ -1579,6 +1586,19 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.writer.write_str("none")?;
                 }
                 self.writer.write_str("))")
+            }
+            super::TransitionAccept::NamedTimeTrigger(name, kind, expression) => {
+                self.writer.write_str("(named-time-trigger (name ")?;
+                self.write_optional_name(Some(*name))?;
+                self.writer.write_str(") ")?;
+                self.writer.write_str(match kind {
+                    super::TriggerKind::At => "at",
+                    super::TriggerKind::When => "when",
+                    super::TriggerKind::After => "after",
+                })?;
+                self.writer.write_char(' ')?;
+                self.write_expression(expression)?;
+                self.writer.write_char(')')
             }
             super::TransitionAccept::TimeTrigger(kind, expression) => {
                 self.writer.write_str("(time-trigger ")?;
@@ -3057,119 +3077,126 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_calc_def_body(&mut self, body: &super::CalcDefBody) -> io::Result<()> {
         match body {
             super::CalcDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
-            super::CalcDefBody::Brace { elements, .. } => {
-                let mut first = self.open_brace_body()?;
-                for element in elements {
-                    match &element.value {
-                        super::CalcDefBodyElement::Error(error) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_malformed(&error.value, &element.span)?;
-                        }
-                        super::CalcDefBodyElement::Annotating(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_annotating_member(member)?;
-                        }
-                        super::CalcDefBodyElement::MetadataKeywordUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_metadata_keyword_usage(&usage.value)?;
-                        }
-                        super::CalcDefBodyElement::Package(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            write!(
-                                self.writer,
-                                "(package-member (visibility {}) ",
-                                visibility_name(member.membership.visibility)
-                            )?;
-                            self.write_package(&member.package.value)?;
-                            self.writer.write_char(')')?;
-                        }
-                        super::CalcDefBodyElement::LibraryPackage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            write!(
-                                self.writer,
-                                "(library-package-member (visibility {}) ",
-                                visibility_name(member.membership.visibility)
-                            )?;
-                            self.write_library_package(&member.package.value)?;
-                            self.writer.write_char(')')?;
-                        }
-                        super::CalcDefBodyElement::ActionMember(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_first_merge_member(&member.value, &member.span)?;
-                        }
-                        super::CalcDefBodyElement::KermlRelationship(relationship) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_kerml_relationship(&relationship.value)?;
-                        }
-                        super::CalcDefBodyElement::KermlFeature(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_kerml_feature(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::Invariant(_member) => {
-                            self.write_marker(&mut first, "invariant")?;
-                        }
-                        super::CalcDefBodyElement::Connector(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_kerml_connector(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::Binding(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_bind(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::Succession(_member) => {
-                            self.write_marker(&mut first, "succession")?;
-                        }
-                        super::CalcDefBodyElement::FlowUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_flow_usage(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::Import(_member) => {
-                            self.write_marker(&mut first, "import")?;
-                        }
-                        super::CalcDefBodyElement::AliasDef(alias) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_alias_definition(&alias.value)?;
-                        }
-                        super::CalcDefBodyElement::AttributeUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_attribute_usage(&usage.value)?;
-                        }
-                        super::CalcDefBodyElement::AssertConstraint(_member) => {
-                            self.write_marker(&mut first, "assert-constraint")?;
-                        }
-                        super::CalcDefBodyElement::KermlClassifier(declaration) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_kerml_classifier(&declaration.value)?;
-                        }
-                        super::CalcDefBodyElement::DefaultReferenceUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_default_reference_usage(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::ReturnDecl(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_return_declaration(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::Expression(expression) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(expression ")?;
-                            self.write_expression(expression)?;
-                            self.writer.write_char(')')?;
-                        }
-                        super::CalcDefBodyElement::CalcUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_calculation_usage(&member.value)?;
-                        }
-                        super::CalcDefBodyElement::CalcDef(_member) => {
-                            self.write_marker(&mut first, "calc-def")?;
-                        }
-                        super::CalcDefBodyElement::PartUsage(member) => {
-                            self.write_part_usage_member(&mut first, &member.value)?;
-                        }
-                    }
+            super::CalcDefBody::Brace { elements, .. } => self.write_calc_body_elements(elements),
+        }
+    }
+
+    /// The brace form of a calculation body: `(body brace <member>*)`. Shared with a body
+    /// expression's members, which are the same `FunctionBodyPart` items.
+    fn write_calc_body_elements(
+        &mut self,
+        elements: &[Node<super::CalcDefBodyElement>],
+    ) -> io::Result<()> {
+        let mut first = self.open_brace_body()?;
+        for element in elements {
+            match &element.value {
+                super::CalcDefBodyElement::Error(error) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_malformed(&error.value, &element.span)?;
                 }
-                self.writer.write_char(')')
+                super::CalcDefBodyElement::Annotating(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_annotating_member(member)?;
+                }
+                super::CalcDefBodyElement::MetadataKeywordUsage(usage) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_metadata_keyword_usage(&usage.value)?;
+                }
+                super::CalcDefBodyElement::Package(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    write!(
+                        self.writer,
+                        "(package-member (visibility {}) ",
+                        visibility_name(member.membership.visibility)
+                    )?;
+                    self.write_package(&member.package.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::CalcDefBodyElement::LibraryPackage(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    write!(
+                        self.writer,
+                        "(library-package-member (visibility {}) ",
+                        visibility_name(member.membership.visibility)
+                    )?;
+                    self.write_library_package(&member.package.value)?;
+                    self.writer.write_char(')')?;
+                }
+                super::CalcDefBodyElement::ActionMember(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_first_merge_member(&member.value, &member.span)?;
+                }
+                super::CalcDefBodyElement::KermlRelationship(relationship) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_kerml_relationship(&relationship.value)?;
+                }
+                super::CalcDefBodyElement::KermlFeature(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_kerml_feature(&member.value)?;
+                }
+                super::CalcDefBodyElement::Invariant(_member) => {
+                    self.write_marker(&mut first, "invariant")?;
+                }
+                super::CalcDefBodyElement::Connector(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_kerml_connector(&member.value)?;
+                }
+                super::CalcDefBodyElement::Binding(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_bind(&member.value)?;
+                }
+                super::CalcDefBodyElement::Succession(_member) => {
+                    self.write_marker(&mut first, "succession")?;
+                }
+                super::CalcDefBodyElement::FlowUsage(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_flow_usage(&member.value)?;
+                }
+                super::CalcDefBodyElement::Import(_member) => {
+                    self.write_marker(&mut first, "import")?;
+                }
+                super::CalcDefBodyElement::AliasDef(alias) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_alias_definition(&alias.value)?;
+                }
+                super::CalcDefBodyElement::AttributeUsage(usage) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_attribute_usage(&usage.value)?;
+                }
+                super::CalcDefBodyElement::AssertConstraint(_member) => {
+                    self.write_marker(&mut first, "assert-constraint")?;
+                }
+                super::CalcDefBodyElement::KermlClassifier(declaration) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_kerml_classifier(&declaration.value)?;
+                }
+                super::CalcDefBodyElement::DefaultReferenceUsage(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_default_reference_usage(&member.value)?;
+                }
+                super::CalcDefBodyElement::ReturnDecl(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_return_declaration(&member.value)?;
+                }
+                super::CalcDefBodyElement::Expression(expression) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.writer.write_str("(expression ")?;
+                    self.write_expression(expression)?;
+                    self.writer.write_char(')')?;
+                }
+                super::CalcDefBodyElement::CalcUsage(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_calculation_usage(&member.value)?;
+                }
+                super::CalcDefBodyElement::CalcDef(_member) => {
+                    self.write_marker(&mut first, "calc-def")?;
+                }
+                super::CalcDefBodyElement::PartUsage(member) => {
+                    self.write_part_usage_member(&mut first, &member.value)?;
+                }
             }
         }
+        self.writer.write_char(')')
     }
 
     fn write_first_merge_member(
@@ -3342,7 +3369,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_flow_usage(&mut self, flow: &super::FlowUsage) -> io::Result<()> {
-        self.writer.write_str("(flow-usage (kind ")?;
+        self.writer.write_str("(flow-usage ")?;
+        if flow.then_span.is_some() {
+            self.writer.write_str("(then true) ")?;
+        }
+        self.writer.write_str("(kind ")?;
         self.writer.write_str(match flow.kind {
             super::FlowUsageKind::Flow => "flow",
             super::FlowUsageKind::Message => "message",
@@ -3445,7 +3476,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         })?;
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(payload.multiplicity.as_ref())?;
-        self.writer.write_char(')')
+        self.writer.write_char(')')?;
+        // Written only when present, so payloads without a value keep their projection.
+        if let Some(value) = &payload.value {
+            self.writer.write_str(" (value ")?;
+            self.write_feature_value(&value.value)?;
+            self.writer.write_char(')')?;
+        }
+        Ok(())
     }
 
     fn write_flow_endpoints(&mut self, endpoints: &super::FlowEndpoints) -> io::Result<()> {
@@ -3937,7 +3975,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
 
     /// One source-backed state usage, shared by every body owner that stores the typed node.
     fn write_state_usage(&mut self, usage: &super::StateUsage) -> io::Result<()> {
-        self.writer.write_str("(state-usage (name ")?;
+        self.writer.write_str("(state-usage ")?;
+        if usage.then_span.is_some() {
+            self.writer.write_str("(then true) ")?;
+        }
+        self.writer.write_str("(name ")?;
         self.write_optional_name(usage.name)?;
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
@@ -5433,6 +5475,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::PortUsage(port) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_port_usage(&port.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::SuccessionUsage(member) => {
+                            self.write_succession_usage(&mut first, &member.value)?;
                         }
                         super::InterfaceUsageBodyElement::FlowUsage(flow) => {
                             self.write_item_prefix(&mut first)?;

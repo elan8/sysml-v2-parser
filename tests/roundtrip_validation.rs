@@ -234,6 +234,11 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Metadata Examples/RequirementMetadataExample.sysml",
     "Simple Tests/RequirementTest.sysml",
     "Simple Tests/UseCaseTest.sysml",
+    // Promoted by `then state` and by members inside a body expression (`->forAll { in i : T;
+    // private attribute a = ...; ... }`).
+    "Analysis Examples/Vehicle Analysis Demo.sysml",
+    "Geometry Examples/VehicleGeometryAndCoordinateFrames.sysml",
+    "Simple Tests/AssignmentTest.sysml",
     "Arrowhead Framework Example/AHFCoreLib.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/MetadataTest.sysml",

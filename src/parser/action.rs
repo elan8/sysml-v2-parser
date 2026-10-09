@@ -2233,7 +2233,8 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         .and_then(|accept| match accept {
             crate::ast::TransitionAccept::Payload(payload, _) => payload.type_span,
             crate::ast::TransitionAccept::Shorthand(_, _)
-            | crate::ast::TransitionAccept::TimeTrigger(_, _) => None,
+            | crate::ast::TransitionAccept::TimeTrigger(_, _)
+            | crate::ast::TransitionAccept::NamedTimeTrigger(_, _, _) => None,
         })
         .or(type_ref_span);
     let (input, via) = if saw_send_keyword {

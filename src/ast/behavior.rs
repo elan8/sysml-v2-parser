@@ -331,6 +331,10 @@ pub enum TransitionAccept {
     /// OMG spec Annex `5-State-based Behavior-1.sysml`. Without this the trigger keyword was
     /// swallowed as the payload expression itself.
     TimeTrigger(TriggerKind, Node<Expression>),
+    /// A time trigger whose payload parameter is named: `accept sig after 10[SI::s]`
+    /// (`PayloadParameter = Identification? PayloadFeatureSpecializationPart? TriggerValuePart`;
+    /// Simple Tests/ActionTest.sysml).
+    NamedTimeTrigger(DeclarationName, TriggerKind, Node<Expression>),
 }
 
 /// The three time-trigger keywords of BNF `TriggerKind`.
@@ -601,6 +605,10 @@ pub struct PayloadFeature {
     pub type_name: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ValuePart` of the named alternative (`PayloadFeature = Identification?
+    /// PayloadFeatureSpecializationPart ValuePart? | ...`): `of fuelCommand : FuelCommand =
+    /// fuelCommandMessage.fuelCommand`.
+    pub value: Option<Box<Node<FeatureValue>>>,
 }
 
 /// One authored `of PayloadFeature` clause on a flow declaration.
@@ -653,6 +661,11 @@ pub struct FlowEndpoints {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowUsage {
+    /// `SourceSuccessionMember`'s `then`, as the authored keyword's span; see
+    /// [`PartUsage::then_span`](crate::ast::PartUsage::then_span). `then state wait;` (Simple
+    /// Tests/AssignmentTest.sysml), `then message m of M from a to b;` (training `27.
+    /// Occurrences`).
+    pub then_span: Option<Span>,
     pub kind: FlowUsageKind,
     pub declaration: FlowDeclaration,
     pub body: DefinitionBody,
@@ -1243,6 +1256,11 @@ impl PartialEq for FinalState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateUsage {
+    /// `SourceSuccessionMember`'s `then`, as the authored keyword's span; see
+    /// [`PartUsage::then_span`](crate::ast::PartUsage::then_span). `then state wait;` (Simple
+    /// Tests/AssignmentTest.sysml), `then message m of M from a to b;` (training `27.
+    /// Occurrences`).
+    pub then_span: Option<Span>,
     /// Leading direction (`in`/`out`/`inout`).
     pub direction: Option<InOut>,
     /// Leading `derived` keyword.

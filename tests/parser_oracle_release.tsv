@@ -15,16 +15,9 @@ ours-rejects	kerml/src/examples/Simple Tests/Redefinition.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingFeaturesEnhanced.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingSteps.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/TimeVaryingCarDriver.kerml
-ours-rejects	sysml/src/examples/Analysis Examples/Vehicle Analysis Demo.sysml
-ours-rejects	sysml/src/examples/Arrowhead Framework Example/AHFSequences.sysml
 ours-rejects	sysml/src/examples/Cause and Effect Examples/CauseAndEffectExample.sysml
-ours-rejects	sysml/src/examples/Geometry Examples/VehicleGeometryAndCoordinateFrames.sysml
-ours-rejects	sysml/src/examples/Simple Tests/ActionTest.sysml
 ours-rejects	sysml/src/examples/Simple Tests/AllocationTest.sysml
-ours-rejects	sysml/src/examples/Simple Tests/AssignmentTest.sysml
 ours-rejects	sysml/src/examples/Simple Tests/ConnectionTest.sysml
 ours-rejects	sysml/src/examples/Simple Tests/EnumerationTest.sysml
 ours-rejects	sysml/src/examples/Simple Tests/VariabilityTest.sysml
 ours-rejects	sysml/src/examples/Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml
-ours-rejects	sysml/src/training/27. Occurrences/Interaction Example-2.sysml
-ours-rejects	sysml/src/training/27. Occurrences/Message Payload Example.sysml
