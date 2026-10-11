@@ -661,6 +661,12 @@ pub(crate) fn use_case_def_body_element(
             let elem = UseCaseDefBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        // `CalculationUsage` owns its `#Tag` too (#180); it refuses by lookahead unless `calc`
+        // follows the prefix.
+        if let Ok((next, usage)) = crate::parser::constraint::calc_usage(start) {
+            let elem = UseCaseDefBodyElement::CalcUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         alt((

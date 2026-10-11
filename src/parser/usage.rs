@@ -551,6 +551,13 @@ pub(crate) fn subsetting(
     subsetting_clause(input, true)
 }
 
+/// [`subsetting`] for a declaration whose `ValuePart` the caller parses itself.
+pub(crate) fn subsetting_before_value(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
+    subsetting_clause(input, false).map(|(input, (relationship, _))| (input, relationship))
+}
+
 /// `takes_value: false` leaves a trailing `= expr` for a caller that owns the declaration's
 /// `ValuePart` as a [`crate::ast::FeatureValue`].
 fn subsetting_clause(
