@@ -1212,6 +1212,7 @@ fn walk_action_usage_body_elements(
                 }
             }
             ActionUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
+            ActionUsageBodyElement::Perform(n) => walk_perform(report, &p, &n.value),
             ActionUsageBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)
             }
@@ -1605,6 +1606,7 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::EndDecl(n) => walk_end_decl(report, path, &n.value),
         OccurrenceBodyElement::StateUsage(n) => walk_state_def_body(report, path, &n.value.body),
         OccurrenceBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
+        OccurrenceBodyElement::Perform(n) => walk_perform(report, path, &n.value),
         OccurrenceBodyElement::ConnectionUsage(n) => {
             walk_connection_def_body(report, path, &n.value.body)
         }
@@ -1878,6 +1880,9 @@ fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget)
                 walk_action_branch_body(report, &format!("{path}/else"), else_body);
             }
         }
+        ThenTarget::While(n) => walk_action_node_body(report, path, &n.value.prefix, &n.value.body),
+        ThenTarget::Loop(n) => walk_action_node_body(report, path, &n.value.prefix, &n.value.body),
+        ThenTarget::For(n) => walk_for_loop(report, path, &n.value),
         ThenTarget::Accept(_) | ThenTarget::Feature(_) => {}
     }
 }

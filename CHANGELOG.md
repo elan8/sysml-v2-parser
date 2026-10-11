@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **An action usage body owns `perform` members, and an action usage carries a value (breaking
+  AST change, `PARSE_AST_VERSION` 268).** `ActionUsage` and `ActionDefinition` share one
+  `ActionBody`, whose `BehaviorUsageElement` includes `PerformActionUsage`, but only the definition
+  body dispatched it: `action g { perform a; }` was recovered as `unexpected keyword perform in
+  action body` (spec42 #256). `ActionUsageBodyElement::Perform` is new. `ActionUsageDeclaration =
+  UsageDeclaration ValuePart?` was parsed without its `ValuePart`, so `action :>> generate =
+  fourCylinder;` failed (#105); `ActionUsage::value` is new. Neighbouring forms from the
+  release corpus are fixed with them:
+  - `then while ... { }`, `then loop { } until ...;` and `then for n in ... { }` are `ActionNode`
+    succession targets, with their `action` prefix (`then action a while ...`): `ThenTarget::While`,
+    `::Loop`, `::For` (`StructuredControlTest.sysml`).
+  - An occurrence usage body owns `perform` members (`OccurrenceBodyElement::Perform`;
+    `timeslice test1 { perform action :>> vehicleMassTest { ... } }`).
+  - `perform a redefines b;` is accepted, and the keyword spelling is kept on emission.
+  - A keyword-less member led by `:`, `:>` or `:>>` needs no value in an action, calc or
+    constraint body, nor in a KerML type body, which shares the rule (`:>> stateSpace :
+    CartState;`, `metaclass M { :>> annotatedElement : KerML::Class; }`). A bare identifier still
+    does.
+  - `action second :> stepB = other;` keeps its value: the subsetting clause no longer takes
+    the `= expr` that is the usage's `ValuePart`.
+  - A keyword-less reference usage is emitted with its typing and specialization clauses in
+    authored order. `:>> elements : Real[3];` was rewritten as ` : Real[3] :>> elements;`.
+
 - **`ref x :> y` in an action body is a subsetting, not a typing (`PARSE_AST_VERSION` 267).**
   `action_ref_decl` kept a legacy branch that read a leading `:>` as `RefDecl::typing`, so
   `protected ref var[0..1] :> seq { ... }` (Systems Library `Actions.sysml`, `ForLoopAction`) was

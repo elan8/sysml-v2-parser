@@ -337,6 +337,9 @@ pub(crate) fn emit_action_usage(
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
+    if let Some(value) = &usage.value {
+        super::expr::emit_feature_value(w, value)?;
+    }
     if let Some(accept) = &usage.accept {
         w.push_str(" accept ");
         emit_transition_accept(w, path, accept)?;
@@ -561,6 +564,7 @@ pub(crate) fn emit_action_usage_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         ActionUsageBodyElement::StateUsage(s) => emit_state_usage(w, path, &s.value),
+        ActionUsageBodyElement::Perform(p) => emit_perform(w, path, &p.value),
         ActionUsageBodyElement::DefaultReferenceUsage(d) => {
             structure::emit_default_reference_usage(w, path, &d.value)
         }
@@ -682,6 +686,20 @@ pub(crate) fn emit_then_action_pub(
             }
             Ok(())
         }
+        ThenTarget::While(wh) => {
+            emit_action_node_prefix(w, path, &wh.value.prefix)?;
+            w.push_str("while ");
+            emit_expression(w, &wh.value.condition.value)?;
+            emit_action_body_parameter(w, path, &wh.value.body)?;
+            emit_until_parameter(w, wh.value.until.as_ref())
+        }
+        ThenTarget::Loop(l) => {
+            emit_action_node_prefix(w, path, &l.value.prefix)?;
+            w.push_str("loop");
+            emit_action_body_parameter(w, path, &l.value.body)?;
+            emit_until_parameter(w, l.value.until.as_ref())
+        }
+        ThenTarget::For(f) => emit_for_loop(w, path, &f.value),
         ThenTarget::Feature(f) => {
             emit_expression(w, &f.value)?;
             w.push_char(';');
@@ -1791,6 +1809,7 @@ pub(crate) fn emit_occurrence_body_element(
         crate::ast::OccurrenceBodyElement::ConnectionUsage(c) => {
             crate::emit::structure::emit_connection_usage(w, path, &c.value)
         }
+        crate::ast::OccurrenceBodyElement::Perform(p) => emit_perform(w, path, &p.value),
         crate::ast::OccurrenceBodyElement::StateUsage(s) => {
             // Occurrence-body `StateUsage` nodes are exhibit usages (§6 G30 / G18).
             emit_occurrence_exhibit(w, path, &s.value)

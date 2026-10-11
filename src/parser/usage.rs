@@ -548,20 +548,28 @@ pub(crate) fn subsetting_relationship_node(
 pub(crate) fn subsetting(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (Node<SubsettingRelationship>, Option<Node<Expression>>)> {
+    subsetting_clause(input, true)
+}
+
+/// `takes_value: false` leaves a trailing `= expr` for a caller that owns the declaration's
+/// `ValuePart` as a [`crate::ast::FeatureValue`].
+fn subsetting_clause(
+    input: Input<'_>,
+    takes_value: bool,
+) -> IResult<Input<'_>, (Node<SubsettingRelationship>, Option<Node<Expression>>)> {
     let before = input;
     let (input, spelling) =
         preceded(ws_and_comments, crate::parser::lex::spelled_subset_operator).parse(input)?;
-    let (input, (target, value)) = preceded(
-        ws_and_comments,
-        (
-            specialization_targets,
-            opt(preceded(
-                preceded(ws_and_comments, tag(&b"="[..])),
-                preceded(ws_and_comments, expression),
-            )),
-        ),
-    )
-    .parse(input)?;
+    let (input, target) = preceded(ws_and_comments, specialization_targets).parse(input)?;
+    let (input, value) = if takes_value {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b"="[..])),
+            preceded(ws_and_comments, expression),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let span = span_from_to(before, input);
     let node =
         spelled_subsetting_relationship_node(target, SubsettingKind::Subsets, spelling, span);
@@ -720,13 +728,30 @@ pub(crate) fn merge_into(
 pub(crate) fn specialization_clauses(
     input: Input<'_>,
 ) -> IResult<Input<'_>, SpecializationClauses> {
+    specialization_clauses_with(input, true)
+}
+
+/// [`specialization_clauses`] for a declaration whose `ValuePart` the caller parses itself: a
+/// `:> target = expr` leaves the `= expr` in place (`action second :> stepB = other;`).
+pub(crate) fn specialization_clauses_before_value(
+    input: Input<'_>,
+) -> IResult<Input<'_>, SpecializationClauses> {
+    specialization_clauses_with(input, false)
+}
+
+fn specialization_clauses_with(
+    input: Input<'_>,
+    subsetting_takes_value: bool,
+) -> IResult<Input<'_>, SpecializationClauses> {
     // Clauses accumulate directly: collecting them first would allocate on a path the grammar
     // re-enters speculatively for every usage and definition header.
     let mut out = SpecializationClauses::default();
     let mut input = input;
     loop {
         let (after_ws, _) = ws_and_comments(input)?;
-        if let Ok((rest, (relationship, value))) = subsetting(after_ws) {
+        if let Ok((rest, (relationship, value))) =
+            subsetting_clause(after_ws, subsetting_takes_value)
+        {
             match &mut out.subsets {
                 Some((existing, existing_value)) => {
                     merge_clause(existing, relationship);

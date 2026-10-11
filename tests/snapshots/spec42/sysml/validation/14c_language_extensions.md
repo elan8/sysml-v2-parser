@@ -300,24 +300,24 @@ package '14c-Language-Extensions' {
              :>> baseType = effects meta SysML::Usage;
         }
         metadata def <fmea> FMEAItemMetadata :> SituationMetadata {
-             : SysML::ItemDefinition :> annotatedElement;
-             : SysML::ItemUsage :> annotatedElement;
+             :> annotatedElement : SysML::ItemDefinition;
+             :> annotatedElement : SysML::ItemUsage;
              :>> baseType = fmeaItems meta SysML::Usage;
         }
         metadata def <causation> CausationMetadata :> SemanticMetadata {
-             : SysML::ConnectionUsage :>> annotatedElement;
+             :>> annotatedElement : SysML::ConnectionUsage;
              :>> baseType = causations meta SysML::Usage;
         }
         metadata def <fmeaspec> FMEARequirementMetadata :> SemanticMetadata {
-             : SysML::RequirementUsage :>> annotatedElement;
+             :>> annotatedElement : SysML::RequirementUsage;
              :>> baseType = fmeaRequirements meta SysML::Usage;
         }
         metadata def <violation> ViolationMetadata :> SemanticMetadata {
-             : SysML::ConnectionUsage :>> annotatedElement;
+             :>> annotatedElement : SysML::ConnectionUsage;
              :>> baseType = violations meta SysML::Usage;
         }
         abstract metadata def ControllingMeasureMetadata :> SemanticMetadata {
-             : SysML::ConnectionUsage :>> annotatedElement;
+             :>> annotatedElement : SysML::ConnectionUsage;
         }
         metadata def <prevention> PreventionMetadata :> ControllingMeasureMetadata {
              :>> baseType = preventions meta SysML::Usage;

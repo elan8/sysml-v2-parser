@@ -100,7 +100,6 @@ both-reject	negative/grammar/k19-metadata-typing-without-name.kerml
 theirs-rejects	negative/grammar/k20-function-body-second-result-expression.kerml
 theirs-rejects	negative/grammar/k21-name-before-feature-keyword.kerml
 ours-rejects	negative/semantic/k26-binary-connector-three-ends.kerml
-ours-rejects	negative/semantic/k35-metadata-annotates-wrong-kind.kerml
 ours-rejects	negative/semantic/k45-conjugated-feature-without-type.kerml
 ours-rejects	negative/semantic/k49-binding-connector-with-three-ends.kerml
 theirs-rejects	negative/semantic/k51-return-parameter-in-classifier.kerml

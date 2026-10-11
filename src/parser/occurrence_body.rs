@@ -587,6 +587,13 @@ pub(crate) fn occurrence_body_element(
         map(crate::parser::part::connection_usage_member, |n| {
             OccurrenceBodyElement::ConnectionUsage(Box::new(n))
         }),
+        // `perform action …` before bare `perform …`, as every other owning body orders them.
+        map(crate::parser::part::perform_action_decl, |n| {
+            OccurrenceBodyElement::Perform(Box::new(n))
+        }),
+        map(crate::parser::part::perform_usage, |n| {
+            OccurrenceBodyElement::Perform(Box::new(n))
+        }),
         // Last of the structured arms: `ref_decl` accepts a bare `ref` with no kind keyword, so
         // trying it earlier would claim members the kinded parsers above own.
         map(

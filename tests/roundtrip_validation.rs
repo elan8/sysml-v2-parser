@@ -220,6 +220,11 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Interaction Sequencing Examples/ServerSequenceRealization-2.sysml",
     "v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel Package - Updated.sysml",
     "v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel Package.sysml",
+    // Promoted by `perform` members and a value on action usages, loop nodes as `then` targets,
+    // and specialization-led keyword-less action body members.
+    "Simple Tests/StructuredControlTest.sysml",
+    "State Space Representation Examples/CartSample.sysml",
+    "Variability Examples/VehicleVariabilityModel.sysml",
     "Arrowhead Framework Example/AHFCoreLib.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/MetadataTest.sysml",

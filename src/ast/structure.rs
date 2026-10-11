@@ -2049,6 +2049,10 @@ pub enum OccurrenceBodyElement {
     /// (Systems Library `Flows.sysml`). Part and attribute bodies already dispatched this
     /// member; occurrence bodies did not.
     ConnectionUsage(Box<Node<ConnectionUsageMember>>),
+    /// `PerformActionUsage`, a `BehaviorUsageElement` of `OccurrenceUsageElement`, e.g.
+    /// `timeslice test1 { perform action :>> vehicleMassTest { ... } }` (training `34.
+    /// Verification/Verification Case Usage Example.sysml`).
+    Perform(Box<Node<Perform>>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the
