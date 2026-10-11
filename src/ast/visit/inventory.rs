@@ -8392,16 +8392,23 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_succession_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlSuccessionMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlSuccessionMember { is_all, name, multiplicity, first, then, membership } = &$($mutability)? node.value;
+            let KermlSuccessionMember { is_all, name, multiplicity, multiplicity_modifiers, specializations, first_span, first, then, membership } = &$($mutability)? node.value;
             let _ = is_all;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
+            for inner in specializations {
+                visitor.visit_feature_specialization(inner);
+            }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            if let Some(inner) = first_span {
+                visitor.visit_span(inner);
+            }
             visitor.visit_kerml_connector_end(first);
             visitor.visit_kerml_connector_end(then);
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }

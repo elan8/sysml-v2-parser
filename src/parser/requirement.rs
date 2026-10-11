@@ -936,9 +936,11 @@ fn string_value(input: Input<'_>) -> IResult<Input<'_>, crate::ast::StringLitera
 /// We only parse optional Identification and locale when the next token is not "/*", so that
 /// ws_and_comments inside identification does not consume the doc body.
 pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocComment>> {
+    use crate::parser::lex::ws_and_notes;
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"doc"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
         (input, None, None)
     } else if starts_with_keyword(input.fragment(), b"locale") {
@@ -947,28 +949,40 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
         // comment's own name, leaving nothing for the subsequent `locale` keyword check to
         // match. Real usage: `Simple Tests/CommentTest.sysml:32`.
         let (input, locale) = preceded(
-            preceded(ws_and_comments, tag(&b"locale"[..])),
-            preceded(ws1, string_value),
+            preceded(ws_and_notes, tag(&b"locale"[..])),
+            preceded(ws1, preceded(ws_and_notes, string_value)),
         )
         .parse(input)?;
         (input, None, Some(locale))
     } else {
-        let (input, ident_parsed) = opt(identification).parse(input)?;
-        // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
-        // search for an optional `locale`. Skipping comments here walked straight past the body
-        // and found the *next* member's `locale`, fusing two members into one and discarding
-        // this one's text with no diagnostic -- `comment named /* two */` followed by `locale
-        // "en_US" /* three */` became a single comment named `named`, in locale `en_US`, whose
-        // text was ` three `. Same hazard the `/*` guard above and the body scan below document.
+        // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?`, read here one
+        // half at a time. The shared `identification` skips comments between the halves, so
+        // `doc <a> /* text */` walked past its own body and took the next member's first word
+        // as the declared name (#164, `Simple Tests/Comments.kerml`).
+        let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+        let (after_gap, _) = ws_and_notes(input)?;
+        let (input, declared_name) = if short_name.is_some()
+            && (after_gap.fragment().starts_with(b"/*")
+                || starts_with_keyword(after_gap.fragment(), b"locale"))
+        {
+            (input, None)
+        } else {
+            opt(preceded(ws_and_notes, name)).parse(input)?
+        };
+        let ident_parsed = Some(crate::ast::Identification {
+            short_name,
+            name: declared_name,
+        });
+        // Skip notes while keeping the documentation body as the next grammar token.
         let (input, locale) = opt(preceded(
-            preceded(ws, tag(&b"locale"[..])),
-            preceded(ws1, string_value),
+            preceded(ws_and_notes, tag(&b"locale"[..])),
+            preceded(ws1, preceded(ws_and_notes, string_value)),
         ))
         .parse(input)?;
         (input, ident_parsed, locale)
     };
-    // Use ws (not ws_and_comments) so we don't consume the doc body as a block comment.
-    let (input, body) = preceded(ws, comment_body).parse(input)?;
+    // Notes are trivia; the regular block comment belongs to this documentation member.
+    let (input, body) = preceded(ws_and_notes, comment_body).parse(input)?;
     let ident = ident_parsed.filter(|i| i.short_name.is_some() || i.name.is_some());
     Ok((
         input,
@@ -993,8 +1007,8 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
 /// Consume a `REGULAR_COMMENT` body (`'/*' COMMENT_TEXT '*/'`, KerML BNF 38) and return the
 /// authored text together with the span it occupies.
 ///
-/// Takes trivia-free input: every caller reaches this after `ws`, never `ws_and_comments`, so the
-/// member's own body is not skipped as trivia before it can be read.
+/// Takes trivia-free input: callers must stop trivia handling before the member's own regular
+/// comment body rather than skipping it with `ws_and_comments`.
 fn comment_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::CommentBody> {
     let (input, _) = tag(&b"/*"[..]).parse(input)?;
     let body_start = input;

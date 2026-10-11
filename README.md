@@ -37,6 +37,9 @@ source spans without splitting or reparsing display strings.
 Declaration names are optional independently of short names in `Identification`. For example,
 `verification <V1> : VerificationType;` retains its short name while its AST `name` is `None`.
 
+`KermlSuccessionMember::multiplicity_modifiers` retains authored declaration ordering and
+uniqueness keywords separately from its endpoint multiplicities.
+
 `RequireConstraint::specializations` retains ordered, typed `FeatureSpecialization` clauses,
 including repeated typings, references and crosses. It replaces the former `typing`, `subsets`
 and `redefines` fields. `RequireConstraint::value` separately retains the declaration's binding,

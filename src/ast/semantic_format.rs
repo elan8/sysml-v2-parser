@@ -3146,8 +3146,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.write_item_prefix(&mut first)?;
                     self.write_bind(&member.value)?;
                 }
-                super::CalcDefBodyElement::Succession(_member) => {
-                    self.write_marker(&mut first, "succession")?;
+                super::CalcDefBodyElement::Succession(member) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_kerml_succession(&member.value)?;
                 }
                 super::CalcDefBodyElement::FlowUsage(member) => {
                     self.write_item_prefix(&mut first)?;
@@ -3498,6 +3499,45 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (to ")?;
         self.write_kerml_connector_end(&endpoints.to.value)?;
         self.writer.write_char(')')
+    }
+
+    fn write_kerml_succession(
+        &mut self,
+        succession: &super::KermlSuccessionMember,
+    ) -> io::Result<()> {
+        let super::KermlSuccessionMember {
+            is_all,
+            name,
+            multiplicity,
+            multiplicity_modifiers,
+            specializations,
+            first_span,
+            first,
+            then,
+            membership,
+        } = succession;
+        write!(
+            self.writer,
+            "(kerml-succession (visibility {}) (all {}) (name ",
+            visibility_name(membership.visibility),
+            is_all
+        )?;
+        self.write_optional_name(*name)?;
+        self.writer.write_str(") ")?;
+        self.write_feature_specializations(specializations)?;
+        self.writer.write_str(" (multiplicity ")?;
+        self.write_multiplicity_clause(multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(multiplicity_modifiers)?;
+        write!(
+            self.writer,
+            " (first-keyword {}) (first ",
+            first_span.is_some()
+        )?;
+        self.write_kerml_connector_end(&first.value)?;
+        self.writer.write_str(") (then ")?;
+        self.write_kerml_connector_end(&then.value)?;
+        self.writer.write_str("))")
     }
 
     fn write_kerml_connector_end(&mut self, end: &super::KermlConnectorEnd) -> io::Result<()> {
@@ -4958,6 +4998,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     Some(name) => self.write_name(*name)?,
                     None => self.writer.write_str("none")?,
                 }
+                self.writer.write_str(") (short-name ")?;
+                self.write_optional_name(
+                    doc.value
+                        .identification
+                        .as_ref()
+                        .and_then(|ident| ident.short_name),
+                )?;
                 self.writer.write_str(") (locale ")?;
                 self.write_optional_string_literal(doc.value.locale)?;
                 self.writer.write_str(") ")?;

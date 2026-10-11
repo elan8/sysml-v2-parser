@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Succession declaration modifiers survive parsing and emission (breaking AST change,
+  `PARSE_AST_VERSION` 277).** `KermlSuccessionMember::multiplicity_modifiers` retains ordering
+  and uniqueness keyword slots. Semantic snapshots project the complete succession declaration
+  and both ends instead of a marker. Documentation identification, locale and body boundaries
+  skip line and block notes while stopping at the member's own regular comment body; snapshots
+  also project documentation short names.
+
+- **KerML successions take their whole declaration, and named documentation keeps its body
+  (breaking AST change, `PARSE_AST_VERSION` 276).**
+  - `SuccessionDeclaration = ( FeatureDeclaration? 'first' )? ...`. Only the ends-only and the
+    named `first` forms were parsed; `succession first a then b;` and `succession redefines p :
+    L [1] first a then b;` were rejected. `KermlSuccessionMember::specializations` and
+    `::first_span` are new. A multiplicity may follow `then` directly (`then[0..1] endShot`)
+    (#163).
+  - `doc <a> /* text */` lost its text and took the next member's first word as its declared
+    name, with no diagnostic. The documentation's `Identification` is now read without
+    skipping the member's own body (#164).
+
 - **A constraint usage keeps all its types, and directed and redefinition members keep their
   visibility (breaking AST change, `PARSE_AST_VERSION` 275).**
   - `constraint c : A, B;` kept only `A`, with no diagnostic. `ConstraintUsage::type_name` is
