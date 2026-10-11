@@ -1790,6 +1790,9 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
             InterfaceUsageBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)
             }
+            InterfaceUsageBodyElement::SuccessionUsage(n) => {
+                walk_ref_body(report, &p, &n.value.body)
+            }
             InterfaceUsageBodyElement::FlowUsage(flow) => walk_flow_usage(report, &p, &flow.value),
             InterfaceUsageBodyElement::Perform(perform) => walk_perform(report, &p, &perform.value),
             InterfaceUsageBodyElement::Annotating(member) => {

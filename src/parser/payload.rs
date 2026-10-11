@@ -96,6 +96,20 @@ fn accept_parameter_part(
             return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
         }
     }
+    // `Identification TriggerValuePart`: a named payload parameter with a trigger, `accept sig
+    // after 10[SI::s]`. Checked before the payload expression, which would read `sig` alone
+    // and leave the trigger keyword to end the statement.
+    if allow_trigger_kind {
+        if let Ok((after_name, payload_name)) = name(input) {
+            if let Ok((after_kind, kind)) = preceded(ws1, trigger_kind).parse(after_name) {
+                let (input, expr_node) = expression(after_kind)?;
+                return Ok((
+                    input,
+                    TransitionAccept::NamedTimeTrigger(payload_name, kind, expr_node),
+                ));
+            }
+        }
+    }
     let payload_name = name(input).ok().map(|(_, value)| value);
     let (input, expr_node) = expression(input)?;
     let (input, type_suffix) = opt(preceded(
@@ -172,7 +186,9 @@ fn control_node_payload_stmt<'a>(
             TransitionAccept::Payload(payload, _) => payload.type_span,
             // A shorthand or trigger carries its own span inside the `accept` value; there is no
             // separate type reference to point at.
-            TransitionAccept::Shorthand(..) | TransitionAccept::TimeTrigger(..) => None,
+            TransitionAccept::Shorthand(..)
+            | TransitionAccept::TimeTrigger(..)
+            | TransitionAccept::NamedTimeTrigger(..) => None,
         };
         (input, type_ref_span, Some(accept), None)
     };

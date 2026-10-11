@@ -866,6 +866,13 @@ fn interface_usage_other_body_element(
                 InterfaceUsageBodyElement::AttributeUsage(Box::new(usage)),
             )
         }),
+        map(crate::parser::occurrence_body::succession_usage, |usage| {
+            let span = usage.span;
+            Node::new(
+                span,
+                InterfaceUsageBodyElement::SuccessionUsage(Box::new(usage)),
+            )
+        }),
         // A nested interface usage; `interface_usage` refuses by lookahead unless `interface`
         // follows the prefix.
         map(interface_usage, |usage| {
@@ -1874,6 +1881,7 @@ pub(crate) fn exhibit_state_as_state_usage(
 ) -> IResult<Input<'_>, Node<crate::ast::StateUsage>> {
     let (input, exhibit) = exhibit_state(input)?;
     let state = crate::ast::StateUsage {
+        then_span: None,
         direction: exhibit.value.direction,
         is_derived: exhibit.value.is_derived,
         is_abstract: exhibit.value.is_abstract,

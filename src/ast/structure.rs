@@ -2335,6 +2335,9 @@ pub enum InterfaceUsageBodyElement {
     /// Attribute usage, e.g. `attribute :>> maxTorque = 90 * 1.356 [N*m];` (SysML v2 Spec
     /// Annex A SimpleVehicleModel.sysml). An interface definition body already owned it.
     AttributeUsage(Box<Node<AttributeUsage>>),
+    /// Succession usage, e.g. `succession first call_getItems.start then returnack.done;`
+    /// (Arrowhead Framework Example/AHFSequences.sysml).
+    SuccessionUsage(Box<Node<SuccessionUsage>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.
