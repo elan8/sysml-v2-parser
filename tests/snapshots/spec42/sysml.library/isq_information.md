@@ -1126,11 +1126,11 @@ standard library package ISQInformation {
     attribute callIntensity : CallIntensityValue[*] nonunique :> scalarQuantities;
     attribute def CallIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     alias CallingRateUnit for CallIntensityUnit;
@@ -1156,11 +1156,11 @@ standard library package ISQInformation {
     attribute completedCallIntensity : CompletedCallIntensityValue[*] nonunique :> scalarQuantities;
     attribute def CompletedCallIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* IEC-80000-13 item 13-9 storage capacity, storage size */
@@ -1226,11 +1226,11 @@ standard library package ISQInformation {
     attribute transferRate : TransferRateValue[*] nonunique :> scalarQuantities;
     attribute def TransferRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* IEC-80000-13 item 13-12 period of data elements */
@@ -1268,11 +1268,11 @@ standard library package ISQInformation {
     attribute binaryDigitRate : BinaryDigitRateValue[*] nonunique :> scalarQuantities;
     attribute def BinaryDigitRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     alias BitRateUnit for BinaryDigitRateUnit;
@@ -1314,11 +1314,11 @@ standard library package ISQInformation {
     attribute equivalentBinaryDigitRate : EquivalentBinaryDigitRateValue[*] nonunique :> scalarQuantities;
     attribute def EquivalentBinaryDigitRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     alias EquivalentBitRateUnit for EquivalentBinaryDigitRateUnit;
@@ -1344,11 +1344,11 @@ standard library package ISQInformation {
     attribute modulationRate : ModulationRateValue[*] nonunique :> scalarQuantities;
     attribute def ModulationRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     alias LineDigitRateUnit for ModulationRateUnit;
@@ -1760,11 +1760,11 @@ standard library package ISQInformation {
     attribute averageInformationRate : AverageInformationRateValue[*] nonunique :> scalarQuantities;
     attribute def AverageInformationRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* IEC-80000-13 item 13-39 character mean transinformation content */
@@ -1807,11 +1807,11 @@ standard library package ISQInformation {
     attribute averageTransinformationRate : AverageTransinformationRateValue[*] nonunique :> scalarQuantities;
     attribute def AverageTransinformationRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* IEC-80000-13 item 13-41 channel capacity per character, channel capacity */
@@ -1857,11 +1857,11 @@ standard library package ISQInformation {
     attribute channelTimeCapacity : ChannelTimeCapacityValue[*] nonunique :> scalarQuantities;
     attribute def ChannelTimeCapacityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
 }

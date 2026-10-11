@@ -141,6 +141,10 @@ pub enum RequirementDefBodyElement {
     /// `connection c connect a to b;`. Two nodes, one production: adding only one of them would
     /// leave its sibling spelling in recovery.
     ConnectionUsage(Box<Node<crate::ast::ConnectionUsageMember>>),
+    /// Keyword-less usage (`DefaultReferenceUsage`), e.g. `:>> info = info1;`, `out :>>
+    /// fuelEconomy = 35[mph];` or `in massActual :> ISQ::mass;`. Every `DefinitionBody` and
+    /// `UsageBody` owns it through `UsageElement`.
+    DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.
@@ -238,19 +242,17 @@ pub struct RequireConstraint {
     /// document's qualified-reference table. `None` for the `constraint`-keyword declaration
     /// form, whose `name` declares rather than references.
     pub target: Option<crate::ast::QualifiedReferenceId>,
-    /// Typing clause of the declared form, `require constraint c : C;`.
-    ///
-    /// `RequirementConstraintUsage`'s second alternative is
-    /// `( UsageExtensionKeyword* ConstraintUsageKeyword | UsageExtensionKeyword+ )
-    /// ConstraintUsageDeclaration CalculationBody` (SysML BNF 2066-2071; reference
-    /// `SysML.xtext:2066-2071`), and `ConstraintUsageDeclaration` is an ordinary
-    /// `UsageDeclaration` -- so the `constraint`-keyword form declares a name *and* may specialize
-    /// it. Only a bare name was parsed before, so `require constraint c : C;` reached
-    /// `recovered_requirement_body_element` and lost the whole member.
-    ///
-    /// Distinct from [`Self::target`]: that is the keyword-less shorthand's *reference* to an
-    /// existing constraint, this is the declared usage's type.
-    pub typing: Option<Node<crate::ast::TypingRelationship>>,
+    /// Ordered `FeatureSpecialization` alternatives in the declared usage, including repeated
+    /// typings, subsettings, references, crosses and redefinitions. These replace the separate
+    /// typing/subsets/redefines fields so accepted relationships cannot be silently discarded.
+    pub specializations: Vec<crate::ast::FeatureSpecialization>,
+    /// `UsageExtensionKeyword`s after `require`/`assume`: `assume #goal constraint c;`. Without
+    /// the `constraint` keyword they still select the declared form (`UsageExtensionKeyword+
+    /// ConstraintUsageDeclaration`), so `require #goal massLimit;` declares `massLimit`.
+    pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
+    /// `ValuePart` of `ConstraintUsageDeclaration = UsageDeclaration ValuePart?`, separate
+    /// from its specialization clauses. Retains binding, assignment and default spellings.
+    pub value: Option<Box<Node<crate::ast::FeatureValue>>>,
     pub body: ConstraintDefBody,
 }
 
@@ -990,6 +992,9 @@ pub enum UseCaseDefBodyElement {
     /// `DefaultReferenceUsage` node the calc/constraint/part bodies already use for the same
     /// `RefPrefix? Usage` shape. A bare `name;` stays on [`Self::Expression`].
     DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
+    /// `Import`, a `NonBehaviorBodyItem` of the `CaseBody` every case-family body is, e.g.
+    /// `private import VerificationCases::*;` in a verification case definition.
+    Import(Node<crate::ast::Import>),
 }
 
 /// actor usage `actor pilot : Operator;` / `actor passengers : Person[0..4];`
@@ -1008,6 +1013,9 @@ pub struct ActorUsage {
     /// Optional multiplicity after the type, e.g. `[0..4]` in `actor passengers : Person[0..4];`
     /// (validation `18-Use Case`).
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ValuePart` of the `Usage` an actor is (`ActorUsage : PartUsage = 'actor' Usage`), e.g.
+    /// `actor user = UseSystem::user;` (Simple Tests/UseCaseTest.sysml).
+    pub value: Option<Box<Node<crate::ast::FeatureValue>>>,
     /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
     /// [`crate::ast::MembershipKind::ActorMembership`] -- confirmed against
     /// `SysML-textual-bnf.kebnf`'s `ActorMember : ActorMembership = MemberPrefix

@@ -1458,6 +1458,11 @@ pub enum InterfaceDefBodyElement {
     /// 727-750, 374-389, 1382-1395). The existing source-backed ConstraintUsage owns its
     /// occurrence prefix, declaration, and CalculationBody.
     ConstraintUsage(Box<Node<ConstraintUsage>>),
+    /// Nested interface usage (`InterfaceBodyItem` → `DefinitionBodyItem` →
+    /// `OccurrenceUsageElement`), e.g. `interface wheelFastenerInterface : WheelFastenerInterface
+    /// [5] connect a to b;` inside `interface def WheelHubInterface` (SysML v2 Spec Annex A
+    /// SimpleVehicleModel.sysml).
+    InterfaceUsage(Box<Node<InterfaceUsage>>),
 }
 
 /// The immediate declaration introducer after an `end` prefix.
@@ -1785,6 +1790,10 @@ pub enum ConnectionDefBodyElement {
     /// Bare `part <name>;` member inside a connection def/usage body (GH-89), e.g. `abstract
     /// connection def C { part p; end end1; ... }` (Simple Tests/ConnectionTest.sysml:31).
     PartUsage(Box<Node<PartUsage>>),
+    /// Keyword-less usage (`DefaultReferenceUsage`), e.g. `:>> info = info1;`, `out :>>
+    /// fuelEconomy = 35[mph];` or `in massActual :> ISQ::mass;`. Every `DefinitionBody` and
+    /// `UsageBody` owns it through `UsageElement`.
+    DefaultReferenceUsage(Box<Node<DefaultReferenceUsage>>),
 }
 
 // ---------------------------------------------------------------------------
@@ -2053,6 +2062,13 @@ pub enum OccurrenceBodyElement {
     /// `timeslice test1 { perform action :>> vehicleMassTest { ... } }` (training `34.
     /// Verification/Verification Case Usage Example.sysml`).
     Perform(Box<Node<Perform>>),
+    /// Keyword-less usage (`DefaultReferenceUsage`), e.g. `:>> info = info1;`, `out :>>
+    /// fuelEconomy = 35[mph];` or `in massActual :> ISQ::mass;`. Every `DefinitionBody` and
+    /// `UsageBody` owns it through `UsageElement`.
+    DefaultReferenceUsage(Box<Node<DefaultReferenceUsage>>),
+    /// Port usage, e.g. the `end port supplierPort : FuelOutPort;` ends of a flow definition
+    /// (training `13. Flows/Flow Definition Example.sysml`).
+    PortUsage(Box<Node<PortUsage>>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the
@@ -2311,6 +2327,14 @@ pub enum InterfaceUsageBodyElement {
     /// `PerformActionUsage`, retained as the grammar-owned perform production rather than a
     /// reference-shaped interface-body special case.
     Perform(Box<Node<Perform>>),
+    /// Nested interface usage (`InterfaceBodyItem` → `DefinitionBodyItem` →
+    /// `OccurrenceUsageElement`), e.g. `interface wheelFastenerInterface : WheelFastenerInterface
+    /// [5] connect a to b;` inside `interface def WheelHubInterface` (SysML v2 Spec Annex A
+    /// SimpleVehicleModel.sysml).
+    InterfaceUsage(Box<Node<InterfaceUsage>>),
+    /// Attribute usage, e.g. `attribute :>> maxTorque = 90 * 1.356 [N*m];` (SysML v2 Spec
+    /// Annex A SimpleVehicleModel.sysml). An interface definition body already owned it.
+    AttributeUsage(Box<Node<AttributeUsage>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.

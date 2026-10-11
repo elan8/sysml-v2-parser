@@ -34,7 +34,12 @@ fn numeric_literal_token(input: Input<'_>) -> IResult<Input<'_>, (&[u8], crate::
     while i < frag.len() && frag[i].is_ascii_digit() {
         i += 1;
     }
-    if i == digit_start {
+    // `RealValue = DECIMAL_VALUE? '.' ( DECIMAL_VALUE | EXPONENTIAL_VALUE )` (KerML): the integer
+    // part is optional, so `.6` is a real. A `.` with no digit after it is not a literal.
+    let fraction_only = i == digit_start
+        && frag.get(i) == Some(&b'.')
+        && frag.get(i + 1).is_some_and(u8::is_ascii_digit);
+    if i == digit_start && !fraction_only {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Digit,

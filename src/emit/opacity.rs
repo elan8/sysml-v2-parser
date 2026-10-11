@@ -303,6 +303,9 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
             InterfaceDefBodyElement::PortDef(port) => {
                 walk_port_def_body(report, &p, &port.value.body)
             }
+            InterfaceDefBodyElement::InterfaceUsage(n) => {
+                walk_interface_usage(report, &p, &n.value)
+            }
             InterfaceDefBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)
             }
@@ -474,6 +477,9 @@ fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &Conne
             }
             ConnectionDefBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)
+            }
+            ConnectionDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
             }
             ConnectionDefBodyElement::RefDecl(reference) => {
                 walk_ref_body(report, &p, &reference.value.body)
@@ -1301,6 +1307,9 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::RequirementDef(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
+            RequirementDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
             RequirementDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             RequirementDefBodyElement::ConcernUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
@@ -1354,6 +1363,9 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
         let p = format!("{path}/body[{i}]");
         match &el.value {
             UseCaseDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
+            UseCaseDefBodyElement::Import(n) => {
+                walk_optional_relationship_body(report, &p, n.value.body_elements.as_deref())
+            }
             UseCaseDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             UseCaseDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
@@ -1605,6 +1617,10 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::Allocate(n) => walk_ref_body(report, path, &n.value.body),
         OccurrenceBodyElement::EndDecl(n) => walk_end_decl(report, path, &n.value),
         OccurrenceBodyElement::StateUsage(n) => walk_state_def_body(report, path, &n.value.body),
+        OccurrenceBodyElement::PortUsage(port) => walk_port_body(report, path, &port.value.body),
+        OccurrenceBodyElement::DefaultReferenceUsage(n) => {
+            walk_default_reference_usage(report, path, &n.value)
+        }
         OccurrenceBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         OccurrenceBodyElement::Perform(n) => walk_perform(report, path, &n.value),
         OccurrenceBodyElement::ConnectionUsage(n) => {
@@ -1765,6 +1781,12 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
             InterfaceUsageBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             InterfaceUsageBodyElement::RefRedef { body, .. } => walk_ref_body(report, &p, body),
             InterfaceUsageBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
+            InterfaceUsageBodyElement::AttributeUsage(a) => {
+                walk_attribute_body(report, &p, &a.value.body)
+            }
+            InterfaceUsageBodyElement::InterfaceUsage(n) => {
+                walk_interface_usage(report, &p, &n.value)
+            }
             InterfaceUsageBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)
             }

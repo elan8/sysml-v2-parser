@@ -682,6 +682,10 @@ pub(crate) fn use_case_def_body_element(
                 crate::parser::metadata_annotation::metadata_keyword_prefix,
                 UseCaseDefBodyElement::MetadataKeywordUsage,
             ),
+            map(
+                crate::parser::import::import_,
+                UseCaseDefBodyElement::Import,
+            ),
             map(attribute_def, UseCaseDefBodyElement::AttributeDef),
             map(
                 crate::parser::attribute::directed_attribute_usage,
@@ -920,6 +924,13 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
         )));
     }
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
+    // `ActorUsage : PartUsage = 'actor' Usage`, whose `UsageDeclaration ValuePart?` gives an
+    // actor a value: `actor user = UseSystem::user;`.
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -931,6 +942,7 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
                 short_name,
                 type_name,
                 multiplicity,
+                value: value.map(Box::new),
                 membership: Membership::actor(visibility, visibility_span),
             },
         ),

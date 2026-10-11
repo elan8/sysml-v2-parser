@@ -666,7 +666,9 @@ pub(crate) fn occurrence_usage_prefix(
 }
 
 /// `UsageExtensionKeyword*`, in authored order. Takes and returns trivia-free input.
-fn usage_extension_keywords(mut input: Input<'_>) -> (Input<'_>, Vec<Node<UsageExtensionKeyword>>) {
+pub(crate) fn usage_extension_keywords(
+    mut input: Input<'_>,
+) -> (Input<'_>, Vec<Node<UsageExtensionKeyword>>) {
     let mut extension_keywords = Vec::new();
     while input.fragment().starts_with(b"#") {
         let Ok((rest, keyword)) = usage_extension_keyword(input) else {

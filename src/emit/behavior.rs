@@ -1803,6 +1803,12 @@ pub(crate) fn emit_occurrence_body_element(
         crate::ast::OccurrenceBodyElement::Satisfy(s) => {
             super::requirement::emit_satisfy(w, path, &s.value)
         }
+        crate::ast::OccurrenceBodyElement::PortUsage(p) => {
+            crate::emit::structure::emit_port_usage(w, path, &p.value)
+        }
+        crate::ast::OccurrenceBodyElement::DefaultReferenceUsage(d) => {
+            crate::emit::structure::emit_default_reference_usage(w, path, &d.value)
+        }
         crate::ast::OccurrenceBodyElement::RefDecl(r) => {
             crate::emit::structure::emit_ref_decl(w, path, &r.value)
         }

@@ -1584,11 +1584,11 @@ standard library package ISQSpaceTime {
     attribute curvature : CurvatureValue[*] nonunique :> scalarQuantities;
     attribute def CurvatureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-3 item 3-3 area */
@@ -1611,11 +1611,11 @@ standard library package ISQSpaceTime {
     attribute area : AreaValue[*] nonunique :> scalarQuantities;
     attribute def AreaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-3 item 3-4 volume */
@@ -1638,11 +1638,11 @@ standard library package ISQSpaceTime {
     attribute volume : VolumeValue[*] nonunique :> scalarQuantities;
     attribute def VolumeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 3;
+            :>> quantity = isq.L;
+            :>> exponent = 3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-3 item 3-5 angular measure, plane angle */
@@ -1767,15 +1767,15 @@ standard library package ISQSpaceTime {
     attribute speed : SpeedValue[*] nonunique :> scalarQuantities;
     attribute def SpeedUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-3 item 3-11 acceleration */
@@ -1798,15 +1798,15 @@ standard library package ISQSpaceTime {
     attribute acceleration : AccelerationValue[*] nonunique :> scalarQuantities;
     attribute def AccelerationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def CartesianAcceleration3dVector :> '3dVectorQuantityValue' {
@@ -1851,11 +1851,11 @@ standard library package ISQSpaceTime {
     attribute angularVelocity : AngularVelocityValue[*] nonunique :> scalarQuantities;
     attribute def AngularVelocityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def CartesianAngularVelocity3dVector :> '3dVectorQuantityValue' {
@@ -1900,11 +1900,11 @@ standard library package ISQSpaceTime {
     attribute angularAcceleration : AngularAccelerationValue[*] nonunique :> scalarQuantities;
     attribute def AngularAccelerationUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def CartesianAngularAcceleration3dVector :> '3dVectorQuantityValue' {
@@ -1995,11 +1995,11 @@ standard library package ISQSpaceTime {
     attribute frequency : FrequencyValue[*] nonunique :> scalarQuantities;
     attribute def FrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-3 item 3-17.2 rotational frequency */
@@ -2037,11 +2037,11 @@ standard library package ISQSpaceTime {
     attribute angularFrequency : AngularFrequencyValue[*] nonunique :> scalarQuantities;
     attribute def AngularFrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-3 item 3-19 wavelength */
@@ -2079,11 +2079,11 @@ standard library package ISQSpaceTime {
     attribute repetency : RepetencyValue[*] nonunique :> scalarQuantities;
     attribute def RepetencyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias WavenumberUnit for RepetencyUnit;
@@ -2132,11 +2132,11 @@ standard library package ISQSpaceTime {
     attribute angularRepetency : AngularRepetencyValue[*] nonunique :> scalarQuantities;
     attribute def AngularRepetencyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias AngularWavenumberUnit for AngularRepetencyUnit;
@@ -2162,15 +2162,15 @@ standard library package ISQSpaceTime {
     attribute phaseVelocity : PhaseVelocityValue[*] nonunique :> scalarQuantities;
     attribute def PhaseVelocityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     alias PhaseSpeedUnit for PhaseVelocityUnit;
@@ -2212,11 +2212,11 @@ standard library package ISQSpaceTime {
     attribute dampingCoefficient : DampingCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def DampingCoefficientUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-3 item 3-25 logarithmic decrement */
@@ -2255,11 +2255,11 @@ standard library package ISQSpaceTime {
     attribute attenuation : AttenuationValue[*] nonunique :> scalarQuantities;
     attribute def AttenuationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias ExtinctionUnit for AttenuationUnit;
@@ -2285,11 +2285,11 @@ standard library package ISQSpaceTime {
     attribute phaseCoefficient : PhaseCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def PhaseCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-3 item 3-26.3 propagation coefficient */
@@ -2312,11 +2312,11 @@ standard library package ISQSpaceTime {
     attribute propagationCoefficient : PropagationCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def PropagationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
 }

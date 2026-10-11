@@ -76,8 +76,8 @@ standard library package ParametersOfInterestMetadata {
 	 	 * MeasureOfEffectiveness is semantic metadata for identifying an attribute as a
 	 	 * measure of effectiveness.
 	 	 */
-         :>> annotatedElement : SysML::Usage;
-         :>> baseType = measuresOfEffectiveness meta SysML::Usage;
+        :>> annotatedElement : SysML::Usage;
+        :>> baseType = measuresOfEffectiveness meta SysML::Usage;
     }
     metadata def <mop> MeasureOfPerformance :> SemanticMetadata {
         doc
@@ -85,8 +85,8 @@ standard library package ParametersOfInterestMetadata {
 	 	 * MeasureOfPerformance is semantic metadata for identifying an attribute as a
 	 	 * measure of performance.
 	 	 */
-         :>> annotatedElement : SysML::Usage;
-         :>> baseType = measuresOfPerformance meta SysML::Usage;
+        :>> annotatedElement : SysML::Usage;
+        :>> baseType = measuresOfPerformance meta SysML::Usage;
     }
 }
 ~~~

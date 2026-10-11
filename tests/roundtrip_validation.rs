@@ -225,6 +225,15 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/StructuredControlTest.sysml",
     "State Space Representation Examples/CartSample.sysml",
     "Variability Examples/VehicleVariabilityModel.sysml",
+    // Promoted by the release-corpus body members: actor values, keyword-less and directed
+    // usages in connection, occurrence and requirement bodies, and `require`/`assume`
+    // constraints with extension keywords and specialization clauses.
+    "Association Examples/ProductSelection_OwnedEnds.sysml",
+    "Association Examples/ProductSelection_UnownedEnds.sysml",
+    "Individuals Examples/AnalysisIndividualExample.sysml",
+    "Metadata Examples/RequirementMetadataExample.sysml",
+    "Simple Tests/RequirementTest.sysml",
+    "Simple Tests/UseCaseTest.sysml",
     "Arrowhead Framework Example/AHFCoreLib.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/MetadataTest.sysml",

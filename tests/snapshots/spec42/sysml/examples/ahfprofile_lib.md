@@ -192,31 +192,31 @@ library package AHFProfileMetadata {
     private import AHFProfileLib::*;
     port global_sd : SD;
     metadata def <service> SDMetadata :> SemanticMetadata {
-         :>> baseType default global_sd meta SysML::PortUsage;
+        :>> baseType default global_sd meta SysML::PortUsage;
     }
     metadata def <sos> SysLocalCloudsMetadata :> SemanticMetadata {
-         :>> baseType = system_of_systems meta SysML::PartUsage;
+        :>> baseType = system_of_systems meta SysML::PartUsage;
     }
     metadata def <cloud> LocalCloudsMetadata :> SemanticMetadata {
-         :>> baseType default system_of_systems::locclouds meta SysML::PartUsage;
+        :>> baseType default system_of_systems::locclouds meta SysML::PartUsage;
     }
     metadata def <system> SysDMetadata :> SemanticMetadata {
-         :>> baseType default system_of_systems::locclouds::systems meta SysML::PartUsage;
+        :>> baseType default system_of_systems::locclouds::systems meta SysML::PartUsage;
     }
     metadata def <idd> IDDMetadata :> SDMetadata {
-         :>> baseType = SDDD::idds meta SysML::PortUsage;
+        :>> baseType = SDDD::idds meta SysML::PortUsage;
     }
     port global_sddd : SDDD;
     metadata def <servicedd> SDDDMetadata :> SDMetadata {
-         :>> baseType = global_sddd meta SysML::PortUsage;
+        :>> baseType = global_sddd meta SysML::PortUsage;
     }
     metadata def <clouddd> LocalCloudsDDMetadata :> LocalCloudsMetadata {
-         :>> baseType = system_of_systems::locclouds meta SysML::PartUsage;
+        :>> baseType = system_of_systems::locclouds meta SysML::PartUsage;
     }
     part global_clouddd : LocalCloudDD;
     part global_systemsdd : SysDD;
     metadata def <systemdd> SysDDMetadata :> SysDMetadata {
-         :>> baseType = global_systemsdd meta SysML::PartUsage;
+        :>> baseType = global_systemsdd meta SysML::PartUsage;
     }
 }
 ~~~

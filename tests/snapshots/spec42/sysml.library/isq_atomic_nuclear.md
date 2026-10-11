@@ -2957,11 +2957,11 @@ standard library package ISQAtomicNuclear {
     attribute rydbergConstant : RydbergConstantValue[*] nonunique :> scalarQuantities;
     attribute def RydbergConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-8 Hartree energy */
@@ -2984,19 +2984,19 @@ standard library package ISQAtomicNuclear {
     attribute hartreeEnergy : HartreeEnergyValue[*] nonunique :> scalarQuantities;
     attribute def HartreeEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 6;
+            :>> quantity = isq.L;
+            :>> exponent = 6;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 3;
+            :>> quantity = isq.M;
+            :>> exponent = 3;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -6;
+            :>> quantity = isq.T;
+            :>> exponent = -6;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-9.1 magnetic dipole moment */
@@ -3019,15 +3019,15 @@ standard library package ISQAtomicNuclear {
     attribute magneticDipoleMoment : MagneticDipoleMomentValue[*] nonunique :> scalarQuantities;
     attribute def MagneticDipoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+            :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticDipoleMoment3dVector :> '3dVectorQuantityValue' {
@@ -3102,19 +3102,19 @@ standard library package ISQAtomicNuclear {
     attribute spin : SpinValue[*] nonunique :> scalarQuantities;
     attribute def SpinUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def CartesianSpin3dVector :> '3dVectorQuantityValue' {
@@ -3159,19 +3159,19 @@ standard library package ISQAtomicNuclear {
     attribute totalAngularMomentum : TotalAngularMomentumValue[*] nonunique :> scalarQuantities;
     attribute def TotalAngularMomentumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def CartesianTotalAngularMomentum3dVector :> '3dVectorQuantityValue' {
@@ -3216,19 +3216,19 @@ standard library package ISQAtomicNuclear {
     attribute gyromagneticRatio : GyromagneticRatioValue[*] nonunique :> scalarQuantities;
     attribute def GyromagneticRatioUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 1;
+            :>> quantity = isq.T;
+            :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
+            :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
         }
     }
     alias MagnetogyricRatioUnit for GyromagneticRatioUnit;
@@ -3257,19 +3257,19 @@ standard library package ISQAtomicNuclear {
     attribute gyromagneticRatioOfTheElectron : GyromagneticRatioOfTheElectronValue[*] nonunique :> scalarQuantities;
     attribute def GyromagneticRatioOfTheElectronUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 1;
+            :>> quantity = isq.T;
+            :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
+            :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
         }
     }
     alias MagnetogyricRatioOfTheElectronUnit for GyromagneticRatioOfTheElectronUnit;
@@ -3467,11 +3467,11 @@ standard library package ISQAtomicNuclear {
     attribute larmorFrequency : LarmorFrequencyValue[*] nonunique :> scalarQuantities;
     attribute def LarmorFrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-10 item 10-15.3 nuclear precession angular frequency */
@@ -3540,11 +3540,11 @@ standard library package ISQAtomicNuclear {
     attribute nuclearQuadrupoleMoment : NuclearQuadrupoleMomentValue[*] nonunique :> scalarQuantities;
     attribute def NuclearQuadrupoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-19.1 nuclear radius */
@@ -3706,11 +3706,11 @@ standard library package ISQAtomicNuclear {
     attribute decayConstant : DecayConstantValue[*] nonunique :> scalarQuantities;
     attribute def DecayConstantUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     alias DisintegrationConstantUnit for DecayConstantUnit;
@@ -3767,11 +3767,11 @@ standard library package ISQAtomicNuclear {
     attribute nuclearActivity : NuclearActivityValue[*] nonunique :> scalarQuantities;
     attribute def NuclearActivityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-10 item 10-28 specific activity, massic activity */
@@ -3794,15 +3794,15 @@ standard library package ISQAtomicNuclear {
     attribute specificActivity : SpecificActivityValue[*] nonunique :> scalarQuantities;
     attribute def SpecificActivityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     alias MassicActivityUnit for SpecificActivityUnit;
@@ -3828,15 +3828,15 @@ standard library package ISQAtomicNuclear {
     attribute activityDensity : ActivityDensityValue[*] nonunique :> scalarQuantities;
     attribute def ActivityDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -3;
+            :>> quantity = isq.L;
+            :>> exponent = -3;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     alias VolumicActivityUnit for ActivityDensityUnit;
@@ -3865,15 +3865,15 @@ standard library package ISQAtomicNuclear {
     attribute surfaceActivityDensity : SurfaceActivityDensityValue[*] nonunique :> scalarQuantities;
     attribute def SurfaceActivityDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-31 half life */
@@ -3972,11 +3972,11 @@ standard library package ISQAtomicNuclear {
     attribute particleEmissionRate : ParticleEmissionRateValue[*] nonunique :> scalarQuantities;
     attribute def ParticleEmissionRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-10 item 10-37.1 reaction energy */
@@ -4059,11 +4059,11 @@ standard library package ISQAtomicNuclear {
     attribute directionDistributionOfCrossSection : DirectionDistributionOfCrossSectionValue[*] nonunique :> scalarQuantities;
     attribute def DirectionDistributionOfCrossSectionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-40 energy distribution of cross section */
@@ -4086,15 +4086,15 @@ standard library package ISQAtomicNuclear {
     attribute energyDistributionOfCrossSection : EnergyDistributionOfCrossSectionValue[*] nonunique :> scalarQuantities;
     attribute def EnergyDistributionOfCrossSectionUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 2;
+            :>> quantity = isq.T;
+            :>> exponent = 2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-41 direction and energy distribution of cross section */
@@ -4117,15 +4117,15 @@ standard library package ISQAtomicNuclear {
     attribute directionAndEnergyDistributionOfCrossSection : DirectionAndEnergyDistributionOfCrossSectionValue[*] nonunique :> scalarQuantities;
     attribute def DirectionAndEnergyDistributionOfCrossSectionUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 2;
+            :>> quantity = isq.T;
+            :>> exponent = 2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-42.1 volumic cross section, macroscopic cross section */
@@ -4148,11 +4148,11 @@ standard library package ISQAtomicNuclear {
     attribute volumicCrossSection : VolumicCrossSectionValue[*] nonunique :> scalarQuantities;
     attribute def VolumicCrossSectionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias MacroscopicCrossSectionUnit for VolumicCrossSectionUnit;
@@ -4178,11 +4178,11 @@ standard library package ISQAtomicNuclear {
     attribute volumicTotalCrossSection : VolumicTotalCrossSectionValue[*] nonunique :> scalarQuantities;
     attribute def VolumicTotalCrossSectionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias MacroscopicTotalCrossSectionUnit for VolumicTotalCrossSectionUnit;
@@ -4208,11 +4208,11 @@ standard library package ISQAtomicNuclear {
     attribute particleFluence : ParticleFluenceValue[*] nonunique :> scalarQuantities;
     attribute def ParticleFluenceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-44 particle fluence rate */
@@ -4235,15 +4235,15 @@ standard library package ISQAtomicNuclear {
     attribute particleFluenceRate : ParticleFluenceRateValue[*] nonunique :> scalarQuantities;
     attribute def ParticleFluenceRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-45 radiant energy */
@@ -4281,15 +4281,15 @@ standard library package ISQAtomicNuclear {
     attribute energyFluence : EnergyFluenceValue[*] nonunique :> scalarQuantities;
     attribute def EnergyFluenceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-47 energy fluence rate */
@@ -4312,15 +4312,15 @@ standard library package ISQAtomicNuclear {
     attribute energyFluenceRate : EnergyFluenceRateValue[*] nonunique :> scalarQuantities;
     attribute def EnergyFluenceRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-48 particle current density */
@@ -4343,15 +4343,15 @@ standard library package ISQAtomicNuclear {
     attribute particleCurrentDensity : ParticleCurrentDensityValue[*] nonunique :> scalarQuantities;
     attribute def ParticleCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def CartesianParticleCurrentDensity3dVector :> '3dVectorQuantityValue' {
@@ -4396,11 +4396,11 @@ standard library package ISQAtomicNuclear {
     attribute linearAttenuationCoefficientForIonizingRadiation : LinearAttenuationCoefficientForIonizingRadiationValue[*] nonunique :> scalarQuantities;
     attribute def LinearAttenuationCoefficientForIonizingRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-50 mass attenuation coefficient */
@@ -4423,15 +4423,15 @@ standard library package ISQAtomicNuclear {
     attribute massAttenuationCoefficientForIonizingRadiation : MassAttenuationCoefficientForIonizingRadiationValue[*] nonunique :> scalarQuantities;
     attribute def MassAttenuationCoefficientForIonizingRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF);
+            :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     /* ISO-80000-10 item 10-51 molar attenuation coefficient */
@@ -4454,15 +4454,15 @@ standard library package ISQAtomicNuclear {
     attribute molarAttenuationCoefficient : MolarAttenuationCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def MolarAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute amountOfSubstancePF : QuantityPowerFactor[1] {
-             :>> quantity = isq.N;
-             :>> exponent = -1;
+            :>> quantity = isq.N;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, amountOfSubstancePF);
+            :>> quantityPowerFactors = (lengthPF, amountOfSubstancePF);
         }
     }
     /* ISO-80000-10 item 10-52 atomic attenuation coefficient */
@@ -4485,11 +4485,11 @@ standard library package ISQAtomicNuclear {
     attribute atomicAttenuationCoefficient : AtomicAttenuationCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def AtomicAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-53 half-value thickness */
@@ -4527,19 +4527,19 @@ standard library package ISQAtomicNuclear {
     attribute totalLinearStoppingPower : TotalLinearStoppingPowerValue[*] nonunique :> scalarQuantities;
     attribute def TotalLinearStoppingPowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     alias LinearStoppingPowerUnit for TotalLinearStoppingPowerUnit;
@@ -4565,15 +4565,15 @@ standard library package ISQAtomicNuclear {
     attribute totalMassStoppingPower : TotalMassStoppingPowerValue[*] nonunique :> scalarQuantities;
     attribute def TotalMassStoppingPowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 4;
+            :>> quantity = isq.L;
+            :>> exponent = 4;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     alias MassStoppingPowerUnit for TotalMassStoppingPowerUnit;
@@ -4614,15 +4614,15 @@ standard library package ISQAtomicNuclear {
     attribute meanMassRange : MeanMassRangeValue[*] nonunique :> scalarQuantities;
     attribute def MeanMassRangeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF);
+            :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     /* ISO-80000-10 item 10-58 linear ionization */
@@ -4645,11 +4645,11 @@ standard library package ISQAtomicNuclear {
     attribute linearIonization : LinearIonizationValue[*] nonunique :> scalarQuantities;
     attribute def LinearIonizationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-59 total ionization */
@@ -4688,19 +4688,19 @@ standard library package ISQAtomicNuclear {
     attribute averageEnergyLossPerElementaryChargeProduced : AverageEnergyLossPerElementaryChargeProducedValue[*] nonunique :> scalarQuantities;
     attribute def AverageEnergyLossPerElementaryChargeProducedUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-61 mobility */
@@ -4723,19 +4723,19 @@ standard library package ISQAtomicNuclear {
     attribute mobility : MobilityValue[*] nonunique :> scalarQuantities;
     attribute def MobilityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 2;
+            :>> quantity = isq.T;
+            :>> exponent = 2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
+            :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
         }
     }
     /* ISO-80000-10 item 10-62.1 particle number density */
@@ -4758,11 +4758,11 @@ standard library package ISQAtomicNuclear {
     attribute particleNumberDensity : ParticleNumberDensityValue[*] nonunique :> scalarQuantities;
     attribute def ParticleNumberDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -3;
+            :>> quantity = isq.L;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-10 item 10-62.2 ion number density, ion density */
@@ -4785,11 +4785,11 @@ standard library package ISQAtomicNuclear {
     attribute ionNumberDensity : IonNumberDensityValue[*] nonunique :> scalarQuantities;
     attribute def IonNumberDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -3;
+            :>> quantity = isq.L;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias IonDensityUnit for IonNumberDensityUnit;
@@ -4815,15 +4815,15 @@ standard library package ISQAtomicNuclear {
     attribute recombinationCoefficient : RecombinationCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def RecombinationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 3;
+            :>> quantity = isq.L;
+            :>> exponent = 3;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-64 diffusion coefficient, diffusion coefficient for particle number density */
@@ -4866,15 +4866,15 @@ standard library package ISQAtomicNuclear {
     attribute particleSourceDensity : ParticleSourceDensityValue[*] nonunique :> scalarQuantities;
     attribute def ParticleSourceDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -3;
+            :>> quantity = isq.L;
+            :>> exponent = -3;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-67 slowing-down density */
@@ -4897,15 +4897,15 @@ standard library package ISQAtomicNuclear {
     attribute slowingDownDensity : SlowingDownDensityValue[*] nonunique :> scalarQuantities;
     attribute def SlowingDownDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -3;
+            :>> quantity = isq.L;
+            :>> exponent = -3;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-68 resonance escape probability */
@@ -5256,15 +5256,15 @@ standard library package ISQAtomicNuclear {
     attribute absorbedDose : AbsorbedDoseValue[*] nonunique :> scalarQuantities;
     attribute def AbsorbedDoseUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-81.2 specific energy imparted */
@@ -5322,15 +5322,15 @@ standard library package ISQAtomicNuclear {
     attribute doseEquivalent : DoseEquivalentValue[*] nonunique :> scalarQuantities;
     attribute def DoseEquivalentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-83.2 dose equivalent rate */
@@ -5368,15 +5368,15 @@ standard library package ISQAtomicNuclear {
     attribute absorbedDoseRate : AbsorbedDoseRateValue[*] nonunique :> scalarQuantities;
     attribute def AbsorbedDoseRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-85 linear energy transfer */
@@ -5399,19 +5399,19 @@ standard library package ISQAtomicNuclear {
     attribute linearEnergyTransfer : LinearEnergyTransferValue[*] nonunique :> scalarQuantities;
     attribute def LinearEnergyTransferUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-86.1 kerma */
@@ -5434,15 +5434,15 @@ standard library package ISQAtomicNuclear {
     attribute kerma : KermaValue[*] nonunique :> scalarQuantities;
     attribute def KermaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-86.2 kerma rate */
@@ -5465,15 +5465,15 @@ standard library package ISQAtomicNuclear {
     attribute kermaRate : KermaRateValue[*] nonunique :> scalarQuantities;
     attribute def KermaRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-10 item 10-87 mass energy-transfer coefficient */
@@ -5496,15 +5496,15 @@ standard library package ISQAtomicNuclear {
     attribute massEnergyTransferCoefficient : MassEnergyTransferCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def MassEnergyTransferCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF);
+            :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     /* ISO-80000-10 item 10-88 exposure */
@@ -5527,19 +5527,19 @@ standard library package ISQAtomicNuclear {
     attribute exposure : ExposureValue[*] nonunique :> scalarQuantities;
     attribute def ExposureUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 1;
+            :>> quantity = isq.T;
+            :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
+            :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
         }
     }
     /* ISO-80000-10 item 10-89 exposure rate */
@@ -5562,15 +5562,15 @@ standard library package ISQAtomicNuclear {
     attribute exposureRate : ExposureRateValue[*] nonunique :> scalarQuantities;
     attribute def ExposureRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.I;
-             :>> exponent = 1;
+            :>> quantity = isq.I;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, electricCurrentPF);
+            :>> quantityPowerFactors = (massPF, electricCurrentPF);
         }
     }
 }

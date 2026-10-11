@@ -1592,15 +1592,15 @@ standard library package ISQLight {
     attribute speedOfLightInAMedium : SpeedOfLightInAMediumValue[*] nonunique :> scalarQuantities;
     attribute def SpeedOfLightInAMediumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-1.2 refractive index */
@@ -1654,19 +1654,19 @@ standard library package ISQLight {
     attribute spectralRadiantEnergy : SpectralRadiantEnergyValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-3.1 radiant energy density */
@@ -1689,19 +1689,19 @@ standard library package ISQLight {
     attribute radiantEnergyDensity : RadiantEnergyDensityValue[*] nonunique :> scalarQuantities;
     attribute def RadiantEnergyDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-3.2 spectral radiant energy density in terms of wavelength */
@@ -1724,19 +1724,19 @@ standard library package ISQLight {
     attribute spectralRadiantEnergyDensityInTermsOfWavelength : SpectralRadiantEnergyDensityInTermsOfWavelengthValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantEnergyDensityInTermsOfWavelengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-3.3 spectral radiant energy density in terms of wavenumber */
@@ -1759,15 +1759,15 @@ standard library package ISQLight {
     attribute spectralRadiantEnergyDensityInTermsOfWavenumber : SpectralRadiantEnergyDensityInTermsOfWavenumberValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantEnergyDensityInTermsOfWavenumberUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-4.1 radiant flux, radiant power */
@@ -1790,19 +1790,19 @@ standard library package ISQLight {
     attribute radiantFlux : RadiantFluxValue[*] nonunique :> scalarQuantities;
     attribute def RadiantFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     alias RadiantPowerUnit for RadiantFluxUnit;
@@ -1828,19 +1828,19 @@ standard library package ISQLight {
     attribute spectralRadiantFlux : SpectralRadiantFluxValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     alias SpectralRadiantPowerUnit for SpectralRadiantFluxUnit;
@@ -1866,19 +1866,19 @@ standard library package ISQLight {
     attribute radiantIntensity : RadiantIntensityValue[*] nonunique :> scalarQuantities;
     attribute def RadiantIntensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-5.2 spectral radiant intensity */
@@ -1901,19 +1901,19 @@ standard library package ISQLight {
     attribute spectralRadiantIntensity : SpectralRadiantIntensityValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantIntensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 1;
+            :>> quantity = isq.L;
+            :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-6.1 radiance */
@@ -1936,15 +1936,15 @@ standard library package ISQLight {
     attribute radiance : RadianceValue[*] nonunique :> scalarQuantities;
     attribute def RadianceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-6.2 spectral radiance */
@@ -1967,19 +1967,19 @@ standard library package ISQLight {
     attribute spectralRadiance : SpectralRadianceValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-7.1 irradiance */
@@ -2002,15 +2002,15 @@ standard library package ISQLight {
     attribute irradiance : IrradianceValue[*] nonunique :> scalarQuantities;
     attribute def IrradianceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-7.2 spectral irradiance */
@@ -2033,19 +2033,19 @@ standard library package ISQLight {
     attribute spectralIrradiance : SpectralIrradianceValue[*] nonunique :> scalarQuantities;
     attribute def SpectralIrradianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-8.1 radiant exitance , radiant emittance */
@@ -2068,15 +2068,15 @@ standard library package ISQLight {
     attribute radiantExitance : RadiantExitanceValue[*] nonunique :> scalarQuantities;
     attribute def RadiantExitanceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     alias RadiantEmittanceUnit for RadiantExitanceUnit;
@@ -2102,19 +2102,19 @@ standard library package ISQLight {
     attribute spectralRadiantExitance : SpectralRadiantExitanceValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -3;
+            :>> quantity = isq.T;
+            :>> exponent = -3;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-9.1 radiant exposure */
@@ -2137,15 +2137,15 @@ standard library package ISQLight {
     attribute radiantExposure : RadiantExposureValue[*] nonunique :> scalarQuantities;
     attribute def RadiantExposureUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (massPF, durationPF);
+            :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-9.2 spectral radiant exposure */
@@ -2168,19 +2168,19 @@ standard library package ISQLight {
     attribute spectralRadiantExposure : SpectralRadiantExposureValue[*] nonunique :> scalarQuantities;
     attribute def SpectralRadiantExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = 1;
+            :>> quantity = isq.M;
+            :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -2;
+            :>> quantity = isq.T;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-10.1 luminous efficiency */
@@ -2235,23 +2235,23 @@ standard library package ISQLight {
     attribute luminousEfficacyOfRadiation : LuminousEfficacyOfRadiationValue[*] nonunique :> scalarQuantities;
     attribute def LuminousEfficacyOfRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 3;
+            :>> quantity = isq.T;
+            :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-11.2 spectral luminous efficacy */
@@ -2274,23 +2274,23 @@ standard library package ISQLight {
     attribute spectralLuminousEfficacy : SpectralLuminousEfficacyValue[*] nonunique :> scalarQuantities;
     attribute def SpectralLuminousEfficacyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 3;
+            :>> quantity = isq.T;
+            :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-11.3 maximum luminous efficacy */
@@ -2313,23 +2313,23 @@ standard library package ISQLight {
     attribute maximumLuminousEfficacy : MaximumLuminousEfficacyValue[*] nonunique :> scalarQuantities;
     attribute def MaximumLuminousEfficacyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 3;
+            :>> quantity = isq.T;
+            :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-11.4 luminous efficacy of a source */
@@ -2352,23 +2352,23 @@ standard library package ISQLight {
     attribute luminousEfficacyOfASource : LuminousEfficacyOfASourceValue[*] nonunique :> scalarQuantities;
     attribute def LuminousEfficacyOfASourceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 3;
+            :>> quantity = isq.T;
+            :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-12 luminous energy, quantity of light */
@@ -2391,15 +2391,15 @@ standard library package ISQLight {
     attribute luminousEnergy : LuminousEnergyValue[*] nonunique :> scalarQuantities;
     attribute def LuminousEnergyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 1;
+            :>> quantity = isq.T;
+            :>> exponent = 1;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (durationPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (durationPF, luminousIntensityPF);
         }
     }
     alias QuantityOfLightUnit for LuminousEnergyUnit;
@@ -2425,11 +2425,11 @@ standard library package ISQLight {
     attribute luminousFlux : LuminousFluxValue[*] nonunique :> scalarQuantities;
     attribute def LuminousFluxUnit :> DerivedUnit {
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = luminousIntensityPF;
+            :>> quantityPowerFactors = luminousIntensityPF;
         }
     }
     /* ISO-80000-7 item 7-14 luminous intensity */
@@ -2454,15 +2454,15 @@ standard library package ISQLight {
     attribute luminance : LuminanceValue[*] nonunique :> scalarQuantities;
     attribute def LuminanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-16 illuminance */
@@ -2485,15 +2485,15 @@ standard library package ISQLight {
     attribute illuminance : IlluminanceValue[*] nonunique :> scalarQuantities;
     attribute def IlluminanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-17 luminous exitance */
@@ -2516,15 +2516,15 @@ standard library package ISQLight {
     attribute luminousExitance : LuminousExitanceValue[*] nonunique :> scalarQuantities;
     attribute def LuminousExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-18 luminous exposure, quantity of illumination, light exposure */
@@ -2547,19 +2547,19 @@ standard library package ISQLight {
     attribute luminousExposure : LuminousExposureValue[*] nonunique :> scalarQuantities;
     attribute def LuminousExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = 1;
+            :>> quantity = isq.T;
+            :>> exponent = 1;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF, luminousIntensityPF);
         }
     }
     alias QuantityOfIlluminationUnit for LuminousExposureUnit;
@@ -2620,11 +2620,11 @@ standard library package ISQLight {
     attribute photonFlux : PhotonFluxValue[*] nonunique :> scalarQuantities;
     attribute def PhotonFluxUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-7 item 7-21 photon intensity */
@@ -2647,11 +2647,11 @@ standard library package ISQLight {
     attribute photonIntensity : PhotonIntensityValue[*] nonunique :> scalarQuantities;
     attribute def PhotonIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = durationPF;
+            :>> quantityPowerFactors = durationPF;
         }
     }
     /* ISO-80000-7 item 7-22 photon radiance */
@@ -2674,15 +2674,15 @@ standard library package ISQLight {
     attribute photonRadiance : PhotonRadianceValue[*] nonunique :> scalarQuantities;
     attribute def PhotonRadianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-23 photon irradiance */
@@ -2705,15 +2705,15 @@ standard library package ISQLight {
     attribute photonIrradiance : PhotonIrradianceValue[*] nonunique :> scalarQuantities;
     attribute def PhotonIrradianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-24 photon exitance */
@@ -2736,15 +2736,15 @@ standard library package ISQLight {
     attribute photonExitance : PhotonExitanceValue[*] nonunique :> scalarQuantities;
     attribute def PhotonExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.T;
-             :>> exponent = -1;
+            :>> quantity = isq.T;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, durationPF);
+            :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     /* ISO-80000-7 item 7-25 photon exposure */
@@ -2767,11 +2767,11 @@ standard library package ISQLight {
     attribute photonExposure : PhotonExposureValue[*] nonunique :> scalarQuantities;
     attribute def PhotonExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-7 item 7-26.1 tristimulus values for the CIE 1931 standard colorimetric observer */
@@ -2794,15 +2794,15 @@ standard library package ISQLight {
     attribute tristimulusValuesForTheCie1931StandardColorimetricObserver : TristimulusValuesForTheCie1931StandardColorimetricObserverValue[*] nonunique :> scalarQuantities;
     attribute def TristimulusValuesForTheCie1931StandardColorimetricObserverUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-26.2 tristimulus values for the CIE 1964 standard colorimetric observer */
@@ -2825,15 +2825,15 @@ standard library package ISQLight {
     attribute tristimulusValuesForTheCie1964StandardColorimetricObserver : TristimulusValuesForTheCie1964StandardColorimetricObserverValue[*] nonunique :> scalarQuantities;
     attribute def TristimulusValuesForTheCie1964StandardColorimetricObserverUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -2;
+            :>> quantity = isq.L;
+            :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.J;
-             :>> exponent = 1;
+            :>> quantity = isq.J;
+            :>> exponent = 1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+            :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     /* ISO-80000-7 item 7-27.1 CIE colour-matching functions for the CIE 1931 standard colorimetric observer */
@@ -3161,11 +3161,11 @@ standard library package ISQLight {
     attribute linearAttenuationCoefficient : LinearAttenuationCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def LinearAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     alias LinearExtinctionCoefficientUnit for LinearAttenuationCoefficientUnit;
@@ -3191,11 +3191,11 @@ standard library package ISQLight {
     attribute linearAbsorptionCoefficient : LinearAbsorptionCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def LinearAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = -1;
+            :>> quantity = isq.L;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = lengthPF;
+            :>> quantityPowerFactors = lengthPF;
         }
     }
     /* ISO-80000-7 item 7-36.1 mass attenuation coefficient */
@@ -3218,15 +3218,15 @@ standard library package ISQLight {
     attribute massAttenuationCoefficient : MassAttenuationCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def MassAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF);
+            :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     /* ISO-80000-7 item 7-36.2 mass absorption coefficient */
@@ -3249,15 +3249,15 @@ standard library package ISQLight {
     attribute massAbsorptionCoefficient : MassAbsorptionCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def MassAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.M;
-             :>> exponent = -1;
+            :>> quantity = isq.M;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, massPF);
+            :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     /* ISO-80000-7 item 7-37 molar absorption coefficient */
@@ -3280,15 +3280,15 @@ standard library package ISQLight {
     attribute molarAbsorptionCoefficient : MolarAbsorptionCoefficientValue[*] nonunique :> scalarQuantities;
     attribute def MolarAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-             :>> quantity = isq.L;
-             :>> exponent = 2;
+            :>> quantity = isq.L;
+            :>> exponent = 2;
         }
         private attribute amountOfSubstancePF : QuantityPowerFactor[1] {
-             :>> quantity = isq.N;
-             :>> exponent = -1;
+            :>> quantity = isq.N;
+            :>> exponent = -1;
         }
         attribute :>> quantityDimension {
-             :>> quantityPowerFactors = (lengthPF, amountOfSubstancePF);
+            :>> quantityPowerFactors = (lengthPF, amountOfSubstancePF);
         }
     }
 }
