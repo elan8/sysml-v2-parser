@@ -569,8 +569,10 @@ pub struct KermlSuccessionMember {
     /// Declared succession name, present only with the `first` keyword form (`succession
     /// triggerAfter [taNum] first [0..1] transitionLinkSource then ...;`); empty otherwise.
     pub name: Option<DeclarationName>,
-    /// The succession's own multiplicity in the named `first` form (`[taNum]` above).
+    /// The succession declaration's multiplicity before `first` (`[taNum]` above).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    /// Authored declaration-level ordering and uniqueness keywords.
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// The rest of the succession's `FeatureDeclaration`: `succession redefines p_before_d :
     /// MyPaint_Before_Dry_Link [1] first paint then dry;` (KerML Spec Annex A
     /// `A-3-6-Sequences.kerml`).

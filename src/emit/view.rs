@@ -611,7 +611,8 @@ pub(crate) fn emit_kerml_succession_member(
     }
     let declared = succession.name.is_some()
         || !succession.specializations.is_empty()
-        || succession.multiplicity.is_some();
+        || succession.multiplicity.is_some()
+        || succession.multiplicity_modifiers.is_authored();
     if declared {
         w.trim_trailing_space();
         if let Some(name) = succession.name {
@@ -625,6 +626,7 @@ pub(crate) fn emit_kerml_succession_member(
             }
             emit_multiplicity(w, &multiplicity.value)?;
         }
+        emit_multiplicity_modifiers(w, &succession.multiplicity_modifiers);
         w.push_str(" first ");
     } else if succession.first_span.is_some() {
         w.push_str("first ");

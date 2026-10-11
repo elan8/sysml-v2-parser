@@ -1106,6 +1106,8 @@ fn kerml_succession_member_inner(
                     b"references",
                     b"crosses",
                     b"redefines",
+                    b"ordered",
+                    b"nonunique",
                 ],
             ) || peek.fragment().starts_with(b":")
                 || peek.fragment().starts_with(b"[")
@@ -1130,10 +1132,23 @@ fn kerml_succession_member_inner(
         })
     })
     .parse(input)?;
-    let (name_str, decl_multiplicity, specializations, first_span) = match declared {
-        Some((n, part, span)) => (n, part.multiplicity, part.specializations, Some(span)),
-        None => (None, None, Vec::new(), None),
-    };
+    let (name_str, decl_multiplicity, multiplicity_modifiers, specializations, first_span) =
+        match declared {
+            Some((n, part, span)) => (
+                n,
+                part.multiplicity,
+                part.multiplicity_modifiers,
+                part.specializations,
+                Some(span),
+            ),
+            None => (
+                None,
+                None,
+                crate::ast::MultiplicityModifiers::default(),
+                Vec::new(),
+                None,
+            ),
+        };
     let (input, first) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     // A multiplicity may follow the keyword directly: `then[0..1] endShot`.
@@ -1153,6 +1168,7 @@ fn kerml_succession_member_inner(
                 is_all: is_all.is_some(),
                 name: name_str,
                 multiplicity: decl_multiplicity,
+                multiplicity_modifiers,
                 specializations,
                 first_span,
                 first,
