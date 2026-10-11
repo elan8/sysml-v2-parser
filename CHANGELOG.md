@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **KerML successions take their whole declaration, and named documentation keeps its body
-  (breaking AST change, `PARSE_AST_VERSION` 272).**
+  (breaking AST change, `PARSE_AST_VERSION` 276).**
   - `SuccessionDeclaration = ( FeatureDeclaration? 'first' )? ...`. Only the ends-only and the
     named `first` forms were parsed; `succession first a then b;` and `succession redefines p :
     L [1] first a then b;` were rejected. `KermlSuccessionMember::specializations` and
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     skipping the member's own body (#164).
 
 - **A constraint usage keeps all its types, and directed and redefinition members keep their
-  visibility (breaking AST change, `PARSE_AST_VERSION` 271).**
+  visibility (breaking AST change, `PARSE_AST_VERSION` 275).**
   - `constraint c : A, B;` kept only `A`, with no diagnostic. `ConstraintUsage::type_name` is
     replaced by `ConstraintUsage::typing: Option<Node<TypingRelationship>>`, the shape `CalcUsage`
     and the other usages have, so every target and the clause's spelling (`:`, `defined by`)
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     visibility on the `AttributeUsage::membership` it already had (#178).
 
 - **Succession members and body expressions from the release corpus (breaking AST change,
-  `PARSE_AST_VERSION` 270).** New variants and fields; consumers with exhaustive matches need
+  `PARSE_AST_VERSION` 274).** New variants and fields; consumers with exhaustive matches need
   arms (#166, #167).
   - `then accept sig after 10[SI::s];`: `TransitionAccept::NamedTimeTrigger`, a time trigger
     whose payload parameter is named.
@@ -45,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `(1..n)->forAll { in i : Natural; private attribute f = frames#(i); f.valid }`:
     `CollectionOperatorBody::members`, the `FunctionBodyPart` items between a body expression's
     parameters and its result. A member is recognised by a leading visibility or `attribute`.
+
+- **Required constraint declarations retain their values and all specializations (breaking AST
+  change, `PARSE_AST_VERSION` 273).** `RequireConstraint::specializations` replaces `typing`,
+  `subsets` and `redefines` with the ordered `FeatureSpecialization` sequence, retaining references,
+  crosses and repeated clauses. `RequireConstraint::value` owns the separate `ValuePart`, including
+  `=`, `:=`, `default` and `default :=`; subsetting parsing no longer consumes and drops it.
+  Emission, visitors, serde validation and semantic snapshots preserve these facts. Required
+  constraints nested in constraint bodies are now projected structurally as well.
 
 - **Body members from the release corpus that their bodies rejected (breaking AST change,
   `PARSE_AST_VERSION` 269).** New variants and fields; consumers with exhaustive matches need

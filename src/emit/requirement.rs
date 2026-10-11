@@ -405,14 +405,9 @@ pub(crate) fn emit_require_constraint(
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     }
     // `ConstraintUsageDeclaration`'s specialization part, authored between the name and the body.
-    if let Some(typing) = &req.typing {
-        super::structure::emit_typing_clause(w, &typing.value)?;
-    }
-    if let Some(subsets) = &req.subsets {
-        super::structure::emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(redefines) = &req.redefines {
-        super::structure::emit_subsetting_clause(w, &redefines.value)?;
+    super::view::emit_feature_specializations(w, &req.specializations)?;
+    if let Some(value) = &req.value {
+        super::expr::emit_feature_value(w, value)?;
     }
     match &req.body {
         crate::ast::ConstraintDefBody::Semicolon { .. } => {
