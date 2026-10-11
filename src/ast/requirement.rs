@@ -242,27 +242,17 @@ pub struct RequireConstraint {
     /// document's qualified-reference table. `None` for the `constraint`-keyword declaration
     /// form, whose `name` declares rather than references.
     pub target: Option<crate::ast::QualifiedReferenceId>,
-    /// Typing clause of the declared form, `require constraint c : C;`.
-    ///
-    /// `RequirementConstraintUsage`'s second alternative is
-    /// `( UsageExtensionKeyword* ConstraintUsageKeyword | UsageExtensionKeyword+ )
-    /// ConstraintUsageDeclaration CalculationBody` (SysML BNF 2066-2071; reference
-    /// `SysML.xtext:2066-2071`), and `ConstraintUsageDeclaration` is an ordinary
-    /// `UsageDeclaration` -- so the `constraint`-keyword form declares a name *and* may specialize
-    /// it. Only a bare name was parsed before, so `require constraint c : C;` reached
-    /// `recovered_requirement_body_element` and lost the whole member.
-    ///
-    /// Distinct from [`Self::target`]: that is the keyword-less shorthand's *reference* to an
-    /// existing constraint, this is the declared usage's type.
-    pub typing: Option<Node<crate::ast::TypingRelationship>>,
+    /// Ordered `FeatureSpecialization` alternatives in the declared usage, including repeated
+    /// typings, subsettings, references, crosses and redefinitions. These replace the separate
+    /// typing/subsets/redefines fields so accepted relationships cannot be silently discarded.
+    pub specializations: Vec<crate::ast::FeatureSpecialization>,
     /// `UsageExtensionKeyword`s after `require`/`assume`: `assume #goal constraint c;`. Without
     /// the `constraint` keyword they still select the declared form (`UsageExtensionKeyword+
     /// ConstraintUsageDeclaration`), so `require #goal massLimit;` declares `massLimit`.
     pub extension_keywords: Vec<Node<crate::ast::UsageExtensionKeyword>>,
-    /// `:>` clause of the declared form's `ConstraintUsageDeclaration`.
-    pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `:>>` clause of the declared form, `require constraint c1 :>> c;`.
-    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `ValuePart` of `ConstraintUsageDeclaration = UsageDeclaration ValuePart?`, separate
+    /// from its specialization clauses. Retains binding, assignment and default spellings.
+    pub value: Option<Box<Node<crate::ast::FeatureValue>>>,
     pub body: ConstraintDefBody,
 }
 
