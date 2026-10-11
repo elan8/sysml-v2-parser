@@ -849,8 +849,21 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
     // declared form declares a fresh name, which may be absent (`require constraint :>> c;`).
     let (input, name, target) = if input.fragment().starts_with(b"{")
         || input.fragment().starts_with(b";")
-        || (declares && input.fragment().starts_with(b":"))
-    {
+        || (declares
+            && (input.fragment().starts_with(b":")
+                || input.fragment().starts_with(b"=")
+                || crate::parser::lex::starts_with_any_keyword(
+                    input.fragment(),
+                    &[
+                        b"typed",
+                        b"defined",
+                        b"subsets",
+                        b"references",
+                        b"crosses",
+                        b"redefines",
+                        b"default",
+                    ],
+                ))) {
         (input, None, None)
     } else if declares {
         let (input, n) = name(input)?;
@@ -863,21 +876,15 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
     // carry a typing and specialization clauses: `require constraint c : C;`, `require
     // constraint c1 :>> c;`. Only reachable for the declared form -- the shorthand's qualified
     // reference has already consumed the name position.
-    let (input, typing, clauses) = if declares {
-        let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
-        let (input, result) = crate::parser::usage::optional_typings(input)?;
-        let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(result);
-        let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
-        let subsets = trailing
-            .subsets
-            .or(leading.subsets)
-            .map(|(relationship, _)| relationship);
-        let redefines = trailing.redefines.or(leading.redefines);
-        (input, typing, (subsets, redefines))
+    let (input, specializations, value) = if declares {
+        let (input, specializations) =
+            crate::parser::usage::feature_specializations_before_value(input)?;
+        let (input, value) =
+            opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+        (input, specializations, value.map(Box::new))
     } else {
-        (input, None, (None, None))
+        (input, Vec::new(), None)
     };
-    let (subsets, redefines) = clauses;
     let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
@@ -889,10 +896,9 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
                 has_constraint_keyword,
                 name,
                 target,
-                typing,
+                specializations,
                 extension_keywords,
-                subsets,
-                redefines,
+                value,
                 body,
             },
         ),

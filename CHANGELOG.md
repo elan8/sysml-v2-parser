@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Required constraint declarations retain their values and all specializations (breaking AST
+  change, `PARSE_AST_VERSION` 273).** `RequireConstraint::specializations` replaces `typing`,
+  `subsets` and `redefines` with the ordered `FeatureSpecialization` sequence, retaining references,
+  crosses and repeated clauses. `RequireConstraint::value` owns the separate `ValuePart`, including
+  `=`, `:=`, `default` and `default :=`; subsetting parsing no longer consumes and drops it.
+  Emission, visitors, serde validation and semantic snapshots preserve these facts. Required
+  constraints nested in constraint bodies are now projected structurally as well.
+
 - **Body members from the release corpus that their bodies rejected (breaking AST change,
   `PARSE_AST_VERSION` 269).** New variants and fields; consumers with exhaustive matches need
   arms (#165, #168).

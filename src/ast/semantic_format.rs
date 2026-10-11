@@ -2908,8 +2908,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ConstraintDefBodyElement::FeatureDecl(_member) => {
                             self.write_marker(&mut first, "default-reference-usage")?;
                         }
-                        super::ConstraintDefBodyElement::RequireConstraint(_member) => {
-                            self.write_marker(&mut first, "require-constraint")?;
+                        super::ConstraintDefBodyElement::RequireConstraint(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_require_constraint(&member.value)?;
                         }
                         // Projected exactly as the calculation scope projects its own
                         // `ReturnParameterMember`; the two scopes share the node.
@@ -2947,24 +2948,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(target) => self.write_reference(target)?,
             None => self.writer.write_str("none")?,
         }
-        self.writer.write_str(") (typing ")?;
-        match &constraint.typing {
-            Some(typing) => self.write_typing(&typing.value)?,
-            None => self.writer.write_str("none")?,
-        }
-        self.writer.write_char(')')?;
+        self.writer.write_str(") ")?;
+        self.write_feature_specializations(&constraint.specializations)?;
         // Written only when present, so existing members keep their projection.
         if !constraint.extension_keywords.is_empty() {
             self.write_extension_keywords(&constraint.extension_keywords)?;
         }
-        if constraint.subsets.is_some() {
-            self.writer.write_char(' ')?;
-            self.write_optional_subsetting("subsets", constraint.subsets.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        match &constraint.value {
+            Some(value) => self.write_feature_value(&value.value)?,
+            None => self.writer.write_str("none")?,
         }
-        if constraint.redefines.is_some() {
-            self.writer.write_char(' ')?;
-            self.write_optional_subsetting("redefines", constraint.redefines.as_ref())?;
-        }
+        self.writer.write_char(')')?;
         self.writer.write_char(' ')?;
         self.write_constraint_def_body(&constraint.body)?;
         self.writer.write_char(')')

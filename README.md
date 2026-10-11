@@ -37,6 +37,11 @@ source spans without splitting or reparsing display strings.
 Declaration names are optional independently of short names in `Identification`. For example,
 `verification <V1> : VerificationType;` retains its short name while its AST `name` is `None`.
 
+`RequireConstraint::specializations` retains ordered, typed `FeatureSpecialization` clauses,
+including repeated typings, references and crosses. It replaces the former `typing`, `subsets`
+and `redefines` fields. `RequireConstraint::value` separately retains the declaration's binding,
+assignment or default value; formatting and semantic snapshots consume these typed fields.
+
 With the optional `serde` feature, serialize and deserialize `ParsedDocument` as the atomic cache
 unit. Its wire envelope includes `PARSE_AST_VERSION` and rejects version mismatches, invalid arena
 ranges, and dangling AST reference identities during deserialization.
