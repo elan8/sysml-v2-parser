@@ -53,9 +53,8 @@ pub(crate) fn emit_constraint_usage(
         w.push_char(' ');
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &multiplicity.value)?;

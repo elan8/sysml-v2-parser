@@ -1028,7 +1028,7 @@ mod par_002_nested_def_tests {
                         .map(|n| crate::parser::lex::name_bytes(source, n)),
                     Some(&b"hasLegalProfileDepth"[..])
                 );
-                assert_eq!(c.value.type_name, None);
+                assert!(c.value.typing.is_none());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
         }
@@ -1049,7 +1049,7 @@ mod par_002_nested_def_tests {
                         .map(|n| crate::parser::lex::name_bytes(source, n)),
                     Some(&b"discBrakeConstraint"[..])
                 );
-                assert!(c.value.type_name.is_some());
+                assert!(c.value.typing.is_some());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
         }

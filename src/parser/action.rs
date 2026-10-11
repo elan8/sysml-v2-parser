@@ -330,6 +330,8 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     // leading words follows the trivia, before entering an arena transaction.
     {
         let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        // Past `MemberPrefix`: `private in x : Real;`.
+        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
         if !(starts_with_keyword(cursor.fragment(), b"in")
             || starts_with_keyword(cursor.fragment(), b"out")
             || starts_with_keyword(cursor.fragment(), b"inout"))
@@ -346,6 +348,8 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
 fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let membership = crate::ast::Membership::feature(visibility, visibility_span);
     let (input, direction) = alt((
         map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
         map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),
@@ -412,6 +416,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                     redefines: Some(redefines),
                     value,
                     body: None,
+                    membership,
                 },
             ),
         ));
@@ -556,6 +561,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 redefines,
                 value,
                 body,
+                membership: membership.clone(),
             },
         ))
     })();

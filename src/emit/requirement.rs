@@ -271,6 +271,7 @@ pub(crate) fn emit_redefinition_attribute_binding(
     path: &str,
     usage: &crate::ast::AttributeUsage,
 ) -> Result<(), EmitError> {
+    emit_visibility(w, usage.membership.visibility);
     w.push_str(":>> ");
     let target = usage
         .redefines

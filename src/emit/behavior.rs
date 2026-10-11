@@ -20,6 +20,7 @@ pub(crate) fn emit_inout_decl(
     path: &str,
     decl: &InOutDecl,
 ) -> Result<(), EmitError> {
+    emit_visibility(w, decl.membership.visibility);
     emit_direction(w, decl.direction);
     if let Some(kind) = &decl.kind {
         match kind.value {

@@ -54,7 +54,10 @@ pub struct ConstraintUsage {
     pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: Option<DeclarationName>,
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// The whole `Typings` clause. `Typings = TypedBy ( ',' FeatureTyping )*`, so `constraint c
+    /// : A, B;` has two types; a single `type_name` kept only the first and dropped the rest
+    /// without a diagnostic (#174).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Usage-level `:>` subsetting, e.g. `constraint c :> Base;`. Mirrors
     /// `ConnectionUsageMember::subsets`.
