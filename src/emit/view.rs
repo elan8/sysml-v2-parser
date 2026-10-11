@@ -429,7 +429,7 @@ pub(crate) fn emit_kerml_feature(
 }
 
 /// Emit ordered KerML `FeatureSpecialization` alternatives, each with its authored spelling.
-fn emit_feature_specializations(
+pub(crate) fn emit_feature_specializations(
     w: &mut EmitWriter<'_>,
     specializations: &[crate::ast::FeatureSpecialization],
 ) -> Result<(), EmitError> {

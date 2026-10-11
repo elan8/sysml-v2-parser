@@ -6554,7 +6554,7 @@ macro_rules! ast_traversal {
         pub fn walk_require_constraint<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequireConstraint>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequireConstraint { is_assume, has_constraint_keyword, name, target, typing, extension_keywords, subsets, redefines, body } = &$($mutability)? node.value;
+            let RequireConstraint { is_assume, has_constraint_keyword, name, target, specializations, extension_keywords, value, body } = &$($mutability)? node.value;
             let _ = is_assume;
             let _ = has_constraint_keyword;
             if let Some(inner) = name {
@@ -6563,17 +6563,14 @@ macro_rules! ast_traversal {
             if let Some(inner) = target {
                 visitor.visit_qualified_reference(inner);
             }
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
+            for inner in specializations {
+                visitor.visit_feature_specialization(inner);
             }
             for inner in extension_keywords {
                 visitor.visit_usage_extension_keyword(inner);
             }
-            if let Some(inner) = subsets {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             visitor.visit_constraint_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
