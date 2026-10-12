@@ -554,6 +554,11 @@ pub(crate) fn occurrence_body_element(
         map(bind_, OccurrenceBodyElement::Bind),
         map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
         map(satisfy, |n| OccurrenceBodyElement::Satisfy(Box::new(n))),
+        // Before `end_decl`, which refuses a kind keyword after `end`: `end port p : P;` is a
+        // port usage that is an end. `port_usage` refuses by lookahead unless `port` follows.
+        map(crate::parser::port::port_usage, |n| {
+            OccurrenceBodyElement::PortUsage(Box::new(n))
+        }),
         // Allocation / connection ends in structured definition bodies (`allocation def { end …; }`).
         map(
             crate::parser::connector::end_decl,
@@ -599,6 +604,11 @@ pub(crate) fn occurrence_body_element(
         map(
             crate::parser::connector::ref_decl,
             OccurrenceBodyElement::RefDecl,
+        ),
+        // Last, so every keyword-led member above keeps priority over the keyword-less usage.
+        map(
+            crate::parser::attribute::default_reference_member,
+            |usage| OccurrenceBodyElement::DefaultReferenceUsage(Box::new(usage)),
         ),
     ))
     .parse(input)?;

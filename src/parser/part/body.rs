@@ -241,6 +241,16 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             let elem = PartDefBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        // `InterfaceUsage` and `CalculationUsage` own their `#Tag` too (#180). Both refuse by
+        // lookahead unless their kind keyword follows the prefix.
+        if let Ok((next, usage)) = crate::parser::part::interface_usage(start) {
+            let elem = PartDefBodyElement::InterfaceUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::constraint::calc_usage(start) {
+            let elem = PartDefBodyElement::CalcUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
         if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
             let elem = PartDefBodyElement::PortUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
@@ -1018,7 +1028,7 @@ mod par_002_nested_def_tests {
                         .map(|n| crate::parser::lex::name_bytes(source, n)),
                     Some(&b"hasLegalProfileDepth"[..])
                 );
-                assert_eq!(c.value.type_name, None);
+                assert!(c.value.typing.is_none());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
         }
@@ -1039,7 +1049,7 @@ mod par_002_nested_def_tests {
                         .map(|n| crate::parser::lex::name_bytes(source, n)),
                     Some(&b"discBrakeConstraint"[..])
                 );
-                assert!(c.value.type_name.is_some());
+                assert!(c.value.typing.is_some());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
         }

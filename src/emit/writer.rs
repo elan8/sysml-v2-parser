@@ -9,6 +9,8 @@ pub(crate) struct EmitWriter<'a> {
     opts: &'a EmitOptions,
     document: &'a ParsedDocument,
     at_line_start: bool,
+    /// Set by [`Self::begin_anonymous_declaration`]; consumed by the next write.
+    absorbs_leading_space: bool,
 }
 
 impl<'a> EmitWriter<'a> {
@@ -19,7 +21,17 @@ impl<'a> EmitWriter<'a> {
             opts,
             document,
             at_line_start: true,
+            absorbs_leading_space: false,
         }
+    }
+
+    /// Marks the point where a declaration label would stand but none was authored.
+    ///
+    /// Clauses supply their own leading space (` :>> x`), which separates them from a label.
+    /// With no label, that space would lead the line (` :>> info = info1;`) or double the one
+    /// after a prefix (`out  :>> x`). The next write drops it in exactly those two positions.
+    pub(crate) fn begin_anonymous_declaration(&mut self) {
+        self.absorbs_leading_space = true;
     }
 
     pub(crate) fn emit_comments(&self) -> bool {
@@ -31,6 +43,13 @@ impl<'a> EmitWriter<'a> {
     }
 
     pub(crate) fn push_str(&mut self, s: &str) {
+        let s = if std::mem::take(&mut self.absorbs_leading_space)
+            && (self.at_line_start || self.buf.ends_with(' '))
+        {
+            s.strip_prefix(' ').unwrap_or(s)
+        } else {
+            s
+        };
         if self.at_line_start && !s.is_empty() && s != "\n" {
             for _ in 0..self.depth * self.opts.indent {
                 self.buf.push(' ');

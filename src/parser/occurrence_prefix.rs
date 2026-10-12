@@ -323,6 +323,14 @@ pub(crate) fn kind_keyword_follows(input: Input<'_>, keyword: &[u8]) -> bool {
     scan_prefix_for(input, |fragment| starts_with_keyword(fragment, keyword))
 }
 
+/// [`kind_keyword_follows`] for a two-word kind: `calc def`, as opposed to the `calc` usage.
+pub(crate) fn kind_keyword_pair_follows(input: Input<'_>, first: &[u8], second: &[u8]) -> bool {
+    scan_prefix_for(input, |fragment| {
+        starts_with_keyword(fragment, first)
+            && starts_with_keyword(fragment[first.len()..].trim_ascii_start(), second)
+    })
+}
+
 /// Whether a `#` extension tag follows the member's optional prefixes; same contract as
 /// [`kind_keyword_follows`], with the `#` itself as the target instead of a keyword.
 pub(crate) fn hash_extension_follows(input: Input<'_>) -> bool {
@@ -658,7 +666,9 @@ pub(crate) fn occurrence_usage_prefix(
 }
 
 /// `UsageExtensionKeyword*`, in authored order. Takes and returns trivia-free input.
-fn usage_extension_keywords(mut input: Input<'_>) -> (Input<'_>, Vec<Node<UsageExtensionKeyword>>) {
+pub(crate) fn usage_extension_keywords(
+    mut input: Input<'_>,
+) -> (Input<'_>, Vec<Node<UsageExtensionKeyword>>) {
     let mut extension_keywords = Vec::new();
     while input.fragment().starts_with(b"#") {
         let Ok((rest, keyword)) = usage_extension_keyword(input) else {

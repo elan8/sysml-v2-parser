@@ -427,6 +427,11 @@ pub struct CollectionOperatorBody {
     /// feature body, so it may be documented like any other.
     pub doc: Option<Box<Node<super::DocComment>>>,
     pub parameters: Vec<Node<CollectionOperatorParameter>>,
+    /// Members between the parameters and the result. `ExpressionBody = '{' FunctionBodyPart
+    /// '}'`, so a body expression owns the same items a calculation body does: `(1..n)->forAll {
+    /// in i : Natural; private attribute f = frames#(i); f.valid }` (Geometry Examples/
+    /// VehicleGeometryAndCoordinateFrames.sysml).
+    pub members: Vec<Node<super::CalcDefBodyElement>>,
     pub result: Option<Box<Node<Expression>>>,
     pub close_brace_span: Span,
 }

@@ -122,7 +122,7 @@ fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Constrain
                 prefix,
                 short_name,
                 name: name_str,
-                type_name: header.type_reference,
+                typing: header.typing,
                 multiplicity: header.multiplicity,
                 subsets: header.subsets,
                 redefines: header.redefines,
@@ -251,11 +251,14 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::AliasDef,
         )
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"in")
-        || starts_with_keyword(input.fragment(), b"out")
-        || starts_with_keyword(input.fragment(), b"inout")
+    } else if (starts_with_keyword(after_visibility.fragment(), b"in")
+        || starts_with_keyword(after_visibility.fragment(), b"out")
+        || starts_with_keyword(after_visibility.fragment(), b"inout"))
+        // `in fork f;` is a control node with a directed `ControlNodePrefix`, owned by the
+        // action-member arm below, not a directed parameter named `fork`.
+        && !prefixed_control_node_follows(input)
     {
-        if named_in_out_missing_type(input) {
+        if named_in_out_missing_type(after_visibility) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
@@ -274,9 +277,9 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::AttributeUsage(Box::new(n))
         })
         .parse(input)?
-    } else if input.fragment().starts_with(b":>>")
-        || input.fragment().starts_with(b":>")
-        || starts_with_keyword(input.fragment(), b"redefines")
+    } else if after_visibility.fragment().starts_with(b":>>")
+        || after_visibility.fragment().starts_with(b":>")
+        || starts_with_keyword(after_visibility.fragment(), b"redefines")
     {
         // `redefines partMasses = (…);` is the keyword spelling of the same `:>>` member
         // (`Redefinitions = ( ':>>' | 'redefines' ) OwnedRedefinition`, SysML BNF); without it the
@@ -321,10 +324,11 @@ pub(crate) fn constraint_def_body_element(
             (next, ConstraintDefBodyElement::Error(node))
         }
     } else if let Some((next, member)) =
-        (starts_with_any_keyword(
+        ((starts_with_any_keyword(
             after_visibility.fragment(),
             crate::parser::lex::CALCULATION_ACTION_STARTERS,
         ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
+            || prefixed_control_node_follows(input))
         .then(|| {
             // Transactional: when the action parser declines (`if a ? b else c` is a result
             // expression), the references it allocated must not stay in the arena.
@@ -412,13 +416,25 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
         let (input, identification) = identification(input)?;
         (input, (identification, None))
     };
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
-    let (input, multiplicity) = opt(preceded(
+    // `FeatureSpecializationPart = ... | MultiplicityPart FeatureSpecialization*`: the
+    // multiplicity may precede the typing (`calc c[2] : C;`, #181), as on the other usages.
+    let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
     let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
     // `calc self: Calculation :>> Action::self, Evaluation::self;` (Systems Library
@@ -606,7 +622,8 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
     if crate::parser::lex::starts_with_any_keyword(
         action_peek.fragment(),
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
-    ) {
+    ) || prefixed_control_node_follows(peek)
+    {
         let start = input;
         // Transactional for the same reason as the constraint-body probe: a declined attempt
         // (`if a ? b else c` is a result expression) must leave no arena entries behind.
@@ -700,6 +717,15 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
     calc_def_body_element(input)
 }
 
+/// Whether a control node follows its `ControlNodePrefix` (`individual fork f;`, `in fork f;`,
+/// #179). The bare keywords are in `CALCULATION_ACTION_STARTERS`; this admits the prefixed
+/// spellings to the same action-member arm.
+fn prefixed_control_node_follows(input: Input<'_>) -> bool {
+    [&b"fork"[..], b"join", b"merge", b"decide"]
+        .iter()
+        .any(|keyword| crate::parser::occurrence_prefix::kind_keyword_follows(input, keyword))
+}
+
 /// Skips an optional `(private|protected|public)?` `abstract`? prefix and reports whether either
 /// was present, for the dispatch-gate peeks below (`calc_usage`/`parse_calc_def` themselves also
 /// consume `abstract`/visibility, so this only needs to decide *which* branch to try).
@@ -722,13 +748,9 @@ fn skip_calc_modifiers(input: Input<'_>) -> IResult<Input<'_>, bool> {
 /// `starts_with_keyword(.., b"calc")` alone can't tell apart from this one (both start with
 /// `calc`).
 fn calc_def_follows_visibility(input: Input<'_>) -> bool {
-    let Ok((after_mods, _)) = skip_calc_modifiers(input) else {
-        return false;
-    };
-    let Ok((after_calc, _)) = preceded(tag(&b"calc"[..]), ws1).parse(after_mods) else {
-        return false;
-    };
-    starts_with_keyword(after_calc.fragment(), b"def")
+    // Past the whole `OccurrenceDefinitionPrefix`, not only visibility, `abstract` and `ref`:
+    // `individual calc def D;` (#175).
+    crate::parser::occurrence_prefix::kind_keyword_pair_follows(input, b"calc", b"def")
 }
 
 /// True when `input` is a modifier-prefixed, `def`-less `calc` usage (e.g. `abstract calc
@@ -1066,28 +1088,75 @@ fn kerml_succession_member_inner(
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
-    // Named form, only with the `first` keyword: `succession triggerAfter [taNum] first
-    // [0..1] transitionLinkSource then ...;` (`TransitionPerformances.kerml`).
-    let (input, named) = opt(map(
-        (
-            preceded(ws_and_comments, name),
-            opt(preceded(
-                ws_and_comments,
-                crate::parser::usage::multiplicity_node,
-            )),
-            preceded(ws_and_comments, tag(&b"first"[..])),
-            ws1,
-        ),
-        |(n, m, _, _)| (n, m),
-    ))
+    // `SuccessionDeclaration = ( FeatureDeclaration? 'first' )? ...`. With the keyword, an
+    // optional declaration precedes it: a name (`succession triggerAfter [taNum] first ...`,
+    // `TransitionPerformances.kerml`), specializations alone (`succession redefines p : L [1]
+    // first paint then dry;`), or nothing (`succession first startShot then operated;`).
+    // Without it the ends follow directly. The declared attempt is transactional: its
+    // multiplicity may allocate references before `first` turns out to be absent.
+    let (input, declared) = opt(|input| {
+        crate::parser::span::reference_transaction(input, |input| {
+            let (peek, _) = ws_and_comments(input)?;
+            let (input, declared_name) = if starts_with_any_keyword(
+                peek.fragment(),
+                &[
+                    b"first",
+                    b"typed",
+                    b"subsets",
+                    b"references",
+                    b"crosses",
+                    b"redefines",
+                    b"ordered",
+                    b"nonunique",
+                ],
+            ) || peek.fragment().starts_with(b":")
+                || peek.fragment().starts_with(b"[")
+            {
+                (input, None)
+            } else {
+                let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+                (input, Some(n))
+            };
+            let (input, part) = kerml_feature_specialization_part(input)?;
+            let (keyword_start, _) = ws_and_comments(input)?;
+            if !starts_with_keyword(keyword_start.fragment(), b"first") {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+            let (input, _) = tag(&b"first"[..]).parse(keyword_start)?;
+            let first_span = crate::parser::span::span_from_to(keyword_start, input);
+            let (input, _) = ws1(input)?;
+            Ok((input, (declared_name, part, first_span)))
+        })
+    })
     .parse(input)?;
-    let (name_str, decl_multiplicity) = match named {
-        Some((n, m)) => (Some(n), m),
-        None => (None, None),
-    };
+    let (name_str, decl_multiplicity, multiplicity_modifiers, specializations, first_span) =
+        match declared {
+            Some((n, part, span)) => (
+                n,
+                part.multiplicity,
+                part.multiplicity_modifiers,
+                part.specializations,
+                Some(span),
+            ),
+            None => (
+                None,
+                None,
+                crate::ast::MultiplicityModifiers::default(),
+                Vec::new(),
+                None,
+            ),
+        };
     let (input, first) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // A multiplicity may follow the keyword directly: `then[0..1] endShot`.
+    let (input, _) = if input.fragment().starts_with(b"[") {
+        (input, ())
+    } else {
+        ws1(input)?
+    };
     let (input, then) = kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
@@ -1099,6 +1168,9 @@ fn kerml_succession_member_inner(
                 is_all: is_all.is_some(),
                 name: name_str,
                 multiplicity: decl_multiplicity,
+                multiplicity_modifiers,
+                specializations,
+                first_span,
                 first,
                 then,
                 membership: Membership::feature(visibility, visibility_span),
@@ -1750,7 +1822,9 @@ const PART_USAGE_PREFIX_STARTERS: &[&[u8]] = &[
     b"variation",
 ];
 
-fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
+pub(crate) fn calc_def_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -1929,8 +2003,9 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::AttributeUsage(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"redefines") {
-        // Keyword-led, nameless redefinition: `redefines predecessors [0];`. A `Feature` (KerML
+    } else if starts_with_keyword(after_visibility, b"redefines") {
+        // Keyword-led, nameless redefinition: `redefines predecessors [0];`, with its
+        // `MemberPrefix` visibility if any (`private redefines b = 1;`, #178). A `Feature` (KerML
         // BNF 562) may be nothing but its `FeatureDeclaration` (601), and that declaration's
         // second alternative is a bare `FeatureSpecializationPart` (632) = `FeatureSpecialization+
         // MultiplicityPart?`, reaching `Redefinitions` (663) -> `Redefines` (666) = `REDEFINES
@@ -2690,7 +2765,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"c"[..])
         );
-        assert!(node.value.type_name.is_some());
+        assert!(node.value.typing.is_some());
         assert_eq!(
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
@@ -2708,7 +2783,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"mc"[..])
         );
-        assert!(node.value.type_name.is_some());
+        assert!(node.value.typing.is_some());
         assert!(matches!(node.value.body, ConstraintDefBody::Brace { .. }));
     }
 
@@ -2722,7 +2797,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"hasLegalProfileDepth"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
     }
 
     /// Regression: `Systems Library/Constraints.sysml`'s `constraintChecks` -- `abstract` +
@@ -2740,7 +2815,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"constraintChecks"[..])
         );
-        assert!(node.value.type_name.is_some());
+        assert!(node.value.typing.is_some());
     }
 
     /// Regression: `Systems Library/Constraints.sysml`'s `assertedConstraintChecks` -- `abstract`
@@ -2756,7 +2831,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"assertedConstraintChecks"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
     }
 
     /// Regression: `Systems Library/Requirements.sysml`'s `constraint assumptions[0..*] :>
@@ -2773,7 +2848,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"assumptions"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
     }
 
     /// Regression: `Systems Library/Requirements.sysml`'s `constraint assumptions :>>
@@ -2790,7 +2865,7 @@ mod constraint_usage_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"assumptions"[..])
         );
-        assert_eq!(node.value.type_name, None);
+        assert!(node.value.typing.is_none());
         assert!(matches!(
             node.value.body,
             ConstraintDefBody::Semicolon { .. }

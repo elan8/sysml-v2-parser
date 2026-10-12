@@ -94,6 +94,11 @@ fn connection_def_body_element(
         map(part_usage, |p| {
             ConnectionDefBodyElement::PartUsage(Box::new(p))
         }),
+        // Last, so every keyword-led member above keeps priority over the keyword-less usage.
+        map(
+            crate::parser::attribute::default_reference_member,
+            |usage| ConnectionDefBodyElement::DefaultReferenceUsage(Box::new(usage)),
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

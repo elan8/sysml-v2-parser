@@ -265,6 +265,14 @@ fn emit_body_expression_bare(
             }
         }
     }
+    for (index, member) in body.members.iter().enumerate() {
+        w.push_char(' ');
+        super::view::emit_calc_body_element(
+            w,
+            &format!("body-expression/member[{index}]"),
+            &member.value,
+        )?;
+    }
     if let Some(result) = &body.result {
         w.push_char(' ');
         emit_expression(w, &result.value)?;

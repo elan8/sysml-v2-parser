@@ -551,6 +551,13 @@ pub(crate) fn subsetting(
     subsetting_clause(input, true)
 }
 
+/// [`subsetting`] for a declaration whose `ValuePart` the caller parses itself.
+pub(crate) fn subsetting_before_value(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
+    subsetting_clause(input, false).map(|(input, (relationship, _))| (input, relationship))
+}
+
 /// `takes_value: false` leaves a trailing `= expr` for a caller that owns the declaration's
 /// `ValuePart` as a [`crate::ast::FeatureValue`].
 fn subsetting_clause(
@@ -790,6 +797,20 @@ fn specialization_clauses_with(
 pub(crate) fn feature_specializations(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Vec<crate::ast::FeatureSpecialization>> {
+    feature_specializations_with(input, true)
+}
+
+/// Ordered `FeatureSpecialization`s for an owner whose `ValuePart` follows the declaration.
+pub(crate) fn feature_specializations_before_value(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<crate::ast::FeatureSpecialization>> {
+    feature_specializations_with(input, false)
+}
+
+fn feature_specializations_with(
+    input: Input<'_>,
+    subsetting_takes_value: bool,
+) -> IResult<Input<'_>, Vec<crate::ast::FeatureSpecialization>> {
     let mut input = input;
     let mut out = Vec::new();
     loop {
@@ -809,7 +830,9 @@ pub(crate) fn feature_specializations(
             );
             out.push(crate::ast::FeatureSpecialization::Typing(relationship));
             input = after_typing;
-        } else if let Ok((rest, (relationship, value))) = subsetting(after_ws) {
+        } else if let Ok((rest, (relationship, value))) =
+            subsetting_clause(after_ws, subsetting_takes_value)
+        {
             out.push(crate::ast::FeatureSpecialization::Subsetting {
                 relationship,
                 value,

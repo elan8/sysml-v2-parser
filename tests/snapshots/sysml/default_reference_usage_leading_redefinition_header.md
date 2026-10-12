@@ -24,16 +24,8 @@ package DefaultReferenceUsageLeadingRedefinitionHeader {
 )
 ~~~
 # FORMAT
-~~~sysml
-package DefaultReferenceUsageLeadingRedefinitionHeader {
-    attribute def Outer :> Unit {
-         :>> unitConversion : ConversionByConvention {
-             :>> referenceUnit = metre;
-             :>> conversionFactor = 1;
-        }
-         :>> elements : Real[3] ordered nonunique;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

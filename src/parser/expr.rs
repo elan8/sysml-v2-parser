@@ -34,7 +34,12 @@ fn numeric_literal_token(input: Input<'_>) -> IResult<Input<'_>, (&[u8], crate::
     while i < frag.len() && frag[i].is_ascii_digit() {
         i += 1;
     }
-    if i == digit_start {
+    // `RealValue = DECIMAL_VALUE? '.' ( DECIMAL_VALUE | EXPONENTIAL_VALUE )` (KerML): the integer
+    // part is optional, so `.6` is a real. A `.` with no digit after it is not a literal.
+    let fraction_only = i == digit_start
+        && frag.get(i) == Some(&b'.')
+        && frag.get(i + 1).is_some_and(u8::is_ascii_digit);
+    if i == digit_start && !fraction_only {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Digit,
@@ -502,6 +507,23 @@ fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<Collect
             break;
         }
     }
+    // `FunctionBodyPart` members before the result expression. Only keyword-led ones: a
+    // visibility or `attribute` cannot start an expression, so the result is never read as a
+    // member.
+    let mut members = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        let leads_member = [&b"private"[..], b"protected", b"public", b"attribute"]
+            .iter()
+            .any(|keyword| starts_with_keyword(next.fragment(), keyword));
+        if !leads_member {
+            input = next;
+            break;
+        }
+        let (next, member) = crate::parser::constraint::calc_def_body_element(next)?;
+        members.push(member);
+        input = next;
+    }
     let (next, _) = ws_and_comments(input)?;
     let (input, result) = if next.fragment().starts_with(b"}") {
         (next, None)
@@ -520,6 +542,7 @@ fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<Collect
                 open_brace_span,
                 doc: doc.map(Box::new),
                 parameters,
+                members,
                 result,
                 close_brace_span,
             },

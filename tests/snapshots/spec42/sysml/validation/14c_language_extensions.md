@@ -288,42 +288,42 @@ package '14c-Language-Extensions' {
             status : Status;
         }
         metadata def <situation> SituationMetadata :> SemanticMetadata {
-             :>> baseType default situations meta SysML::Usage;
+            :>> baseType default situations meta SysML::Usage;
         }
         metadata def <cause> CauseMetadata :> SituationMetadata {
-             :>> baseType = causes meta SysML::Usage;
+            :>> baseType = causes meta SysML::Usage;
         }
         metadata def <failure> FailureModeMetadata :> SituationMetadata {
-             :>> baseType = failureModes meta SysML::Usage;
+            :>> baseType = failureModes meta SysML::Usage;
         }
         metadata def <effect> EffectMetadata :> SituationMetadata {
-             :>> baseType = effects meta SysML::Usage;
+            :>> baseType = effects meta SysML::Usage;
         }
         metadata def <fmea> FMEAItemMetadata :> SituationMetadata {
-             :> annotatedElement : SysML::ItemDefinition;
-             :> annotatedElement : SysML::ItemUsage;
-             :>> baseType = fmeaItems meta SysML::Usage;
+            :> annotatedElement : SysML::ItemDefinition;
+            :> annotatedElement : SysML::ItemUsage;
+            :>> baseType = fmeaItems meta SysML::Usage;
         }
         metadata def <causation> CausationMetadata :> SemanticMetadata {
-             :>> annotatedElement : SysML::ConnectionUsage;
-             :>> baseType = causations meta SysML::Usage;
+            :>> annotatedElement : SysML::ConnectionUsage;
+            :>> baseType = causations meta SysML::Usage;
         }
         metadata def <fmeaspec> FMEARequirementMetadata :> SemanticMetadata {
-             :>> annotatedElement : SysML::RequirementUsage;
-             :>> baseType = fmeaRequirements meta SysML::Usage;
+            :>> annotatedElement : SysML::RequirementUsage;
+            :>> baseType = fmeaRequirements meta SysML::Usage;
         }
         metadata def <violation> ViolationMetadata :> SemanticMetadata {
-             :>> annotatedElement : SysML::ConnectionUsage;
-             :>> baseType = violations meta SysML::Usage;
+            :>> annotatedElement : SysML::ConnectionUsage;
+            :>> baseType = violations meta SysML::Usage;
         }
         abstract metadata def ControllingMeasureMetadata :> SemanticMetadata {
-             :>> annotatedElement : SysML::ConnectionUsage;
+            :>> annotatedElement : SysML::ConnectionUsage;
         }
         metadata def <prevention> PreventionMetadata :> ControllingMeasureMetadata {
-             :>> baseType = preventions meta SysML::Usage;
+            :>> baseType = preventions meta SysML::Usage;
         }
         metadata def <mitigation> MitigationMetadata :> ControllingMeasureMetadata {
-             :>> baseType = mitigations meta SysML::Usage;
+            :>> baseType = mitigations meta SysML::Usage;
         }
     }
     package FMEAUserModel {

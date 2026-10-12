@@ -21,13 +21,8 @@ metadata def M {
 )
 ~~~
 # FORMAT
-~~~sysml
-metadata def M {
-     :> annotatedElement : SysML::Usage;
-     :> annotatedElement : SysML::Definition;
-     :>> baseType = SysML::PartUsage;
-    attribute named :> annotatedElement;
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

@@ -9,6 +9,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Succession declaration modifiers survive parsing and emission (breaking AST change,
+  `PARSE_AST_VERSION` 277).** `KermlSuccessionMember::multiplicity_modifiers` retains ordering
+  and uniqueness keyword slots. Semantic snapshots project the complete succession declaration
+  and both ends instead of a marker. Documentation identification, locale and body boundaries
+  skip line and block notes while stopping at the member's own regular comment body; snapshots
+  also project documentation short names.
+
+- **KerML successions take their whole declaration, and named documentation keeps its body
+  (breaking AST change, `PARSE_AST_VERSION` 276).**
+  - `SuccessionDeclaration = ( FeatureDeclaration? 'first' )? ...`. Only the ends-only and the
+    named `first` forms were parsed; `succession first a then b;` and `succession redefines p :
+    L [1] first a then b;` were rejected. `KermlSuccessionMember::specializations` and
+    `::first_span` are new. A multiplicity may follow `then` directly (`then[0..1] endShot`)
+    (#163).
+  - `doc <a> /* text */` lost its text and took the next member's first word as its declared
+    name, with no diagnostic. The documentation's `Identification` is now read without
+    skipping the member's own body (#164).
+
+- **A constraint usage keeps all its types, and directed and redefinition members keep their
+  visibility (breaking AST change, `PARSE_AST_VERSION` 275).**
+  - `constraint c : A, B;` kept only `A`, with no diagnostic. `ConstraintUsage::type_name` is
+    replaced by `ConstraintUsage::typing: Option<Node<TypingRelationship>>`, the shape `CalcUsage`
+    and the other usages have, so every target and the clause's spelling (`:`, `defined by`)
+    survive (#174).
+  - `private in x : Real;` in a constraint body and `private redefines b = 1;` in constraint
+    and calculation bodies were rejected: the nodes had no slot for `MemberPrefix` visibility.
+    `InOutDecl::membership` is new, and the keyword-less redefinition binding records its
+    visibility on the `AttributeUsage::membership` it already had (#178).
+
+- **Succession members and body expressions from the release corpus (breaking AST change,
+  `PARSE_AST_VERSION` 274).** New variants and fields; consumers with exhaustive matches need
+  arms (#166, #167).
+  - `then accept sig after 10[SI::s];`: `TransitionAccept::NamedTimeTrigger`, a time trigger
+    whose payload parameter is named.
+  - `then state wait;` and `then message m of M from a to b;`: `StateUsage::then_span` and
+    `FlowUsage::then_span`, the `SourceSuccessionMember` slot `PartUsage` already has. `then
+    stateful;` stays a reference to a state.
+  - `of fuelCommand : FuelCommand = msg.fuelCommand`: `PayloadFeature::value`.
+  - `succession first a.start then b.done;` in an interface usage body:
+    `InterfaceUsageBodyElement::SuccessionUsage`.
+  - `(1..n)->forAll { in i : Natural; private attribute f = frames#(i); f.valid }`:
+    `CollectionOperatorBody::members`, the `FunctionBodyPart` items between a body expression's
+    parameters and its result. A member is recognised by a leading visibility or `attribute`.
+
+- **Required constraint declarations retain their values and all specializations (breaking AST
+  change, `PARSE_AST_VERSION` 273).** `RequireConstraint::specializations` replaces `typing`,
+  `subsets` and `redefines` with the ordered `FeatureSpecialization` sequence, retaining references,
+  crosses and repeated clauses. `RequireConstraint::value` owns the separate `ValuePart`, including
+  `=`, `:=`, `default` and `default :=`; subsetting parsing no longer consumes and drops it.
+  Emission, visitors, serde validation and semantic snapshots preserve these facts. Required
+  constraints nested in constraint bodies are now projected structurally as well.
+
+- **Body members from the release corpus that their bodies rejected (breaking AST change,
+  `PARSE_AST_VERSION` 269).** New variants and fields; consumers with exhaustive matches need
+  arms (#165, #168).
+  - `actor user = UseSystem::user;`: `ActorUsage::value`.
+  - Keyword-less and directed usages in connection definition, occurrence and requirement
+    bodies (`:>> info = info1;`, `out :>> fuelEconomy = 35[mph];`, `in massActual :>
+    ISQ::mass;`): `DefaultReferenceUsage` on `ConnectionDefBodyElement`,
+    `OccurrenceBodyElement` and `RequirementDefBodyElement`.
+  - `require constraint c1 :>> c;`, `assume #goal constraint c;` and `require #goal c;`:
+    `RequireConstraint::extension_keywords`, `::subsets`, `::redefines`. Extension keywords
+    without the `constraint` keyword still select the declared form.
+  - `private import X::*;` in a case-family body: `UseCaseDefBodyElement::Import`.
+  - `end port p : P;` in a flow definition: `OccurrenceBodyElement::PortUsage`.
+  - An interface usage nested in an interface definition or usage body, and `attribute` in an
+    interface usage body: `InterfaceDefBodyElement::InterfaceUsage`,
+    `InterfaceUsageBodyElement::InterfaceUsage` and `::AttributeUsage`.
+  - `port nut :>> nut [5];`: a port's multiplicity may follow its specialization clauses.
+  - `.6`: a real literal needs no integer part (KerML `RealValue`).
+  - An anonymous keyword-less usage is emitted without the stray space before its first
+    clause (`:>> info = info1;`, was ` :>> info = info1;`).
+
+- **Body gates reach five members they used to miss.** No AST type changes.
+  - `calc c[2] : C;`: a calculation usage takes its multiplicity before the typing as well as
+    after (#181).
+  - `individual calc def D;` in a calculation body: the nested-definition gate looks past the
+    whole `OccurrenceDefinitionPrefix` (#175).
+  - `individual fork f;` and `in fork f;` in calculation and constraint bodies: the action-member
+    arm is admitted for a prefixed control node, and a constraint body no longer reads `in fork
+    f;` as a parameter named `fork` (#179).
+  - `ref :>> x default y;` in action and calculation bodies keeps its value. Only `= expr` was
+    read; `default`, `:=` and `default :=` were dropped without a diagnostic, as was the value of
+    `ref r :> s = y;` (#173).
+  - `#Tag merge m;`, `#Tag interface i ...;` and `#Tag calc c;` stay one member in action, part
+    and use case bodies. The `#` metadata arm claimed the tag first and split the member in two
+    (#180).
+
 - **An action usage body owns `perform` members, and an action usage carries a value (breaking
   AST change, `PARSE_AST_VERSION` 268).** `ActionUsage` and `ActionDefinition` share one
   `ActionBody`, whose `BehaviorUsageElement` includes `PerformActionUsage`, but only the definition

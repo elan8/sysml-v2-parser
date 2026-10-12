@@ -85,9 +85,9 @@ package Control {
         then done;
     }
     action run : Run {
-         :>> stateSpace : ScalarValues::Real;
-         :> i;
-         :>> i : ScalarValues::Integer[1];
+        :>> stateSpace : ScalarValues::Real;
+        :> i;
+        :>> i : ScalarValues::Integer[1];
     }
     part def Rig {
         perform action providePower;

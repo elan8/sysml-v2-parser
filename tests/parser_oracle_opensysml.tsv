@@ -106,9 +106,6 @@ theirs-rejects	negative/semantic/k51-return-parameter-in-classifier.kerml
 both-reject	negative/semantic/k52-two-conjugators.kerml
 ours-rejects	negative/semantic/k54-cross-feature-typed-narrower-than-end.kerml
 ours-rejects	negative/semantic/s21-interface-def-end-not-port.sysml
-ours-rejects	negative/semantic/s28-requirement-def-subject-not-first.sysml
-ours-rejects	negative/semantic/s30-requirement-subject-not-first.sysml
-ours-rejects	negative/semantic/s83-redefined-constraint-usage-states-second-result-expression.sysml
 both-reject	negative/semantic/s86-end-with-direction.sysml
 theirs-rejects	negative/semantic/s87-end-derived-or-abstract.sysml
 ours-rejects	negative/semantic/s88-cross-feature-typed-narrower-than-end.sysml
@@ -120,7 +117,6 @@ ours-rejects	probes/validateConnectorBinarySpecialization.kerml
 both-reject	probes/validateDefinitionVariationMembership.sysml
 both-reject	probes/validateDefinitionVariationSpecialization.sysml
 both-reject	probes/validateExposeOwningNamespace.sysml
-ours-rejects	probes/validateExpressionResultExpressionMembership.sysml
 theirs-rejects	probes/validateFeatureEndNoDirection.sysml
 theirs-rejects	probes/validateFeatureEndNotDerivedAbstractCompositeOrPortion.sysml
 ours-rejects	probes/validateFeatureHasType.kerml
@@ -128,8 +124,6 @@ ours-rejects	probes/validateInterfaceDefinitionEnd.sysml
 theirs-rejects	probes/validateNamespaceDistinguishablity.kerml
 ours-rejects	probes/validateObjectiveMembershipOwningType.sysml
 theirs-rejects	probes/validateRequirementConstraintMembershipOwningType.sysml
-ours-rejects	probes/validateRequirementDefinitionSubjectParameterPosition.sysml
-ours-rejects	probes/validateRequirementUsageSubjectParameterPosition.sysml
 theirs-rejects	probes/validateReturnParameterMembershipOwningType.kerml
 ours-rejects	probes/validateSendActionUsagePayloadArgument.sysml
 ours-rejects	probes/validateSpecializationSpecificNotConjugated.subset.kerml
