@@ -116,6 +116,38 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_import(&mut self, node: &Node<Import>) {
+        match node.value.membership.visibility {
+            Some(visibility) => {
+                if !self
+                    .document
+                    .source
+                    .validates_span(&node.value.membership.span)
+                {
+                    self.check(Err(
+                        "import visibility is not a valid source span".to_owned()
+                    ));
+                }
+                let keyword = match visibility {
+                    Visibility::Private => "private",
+                    Visibility::Protected => "protected",
+                    Visibility::Public => "public",
+                };
+                self.check(self.delimiter(
+                    &node.value.membership.span,
+                    keyword,
+                    "import visibility",
+                ));
+                self.check(sigil_within(
+                    &node.value.membership.span,
+                    &node.span,
+                    "import visibility",
+                ));
+            }
+            None => self.check(Err("an import requires explicit visibility".to_owned())),
+        }
+        super::visit::walk_import(self, node);
+    }
     fn visit_parse_error_node_value(&mut self, error: &ParseErrorNode) {
         if let Some(span) = &error.diagnostic_span {
             if !self.document.source.validates_span(span) || span.len == 0 {

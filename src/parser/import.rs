@@ -132,13 +132,14 @@ pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> 
     ))
 }
 
-/// Import: visibility? 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
+/// Import: visibility 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
 pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     // Speculated at many member starts; refuse unless `import` follows the optional
-    // visibility keyword, before entering an arena transaction.
+    // visibility keyword, before entering an arena transaction. This lookahead also routes
+    // a bare import to its owning grammar, which rejects the missing prefix.
     {
         let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
-        let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
+        let (cursor, _) = opt(crate::parser::lex::visibility_indicator).parse(cursor)?;
         let (cursor, _) = crate::parser::lex::ws_and_comments(cursor)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -148,6 +149,27 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
         }
     }
     reference_transaction(input, import_inner)
+}
+
+/// The Import production requires VisibilityIndicator in both pinned grammars.
+/// Recovery owns this token diagnosis; it never publishes a successful import with a default.
+pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
+    let (keyword_start, _) = ws_and_comments(input).ok()?;
+    if !crate::parser::lex::starts_with_keyword(keyword_start.fragment(), b"import") {
+        return None;
+    }
+    let (end, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
+        .parse(keyword_start)
+        .ok()?;
+    Some(crate::ast::ParseErrorNode {
+        diagnostic_span: Some(span_from_to(keyword_start, end)),
+        message: "an import requires an explicit visibility indicator".to_owned(),
+        code: "missing_import_visibility".to_owned(),
+        expected: Some("'public', 'private', or 'protected' before 'import'".to_owned()),
+        found: Some("import".to_owned()),
+        suggestion: Some("Specify the import visibility explicitly.".to_owned()),
+        category: Some(crate::error::DiagnosticCategory::ParseError),
+    })
 }
 
 /// The offset just past an import target's last authored token: its final suffix or filter member
@@ -190,9 +212,10 @@ pub(crate) fn import_target_end(shape: &crate::ast::ImportShape, reference_end: 
 fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_indicator(input)?;
+    let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"import"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, _) = ws_and_comments(input)?;
     let target_start = input;
     let (input, all) = opt(terminated(with_span(tag(&b"all"[..])), ws1)).parse(input)?;
     let all_span = all.map(|(span, _)| span);
@@ -211,7 +234,11 @@ fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             start,
             input,
             Import {
-                membership: Membership::new(MembershipKind::Import, visibility, visibility_span),
+                membership: Membership::new(
+                    MembershipKind::Import,
+                    Some(visibility),
+                    visibility_span,
+                ),
                 target: ImportTarget {
                     span: target_span,
                     all_span,
@@ -250,20 +277,17 @@ mod membership_tests {
     }
 
     #[test]
-    fn import_without_visibility_prefix_has_no_membership_visibility() {
-        let (_, node) = import_(input("import SI::kg;")).expect("import");
-        assert_eq!(node.value.membership.visibility, None);
-        assert_eq!(
-            node.value.membership.kind,
-            crate::ast::MembershipKind::Import
-        );
+    fn import_without_visibility_is_rejected_without_publishing_references() {
+        let context = ParseContext::new();
+        assert!(import_(context.input(b"import SI::kg;")).is_err());
+        assert!(context.finish().is_empty());
     }
 
     #[test]
     fn import_suffixes_are_typed_and_reference_excludes_wildcards() {
         let context = ParseContext::new();
         let source = crate::ast::SourceStorage::from(
-            "import $::A::B:: /* wildcard */ * /* recurse */ :: /* marker */ **;",
+            "private import $::A::B:: /* wildcard */ * /* recurse */ :: /* marker */ **;",
         );
         let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
         assert!(rest.fragment().is_empty());
@@ -303,7 +327,7 @@ mod membership_tests {
     fn filter_import_retains_typed_expression_members() {
         let context = ParseContext::new();
         let source = crate::ast::SourceStorage::from(
-            "import A /* before */ [ /* left */ x /* right */ ] [y];",
+            "private import A /* before */ [ /* left */ x /* right */ ] [y];",
         );
         let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
         assert!(rest.fragment().is_empty());

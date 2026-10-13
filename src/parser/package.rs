@@ -3,7 +3,7 @@
 use crate::ast::{
     ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, FilterMember, KermlFeatureDecl,
     KermlSemanticDecl, LibraryPackage, NamespaceDecl, NamespaceName, Node, Package, PackageBody,
-    PackageBodyElement, QualifiedIdentification, RootElement, RootNamespace, Visibility,
+    PackageBodyElement, QualifiedIdentification, RootElement, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
 use crate::parser::alias::alias_def;
@@ -50,7 +50,6 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
@@ -2612,18 +2611,6 @@ pub(crate) fn package_body_element(
     )
     .parse(input)?;
     Ok((input, Box::new(node_from_to(start, input, elem))))
-}
-
-/// Root: (package | namespace)*
-pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespace> {
-    // `ws_and_notes` at every member boundary, matching the editor entry point's own loop: a bare
-    // `/* ... */` between root members is the `Comment` production, and skipping it here would
-    // make strict and editor parsing disagree about the document.
-    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
-    let (input, elements) =
-        many0(preceded(crate::parser::lex::ws_and_notes, root_element)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    Ok((input, RootNamespace { elements }))
 }
 
 #[cfg(test)]

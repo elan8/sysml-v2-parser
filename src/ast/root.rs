@@ -349,6 +349,21 @@ mod serde_tests {
         }
     }
 
+    struct RemoveImportVisibility;
+
+    impl VisitorMut for RemoveImportVisibility {
+        fn visit_import(&mut self, node: &mut Node<crate::ast::Import>) {
+            node.value.membership.visibility = None;
+        }
+    }
+
+    #[test]
+    fn import_requires_visibility_in_the_serialized_document() {
+        assert_typed_corruption_is_rejected("private import A::*;", |document| {
+            apply_visitor(&mut RemoveImportVisibility, document);
+        });
+    }
+
     struct CorruptDirectedActionKind(bool);
 
     impl VisitorMut for CorruptDirectedActionKind {
@@ -657,7 +672,7 @@ mod serde_tests {
 
     #[test]
     fn parsed_document_rejects_tampered_import_suffix_token_provenance() {
-        let document = crate::parse("import A:: /* wildcard */ *;").expect("parse import");
+        let document = crate::parse("private import A:: /* wildcard */ *;").expect("parse import");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
         let marker = find_field_mut(&mut encoded, "marker_span").expect("marker span");
         marker["len"] = serde_json::json!(2);
@@ -669,7 +684,7 @@ mod serde_tests {
 
     #[test]
     fn parsed_document_rejects_tampered_combined_suffix_provenance() {
-        let document = crate::parse("import A::* /* gap */ ::**;").expect("parse import");
+        let document = crate::parse("private import A::* /* gap */ ::**;").expect("parse import");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
         let combined = find_field_mut(&mut encoded, "combined_recursive_suffix_span")
             .expect("combined suffix span");
@@ -749,8 +764,8 @@ mod serde_tests {
     #[test]
     fn parsed_document_validates_imports_nested_beneath_action_and_use_case_members() {
         for source in [
-            "action def A { part p { import Nested::ActionTarget::*; } }",
-            "use case def U { part p { import Nested::UseCaseTarget::*; } }",
+            "action def A { part p { private import Nested::ActionTarget::*; } }",
+            "use case def U { part p { private import Nested::UseCaseTarget::*; } }",
         ] {
             let document = crate::parse(source).expect("nested import");
             let mut encoded = serde_json::to_value(document).expect("serialize document");

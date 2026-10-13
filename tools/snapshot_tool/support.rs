@@ -651,11 +651,11 @@ mod tests {
 
     #[test]
     fn changed_format_must_reparse_to_the_same_semantic_projection() {
-        let original = parse("package P { import A::*; }").expect("parse original");
+        let original = parse("package P { private import A::*; }").expect("parse original");
         let error = validate_canonical_output(
             Path::new("semantic-change.md"),
             &original,
-            "package P {\n    import B::*;\n}",
+            "package P {\n    private import B::*;\n}",
         )
         .expect_err("changed reference must be rejected");
 

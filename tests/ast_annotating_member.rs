@@ -34,7 +34,7 @@ fn a_rep_member_round_trips_from_every_scope_that_owns_one() {
     for source in [
         "package P {\n  dependency d from a to b {\n    rep inline language \"text\" /* hello */\n  }\n}\n",
         "package P {\n  part def A;\n  alias B for A {\n    rep inline language \"text\" /* hello */\n  }\n}\n",
-        "package P {\n  import ISQ::* {\n    rep inline language \"text\" /* hello */\n  }\n}\n",
+        "package P {\n  private import ISQ::* {\n    rep inline language \"text\" /* hello */\n  }\n}\n",
         "package P {\n  connection def C {\n    port a;\n    port b;\n    connect a to b {\n      rep inline language \"text\" /* hello */\n    }\n  }\n}\n",
     ] {
         assert_reparses_identically(source);

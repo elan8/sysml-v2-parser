@@ -55,7 +55,7 @@ fn alias_body_retains_doc_comment() {
 
 #[test]
 fn import_body_retains_doc_comment() {
-    let input = "package P {\nimport ISQ::* {\ndoc /* import annotation */\n}\n}";
+    let input = "package P {\nprivate import ISQ::* {\ndoc /* import annotation */\n}\n}";
     let elements = package_elements(input);
     let import = elements
         .iter()

@@ -7483,7 +7483,7 @@ mod tests {
     fn semantic_ast_streams_through_partial_io_writer() {
         let document = crate::parse(
             r#"package Demo {
-                import Domain::Types;
+                private import Domain::Types;
                 use case def Analysis {
                     return part :>> Outputs::choice : Types::Item = Factory(input = Source::value);
                 }

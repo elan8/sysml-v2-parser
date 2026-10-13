@@ -34,6 +34,9 @@ Semantic references in the AST are opaque, document-local identities. Resolve th
 `ParsedDocument::qualified_reference` to borrow their authored segments, separator kinds, and
 source spans without splitting or reparsing display strings.
 
+Imports require explicit `public`, `private`, or `protected` visibility. A bare import is retained
+as malformed source and reports `missing_import_visibility` on its keyword.
+
 Declaration names are optional independently of short names in `Identification`. For example,
 `verification <V1> : VerificationType;` retains its short name while its AST `name` is `None`.
 

@@ -1006,7 +1006,7 @@ pub(crate) fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
     }
     fragment
         .get(keyword.len())
-        .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
+        .is_none_or(|b| !b.is_ascii_alphanumeric() && *b != b'_')
 }
 
 pub(crate) fn starts_with_any_keyword(fragment: &[u8], keywords: &[&[u8]]) -> bool {
@@ -1717,6 +1717,26 @@ pub(crate) fn gap_before_declared_name(
     }
 }
 
+/// The required VisibilityIndicator production, retaining just its authored keyword token.
+pub(crate) fn visibility_indicator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (crate::ast::Span, crate::ast::Visibility)> {
+    for (word, visibility) in [
+        (&b"private"[..], crate::ast::Visibility::Private),
+        (&b"protected"[..], crate::ast::Visibility::Protected),
+        (&b"public"[..], crate::ast::Visibility::Public),
+    ] {
+        if starts_with_keyword(input.fragment(), word) {
+            let (rest, _) = tag(word).parse(input)?;
+            return Ok((rest, (crate::parser::span_from_to(input, rest), visibility)));
+        }
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Tag,
+    )))
+}
+
 /// Optional `private` / `protected` / `public` visibility prefix, shared by every `*Def`/`*Usage`
 /// parser that needs to feed a [`crate::ast::Membership`] (parser work item 4b, post-PAR-006).
 /// Returns the span of the whole prefix (zero-width, positioned at `input`, when no prefix is
@@ -1729,25 +1749,18 @@ pub(crate) fn visibility_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (crate::ast::Span, Option<crate::ast::Visibility>)> {
     let start = input;
-    // Every member start runs this; nearly all of them begin with some other keyword, so refuse
-    // on the first byte before the three `tag` trials.
     if !input.fragment().starts_with(b"p") {
         return Ok((input, (crate::parser::span_from_to(start, input), None)));
     }
-    let (input, visibility) = opt(alt((
-        map(preceded(tag(&b"private"[..]), ws1), |_| {
-            crate::ast::Visibility::Private
-        }),
-        map(preceded(tag(&b"protected"[..]), ws1), |_| {
-            crate::ast::Visibility::Protected
-        }),
-        map(preceded(tag(&b"public"[..]), ws1), |_| {
-            crate::ast::Visibility::Public
-        }),
-    )))
-    .parse(input)?;
-    let span = crate::parser::span_from_to(start, input);
-    Ok((input, (span, visibility)))
+    let (input, visibility) =
+        opt(nom::sequence::terminated(visibility_indicator, ws1)).parse(input)?;
+    Ok((
+        input,
+        (
+            crate::parser::span_from_to(start, input),
+            visibility.map(|(_, value)| value),
+        ),
+    ))
 }
 
 /// Take input until we hit one of the terminator bytes (e.g. '{' or ';'); returns the consumed

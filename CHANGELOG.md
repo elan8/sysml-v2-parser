@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Imports require explicit public, private or protected visibility, as specified by both pinned
+  grammars. Bare imports become recovery nodes with `missing_import_visibility` on the import
+  keyword; source emission retains their statements and valid later siblings. Visibility keywords
+  are source-backed tokens, notes may separate import tokens, and serialization validates the
+  mandatory prefix. Strict parsing now validates the same parsed document and diagnostics as
+  editor parsing, including precise errors on bare root imports.
+
 - **Recovery diagnostics can identify an offending token independently of the retained malformed
   slice (breaking AST change, `PARSE_AST_VERSION` 278).** `ParseErrorNode::diagnostic_span` is
   source-backed and visited by the canonical span validation and normalization boundary.
