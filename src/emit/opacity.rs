@@ -371,7 +371,8 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
-            ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::Expression(_)
+            | ConstraintDefBodyElement::ReturnExpression(_) => {}
         }
     }
 }
@@ -420,7 +421,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             | CalcDefBodyElement::Succession(_)
             | CalcDefBodyElement::Import(_) => {}
             CalcDefBodyElement::ReturnDecl(n) => walk_calc_def_body(report, &p, &n.value.body),
-            CalcDefBodyElement::Expression(_) => {}
+            CalcDefBodyElement::Expression(_) | CalcDefBodyElement::ReturnExpression(_) => {}
         }
     }
 }
@@ -1703,7 +1704,8 @@ fn walk_constraint_body_elements(
             ConstraintDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
-            ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::Expression(_)
+            | ConstraintDefBodyElement::ReturnExpression(_) => {}
         }
     }
 }

@@ -99,7 +99,7 @@ package '7a-Variant Configuration - General Concept' {
             }
         }
         assert constraint {
-            subsystemA != subsystemA::subsystem2 | subsystemB == subsystemB::subsystem3;
+            subsystemA != subsystemA::subsystem2 | subsystemB == subsystemB::subsystem3
         }
     }
     part vehicleConfigA :> anyVehicleConfig {

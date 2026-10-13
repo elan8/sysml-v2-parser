@@ -431,6 +431,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected,
             suggestion,
         } => ParseErrorNode {
+            diagnostic_span: None,
             message,
             code,
             expected: Some(expected),
@@ -439,6 +440,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::MissingSemicolon => ParseErrorNode {
+            diagnostic_span: None,
             message: "missing semicolon before next declaration".to_string(),
             code: "missing_semicolon".to_string(),
             expected: Some("';'".to_string()),
@@ -447,6 +449,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::UnsupportedAnnotation => ParseErrorNode {
+            diagnostic_span: None,
             message: format!(
                 "incomplete parser support for metadata syntax in {scope_label}"
             ),
@@ -460,6 +463,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             category: Some(DiagnosticCategory::UnsupportedGrammarForm),
         },
         RecoveryClassification::MalformedAnnotationHead => ParseErrorNode {
+            diagnostic_span: None,
             message: format!("malformed metadata reference in {scope_label}"),
             code: "malformed_annotation_head".to_string(),
             expected: Some("qualified name after `#` or `@`".to_string()),
@@ -471,6 +475,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::Unexpected => ParseErrorNode {
+            diagnostic_span: None,
             message: format!("unexpected token in {scope_label}"),
             code: generic_code.to_string(),
             expected: Some(format!("valid {scope_label} element")),
@@ -516,6 +521,7 @@ pub(crate) fn unsupported_body_member(
         .trim()
         .to_string();
     let diagnostic = ParseErrorNode {
+        diagnostic_span: None,
         message: format!(
             "this {scope_label} member is spec-valid but not structurally implemented"
         ),
@@ -541,6 +547,7 @@ pub(crate) fn parse_error_from_recovery_node(
     span: &crate::ast::Span,
     node: &ParseErrorNode,
 ) -> ParseError {
+    let span = node.diagnostic_span.as_ref().unwrap_or(span);
     let mut err = ParseError::new(node.message.clone())
         .with_location(span.offset, span.line, span.column)
         .with_length(span.len.max(1))

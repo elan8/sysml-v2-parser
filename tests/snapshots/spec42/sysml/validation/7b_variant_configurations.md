@@ -230,7 +230,7 @@ package '7b-Variant Configurations' {
             }
             satisfy engineRqtChoice by engineChoice;
             assert constraint 'engine choice constraint' {
-                if engineRqtChoice == engineRqtChoice::highPerformanceRequirement ? engineChoice == engineChoice::'6cylEngine' else engineChoice == engineChoice::'4cylEngine';
+                if engineRqtChoice == engineRqtChoice::highPerformanceRequirement ? engineChoice == engineChoice::'6cylEngine' else engineChoice == engineChoice::'4cylEngine'
             }
             variation part transmissionChoice :>> transmission {
                 variant part manualTransmission : ManualTransmission {
@@ -245,7 +245,7 @@ package '7b-Variant Configurations' {
                 }
             }
             assert constraint 'engine-transmission selection constraint' {
-                (engineChoice == engineChoice::'4cylEngine' && transmissionChoice == transmissionChoice::manualTransmission) xor (engineChoice == engineChoice::'6cylEngine' && transmissionChoice == transmissionChoice::automaticTransmission);
+                (engineChoice == engineChoice::'4cylEngine' && transmissionChoice == transmissionChoice::manualTransmission) xor (engineChoice == engineChoice::'6cylEngine' && transmissionChoice == transmissionChoice::automaticTransmission)
             }
             part :>> rearAxleAssembly {
                 variation part rearWheelChoice :>> rearWheels {
@@ -253,7 +253,7 @@ package '7b-Variant Configurations' {
                     variant part wideRimWheel : WideRimWheel;
                 }
                 assert constraint 'engine-wheel selection constraint' {
-                    (engineChoice == engineChoice::'4cylEngine' && rearWheelChoice->forAll { in ref w; w == rearWheelChoice::narrowRimWheel }) xor (engineChoice == engineChoice::'6cylEngine' && rearWheelChoice->forAll { in ref w; w == rearWheelChoice::wideRimWheel });
+                    (engineChoice == engineChoice::'4cylEngine' && rearWheelChoice->forAll { in ref w; w == rearWheelChoice::narrowRimWheel }) xor (engineChoice == engineChoice::'6cylEngine' && rearWheelChoice->forAll { in ref w; w == rearWheelChoice::wideRimWheel })
                 }
             }
         }

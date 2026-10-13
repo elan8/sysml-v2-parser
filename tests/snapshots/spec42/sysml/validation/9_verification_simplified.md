@@ -141,7 +141,7 @@ package '9-Verification-simplified' {
             doc
             /* The actual mass shall be less than or equal to the required mass limit. */
             require constraint {
-                massActual <= massReqd;
+                massActual <= massReqd
             }
         }
         part def Vehicle {

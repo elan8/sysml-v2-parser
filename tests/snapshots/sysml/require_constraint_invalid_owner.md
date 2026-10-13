@@ -36,7 +36,7 @@ package RequirementConstraintOwners {
     part def Bad {
         require constraint invalid : Bound;
         assume constraint assumed {
-            true;
+            true
         }
         require existing;
         attribute retained;

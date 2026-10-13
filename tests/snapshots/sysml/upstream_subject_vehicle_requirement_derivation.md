@@ -28,7 +28,7 @@ package VehicleRequirementDerivation {
         subject mass :> ISQ::mass;
         attribute massLimit :> ISQ::mass;
         require constraint {
-            mass <= massLimit;
+            mass <= massLimit
         }
     }
 }

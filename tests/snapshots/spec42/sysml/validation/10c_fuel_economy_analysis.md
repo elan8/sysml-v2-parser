@@ -197,7 +197,7 @@ package '10c-Fuel Economy Analysis' {
             attribute actualFuelEconomy :> distancePerVolume;
             attribute requiredFuelEconomy :> distancePerVolume;
             require constraint {
-                actualFuelEconomy >= requiredFuelEconomy;
+                actualFuelEconomy >= requiredFuelEconomy
             }
         }
         requirement cityFuelEconomyRequirement : FuelEconomyRequirement {
@@ -295,7 +295,7 @@ package '10c-Fuel Economy Analysis' {
 				     */
                 :>> actualFuelEconomy = vehicle.fuelEconomy_city;
                 assume constraint {
-                    vehicle.cargoWeight == 1000[lb];
+                    vehicle.cargoWeight == 1000[lb]
                 }
             }
             requirement vehicleFuelEconomyRequirement_highway :> highwayFuelEconomyRequirement {
@@ -305,7 +305,7 @@ package '10c-Fuel Economy Analysis' {
 				     */
                 :>> actualFuelEconomy = vehicle.fuelEconomy_highway;
                 assume constraint {
-                    vehicle.cargoWeight == 1000[lb];
+                    vehicle.cargoWeight == 1000[lb]
                 }
             }
         }

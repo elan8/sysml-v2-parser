@@ -38,7 +38,7 @@ package Classes {
         portion feature all portions : Occurrence[1..*];
         var t : Integer;
         inv checkIt {
-            x > 1;
+            x > 1
         }
         connector from a references a.x to b;
         class Inner {

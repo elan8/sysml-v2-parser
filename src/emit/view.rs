@@ -110,7 +110,9 @@ pub(crate) fn emit_constraint_body_element(
             super::structure::emit_alias_def(w, path, &alias.value)
         }
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
-        ConstraintDefBodyElement::Expression(e) => {
+        ConstraintDefBodyElement::Expression(e) => emit_expression(w, &e.value),
+        ConstraintDefBodyElement::ReturnExpression(e) => {
+            w.push_str("return ");
             emit_expression(w, &e.value)?;
             w.push_char(';');
             Ok(())
@@ -290,7 +292,9 @@ pub(crate) fn emit_calc_body_element(
         CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
         CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
         CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
-        CalcDefBodyElement::Expression(e) => {
+        CalcDefBodyElement::Expression(e) => emit_expression(w, &e.value),
+        CalcDefBodyElement::ReturnExpression(e) => {
+            w.push_str("return ");
             emit_expression(w, &e.value)?;
             w.push_char(';');
             Ok(())

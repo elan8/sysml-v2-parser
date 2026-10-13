@@ -9,7 +9,7 @@ package InterfaceDefConstraintUsage {
     interface def PowerInterface {
         constraint limit : Limit;
         abstract constraint bounded : Limit {
-            limit == limit;
+            limit == limit
         }
     }
 }

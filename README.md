@@ -45,6 +45,10 @@ including repeated typings, references and crosses. It replaces the former `typi
 and `redefines` fields. `RequireConstraint::value` separately retains the declaration's binding,
 assignment or default value; formatting and semantic snapshots consume these typed fields.
 
+`ParseErrorNode::diagnostic_span` optionally highlights an offending token within the retained
+malformed source slice. The enclosing node span remains the authority for recovery emission;
+deserialization rejects diagnostic spans outside it or with invalid source coordinates.
+
 With the optional `serde` feature, serialize and deserialize `ParsedDocument` as the atomic cache
 unit. Its wire envelope includes `PARSE_AST_VERSION` and rejects version mismatches, invalid arena
 ranges, and dangling AST reference identities during deserialization.

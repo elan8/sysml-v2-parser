@@ -50,14 +50,14 @@ standard library package Occurrences {
     }
     datatype UnitBoundedReal :> Real {
         inv unitBound {
-            -1.0 <= that & that <= 1.0;
+            -1.0 <= that & that <= 1.0
         }
     }
     assoc all HappensBefore specializes HappensLink, Without {
         end feature source : Occurrence subsets participant[1];
         feature all spaceShotOf : Occurrence subsets spaceSliceOf[0..*] inverse of spaceShots;
         inv {
-            isClosed == true;
+            isClosed == true
         }
     }
     assoc struct LinkObject specializes Link, Object intersects Link, Object {

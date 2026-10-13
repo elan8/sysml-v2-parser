@@ -117,7 +117,7 @@ standard library package DerivationConnections {
         private assert constraint originalNotDerived {
             doc
             /* The original requirement must not be a derived requirement. */
-            derivedRequirements->excludes(originalRequirement);
+            derivedRequirements->excludes(originalRequirement)
         }
         private assert constraint originalImpliesDerived {
             doc
@@ -125,7 +125,7 @@ standard library package DerivationConnections {
 			 * Whenever the originalRequirement is satisfied, all of the derivedRequirements must also
 			 * be satisfied.
 			 */
-            originalRequirement.result implies allTrue(derivedRequirements.result);
+            originalRequirement.result implies allTrue(derivedRequirements.result)
         }
     }
     abstract connection derivations : Derivation[*] {

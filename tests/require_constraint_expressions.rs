@@ -125,14 +125,16 @@ fn require_constraint_not_and_comparison() {
 }
 
 #[test]
-fn require_constraint_semicolon_separated_ands_join() {
-    let src =
-        "package P {\nrequirement def R {\nrequire constraint { (a <= b); and (c <= d); };\n}\n}";
-    assert_no_other_in_constraint(src);
-    let root = parse(src).expect("parse");
-    let body = first_require_constraint_body(&root);
-    let joined = joined_constraint_expression_text(src, body).expect("expression text");
-    assert_eq!(joined, "(a <= b) and (c <= d)");
+fn require_constraint_semicolon_separated_ands_are_rejected() {
+    let source =
+        "package P { requirement def R { require constraint { (a <= b); and (c <= d); }; } }";
+    let error = parse(source).expect_err("a semicolon cannot split one result expression");
+    assert_eq!(error.code.as_deref(), Some("result_expression_semicolon"));
+    assert_eq!(
+        error.offset,
+        Some(source.find(';').expect("offending terminator"))
+    );
+    assert_eq!(error.length, Some(1));
 }
 
 #[test]
@@ -195,7 +197,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
 #[test]
 fn calc_body_inout_parameter_starts_recovery_sync_list() {
     // `inout` must be in CALC_DEF_BODY_STARTERS so recovery does not treat it as unknown.
-    let src = "package P {\ncalc def C {\ninout z : Real;\nreturn r : Real;\n1 + 1;\n}\n}";
+    let src = "package P {\ncalc def C {\ninout z : Real;\nreturn r : Real;\n1 + 1\n}\n}";
     let r = parse_with_diagnostics(src);
     assert!(
         r.errors.is_empty(),

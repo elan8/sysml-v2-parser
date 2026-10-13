@@ -128,7 +128,7 @@ standard library package RiskMetadata {
 		 * A Level is a Real number in the interval 0.0 to 1.0, inclusive.
 		 */
         assert constraint {
-            that >= 0.0 && that <= 1.0;
+            that >= 0.0 && that <= 1.0
         }
     }
     enum def LevelEnum :> Level {

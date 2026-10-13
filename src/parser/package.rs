@@ -602,6 +602,7 @@ fn unsupported_package_element(
     };
     let found = crate::parser::recovery::recovery_found_snippet_from_span(input, recovery_end);
     let recovery = crate::ast::ParseErrorNode {
+        diagnostic_span: None,
         message: format!(
             "the spec-valid {} production is not implemented in package bodies",
             starter.production.bnf_name()

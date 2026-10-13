@@ -286,7 +286,7 @@ package '8-Requirements' {
                 /*
 				 * A constraint can be used to formalize a requirement.
 				 */
-                massActual <= massReqd;
+                massActual <= massReqd
             }
         }
         requirement def <'2'> ReliabilityRequirement;
@@ -314,7 +314,7 @@ package '8-Requirements' {
 				 */
                 doc
                 /* full fuel tank */
-                vehicle.fuelLevel >= vehicle.fuelTankCapacity;
+                vehicle.fuelLevel >= vehicle.fuelTankCapacity
             }
         }
         requirement <'2.1'> vehicleMass2 : MassLimitationRequirement {
@@ -326,7 +326,7 @@ package '8-Requirements' {
             assume constraint fuelConstraint {
                 doc
                 /* empty fuel tank */
-                vehicle.fuelLevel == 0.0;
+                vehicle.fuelLevel == 0.0
             }
         }
         requirement <'2.2'> vehicleReliability2 : ReliabilityRequirement {

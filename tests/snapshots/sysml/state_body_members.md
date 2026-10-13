@@ -32,7 +32,7 @@ package StateBodyMembers {
         action substates : StateAction[0..*] :> stateActions, subactions;
         succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates;
         assert constraint {
-            notEmpty(exclusiveStates);
+            notEmpty(exclusiveStates)
         }
     }
 }

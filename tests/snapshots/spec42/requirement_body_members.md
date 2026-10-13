@@ -40,7 +40,7 @@ package RequirementBodyMembers {
     requirement def R {
         in ref part suppliedPart : Part;
         in calc margin {
-            1;
+            1
         }
         port controlPort : ControlPort;
         allocate source to target;

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Recovery diagnostics can identify an offending token independently of the retained malformed
+  slice (breaking AST change, `PARSE_AST_VERSION` 278).** `ParseErrorNode::diagnostic_span` is
+  source-backed and visited by the canonical span validation and normalization boundary.
+  Constraint, calculation and KerML function result expressions ending in a semicolon are recovered with the stable
+  `result_expression_semicolon` diagnostic on that semicolon; later members remain available.
+  Result-expression emission omits semicolons. Explicit return expressions have distinct
+  `ReturnExpression` variants and retain their `return` keyword during emission.
+
 - **Succession declaration modifiers survive parsing and emission (breaking AST change,
   `PARSE_AST_VERSION` 277).** `KermlSuccessionMember::multiplicity_modifiers` retains ordering
   and uniqueness keyword slots. Semantic snapshots project the complete succession declaration

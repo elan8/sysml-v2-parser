@@ -10,7 +10,7 @@ package InterfaceDefConstraintUsageRecovery {
         constraint later : Limit;
         broken ???;
         constraint {
-            1 == 1;
+            1 == 1
         }
     }
 }

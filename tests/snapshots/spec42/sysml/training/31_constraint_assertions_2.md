@@ -66,7 +66,7 @@ package 'Constraint Assertions-2' {
     constraint massConstraint : MassConstraint {
         in partMasses : MassValue[0..*];
         in massLimit : MassValue;
-        sum(partMasses) <= massLimit;
+        sum(partMasses) <= massLimit
     }
     part def Vehicle {
         assert massConstraint {

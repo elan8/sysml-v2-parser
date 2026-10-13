@@ -37,7 +37,7 @@ package ImplicitThatReference {
     }
     datatype UnitBoundedReal :> Real {
         inv unitBound {
-            -1.0 <= that & that <= 1.0;
+            -1.0 <= that & that <= 1.0
         }
     }
     part def Casts {

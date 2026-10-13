@@ -43,12 +43,12 @@ package ThatSelfReference {
     }
     datatype UnitBoundedReal :> Real {
         inv unitBound {
-            -1.0 <= that & that <= 1.0;
+            -1.0 <= that & that <= 1.0
         }
     }
     part def Occurrences {
         constraint viaCast {
-            (that as Occurrence).member;
+            (that as Occurrence).member
         }
     }
 }

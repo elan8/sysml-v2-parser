@@ -141,7 +141,7 @@ package '7a1-Variant Configuration - General Concept-a' {
         }
         connect [0..1] subsystemA.part3.p1 to [1] subsystemB.part5.p2;
         assert constraint {
-            subsystemA != subsystemA::subsystem2 | subsystemB == subsystemB::subsystem3;
+            subsystemA != subsystemA::subsystem2 | subsystemB == subsystemB::subsystem3
         }
     }
     part vehicleConfigA :> anyVehicleConfig {

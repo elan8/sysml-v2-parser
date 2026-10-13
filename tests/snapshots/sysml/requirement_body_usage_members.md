@@ -17,7 +17,7 @@ package RequirementBodyUsageMembers {
         succession weighed first weigh then recordMass;
         connect fuelTank to cargo;
         connection mounting connect fuelTank to vehicle;
-        require constraint { massActual <= massReqd; }
+        require constraint { massActual <= massReqd }
     }
 
     requirement massLimit : MassLimit {
@@ -52,7 +52,7 @@ package RequirementBodyUsageMembers {
         connect fuelTank to cargo;
         connection mounting connect fuelTank to vehicle;
         require constraint {
-            massActual <= massReqd;
+            massActual <= massReqd
         }
     }
     requirement massLimit : MassLimit {

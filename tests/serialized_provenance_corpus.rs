@@ -41,7 +41,8 @@ fn snapshot_sources() -> Vec<(PathBuf, String)> {
 
 /// The authored `SOURCE` section, which is the only human-written SysML in a snapshot file.
 fn snapshot_source_section(text: &str) -> Option<String> {
-    let rest = text.split("# SOURCE\n~~~sysml\n").nth(1)?;
+    let normalized = text.replace("\r\n", "\n");
+    let rest = normalized.split("# SOURCE\n~~~sysml\n").nth(1)?;
     Some(rest.split("\n~~~").next()?.to_owned())
 }
 

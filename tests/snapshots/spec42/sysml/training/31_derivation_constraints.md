@@ -47,7 +47,7 @@ package 'Derivation Constraints' {
     part vehicle1 : Vehicle {
         attribute totalMass : MassValue;
         assert constraint {
-            totalMass == chassisMass + engine.mass + transmission.mass;
+            totalMass == chassisMass + engine.mass + transmission.mass
         }
     }
     part vehicle2 : Vehicle {
@@ -59,7 +59,7 @@ package 'Derivation Constraints' {
         in finalSpeed : SpeedValue;
         in deltaT : TimeValue;
         in force : ForceValue;
-        force * deltaT == mass * (finalSpeed - initialSpeed) && mass > 0[kg];
+        force * deltaT == mass * (finalSpeed - initialSpeed) && mass > 0[kg]
     }
 }
 ~~~

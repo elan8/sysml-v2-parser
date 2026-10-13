@@ -116,6 +116,18 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_parse_error_node_value(&mut self, error: &ParseErrorNode) {
+        if let Some(span) = &error.diagnostic_span {
+            if !self.document.source.validates_span(span) || span.len == 0 {
+                self.check(Err(
+                    "recovery diagnostic span is not a nonempty source span".to_owned(),
+                ));
+            }
+            self.check(self.owned(span, "recovery diagnostic"));
+        }
+        super::visit::walk_parse_error_node_value(self, error);
+    }
+
     fn visit_succession_usage(&mut self, node: &Node<SuccessionUsage>) {
         if let Some(span) = &node.value.succession_keyword_span {
             self.check(self.delimiter(span, "succession", "succession usage keyword"));

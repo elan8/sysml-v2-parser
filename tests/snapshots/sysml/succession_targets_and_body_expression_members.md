@@ -77,7 +77,7 @@ package Successions {
     }
     constraint def Dynamics {
         in n : Natural;
-        (1 .. n)->forAll { in i : Natural; private attribute frame = frames#(i); private next : Sample = samples#(i + 1); frame.valid && next.valid };
+        (1 .. n)->forAll { in i : Natural; private attribute frame = frames#(i); private next : Sample = samples#(i + 1); frame.valid && next.valid }
     }
 }
 ~~~

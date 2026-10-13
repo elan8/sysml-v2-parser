@@ -112,7 +112,7 @@ package Expressions {
         inout v : Integer;
         step : ControlPerformances::LoopPerformance {
             in expr whileTest {
-                v > 3;
+                v > 3
             }
             in step body {
                 step decrement {
@@ -134,7 +134,7 @@ package Expressions {
     function TotalMass {
         in partMass;
         in subparts;
-        partMass + (subparts->collect { in p; totalMass(partMass, subparts) }->reduce('+') ?? 0.0);
+        partMass + (subparts->collect { in p; totalMass(partMass, subparts) }->reduce('+') ?? 0.0)
     }
     expr totalMass : TotalMass {
         in mass;

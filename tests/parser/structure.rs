@@ -1541,8 +1541,10 @@ part def Carrier {
 fn test_constraint_expressions_keep_parenthesized_associativity_shapes() {
     let input = r#"package P {
 constraint def C {
-  ((a-b)-c) >= 0;
-  a-(b-c) >= 0;
+  ((a-b)-c) >= 0
+}
+constraint def D {
+  a-(b-c) >= 0
 }
 }"#;
     let result = parse(input).expect("constraint expressions should parse");
@@ -1553,20 +1555,20 @@ constraint def C {
     let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
-    let constraint = elements
+    let exprs: Vec<_> = elements
         .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::ConstraintDef(c) => Some(&c.value),
+        .filter_map(|element| match &element.value {
+            PackageBodyElement::ConstraintDef(constraint) => Some(&constraint.value.body),
             _ => None,
         })
-        .expect("expected constraint definition");
-    let sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } = &constraint.body else {
-        panic!("expected constraint body");
-    };
-    let exprs: Vec<&sysml_v2_parser::ast::Node<sysml_v2_parser::ast::Expression>> = elements
-        .iter()
-        .filter_map(|e| match &e.value {
-            sysml_v2_parser::ast::ConstraintDefBodyElement::Expression(expr) => Some(expr),
+        .flat_map(|body| match body {
+            sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } => elements.as_slice(),
+            sysml_v2_parser::ast::ConstraintDefBody::Semicolon { .. } => &[],
+        })
+        .filter_map(|element| match &element.value {
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Expression(expression) => {
+                Some(expression)
+            }
             _ => None,
         })
         .collect();
@@ -3282,7 +3284,7 @@ fn test_part_def_body_accepts_assert_constraint_and_satisfy() {
     let input = r#"package P {
 requirement def MyReq;
 part def Foo {
-  assert constraint { true; }
+  assert constraint { true }
   satisfy MyReq;
 }
 }"#;

@@ -10,7 +10,7 @@ package StateBodyPartAndConstraintUsages {
     state def Counting {
         part counter : Counter;
         constraint balance : Balanced {
-            counter == counter;
+            counter == counter
         }
         state done;
     }

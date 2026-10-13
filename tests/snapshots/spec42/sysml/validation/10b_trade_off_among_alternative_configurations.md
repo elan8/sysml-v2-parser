@@ -157,7 +157,7 @@ package '10b-Trade-off Among Alternative Configurations' {
                 assert constraint engineSelectionRational {
                     doc
                     /* Selected the best engine based on the 'engineTradeStudy'. */
-                    engine == Analysis::engineTradeStudy.selectedAlternative;
+                    engine == Analysis::engineTradeStudy.selectedAlternative
                 }
             }
         }

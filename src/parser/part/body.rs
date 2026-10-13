@@ -659,6 +659,7 @@ fn unsupported_part_member(
         input = after_relationship;
     }
     let diagnostic = crate::ast::ParseErrorNode {
+        diagnostic_span: None,
         message: "spec-valid connection-like member is not implemented in part definitions"
             .to_owned(),
         code: "unsupported_grammar_form".to_owned(),

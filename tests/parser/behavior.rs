@@ -39,7 +39,7 @@ fn test_state_def_body_parses_members() {
 
 #[test]
 fn test_constraint_and_calc_bodies_parse_members() {
-    let input = "package P { constraint def C { in x : Real; out y : Real; x >= y; } calc def K { in x : Real; return r : Real; x; } }";
+    let input = "package P { constraint def C { in x : Real; out y : Real; x >= y } calc def K { in x : Real; return r : Real; x } }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,

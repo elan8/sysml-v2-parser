@@ -135,7 +135,7 @@ package '15.10-Primitive Data Types' {
 		 */
         attribute x : Real :>> self;
         assert constraint {
-            x >= 0.0;
+            x >= 0.0
         }
     }
     private import ScalarValues::String {

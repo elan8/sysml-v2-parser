@@ -33,25 +33,8 @@ package ConstraintBodyActionMembers {
 )
 ~~~
 # FORMAT
-~~~sysml
-package ConstraintBodyActionMembers {
-    constraint def WithNodes {
-        fork f;
-        join j;
-        merge m;
-        decide d;
-    }
-    constraint withNodes {
-        decide d;
-    }
-    constraint def Conditional {
-        in x : ScalarValues::Real;
-        if x > 0 ? true else false;
-    }
-    constraint def WithDefault {
-        ref :>> a, b default c;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

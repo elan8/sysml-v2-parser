@@ -711,6 +711,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_optional_quoted(self.writer, error.found.as_deref())?;
         self.writer.write_str(") ")?;
         write_span(self.writer, span)?;
+        if let Some(diagnostic_span) = &error.diagnostic_span {
+            self.writer.write_str(" (diagnostic-span ")?;
+            write_span(self.writer, diagnostic_span)?;
+            self.writer.write_char(')')?;
+        }
         self.writer.write_char(')')
     }
 
@@ -2918,6 +2923,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_expression(expression)?;
                         }
+                        super::ConstraintDefBodyElement::ReturnExpression(expression) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(return-expression ")?;
+                            self.write_expression(expression)?;
+                            self.writer.write_char(')')?;
+                        }
                         super::ConstraintDefBodyElement::InOutDecl(_member) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
                         }
@@ -3183,6 +3194,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 super::CalcDefBodyElement::Expression(expression) => {
                     self.write_item_prefix(&mut first)?;
                     self.writer.write_str("(expression ")?;
+                    self.write_expression(expression)?;
+                    self.writer.write_char(')')?;
+                }
+                super::CalcDefBodyElement::ReturnExpression(expression) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.writer.write_str("(return-expression ")?;
                     self.write_expression(expression)?;
                     self.writer.write_char(')')?;
                 }

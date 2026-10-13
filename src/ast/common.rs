@@ -18,6 +18,9 @@ pub struct FilterMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParseErrorNode {
+    /// Optional offending token within the enclosing recovery node source span.
+    /// `None` reports the complete recovered slice.
+    pub diagnostic_span: Option<Span>,
     pub message: String,
     pub code: String,
     pub expected: Option<String>,

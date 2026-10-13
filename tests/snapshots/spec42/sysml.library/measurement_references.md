@@ -664,7 +664,7 @@ standard library package MeasurementReferences {
         attribute source : VectorMeasurementReference[1];
         attribute target : VectorMeasurementReference[1];
         assert constraint validSourceTargetDimensions {
-            source.dimensions == target.dimensions;
+            source.dimensions == target.dimensions
         }
     }
     attribute def CoordinateFramePlacement :> CoordinateTransformation {
@@ -681,13 +681,13 @@ standard library package MeasurementReferences {
         attribute origin : VectorQuantityValue[1];
         attribute basisDirections : VectorQuantityValue[0..*] ordered nonunique;
         assert constraint validOriginDimensions {
-            origin.dimensions == source.dimensions;
+            origin.dimensions == source.dimensions
         }
         assert constraint {
-            size(basisDirections) == 0 || size(basisDirections) == source.dimensions#(1);
+            size(basisDirections) == 0 || size(basisDirections) == source.dimensions#(1)
         }
         assert constraint validateBasisDirections {
-            basisDirections->forAll { in basisDirection : VectorQuantityValue; basisDirection.dimensions->equals(source.dimensions) };
+            basisDirections->forAll { in basisDirection : VectorQuantityValue; basisDirection.dimensions->equals(source.dimensions) }
         }
     }
     abstract attribute def TranslationOrRotation {
@@ -763,7 +763,7 @@ standard library package MeasurementReferences {
         attribute :>> dimensions = (4, 4);
         attribute :>> elements : Real[16] ordered nonunique = (rotationMatrix.elements#(1), rotationMatrix.elements#(2), rotationMatrix.elements#(3), translationVector#(1), rotationMatrix.elements#(4), rotationMatrix.elements#(5), rotationMatrix.elements#(6), translationVector#(2), rotationMatrix.elements#(7), rotationMatrix.elements#(8), rotationMatrix.elements#(9), translationVector#(3), 0, 0, 0, 1);
         assert constraint validSourceDimensions {
-            source.dimensions == 3;
+            source.dimensions == 3
         }
     }
     attribute def NullTransformation :> AffineTransformationMatrix3d {

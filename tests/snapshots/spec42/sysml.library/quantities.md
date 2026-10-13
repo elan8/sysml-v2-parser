@@ -155,10 +155,10 @@ standard library package Quantities {
         attribute contravariantOrder : Natural;
         attribute covariantOrder : Natural;
         assert constraint orderSum {
-            contravariantOrder + covariantOrder == order;
+            contravariantOrder + covariantOrder == order
         }
         assert constraint boundMatch {
-            (isBound == mRef.isBound) || (not isBound && mRef.isBound);
+            (isBound == mRef.isBound) || (not isBound && mRef.isBound)
         }
     }
     abstract attribute def VectorQuantityValue :> TensorQuantityValue, NumericalVectorValue {

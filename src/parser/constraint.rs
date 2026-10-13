@@ -15,7 +15,7 @@ use crate::parser::lex::{
 };
 use crate::parser::usage::{feature_usage_header, redefinition};
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node_from_span, node_from_to};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -313,7 +313,7 @@ pub(crate) fn constraint_def_body_element(
         if let Ok((next, decl)) = return_decl(input) {
             (next, ConstraintDefBodyElement::ReturnDecl(Box::new(decl)))
         } else if let Ok((next, expr)) = return_expression_stmt(input) {
-            (next, ConstraintDefBodyElement::Expression(expr))
+            (next, ConstraintDefBodyElement::ReturnExpression(expr))
         } else {
             let (next, node) = other_return_recovery(
                 input,
@@ -365,10 +365,43 @@ pub(crate) fn constraint_def_body_element(
             nom::error::ErrorKind::Tag,
         )));
     } else {
-        map(expression, ConstraintDefBodyElement::Expression).parse(input)?
+        let (rest, result) = result_expression_member(input)?;
+        (
+            rest,
+            match result {
+                Ok(expression) => ConstraintDefBodyElement::Expression(expression),
+                Err(error) => ConstraintDefBodyElement::Error(error),
+            },
+        )
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// SysML CalculationBody and KerML FunctionBody share ResultExpressionMember:
+/// an OwnedExpression without a terminating semicolon.
+fn result_expression_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Result<Node<Expression>, Node<ParseErrorNode>>> {
+    let checkpoint = input.extra.reference_checkpoint();
+    let (rest, expression) = expression(input)?;
+    let (semicolon_start, _) = ws_and_comments(rest)?;
+    if semicolon_start.fragment().starts_with(b";") {
+        let (end, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        // The rejected expression's references must not survive arena publication.
+        input.extra.rollback_references(checkpoint);
+        let error = ParseErrorNode {
+            diagnostic_span: Some(span_from_to(semicolon_start, end)),
+            message: "a result expression must not end with a semicolon".to_owned(),
+            code: "result_expression_semicolon".to_owned(),
+            expected: Some("a result expression without a semicolon".to_owned()),
+            found: Some(";".to_owned()),
+            suggestion: Some("Remove the semicolon after the result expression.".to_owned()),
+            category: Some(crate::error::DiagnosticCategory::ParseError),
+        };
+        return Ok((end, Err(node_from_to(input, end, error))));
+    }
+    Ok((rest, Ok(expression)))
 }
 
 /// Calculation usage: `OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
@@ -2157,7 +2190,7 @@ pub(crate) fn calc_def_body_element(
         if let Ok((input, decl)) = return_decl(input) {
             (input, CalcDefBodyElement::ReturnDecl(Box::new(decl)))
         } else if let Ok((input, expr)) = return_expression_stmt(input) {
-            (input, CalcDefBodyElement::Expression(expr))
+            (input, CalcDefBodyElement::ReturnExpression(expr))
         } else {
             let (next, node) = other_return_recovery(
                 input,
@@ -2192,7 +2225,14 @@ pub(crate) fn calc_def_body_element(
             nom::error::ErrorKind::Tag,
         )));
     } else {
-        map(expression, CalcDefBodyElement::Expression).parse(input)?
+        let (rest, result) = result_expression_member(input)?;
+        (
+            rest,
+            match result {
+                Ok(expression) => CalcDefBodyElement::Expression(expression),
+                Err(error) => CalcDefBodyElement::Error(error),
+            },
+        )
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

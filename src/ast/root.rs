@@ -295,6 +295,60 @@ mod serde_tests {
             .expect_err("deserialization must reject the typed provenance corruption");
     }
 
+    struct CorruptRecoveryDiagnostic(Span);
+
+    impl VisitorMut for CorruptRecoveryDiagnostic {
+        fn visit_parse_error_node_value(&mut self, error: &mut crate::ast::ParseErrorNode) {
+            assert!(
+                error.diagnostic_span.is_some(),
+                "the fixture must exercise a token diagnostic"
+            );
+            error.diagnostic_span = Some(self.0);
+        }
+    }
+
+    #[test]
+    fn recovery_token_span_is_validated_with_its_source_and_owner() {
+        let source = "constraint bad { 1 == 1; }";
+        let document = crate::parse_for_editor(source).document;
+        let wire = serde_json::to_value(&document).expect("valid recovered document serializes");
+        let restored: ParsedDocument =
+            serde_json::from_value(wire).expect("valid token span roundtrips");
+        assert_eq!(document, restored);
+        for span in [
+            // Valid source coordinates, outside this malformed expression's owner.
+            Span {
+                offset: 0,
+                line: 1,
+                column: 1,
+                len: 1,
+            },
+            // The offending token's offset with a fabricated line.
+            Span {
+                offset: 22,
+                line: 2,
+                column: 23,
+                len: 1,
+            },
+            Span {
+                offset: 22,
+                line: 1,
+                column: 23,
+                len: 0,
+            },
+            Span {
+                offset: usize::MAX,
+                line: 1,
+                column: 1,
+                len: 1,
+            },
+        ] {
+            assert_typed_corruption_is_rejected(source, |document| {
+                apply_visitor(&mut CorruptRecoveryDiagnostic(span), document);
+            });
+        }
+    }
+
     struct CorruptDirectedActionKind(bool);
 
     impl VisitorMut for CorruptDirectedActionKind {

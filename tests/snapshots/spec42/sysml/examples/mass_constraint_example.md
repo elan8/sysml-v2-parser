@@ -154,7 +154,7 @@ package MassConstraintExample {
     }
     part def Vehicle2 {
         assert constraint {
-            m == eng.m + trans.m;
+            m == eng.m + trans.m
         }
         attribute m : MassValue;
         part eng : Engine {
@@ -167,7 +167,7 @@ package MassConstraintExample {
     constraint def MassConstraint3 {
         in totalMass : MassValue;
         in partMasses : MassValue[0..*];
-        totalMass == sum(partMasses);
+        totalMass == sum(partMasses)
     }
     part def Vehicle3 {
         assert constraint massConstraint : MassConstraint3 {
@@ -189,7 +189,7 @@ package MassConstraintExample {
     constraint mc : MassConstraint4 {
         in totalMass : MassValue;
         in partMasses : MassValue[0..*];
-        totalMass == sum(partMasses);
+        totalMass == sum(partMasses)
     }
     part def Vehicle4 {
         assert mc {
@@ -207,7 +207,7 @@ package MassConstraintExample {
     constraint def MassLimit {
         in mass : MassValue;
         in maxMass : MassValue;
-        mass <= maxMass;
+        mass <= maxMass
     }
     part def Vehicle5 {
         assert constraint ml : MassLimit {

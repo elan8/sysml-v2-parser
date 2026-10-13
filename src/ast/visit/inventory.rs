@@ -1952,7 +1952,10 @@ macro_rules! ast_traversal {
         }
 
         pub fn walk_parse_error_node_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ParseErrorNode) {
-            let ParseErrorNode { message, code, expected, found, suggestion, category } = node;
+            let ParseErrorNode { diagnostic_span, message, code, expected, found, suggestion, category } = node;
+            if let Some(span) = diagnostic_span {
+                visitor.visit_span(span);
+            }
             visitor.visit_text(message);
             visitor.visit_text(code);
             if let Some(inner) = expected {
@@ -7471,7 +7474,7 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
                 }
-                ConstraintDefBodyElement::Expression(field_0) => {
+                ConstraintDefBodyElement::Expression(field_0) | ConstraintDefBodyElement::ReturnExpression(field_0) => {
                     visitor.visit_expression(field_0);
                 }
                 ConstraintDefBodyElement::Constraint(field_0) => {
@@ -7628,7 +7631,7 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::ReturnDecl(field_0) => {
                     visitor.visit_return_decl(&$($mutability)? **field_0);
                 }
-                CalcDefBodyElement::Expression(field_0) => {
+                CalcDefBodyElement::Expression(field_0) | CalcDefBodyElement::ReturnExpression(field_0) => {
                     visitor.visit_expression(field_0);
                 }
                 CalcDefBodyElement::CalcUsage(field_0) => {

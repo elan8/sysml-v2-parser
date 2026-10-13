@@ -67,7 +67,7 @@ package 'User Keyword Example' {
         connect 'battery old' to 'power low';
         #situation 'power low' {
             constraint {
-                device.battery.power < minPower;
+                device.battery.power < minPower
             }
         }
         #causation

@@ -91,12 +91,12 @@ package '15_01-Constants' {
 	     */
         attribute e : Real {
             assert constraint {
-                round(e * 1E20) == 271828182845904523536.0;
+                round(e * 1E20) == 271828182845904523536.0
             }
         }
         attribute pi : Real {
             assert constraint {
-                round(pi * 1E20) == 314159265358979323846.0;
+                round(pi * 1E20) == 314159265358979323846.0
             }
         }
     }

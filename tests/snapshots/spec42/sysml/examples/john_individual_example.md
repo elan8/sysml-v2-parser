@@ -113,7 +113,7 @@ package JohnIndividualExample {
 		 */
         ref presidentOfUS[1] :>> presidentOfCountry {
             assert constraint {
-                age >= 35;
+                age >= 35
             }
         }
     }

@@ -58,12 +58,12 @@ package Constraints {
         protected inout z;
         private :>> b = 1;
         protected :>> c = 2;
-        x > 0;
+        x > 0
     }
     calc def F {
         private in x : Real;
         private attribute :>> b = 1;
-        x;
+        x
     }
     action def Act {
         private in p : Real;

@@ -34,22 +34,8 @@ package FallbackRecovery {
 )
 ~~~
 # FORMAT
-~~~sysml
-package FallbackRecovery {
-    constraint def C {
-        objective o;
-        private objective p;
-        x < 10;
-    }
-    calc def K {
-        objective o;
-        1;
-    }
-    class Kc {
-        objective o;
-        1;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

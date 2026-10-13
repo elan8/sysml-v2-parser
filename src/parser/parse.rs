@@ -265,6 +265,7 @@ fn parse_with_diagnostics_document(
                     if let Ok((rest, _)) = lex::skip_to_next_balanced_sync_point(input) {
                         if rest.location_offset() > input.location_offset() {
                             let recovery = ParseErrorNode {
+                                diagnostic_span: None,
                                 message: pe.message,
                                 code: pe
                                     .code
@@ -315,6 +316,7 @@ fn parse_with_diagnostics_document(
                 match skip_result {
                     Ok((rest, _)) if rest.location_offset() > recovery_start.location_offset() => {
                         let recovery = ParseErrorNode {
+                            diagnostic_span: None,
                             message: pe.message,
                             code: pe
                                 .code

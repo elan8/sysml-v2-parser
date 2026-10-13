@@ -29,18 +29,18 @@ package InvariantMemberVisibility {
 package InvariantMemberVisibility {
     class C {
         private inv privateCheck {
-            1 == 1;
+            1 == 1
         }
         protected inv protectedCheck {
-            2 == 2;
+            2 == 2
         }
     }
     behavior B {
         public inv publicCheck {
-            3 == 3;
+            3 == 3
         }
         inv defaultCheck {
-            4 == 4;
+            4 == 4
         }
     }
 }

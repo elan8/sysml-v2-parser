@@ -23,15 +23,8 @@ package ConstraintBodyMembers {
 )
 ~~~
 # FORMAT
-~~~sysml
-package ConstraintBodyMembers {
-    attribute def T;
-    constraint def C {
-        attribute a : T;
-        private attribute b : T;
-        a <= 1;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
