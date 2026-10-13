@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML successions in a type body with every SuccessionDeclaration shape: ends only, the `first` keyword with no declaration, a named declaration, and a declaration of specializations alone, with a multiplicity directly after `then` (#163). Documentation whose Identification is a short name alone keeps its own body (#164)."))
+(snapshot (type semantic) (description "KerML successions in a type body with every SuccessionDeclaration shape: ends only, the `first` keyword with no declaration, a named declaration, and a declaration of specializations alone, with a multiplicity directly after `then` (#163). Documentation whose Identification is a short name alone keeps its own body (#164).") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -58,6 +58,7 @@ package Sequences {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 317) (line 10) (column 20) (len 5)) (segments (segment 0 (token "paint") (name "paint") (separator none) (span (offset 317) (line 10) (column 20) (len 5)))))
     (reference r1 (scope relative) (span (offset 328) (line 10) (column 31) (len 3)) (segments (segment 0 (token "dry") (name "dry") (separator none) (span (offset 328) (line 10) (column 31) (len 3)))))

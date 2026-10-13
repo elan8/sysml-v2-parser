@@ -35,6 +35,7 @@ package FlowMessageDeclarationRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 92) (line 4) (column 14) (len 10)) (segments (segment 0 (token "source") (name "source") (separator none) (span (offset 92) (line 4) (column 14) (len 6))) (segment 1 (token "out") (name "out") (separator dot) (span (offset 99) (line 4) (column 21) (len 3)))))
     (reference r1 (scope relative) (span (offset 106) (line 4) (column 28) (len 9)) (segments (segment 0 (token "target") (name "target") (separator none) (span (offset 106) (line 4) (column 28) (len 6))) (segment 1 (token "in") (name "in") (separator dot) (span (offset 113) (line 4) (column 35) (len 2)))))

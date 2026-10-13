@@ -80,6 +80,7 @@ library package 'Model Library Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 58) (line 2) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 58) (line 2) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 72) (line 2) (column 31) (len 4)))))
     (reference r1 (scope relative) (span (offset 94) (line 3) (column 17) (len 19)) (segments (segment 0 (token "RiskMetadata") (name "RiskMetadata") (separator none) (span (offset 94) (line 3) (column 17) (len 12))) (segment 1 (token "Level") (name "Level") (separator colon-colon) (span (offset 108) (line 3) (column 31) (len 5)))))

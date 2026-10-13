@@ -79,6 +79,7 @@ package 'Metadata Example-2' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 76) (line 4) (column 18) (len 15)) (segments (segment 0 (token "AnalysisTooling") (name "AnalysisTooling") (separator none) (span (offset 76) (line 4) (column 18) (len 15)))))
     (reference r1 (scope relative) (span (offset 110) (line 6) (column 12) (len 13)) (segments (segment 0 (token "ToolExecution") (name "ToolExecution") (separator none) (span (offset 110) (line 6) (column 12) (len 13)))))

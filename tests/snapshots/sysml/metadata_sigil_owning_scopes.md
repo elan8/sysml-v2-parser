@@ -188,6 +188,7 @@ package MetadataSigilOwningScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 160) (line 7) (column 10) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 160) (line 7) (column 10) (len 3)))))
     (reference r1 (scope relative) (span (offset 174) (line 8) (column 10) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 174) (line 8) (column 10) (len 3)))))

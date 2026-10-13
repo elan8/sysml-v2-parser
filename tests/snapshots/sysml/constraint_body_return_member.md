@@ -35,6 +35,7 @@ package ConstraintBodyReturnMember {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 134) (line 3) (column 41) (len 16)) (segments (segment 0 (token "constraintChecks") (name "constraintChecks") (separator none) (span (offset 134) (line 3) (column 41) (len 16)))))
     (reference r1 (scope relative) (span (offset 152) (line 3) (column 59) (len 15)) (segments (segment 0 (token "subperformances") (name "subperformances") (separator none) (span (offset 152) (line 3) (column 59) (len 15)))))

@@ -72,6 +72,7 @@ import Unterminated { doc /* Retain this incomplete relationship body. */
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 38) (line 2) (column 16) (len 11)) (segments (segment 0 (token "RootPresent") (name "RootPresent") (separator none) (span (offset 38) (line 2) (column 16) (len 11)))))
     (reference r1 (scope relative) (span (offset 123) (line 5) (column 20) (len 7)) (segments (segment 0 (token "Present") (name "Present") (separator none) (span (offset 123) (line 5) (column 20) (len 7)))))

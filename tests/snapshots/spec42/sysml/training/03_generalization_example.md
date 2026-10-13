@@ -51,6 +51,7 @@ package 'Generalization Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 137) (line 6) (column 21) (len 6)) (segments (segment 0 (token "Person") (name "Person") (separator none) (span (offset 137) (line 6) (column 21) (len 6)))))
     (reference r1 (scope relative) (span (offset 201) (line 10) (column 14) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 201) (line 10) (column 14) (len 6)))))

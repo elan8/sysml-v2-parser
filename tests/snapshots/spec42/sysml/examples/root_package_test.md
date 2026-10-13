@@ -48,6 +48,7 @@ package P3 {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 58) (line 6) (column 17) (len 2)) (segments (segment 0 (token "P1") (name "P1") (separator none) (span (offset 58) (line 6) (column 17) (len 2)))))
     (reference r1 (scope relative) (span (offset 75) (line 7) (column 11) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 75) (line 7) (column 11) (len 1)))))

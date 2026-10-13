@@ -28,6 +28,7 @@ package TypeBodyPackageRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 117) (line 4) (column 38) (len 5)) (segments (segment 0 (token "Outer") (name "Outer") (separator none) (span (offset 117) (line 4) (column 38) (len 5)))))
   )

@@ -54,6 +54,7 @@ package DependencyTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 148) (line 9) (column 17) (len 6)) (segments (segment 0 (token "System") (name "System") (separator none) (span (offset 148) (line 9) (column 17) (len 6)))))
     (reference r1 (scope relative) (span (offset 182) (line 11) (column 22) (len 19)) (segments (segment 0 (token "'Application Layer'") (name "Application Layer") (separator none) (span (offset 182) (line 11) (column 22) (len 19)))))

@@ -59,6 +59,7 @@ package 'Individuals and Roles' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 17) (len 25)) (segments (segment 0 (token "'Part Definition Example'") (name "Part Definition Example") (separator none) (span (offset 50) (line 2) (column 17) (len 25)))))
     (reference r1 (scope relative) (span (offset 169) (line 7) (column 25) (len 5)) (segments (segment 0 (token "Wheel") (name "Wheel") (separator none) (span (offset 169) (line 7) (column 25) (len 5)))))

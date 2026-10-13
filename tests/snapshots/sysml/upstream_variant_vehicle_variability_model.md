@@ -38,6 +38,7 @@ package VehicleVariabilityModel {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 109) (line 3) (column 52) (len 8)) (segments (segment 0 (token "Diameter") (name "Diameter") (separator none) (span (offset 109) (line 3) (column 52) (len 8)))))
     (reference r1 (scope relative) (span (offset 293) (line 8) (column 21) (len 12)) (segments (segment 0 (token "'4cylEngine'") (name "4cylEngine") (separator none) (span (offset 293) (line 8) (column 21) (len 12)))))

@@ -39,6 +39,7 @@ package ExtendedUsageShorthand {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 38) (line 2) (column 6) (len 7)) (segments (segment 0 (token "clouddd") (name "clouddd") (separator none) (span (offset 38) (line 2) (column 6) (len 7)))))
     (reference r1 (scope relative) (span (offset 94) (line 4) (column 10) (len 7)) (segments (segment 0 (token "service") (name "service") (separator none) (span (offset 94) (line 4) (column 10) (len 7)))))

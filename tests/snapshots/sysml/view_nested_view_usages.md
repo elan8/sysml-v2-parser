@@ -65,6 +65,7 @@ package NestedViews {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 231) (line 8) (column 21) (len 12)) (segments (segment 0 (token "DocumentType") (name "DocumentType") (separator none) (span (offset 231) (line 8) (column 21) (len 12)))))
     (reference r1 (scope relative) (span (offset 364) (line 13) (column 22) (len 12)) (segments (segment 0 (token "DocumentType") (name "DocumentType") (separator none) (span (offset 364) (line 13) (column 22) (len 12)))))

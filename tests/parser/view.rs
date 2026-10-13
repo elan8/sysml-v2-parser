@@ -132,7 +132,7 @@ fn test_view_usage_parse() {
 
 #[test]
 fn test_view_and_connection_bodies_parse_members() {
-    let input = "package P { view def V { doc /*d*/ filter x > 0; render r : Renderer; } view v : V { expose Model::*; satisfy VP; } connection def C { end from : A; end to : B; connect from to to; } }";
+    let input = "package P { view def V { doc /*d*/ filter x > 0; render r : Renderer; } view v : V { expose Model::*; satisfy VP; } connection def C { end 'from' : A; end 'to' : B; connect 'from' to 'to'; } }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -189,7 +189,7 @@ viewpoint safety defined by Mission::SafetyViewpoint { }
 #[test]
 fn test_action_state_and_view_usage_accept_typed_by_alias() {
     let input = r#"package P {
-action send typed by Mission::SendAction;
+action sendAction typed by Mission::SendAction;
 state running typed by Mission::Mode;
 view dashboard typed by Mission::DashboardView;
 }"#;

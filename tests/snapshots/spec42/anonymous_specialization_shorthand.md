@@ -27,6 +27,7 @@ metadata def M {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 43) (line 2) (column 27) (len 12)) (segments (segment 0 (token "SysML") (name "SysML") (separator none) (span (offset 43) (line 2) (column 27) (len 5))) (segment 1 (token "Usage") (name "Usage") (separator colon-colon) (span (offset 50) (line 2) (column 34) (len 5)))))
     (reference r1 (scope relative) (span (offset 24) (line 2) (column 8) (len 16)) (segments (segment 0 (token "annotatedElement") (name "annotatedElement") (separator none) (span (offset 24) (line 2) (column 8) (len 16)))))

@@ -26,6 +26,7 @@ part p : Foo;
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 30) (line 2) (column 10) (len 3)) (segments (segment 0 (token "Foo") (name "Foo") (separator none) (span (offset 30) (line 2) (column 10) (len 3)))))
   )

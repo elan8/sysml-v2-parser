@@ -69,6 +69,7 @@ package 'Parts Example-2' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 138) (line 11) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 138) (line 11) (column 17) (len 7)))))
     (reference r1 (scope relative) (span (offset 161) (line 12) (column 14) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 161) (line 12) (column 14) (len 6)))))

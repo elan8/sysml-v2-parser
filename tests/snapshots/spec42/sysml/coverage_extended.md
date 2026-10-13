@@ -44,6 +44,7 @@ package ExtendedExamples {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 32) (line 2) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 32) (line 2) (column 6) (len 9)))))
     (reference r1 (scope relative) (span (offset 60) (line 3) (column 6) (len 9)) (segments (segment 0 (token "situation") (name "situation") (separator none) (span (offset 60) (line 3) (column 6) (len 9)))))

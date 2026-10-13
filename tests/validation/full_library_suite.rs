@@ -7,8 +7,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use sysml_v2_parser::ast::NameLanguage;
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
-use sysml_v2_parser::{parse_with_diagnostics, ParseError, ParsedDocument};
+use sysml_v2_parser::{parse_for_editor_with_name_language, ParseError, ParsedDocument};
 
 /// Root of the SysML v2 Release tree (from env or the local sysml-v2-release directory).
 fn sysml_v2_release_root() -> PathBuf {
@@ -40,6 +41,15 @@ fn find_library_files(dir: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
         }
     }
     Ok(files)
+}
+
+fn parse_library_source(path: &Path, content: &str) -> sysml_v2_parser::ParseResult {
+    let language = match path.extension().and_then(|extension| extension.to_str()) {
+        Some("kerml") => NameLanguage::Kerml,
+        Some("sysml") => NameLanguage::Sysml,
+        _ => panic!("the corpus finder admitted a file without a model language"),
+    };
+    parse_for_editor_with_name_language(content, language)
 }
 
 fn first_errors_summary(errors: &[ParseError], max_errors: usize) -> String {
@@ -312,7 +322,7 @@ fn test_full_library_suite() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
 
-        let result = parse_with_diagnostics(&content);
+        let result = parse_library_source(file, &content);
         if result.errors.is_empty() {
             eprintln!("✓ {}", relative_path);
             continue;
@@ -416,7 +426,7 @@ fn test_systems_library_strict_no_diagnostics() {
             .to_string();
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
-        let result = parse_with_diagnostics(&content);
+        let result = parse_library_source(file, &content);
         collect_bnf_decl_counts(&result.document, &result.document.root, &mut bnf_counts);
         if !result.errors.is_empty() {
             for err in &result.errors {
@@ -496,7 +506,7 @@ fn test_full_library_strict_no_diagnostics() {
             .to_string();
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
-        let result = parse_with_diagnostics(&content);
+        let result = parse_library_source(file, &content);
         collect_bnf_decl_counts(&result.document, &result.document.root, &mut bnf_counts);
         if result.errors.is_empty() {
             eprintln!("✓ {}", relative_path);
@@ -569,7 +579,7 @@ fn test_systems_library_node_types_no_extended() {
             .to_string();
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative, e));
-        let result = parse_with_diagnostics(&content);
+        let result = parse_library_source(file, &content);
         collect_package_body_type_counts(&result.document.root, &mut type_counts);
 
         let mut file_counts = BTreeMap::new();
@@ -671,7 +681,7 @@ fn test_full_library_node_types_no_extended() {
             .to_string();
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative, e));
-        let result = parse_with_diagnostics(&content);
+        let result = parse_library_source(file, &content);
         collect_package_body_type_counts(&result.document.root, &mut type_counts);
 
         let mut file_counts = BTreeMap::new();

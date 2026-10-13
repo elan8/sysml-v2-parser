@@ -54,6 +54,7 @@ package NamespaceUsages {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 199) (line 8) (column 23) (len 2)) (segments (segment 0 (token "ID") (name "ID") (separator none) (span (offset 199) (line 8) (column 23) (len 2)))))
     (reference r1 (scope relative) (span (offset 224) (line 9) (column 22) (len 2)) (segments (segment 0 (token "KD") (name "KD") (separator none) (span (offset 224) (line 9) (column 22) (len 2)))))

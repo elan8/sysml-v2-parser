@@ -183,6 +183,7 @@ package '2c-Parts Interconnection-Multiple Decompositions' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 327) (line 30) (column 12) (len 2)) (segments (segment 0 (token "A1") (name "A1") (separator none) (span (offset 327) (line 30) (column 12) (len 2)))))
     (reference r1 (scope relative) (span (offset 402) (line 36) (column 13) (len 3)) (segments (segment 0 (token "B11") (name "B11") (separator none) (span (offset 402) (line 36) (column 13) (len 3)))))

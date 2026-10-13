@@ -72,6 +72,7 @@ package PrivateImportTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 90) (line 6) (column 18) (len 2)) (segments (segment 0 (token "P1") (name "P1") (separator none) (span (offset 90) (line 6) (column 18) (len 2)))))
     (reference r1 (scope relative) (span (offset 110) (line 9) (column 10) (len 5)) (segments (segment 0 (token "P1") (name "P1") (separator none) (span (offset 110) (line 9) (column 10) (len 2))) (segment 1 (token "A") (name "A") (separator colon-colon) (span (offset 114) (line 9) (column 14) (len 1)))))

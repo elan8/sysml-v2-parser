@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML function declarations parse as structured classifier nodes with abstract prefixes, quoted operator names, specializes clauses, typed parameters with multiplicities, kinded expr/bool/feature parameters, and return results with multiplicity properties and default values."))
+(snapshot (type semantic) (description "KerML function declarations parse as structured classifier nodes with abstract prefixes, quoted operator names, specializes clauses, typed parameters with multiplicities, kinded expr/bool/feature parameters, and return results with multiplicity properties and default values.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -56,6 +56,7 @@ standard library package RealFunctions {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 60) (line 2) (column 20) (len 20)) (segments (segment 0 (token "ComplexFunctions") (name "ComplexFunctions") (separator none) (span (offset 60) (line 2) (column 20) (len 16))) (segment 1 (token "re") (name "re") (separator colon-colon) (span (offset 78) (line 2) (column 38) (len 2)))))
     (reference r1 (scope relative) (span (offset 89) (line 2) (column 49) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 89) (line 2) (column 49) (len 4)))))

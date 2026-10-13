@@ -71,6 +71,7 @@ package Functions {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 60) (line 3) (column 20) (len 4)) (segments (segment 0 (token "Step") (name "Step") (separator none) (span (offset 60) (line 3) (column 20) (len 4)))))
     (reference r1 (scope relative) (span (offset 85) (line 4) (column 20) (len 4)) (segments (segment 0 (token "Step") (name "Step") (separator none) (span (offset 85) (line 4) (column 20) (len 4)))))

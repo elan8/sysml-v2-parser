@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML class/struct/datatype bodies accept feature members with member/composite/portion/var prefixes, step/expr/bool kinds, invariants, connectors with reference ends, nested class definitions, and var-prefixed directed parameters."))
+(snapshot (type semantic) (description "KerML class/struct/datatype bodies accept feature members with member/composite/portion/var prefixes, step/expr/bool kinds, invariants, connectors with reference ends, nested class definitions, and var-prefixed directed parameters.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -56,6 +56,7 @@ package Classes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 70) (line 3) (column 39) (len 7)) (segments (segment 0 (token "Natural") (name "Natural") (separator none) (span (offset 70) (line 3) (column 39) (len 7)))))
     (reference r1 (scope relative) (span (offset 110) (line 4) (column 28) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 110) (line 4) (column 28) (len 1)))))

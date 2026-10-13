@@ -28,6 +28,7 @@ interface def Broken {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 32) (len 4)) (segments (segment 0 (token "Port") (name "Port") (separator none) (span (offset 54) (line 2) (column 32) (len 4)))))
     (reference r1 (scope relative) (span (offset 40) (line 2) (column 18) (len 11)) (segments (segment 0 (token "participant") (name "participant") (separator none) (span (offset 40) (line 2) (column 18) (len 11)))))

@@ -90,6 +90,7 @@ package AnalysisTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 59) (line 7) (column 12) (len 1)) (segments (segment 0 (token "V") (name "V") (separator none) (span (offset 59) (line 7) (column 12) (len 1)))))
     (reference r1 (scope relative) (span (offset 446) (line 34) (column 27) (len 12)) (segments (segment 0 (token "AnalysisPlan") (name "AnalysisPlan") (separator none) (span (offset 446) (line 34) (column 27) (len 12)))))

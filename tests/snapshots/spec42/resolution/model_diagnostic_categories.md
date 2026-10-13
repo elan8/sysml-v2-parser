@@ -59,6 +59,7 @@ package Demo {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 83) (line 4) (column 23) (len 10)) (segments (segment 0 (token "Controller") (name "Controller") (separator none) (span (offset 83) (line 4) (column 23) (len 10)))))
     (reference r1 (scope relative) (span (offset 113) (line 5) (column 19) (len 6)) (segments (segment 0 (token "Sensor") (name "Sensor") (separator none) (span (offset 113) (line 5) (column 19) (len 6)))))

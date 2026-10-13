@@ -41,6 +41,7 @@ package EndRefPrefix {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 94) (line 3) (column 34) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 94) (line 3) (column 34) (len 1)))))
     (reference r1 (scope relative) (span (offset 126) (line 4) (column 30) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 126) (line 4) (column 30) (len 1)))))

@@ -14,7 +14,10 @@ fn bench_snapshot_corpus(c: &mut Criterion) {
             source,
             |b, source| {
                 b.iter(|| {
-                    let result = sysml_v2_parser::parse_with_diagnostics(black_box(&source.text));
+                    let result = sysml_v2_parser::parse_for_editor_with_name_language(
+                        black_box(&source.text),
+                        source.name_language,
+                    );
                     black_box(result.document.root.elements.len());
                     black_box(result.document.qualified_references.len());
                     black_box(result.errors.len());
@@ -30,7 +33,10 @@ fn bench_snapshot_corpus(c: &mut Criterion) {
     corpus.bench_function("all_sources", |b| {
         b.iter(|| {
             for source in &sources {
-                let result = sysml_v2_parser::parse_with_diagnostics(black_box(&source.text));
+                let result = sysml_v2_parser::parse_for_editor_with_name_language(
+                    black_box(&source.text),
+                    source.name_language,
+                );
                 black_box(result.document.root.elements.len());
                 black_box(result.document.qualified_references.len());
                 black_box(result.errors.len());

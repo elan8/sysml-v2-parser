@@ -27,6 +27,7 @@ package AnalysisCaseUsagePrefixRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 92) (line 3) (column 30) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 92) (line 3) (column 30) (len 1)))))
   )

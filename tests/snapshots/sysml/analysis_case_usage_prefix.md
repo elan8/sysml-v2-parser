@@ -38,6 +38,7 @@ package AnalysisCaseUsagePrefix {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 77) (line 3) (column 22) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 77) (line 3) (column 22) (len 1)))))
     (reference r1 (scope relative) (span (offset 115) (line 4) (column 36) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 115) (line 4) (column 36) (len 1)))))

@@ -30,6 +30,7 @@ package MetadataBodyRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 59) (line 3) (column 10) (len 4)) (segments (segment 0 (token "Risk") (name "Risk") (separator none) (span (offset 59) (line 3) (column 10) (len 4)))))
     (reference r1 (scope relative) (span (offset 112) (line 5) (column 21) (len 13)) (segments (segment 0 (token "technicalRisk") (name "technicalRisk") (separator none) (span (offset 112) (line 5) (column 21) (len 13)))))

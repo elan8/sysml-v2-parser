@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A malformed TypeFeaturingPart fails the containing feature transaction, retains its exact recovery text, and resumes at the next feature member."))
+(snapshot (type recovery) (description "A malformed TypeFeaturingPart fails the containing feature transaction, retains its exact recovery text, and resumes at the next feature member.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -28,6 +28,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 94) (line 4) (column 28) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 94) (line 4) (column 28) (len 1)))))
     (reference r1 (scope relative) (span (offset 108) (line 4) (column 42) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 108) (line 4) (column 42) (len 1)))))

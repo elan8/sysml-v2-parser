@@ -64,6 +64,7 @@ package ThenControls {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 95) (line 4) (column 20) (len 9)) (segments (segment 0 (token "MergeNode") (name "MergeNode") (separator none) (span (offset 95) (line 4) (column 20) (len 9)))))
     (reference r1 (scope relative) (span (offset 170) (line 6) (column 21) (len 12)) (segments (segment 0 (token "DecisionNode") (name "DecisionNode") (separator none) (span (offset 170) (line 6) (column 21) (len 12)))))

@@ -62,6 +62,7 @@ package OccurrencePrefixScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 115) (line 4) (column 6) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 115) (line 4) (column 6) (len 3)))))
     (reference r1 (scope relative) (span (offset 127) (line 4) (column 18) (len 18)) (segments (segment 0 (token "PackageRequirement") (name "PackageRequirement") (separator none) (span (offset 127) (line 4) (column 18) (len 18)))))

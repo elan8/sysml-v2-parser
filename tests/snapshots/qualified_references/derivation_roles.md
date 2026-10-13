@@ -37,6 +37,7 @@ package DerivationExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 99) (line 5) (column 6) (len 10)) (segments (segment 0 (token "derivation") (name "derivation") (separator none) (span (offset 99) (line 5) (column 6) (len 10)))))
     (reference r1 (scope relative) (span (offset 136) (line 6) (column 14) (len 8)) (segments (segment 0 (token "original") (name "original") (separator none) (span (offset 136) (line 6) (column 14) (len 8)))))

@@ -72,6 +72,7 @@ package 'Event Occurrence Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 161) (line 8) (column 16) (len 6)) (segments (segment 0 (token "Driver") (name "Driver") (separator none) (span (offset 161) (line 8) (column 16) (len 6)))))
     (reference r1 (scope relative) (span (offset 224) (line 12) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 224) (line 12) (column 17) (len 7)))))

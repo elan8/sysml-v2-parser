@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type provenance) (description "KerML BindingConnectorDeclaration may omit its inline binary pair and place connector ends in TypeBody. A three-ended binding remains one typed connector with three ordered body-owned end features; inline declared/anonymous and `all` alternatives retain their distinct syntax. KerML textual BNF 875-881; Pilot KerML.xtext 870-881."))
+(snapshot (type provenance) (description "KerML BindingConnectorDeclaration may omit its inline binary pair and place connector ends in TypeBody. A three-ended binding remains one typed connector with three ordered body-owned end features; inline declared/anonymous and `all` alternatives retain their distinct syntax. KerML textual BNF 875-881; Pilot KerML.xtext 870-881.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -42,6 +42,7 @@ package BindingConnectorEnds {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 97) (line 4) (column 21) (len 5)) (segments (segment 0 (token "Thing") (name "Thing") (separator none) (span (offset 97) (line 4) (column 21) (len 5)))))
     (reference r1 (scope relative) (span (offset 124) (line 5) (column 21) (len 5)) (segments (segment 0 (token "Thing") (name "Thing") (separator none) (span (offset 124) (line 5) (column 21) (len 5)))))

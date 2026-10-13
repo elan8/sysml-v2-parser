@@ -95,6 +95,7 @@ package Q {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 39) (line 3) (column 13) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 39) (line 3) (column 13) (len 1)))))
     (reference r1 (scope relative) (span (offset 60) (line 6) (column 12) (len 1)) (segments (segment 0 (token "F") (name "F") (separator none) (span (offset 60) (line 6) (column 12) (len 1)))))

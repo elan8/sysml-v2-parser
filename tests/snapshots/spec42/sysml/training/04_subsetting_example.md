@@ -47,6 +47,7 @@ package 'Subsetting Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 68) (line 4) (column 16) (len 11)) (segments (segment 0 (token "VehiclePart") (name "VehiclePart") (separator none) (span (offset 68) (line 4) (column 16) (len 11)))))
     (reference r1 (scope relative) (span (offset 100) (line 6) (column 14) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 100) (line 6) (column 14) (len 6)))))

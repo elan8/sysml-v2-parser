@@ -74,21 +74,42 @@ pub fn parse_root(input: &str) -> Result<ParsedDocument, ParseError> {
 /// Parse an owned source buffer without cloning the complete document.
 #[allow(clippy::result_large_err)]
 pub fn parse_root_owned(input: String) -> Result<ParsedDocument, ParseError> {
-    parse_root_source(SourceStorage::new(input))
+    parse_root_source(SourceStorage::new(input), crate::ast::NameLanguage::Sysml)
 }
 
 #[allow(clippy::result_large_err)]
 fn parse_root_inner(input: &str) -> Result<ParsedDocument, ParseError> {
-    parse_root_source(SourceStorage::new(input.to_owned()))
+    parse_root_source(
+        SourceStorage::new(input.to_owned()),
+        crate::ast::NameLanguage::Sysml,
+    )
 }
 
 #[allow(clippy::result_large_err)]
-fn parse_root_source(source: SourceStorage) -> Result<ParsedDocument, ParseError> {
-    let ParseResult { document, errors } = parse_with_diagnostics_source(source);
+fn parse_root_source(
+    source: SourceStorage,
+    name_language: crate::ast::NameLanguage,
+) -> Result<ParsedDocument, ParseError> {
+    let ParseResult { document, errors } = parse_with_diagnostics_source(source, name_language);
     match errors.into_iter().next() {
         Some(error) => Err(error),
         None => Ok(document),
     }
+}
+
+#[allow(clippy::result_large_err)]
+pub fn parse_root_owned_with_name_language(
+    input: String,
+    language: crate::ast::NameLanguage,
+) -> Result<ParsedDocument, ParseError> {
+    parse_root_source(SourceStorage::new(input), language)
+}
+
+pub fn parse_with_diagnostics_owned_with_name_language(
+    input: String,
+    language: crate::ast::NameLanguage,
+) -> ParseResult {
+    parse_with_diagnostics_source(SourceStorage::new(input), language)
 }
 
 const MAX_RECOVERY_ERRORS: usize = 100;
@@ -101,18 +122,25 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
 
 /// Parse an owned source buffer for editor use without cloning the complete document.
 pub fn parse_with_diagnostics_owned(input: String) -> ParseResult {
-    parse_with_diagnostics_source(SourceStorage::new(input))
+    parse_with_diagnostics_source(SourceStorage::new(input), crate::ast::NameLanguage::Sysml)
 }
 
 fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
-    parse_with_diagnostics_source(SourceStorage::new(input.to_owned()))
+    parse_with_diagnostics_source(
+        SourceStorage::new(input.to_owned()),
+        crate::ast::NameLanguage::Sysml,
+    )
 }
 
-fn parse_with_diagnostics_source(source: SourceStorage) -> ParseResult {
-    let context = ParseContext::new();
+fn parse_with_diagnostics_source(
+    source: SourceStorage,
+    name_language: crate::ast::NameLanguage,
+) -> ParseResult {
+    let context = ParseContext::with_name_language(name_language);
     let (root, errors) = parse_with_diagnostics_document(source.as_str(), &context);
     ParseResult {
         document: ParsedDocument {
+            name_language,
             source,
             qualified_references: context.finish(),
             root,

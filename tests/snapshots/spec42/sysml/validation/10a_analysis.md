@@ -155,6 +155,7 @@ package '10a-Analysis' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 41) (line 2) (column 17) (len 3)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 41) (line 2) (column 17) (len 3)))))
     (reference r1 (scope relative) (span (offset 65) (line 3) (column 17) (len 2)) (segments (segment 0 (token "SI") (name "SI") (separator none) (span (offset 65) (line 3) (column 17) (len 2)))))

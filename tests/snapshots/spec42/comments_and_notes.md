@@ -27,6 +27,7 @@ y
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (malformed (code "expected_keyword") (found "x /* comment */ // note") (span (offset 0) (line 1) (column 1) (len 24))) (malformed (code "expected_keyword") (found "y") (span (offset 24) (line 2) (column 1) (len 1))))

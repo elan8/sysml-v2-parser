@@ -32,6 +32,7 @@ standard library package Actions {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 69) (line 2) (column 35) (len 11)) (segments (segment 0 (token "Performance") (name "Performance") (separator none) (span (offset 69) (line 2) (column 35) (len 11)))))
     (reference r1 (scope relative) (span (offset 108) (line 3) (column 26) (len 6)) (segments (segment 0 (token "Action") (name "Action") (separator none) (span (offset 108) (line 3) (column 26) (len 6)))))

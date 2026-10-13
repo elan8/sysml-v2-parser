@@ -40,6 +40,7 @@ package SubjectUsageFeatureSpecialization {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 95) (line 3) (column 28) (len 4)) (segments (segment 0 (token "Type") (name "Type") (separator none) (span (offset 95) (line 3) (column 28) (len 4)))))
     (reference r1 (scope relative) (span (offset 127) (line 4) (column 27) (len 6)) (segments (segment 0 (token "subset") (name "subset") (separator none) (span (offset 127) (line 4) (column 27) (len 6)))))

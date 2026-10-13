@@ -82,6 +82,7 @@ package 'Use Case Definition Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 191) (line 9) (column 21) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 191) (line 9) (column 21) (len 7)))))
     (reference r1 (scope relative) (span (offset 220) (line 11) (column 18) (len 6)) (segments (segment 0 (token "Person") (name "Person") (separator none) (span (offset 220) (line 11) (column 18) (len 6)))))

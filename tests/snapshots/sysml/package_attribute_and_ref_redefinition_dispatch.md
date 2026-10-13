@@ -32,6 +32,7 @@ package PackageAttributeAndRefRedefinitionDispatch {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 189) (line 6) (column 31) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 189) (line 6) (column 31) (len 1)))))
     (reference r1 (scope relative) (span (offset 226) (line 8) (column 17) (len 6)) (segments (segment 0 (token "system") (name "system") (separator none) (span (offset 226) (line 8) (column 17) (len 6)))))

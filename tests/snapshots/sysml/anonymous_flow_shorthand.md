@@ -29,6 +29,7 @@ package AnonymousFlowShorthand {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 74) (line 3) (column 19) (len 11)) (segments (segment 0 (token "focus") (name "focus") (separator none) (span (offset 74) (line 3) (column 19) (len 5))) (segment 1 (token "image") (name "image") (separator dot) (span (offset 80) (line 3) (column 25) (len 5)))))
     (reference r1 (scope relative) (span (offset 89) (line 3) (column 34) (len 11)) (segments (segment 0 (token "shoot") (name "shoot") (separator none) (span (offset 89) (line 3) (column 34) (len 5))) (segment 1 (token "image") (name "image") (separator dot) (span (offset 95) (line 3) (column 40) (len 5)))))

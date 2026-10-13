@@ -28,6 +28,7 @@ package ViewCoverage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 119) (line 4) (column 25) (len 16)) (segments (segment 0 (token "ArchitectureView") (name "ArchitectureView") (separator none) (span (offset 119) (line 4) (column 25) (len 16)))))
     (reference r1 (scope relative) (span (offset 154) (line 5) (column 17) (len 21)) (segments (segment 0 (token "ArchitectureViewpoint") (name "ArchitectureViewpoint") (separator none) (span (offset 154) (line 5) (column 17) (len 21)))))

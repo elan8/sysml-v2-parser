@@ -267,6 +267,7 @@ package '7b-Variant Configurations' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 17) (len 17)) (segments (segment 0 (token "RequirementsModel") (name "RequirementsModel") (separator none) (span (offset 54) (line 2) (column 17) (len 17)))))
     (reference r1 (scope relative) (span (offset 92) (line 3) (column 17) (len 11)) (segments (segment 0 (token "DesignModel") (name "DesignModel") (separator none) (span (offset 92) (line 3) (column 17) (len 11)))))

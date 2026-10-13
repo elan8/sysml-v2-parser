@@ -43,6 +43,7 @@ package AliasImport {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 93) (line 5) (column 20) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 93) (line 5) (column 20) (len 7)))))
     (reference r1 (scope relative) (span (offset 145) (line 9) (column 21) (len 16)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 145) (line 9) (column 21) (len 11))) (segment 1 (token "Car") (name "Car") (separator colon-colon) (span (offset 158) (line 9) (column 34) (len 3)))))

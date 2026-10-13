@@ -74,6 +74,7 @@ package 'Metadata Example-1' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 118) (line 5) (column 25) (len 21)) (segments (segment 0 (token "SysML") (name "SysML") (separator none) (span (offset 118) (line 5) (column 25) (len 5))) (segment 1 (token "PartDefinition") (name "PartDefinition") (separator colon-colon) (span (offset 125) (line 5) (column 32) (len 14)))))
     (reference r1 (scope relative) (span (offset 99) (line 5) (column 6) (len 16)) (segments (segment 0 (token "annotatedElement") (name "annotatedElement") (separator none) (span (offset 99) (line 5) (column 6) (len 16)))))

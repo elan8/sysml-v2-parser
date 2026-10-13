@@ -60,6 +60,7 @@ package RefPrefixCoverage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 72) (line 3) (column 26) (len 12)) (segments (segment 0 (token "trailerHitch") (name "trailerHitch") (separator none) (span (offset 72) (line 3) (column 26) (len 12)))))
     (reference r1 (scope relative) (span (offset 124) (line 4) (column 39) (len 11)) (segments (segment 0 (token "ActionUsage") (name "ActionUsage") (separator none) (span (offset 124) (line 4) (column 39) (len 11)))))

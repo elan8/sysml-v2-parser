@@ -38,6 +38,7 @@ package DefaultReferenceUsageScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 91) (line 2) (column 54) (len 13)) (segments (segment 0 (token "Units") (name "Units") (separator none) (span (offset 91) (line 2) (column 54) (len 5))) (segment 1 (token "Length") (name "Length") (separator colon-colon) (span (offset 98) (line 2) (column 61) (len 6)))))
     (reference r1 (scope relative) (span (offset 129) (line 2) (column 92) (len 4)) (segments (segment 0 (token "base") (name "base") (separator none) (span (offset 129) (line 2) (column 92) (len 4)))))

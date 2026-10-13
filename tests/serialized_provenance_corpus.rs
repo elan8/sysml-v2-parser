@@ -12,8 +12,11 @@
 #![cfg(feature = "serde")]
 
 use std::path::{Path, PathBuf};
+#[path = "../tools/snapshot_tool/metadata.rs"]
+mod metadata;
+use sysml_v2_parser::ast::NameLanguage;
 
-fn snapshot_sources() -> Vec<(PathBuf, String)> {
+fn snapshot_sources() -> Vec<(PathBuf, String, NameLanguage)> {
     let mut sources = Vec::new();
     let mut directories = vec![PathBuf::from("tests/snapshots")];
     while let Some(directory) = directories.pop() {
@@ -30,20 +33,18 @@ fn snapshot_sources() -> Vec<(PathBuf, String)> {
             }
             let text = std::fs::read_to_string(&path)
                 .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-            if let Some(source) = snapshot_source_section(&text) {
-                sources.push((path, source));
-            }
+            let authored = metadata::authored_sections(&text.replace("\r\n", "\n"))
+                .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            let metadata::AuthoredSections {
+                meta: _meta,
+                source,
+                name_language,
+            } = authored;
+            sources.push((path, source, name_language));
         }
     }
     sources.sort_by(|left, right| left.0.cmp(&right.0));
     sources
-}
-
-/// The authored `SOURCE` section, which is the only human-written SysML in a snapshot file.
-fn snapshot_source_section(text: &str) -> Option<String> {
-    let normalized = text.replace("\r\n", "\n");
-    let rest = normalized.split("# SOURCE\n~~~sysml\n").nth(1)?;
-    Some(rest.split("\n~~~").next()?.to_owned())
 }
 
 fn relative(path: &Path) -> String {
@@ -61,8 +62,9 @@ fn every_snapshot_document_serializes_with_valid_provenance() {
 
     let failures: Vec<String> = sources
         .iter()
-        .filter_map(|(path, source)| {
-            let document = sysml_v2_parser::parse_for_editor(source).document;
+        .filter_map(|(path, source, language)| {
+            let document =
+                sysml_v2_parser::parse_for_editor_with_name_language(source, *language).document;
             serde_json::to_value(&document)
                 .err()
                 .map(|error| format!("{}: {error}", relative(path)))
@@ -83,8 +85,9 @@ fn every_snapshot_document_serializes_with_valid_provenance() {
 fn every_snapshot_document_deserializes_back() {
     let failures: Vec<String> = snapshot_sources()
         .iter()
-        .filter_map(|(path, source)| {
-            let document = sysml_v2_parser::parse_for_editor(source).document;
+        .filter_map(|(path, source, language)| {
+            let document =
+                sysml_v2_parser::parse_for_editor_with_name_language(source, *language).document;
             let encoded = serde_json::to_value(&document).ok()?;
             match serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(encoded) {
                 Ok(decoded) if decoded == document => None,

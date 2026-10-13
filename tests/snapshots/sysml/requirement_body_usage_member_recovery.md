@@ -31,6 +31,7 @@ package RequirementBodyUsageMemberRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 100) (line 3) (column 23) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 100) (line 3) (column 23) (len 7)))))
     (reference r1 (scope relative) (span (offset 181) (line 6) (column 22) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 181) (line 6) (column 22) (len 7)))))

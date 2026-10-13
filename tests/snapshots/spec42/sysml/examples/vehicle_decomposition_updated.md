@@ -138,6 +138,7 @@ package 'Vehicle Decomposition - Updated' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 448) (line 28) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 448) (line 28) (column 17) (len 7)))))
     (reference r1 (scope relative) (span (offset 471) (line 29) (column 14) (len 18)) (segments (segment 0 (token "'Chassis Assembly'") (name "Chassis Assembly") (separator none) (span (offset 471) (line 29) (column 14) (len 18)))))

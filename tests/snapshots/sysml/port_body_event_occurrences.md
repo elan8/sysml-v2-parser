@@ -30,6 +30,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 25) (line 2) (column 14) (len 8)) (segments (segment 0 (token "PortType") (name "PortType") (separator none) (span (offset 25) (line 2) (column 14) (len 8)))))
     (reference r1 (scope relative) (span (offset 94) (line 4) (column 15) (len 18)) (segments (segment 0 (token "sender") (name "sender") (separator none) (span (offset 94) (line 4) (column 15) (len 6))) (segment 1 (token "sourceEvent") (name "sourceEvent") (separator dot) (span (offset 101) (line 4) (column 22) (len 11)))))

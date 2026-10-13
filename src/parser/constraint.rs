@@ -323,21 +323,19 @@ pub(crate) fn constraint_def_body_element(
             )?;
             (next, ConstraintDefBodyElement::Error(node))
         }
-    } else if let Some((next, member)) =
-        ((starts_with_any_keyword(
-            after_visibility.fragment(),
-            crate::parser::lex::CALCULATION_ACTION_STARTERS,
-        ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
-            || prefixed_control_node_follows(input))
-        .then(|| {
-            // Transactional: when the action parser declines (`if a ? b else c` is a result
-            // expression), the references it allocated must not stay in the arena.
-            crate::parser::span::reference_transaction(
-                input,
-                crate::parser::action::action_def_body_element,
-            )
-        })
-        .and_then(Result::ok)
+    } else if let Some((next, member)) = (starts_with_any_keyword(
+        after_visibility.fragment(),
+        crate::parser::lex::CALCULATION_ACTION_STARTERS,
+    ) || prefixed_control_node_follows(input))
+    .then(|| {
+        // Transactional: when the action parser declines (`if a ? b else c` is a result
+        // expression), the references it allocated must not stay in the arena.
+        crate::parser::span::reference_transaction(
+            input,
+            crate::parser::action::action_def_body_element,
+        )
+    })
+    .and_then(Result::ok)
     {
         // `CalculationBodyItem = ActionBodyItem | ...` (SysML BNF 1366-1368): the same action-body
         // dispatch `calculation_body_element` makes for the one `CalculationBody` production, and
@@ -2270,7 +2268,7 @@ fn refuses_result_expression_fallback(input: Input<'_>) -> bool {
         .count();
     let word = &fragment[..word_len];
     word_len > 0
-        && crate::parser::lex::is_reserved_keyword(word)
+        && crate::parser::lex::is_reserved_keyword_in(input, word)
         && !EXPRESSION_KEYWORDS.contains(&word)
 }
 

@@ -25,6 +25,7 @@ part def Vehicle {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (part-def (name "Vehicle") (modifiers) (body brace (part-def (name "Engine") (modifiers) (body semicolon)) (part-def (name "Wheel") (modifiers) (body semicolon)))))

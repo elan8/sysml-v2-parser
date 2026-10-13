@@ -28,6 +28,7 @@ package MetadataBodyMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 63) (line 2) (column 34) (len 10)) (segments (segment 0 (token "Metaobject") (name "Metaobject") (separator none) (span (offset 63) (line 2) (column 34) (len 10)))))
     (reference r1 (scope relative) (span (offset 75) (line 2) (column 46) (len 4)) (segments (segment 0 (token "Item") (name "Item") (separator none) (span (offset 75) (line 2) (column 46) (len 4)))))

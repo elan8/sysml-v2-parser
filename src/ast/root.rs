@@ -47,6 +47,31 @@ pub struct RootNamespace {
     pub elements: Vec<Node<RootElement>>,
 }
 
+/// Language whose lexical NAME rules govern one parsed document.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+pub enum NameLanguage {
+    #[default]
+    Sysml,
+    Kerml,
+}
+
+mod reserved_keywords {
+    include!(concat!(env!("OUT_DIR"), "/reserved_keywords.rs"));
+}
+
+impl NameLanguage {
+    /// Classify a bare lexical token using the pinned language keyword inventory.
+    pub fn is_reserved(self, word: &str) -> bool {
+        let words = match self {
+            Self::Sysml => reserved_keywords::SYSML,
+            Self::Kerml => reserved_keywords::KERML,
+        };
+        words.binary_search(&word).is_ok()
+    }
+}
+
 /// One parsed SysML/KerML source file and all document-local identities referenced by its AST.
 ///
 /// [`RootNamespace`] nodes use opaque qualified-reference identities whose source spelling and
@@ -55,6 +80,8 @@ pub struct RootNamespace {
 /// identities as globally stable or interpreting an AST without the arena that owns them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedDocument {
+    /// Lexical name vocabulary used to interpret the source and retained recovery states.
+    pub name_language: NameLanguage,
     /// BOM-stripped source text whose byte offsets back AST/reference spans.
     pub source: SourceStorage,
     /// Document-local qualified references shared by all semantic AST nodes.
@@ -98,12 +125,14 @@ fn send_sync_structural_proof(document: ParsedDocument) {
     // Exhaustive by construction: adding or renaming a field of `ParsedDocument` fails here, so a
     // new field cannot reach the `unsafe impl`s without an assertion of its own below.
     let ParsedDocument {
+        name_language,
         source,
         qualified_references,
         root,
     } = document;
-    let _ = (&source, &qualified_references, &root);
+    let _ = (&name_language, &source, &qualified_references, &root);
 
+    assert_send_sync::<NameLanguage>();
     assert_send_sync::<SourceStorage>();
     assert_send_sync::<QualifiedReferenceArena>();
     // The expensive one: this is the full structural walk of the AST type graph, the proof the
@@ -134,9 +163,15 @@ impl ParsedDocument {
 
     /// Decoded `NAME` value of a declaration name: a basic name as written, or the contents of
     /// an unrestricted name with its quotes removed and `\'` escapes decoded. Only an escaped
-    /// unrestricted name allocates.
+    /// unrestricted name allocates. Retained reserved-keyword syntax has no valid decoded name
+    /// and returns `None`, as does a span outside this document.
     pub fn decoded_declaration_name(&self, name: DeclarationName) -> Option<Cow<'_, str>> {
-        decode_authored_name(self.declaration_name(name)?)
+        match name.state() {
+            super::DeclarationNameState::Parsed => {
+                decode_authored_name(self.declaration_name(name)?)
+            }
+            super::DeclarationNameState::ReservedKeyword => None,
+        }
     }
 
     /// Authored spelling of a real literal.
@@ -206,6 +241,7 @@ impl serde::Serialize for ParsedDocument {
         validate_serialized_document(self).map_err(S::Error::custom)?;
         ParsedDocumentWireRef {
             ast_version: crate::PARSE_AST_VERSION,
+            name_language: self.name_language,
             source: &self.source,
             qualified_references: &self.qualified_references,
             root: &self.root,
@@ -231,6 +267,7 @@ impl<'de> serde::Deserialize<'de> for ParsedDocument {
             )));
         }
         let document = Self {
+            name_language: wire.name_language,
             source: wire.source,
             qualified_references: wire.qualified_references,
             root: wire.root,
@@ -244,6 +281,7 @@ impl<'de> serde::Deserialize<'de> for ParsedDocument {
 #[derive(serde::Serialize)]
 struct ParsedDocumentWireRef<'a> {
     ast_version: u32,
+    name_language: NameLanguage,
     source: &'a SourceStorage,
     qualified_references: &'a QualifiedReferenceArena,
     root: &'a RootNamespace,
@@ -253,6 +291,7 @@ struct ParsedDocumentWireRef<'a> {
 #[derive(serde::Deserialize)]
 struct ParsedDocumentWire {
     ast_version: u32,
+    name_language: NameLanguage,
     source: SourceStorage,
     qualified_references: QualifiedReferenceArena,
     root: RootNamespace,
@@ -280,6 +319,7 @@ mod serde_tests {
     fn serialize_unvalidated_wire(document: &ParsedDocument) -> serde_json::Value {
         serde_json::to_value(ParsedDocumentWireRef {
             ast_version: crate::PARSE_AST_VERSION,
+            name_language: document.name_language,
             source: &document.source,
             qualified_references: &document.qualified_references,
             root: &document.root,
@@ -293,6 +333,21 @@ mod serde_tests {
         let encoded = serialize_unvalidated_wire(&document);
         serde_json::from_value::<ParsedDocument>(encoded)
             .expect_err("deserialization must reject the typed provenance corruption");
+    }
+
+    #[test]
+    fn malformed_name_cannot_be_serialized_as_a_successful_name() {
+        struct HideInvalidName;
+        impl VisitorMut for HideInvalidName {
+            fn visit_declaration_name(&mut self, name: &mut DeclarationName) {
+                if name.state == crate::ast::DeclarationNameState::ReservedKeyword {
+                    name.state = crate::ast::DeclarationNameState::Parsed;
+                }
+            }
+        }
+        assert_typed_corruption_is_rejected("package P { part def port; }", |document| {
+            HideInvalidName.visit_root_namespace(&mut document.root);
+        });
     }
 
     struct CorruptRecoveryDiagnostic(Span);
@@ -570,6 +625,7 @@ mod serde_tests {
             )],
         };
         ParsedDocument {
+            name_language: NameLanguage::Sysml,
             source,
             qualified_references: builder.finish(),
             root,

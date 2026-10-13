@@ -31,6 +31,7 @@ package TransitionEffectRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 79) (line 3) (column 27) (len 6)) (segments (segment 0 (token "signal") (name "signal") (separator none) (span (offset 79) (line 3) (column 27) (len 6)))))
     (reference r1 (scope relative) (span (offset 168) (line 6) (column 16) (len 4)) (segments (segment 0 (token "Done") (name "Done") (separator none) (span (offset 168) (line 6) (column 16) (len 4)))))

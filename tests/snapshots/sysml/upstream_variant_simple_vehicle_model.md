@@ -58,6 +58,7 @@ package SimpleVehicleModel {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 181) (line 5) (column 41) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 181) (line 5) (column 41) (len 6)))))
     (reference r1 (scope relative) (span (offset 236) (line 6) (column 47) (len 10)) (segments (segment 0 (token "Engine4Cyl") (name "Engine4Cyl") (separator none) (span (offset 236) (line 6) (column 47) (len 10)))))

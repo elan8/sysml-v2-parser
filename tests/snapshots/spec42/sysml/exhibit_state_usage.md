@@ -25,6 +25,7 @@ package ExhibitStateUsageExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 47) (line 2) (column 13) (len 2)) (segments (segment 0 (token "s1") (name "s1") (separator none) (span (offset 47) (line 2) (column 13) (len 2)))))
   )

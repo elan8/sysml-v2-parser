@@ -40,6 +40,7 @@ package StateBodyMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 67) (line 3) (column 23) (len 15)) (segments (segment 0 (token "isTriggerDuring") (name "isTriggerDuring") (separator none) (span (offset 67) (line 3) (column 23) (len 15)))))
     (reference r1 (scope relative) (span (offset 117) (line 4) (column 34) (len 6)) (segments (segment 0 (token "middle") (name "middle") (separator none) (span (offset 117) (line 4) (column 34) (len 6)))))

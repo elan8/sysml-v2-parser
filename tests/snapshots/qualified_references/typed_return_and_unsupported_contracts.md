@@ -72,6 +72,7 @@ package TypedContracts {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 82) (line 3) (column 31) (len 12)) (segments (segment 0 (token "DeferredType") (name "DeferredType") (separator none) (span (offset 82) (line 3) (column 31) (len 12)))))
     (reference r1 (scope relative) (span (offset 355) (line 12) (column 20) (len 17)) (segments (segment 0 (token "Results") (name "Results") (separator none) (span (offset 355) (line 12) (column 20) (len 7))) (segment 1 (token "accepted") (name "accepted") (separator colon-colon) (span (offset 364) (line 12) (column 29) (len 8)))))

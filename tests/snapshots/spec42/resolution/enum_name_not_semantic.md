@@ -34,6 +34,7 @@ package Demo {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 145) (line 7) (column 27) (len 15)) (segments (segment 0 (token "StatusNamedType") (name "StatusNamedType") (separator none) (span (offset 145) (line 7) (column 27) (len 15)))))
     (reference r1 (scope relative) (span (offset 214) (line 10) (column 17) (len 7)) (segments (segment 0 (token "Derived") (name "Derived") (separator none) (span (offset 214) (line 10) (column 17) (len 7)))))

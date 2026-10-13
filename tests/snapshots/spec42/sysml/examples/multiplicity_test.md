@@ -54,6 +54,7 @@ package MultiplicityTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 114) (line 7) (column 17) (len 1)) (segments (segment 0 (token "P") (name "P") (separator none) (span (offset 114) (line 7) (column 17) (len 1)))))
     (reference r1 (scope relative) (span (offset 127) (line 8) (column 11) (len 1)) (segments (segment 0 (token "P") (name "P") (separator none) (span (offset 127) (line 8) (column 11) (len 1)))))

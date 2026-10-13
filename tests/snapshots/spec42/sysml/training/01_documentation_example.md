@@ -49,6 +49,7 @@ package 'Documentation Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 206) (line 10) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 206) (line 10) (column 16) (len 10)))))
     (reference r1 (scope relative) (span (offset 288) (line 13) (column 19) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 288) (line 13) (column 19) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 293) (line 13) (column 24) (len 11)))))

@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type provenance) (description "KerML feature specialization alternatives retain authored order and clause identity: two references/crosses clauses stay distinct from one comma-target clause, and keyword/operator spellings remain typed. KerML textual BNF FeatureSpecialization, References, and Crosses; Pilot KerML.xtext FeatureSpecialization, ReferencesKeyword, and Crossings."))
+(snapshot (type provenance) (description "KerML feature specialization alternatives retain authored order and clause identity: two references/crosses clauses stay distinct from one comma-target clause, and keyword/operator spellings remain typed. KerML textual BNF FeatureSpecialization, References, and Crosses; Pilot KerML.xtext FeatureSpecialization, ReferencesKeyword, and Crossings.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -28,6 +28,7 @@ package FeatureSpecializationClauses {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 81) (line 2) (column 43) (len 5)) (segments (segment 0 (token "first") (name "first") (separator none) (span (offset 81) (line 2) (column 43) (len 5)))))
     (reference r1 (scope relative) (span (offset 98) (line 2) (column 60) (len 6)) (segments (segment 0 (token "second") (name "second") (separator none) (span (offset 98) (line 2) (column 60) (len 6)))))

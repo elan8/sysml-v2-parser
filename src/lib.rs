@@ -71,7 +71,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 278;
+pub const PARSE_AST_VERSION: u32 = 279;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,6 +119,40 @@ pub fn parse_for_editor(input: &str) -> ParseResult {
 /// Parse an owned source buffer for editor/LSP use without cloning the complete document.
 pub fn parse_for_editor_owned(input: String) -> ParseResult {
     parse_with_diagnostics_owned(input)
+}
+
+/// Parse with an explicit lexical NAME vocabulary; the default entry points select SysML.
+#[allow(clippy::result_large_err)]
+pub fn parse_with_name_language(
+    input: &str,
+    language: ast::NameLanguage,
+) -> Result<ParsedDocument, ParseError> {
+    parse_owned_with_name_language(input.to_owned(), language)
+}
+
+/// Parse an owned buffer with an explicit lexical NAME vocabulary.
+#[allow(clippy::result_large_err)]
+pub fn parse_owned_with_name_language(
+    input: String,
+    language: ast::NameLanguage,
+) -> Result<ParsedDocument, ParseError> {
+    parser::parse_root_owned_with_name_language(input, language)
+}
+
+/// Editor parse with an explicit lexical NAME vocabulary.
+pub fn parse_for_editor_with_name_language(
+    input: &str,
+    language: ast::NameLanguage,
+) -> ParseResult {
+    parse_for_editor_owned_with_name_language(input.to_owned(), language)
+}
+
+/// Editor parse an owned buffer with an explicit lexical NAME vocabulary.
+pub fn parse_for_editor_owned_with_name_language(
+    input: String,
+    language: ast::NameLanguage,
+) -> ParseResult {
+    parser::parse_with_diagnostics_owned_with_name_language(input, language)
 }
 
 #[cfg(test)]

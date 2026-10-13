@@ -30,6 +30,7 @@ package InterfaceDefConstraintUsage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 126) (line 4) (column 28) (len 5)) (segments (segment 0 (token "Limit") (name "Limit") (separator none) (span (offset 126) (line 4) (column 28) (len 5)))))
     (reference r1 (scope relative) (span (offset 171) (line 5) (column 39) (len 5)) (segments (segment 0 (token "Limit") (name "Limit") (separator none) (span (offset 171) (line 5) (column 39) (len 5)))))

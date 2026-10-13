@@ -31,6 +31,7 @@ package Diamond {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 179) (line 8) (column 18) (len 6)) (segments (segment 0 (token "Member") (name "Member") (separator none) (span (offset 179) (line 8) (column 18) (len 6)))))
   )

@@ -112,6 +112,7 @@ package CommentTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 472) (line 34) (column 24) (len 3)) (segments (segment 0 (token "cmt") (name "cmt") (separator none) (span (offset 472) (line 34) (column 24) (len 3)))))
     (reference r1 (scope relative) (span (offset 521) (line 36) (column 16) (len 1)) (segments (segment 0 (token "C") (name "C") (separator none) (span (offset 521) (line 36) (column 16) (len 1)))))

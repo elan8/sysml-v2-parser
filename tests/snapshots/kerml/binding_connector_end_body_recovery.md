@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A malformed inline KerML binding end pair is recovered atomically without leaking its speculative endpoint reference or consuming a later declaration-only binding whose body-owned end feature remains typed."))
+(snapshot (type recovery) (description "A malformed inline KerML binding end pair is recovered atomically without leaking its speculative endpoint reference or consuming a later declaration-only binding whose body-owned end feature remains typed.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -30,6 +30,7 @@ package BindingConnectorEndRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 160) (line 5) (column 38) (len 6)) (segments (segment 0 (token "target") (name "target") (separator none) (span (offset 160) (line 5) (column 38) (len 6)))))
   )

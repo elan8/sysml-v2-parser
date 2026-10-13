@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Pinned KerML Simple Tests/Classes.kerml source: the private nested struct TypeBody retains `alias z for y;` between its typed feature and composite feature siblings (KerML textual BNF TypeBodyElement; Pilot agrees)."))
+(snapshot (type semantic) (description "Pinned KerML Simple Tests/Classes.kerml source: the private nested struct TypeBody retains `alias z for y;` between its typed feature and composite feature siblings (KerML textual BNF TypeBodyElement; Pilot agrees).") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -82,6 +82,7 @@ package Classes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 32) (line 3) (column 13) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 32) (line 3) (column 13) (len 1)))))
     (reference r1 (scope relative) (span (offset 74) (line 6) (column 14) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 74) (line 6) (column 14) (len 1)))))

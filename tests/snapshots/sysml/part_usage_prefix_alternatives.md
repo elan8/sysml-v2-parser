@@ -90,6 +90,7 @@ package PartPrefixAlternatives {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 303) (line 13) (column 30) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 303) (line 13) (column 30) (len 6)))))
     (reference r1 (scope relative) (span (offset 342) (line 14) (column 32) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 342) (line 14) (column 32) (len 6)))))

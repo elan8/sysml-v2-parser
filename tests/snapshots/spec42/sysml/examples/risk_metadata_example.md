@@ -56,6 +56,7 @@ package RiskMetadataExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 46) (line 2) (column 17) (len 12)) (segments (segment 0 (token "RiskMetadata") (name "RiskMetadata") (separator none) (span (offset 46) (line 2) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 79) (line 3) (column 17) (len 13)) (segments (segment 0 (token "RiskLevelEnum") (name "RiskLevelEnum") (separator none) (span (offset 79) (line 3) (column 17) (len 13)))))

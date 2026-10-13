@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A malformed directed keyword-less KerML Feature recovers as one exact TypeBody member and does not consume the following valid directed Feature. This exercises the same FeaturePrefix-first route as named and anonymous declarations without permitting a SysML action parameter to leak into a KerML type body."))
+(snapshot (type recovery) (description "A malformed directed keyword-less KerML Feature recovers as one exact TypeBody member and does not consume the following valid directed Feature. This exercises the same FeaturePrefix-first route as named and anonymous declarations without permitting a SysML action parameter to leak into a KerML type body.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -28,6 +28,7 @@ package DirectedKeywordlessFeatureRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 116) (line 4) (column 24) (len 6)) (segments (segment 0 (token "Result") (name "Result") (separator none) (span (offset 116) (line 4) (column 24) (len 6)))))
   )

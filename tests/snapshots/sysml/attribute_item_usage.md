@@ -27,6 +27,7 @@ package Messaging {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 68) (line 3) (column 24) (len 7)) (segments (segment 0 (token "Picture") (name "Picture") (separator none) (span (offset 68) (line 3) (column 24) (len 7)))))
   )

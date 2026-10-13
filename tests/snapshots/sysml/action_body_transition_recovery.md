@@ -8,7 +8,7 @@ package ActionBodyTransitionRecovery {
     action def Flow {
         transition first leaked accept when then ;
         transition first retained then target;
-        action after;
+        action 'after';
     }
 }
 ~~~
@@ -29,6 +29,7 @@ package ActionBodyTransitionRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 137) (line 4) (column 26) (len 8)) (segments (segment 0 (token "retained") (name "retained") (separator none) (span (offset 137) (line 4) (column 26) (len 8)))))
     (reference r1 (scope relative) (span (offset 151) (line 4) (column 40) (len 6)) (segments (segment 0 (token "target") (name "target") (separator none) (span (offset 151) (line 4) (column 40) (len 6)))))

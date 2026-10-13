@@ -40,6 +40,7 @@ package FlowMessageDeclarationAlternatives {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 57) (line 2) (column 13) (len 13)) (segments (segment 0 (token "inheritedFlow") (name "inheritedFlow") (separator none) (span (offset 57) (line 2) (column 13) (len 13)))))
     (reference r1 (scope relative) (span (offset 85) (line 3) (column 14) (len 13)) (segments (segment 0 (token "redefinedFlow") (name "redefinedFlow") (separator none) (span (offset 85) (line 3) (column 14) (len 13)))))

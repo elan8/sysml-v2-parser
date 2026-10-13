@@ -28,6 +28,7 @@ package CommentLoopInterface {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 68) (line 3) (column 19) (len 6)) (segments (segment 0 (token "source") (name "source") (separator none) (span (offset 68) (line 3) (column 19) (len 6)))))
     (reference r1 (scope relative) (span (offset 78) (line 3) (column 29) (len 6)) (segments (segment 0 (token "target") (name "target") (separator none) (span (offset 78) (line 3) (column 29) (len 6)))))

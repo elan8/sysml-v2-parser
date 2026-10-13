@@ -37,6 +37,7 @@ package KindedReferenceUsageRoutingRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 150) (line 4) (column 37) (len 10)) (segments (segment 0 (token "ActionType") (name "ActionType") (separator none) (span (offset 150) (line 4) (column 37) (len 10)))))
     (reference r1 (scope relative) (span (offset 165) (line 4) (column 52) (len 11)) (segments (segment 0 (token "priorAction") (name "priorAction") (separator none) (span (offset 165) (line 4) (column 52) (len 11)))))

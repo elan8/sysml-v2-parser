@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type provenance) (description "A KerML flow preserves each authored `of PayloadFeature` clause as an ordered, source-backed clause, making the violating side of validateFlowPayloadFeature observable without text reconstruction; the single-clause sibling retains the ordinary shape. KerML textual BNF 1303-1334; Pilot KerML.xtext 995-1035."))
+(snapshot (type provenance) (description "A KerML flow preserves each authored `of PayloadFeature` clause as an ordered, source-backed clause, making the violating side of validateFlowPayloadFeature observable without text reconstruction; the single-clause sibling retains the ordinary shape. KerML textual BNF 1303-1334; Pilot KerML.xtext 995-1035.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -27,6 +27,7 @@ package FlowPayloadClauses {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 70) (line 3) (column 17) (len 5)) (segments (segment 0 (token "Thing") (name "Thing") (separator none) (span (offset 70) (line 3) (column 17) (len 5)))))
     (reference r1 (scope relative) (span (offset 79) (line 3) (column 26) (len 5)) (segments (segment 0 (token "Other") (name "Other") (separator none) (span (offset 79) (line 3) (column 26) (len 5)))))

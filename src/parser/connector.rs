@@ -458,7 +458,16 @@ fn connection_end_full(
     declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<crate::ast::Expression>,
 ) -> Node<ConnectionEnd> {
-    let span = expr.span;
+    // The owning end includes its optional multiplicity and declaration, not only its target.
+    let start = multiplicity
+        .as_ref()
+        .map(|node| node.span)
+        .or_else(|| declared_name.as_ref().map(|declared| *declared.name.span()))
+        .unwrap_or(expr.span);
+    let span = crate::ast::Span {
+        len: expr.span.offset + expr.span.len - start.offset,
+        ..start
+    };
     Node::new(
         span,
         ConnectionEnd {
@@ -480,9 +489,6 @@ pub(crate) fn connector_end_name(
     let Ok((after_name, end_name)) = name(after_ws) else {
         return Ok((input, None));
     };
-    if crate::parser::lex::is_reserved_keyword(crate::parser::lex::name_bytes(input, end_name)) {
-        return Ok((input, None));
-    }
     let (after_trivia, _) = ws_and_comments(after_name)?;
     let operator = if after_trivia.fragment().starts_with(b"::>") {
         let (rest, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;

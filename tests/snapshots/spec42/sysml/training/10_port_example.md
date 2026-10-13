@@ -66,6 +66,7 @@ package 'Port Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 118) (line 8) (column 27) (len 4)) (segments (segment 0 (token "Temp") (name "Temp") (separator none) (span (offset 118) (line 8) (column 27) (len 4)))))
     (reference r1 (scope relative) (span (offset 148) (line 9) (column 25) (len 4)) (segments (segment 0 (token "Fuel") (name "Fuel") (separator none) (span (offset 148) (line 9) (column 25) (len 4)))))

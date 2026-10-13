@@ -66,6 +66,20 @@ pub fn opacity_report(root: &RootNamespace) -> OpacityReport {
             RootElement::Member(m) => walk_package_body_element(&mut report, &path, &m.value),
         }
     }
+    struct NameRecovery<'a>(&'a mut OpacityReport);
+    impl crate::ast::visit::Visitor for NameRecovery<'_> {
+        fn visit_declaration_name(&mut self, name: &crate::ast::DeclarationName) {
+            match name.state() {
+                crate::ast::DeclarationNameState::Parsed => {}
+                crate::ast::DeclarationNameState::ReservedKeyword => hit(
+                    self.0,
+                    &format!("declaration-name@{}", name.span().offset),
+                    OpacityKind::ParseError,
+                ),
+            }
+        }
+    }
+    crate::ast::visit::Visitor::visit_root_namespace(&mut NameRecovery(&mut report), root);
     report
 }
 

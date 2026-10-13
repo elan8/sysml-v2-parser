@@ -26,6 +26,7 @@ package DependencyCoverage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 91) (line 4) (column 21) (len 6)) (segments (segment 0 (token "Source") (name "Source") (separator none) (span (offset 91) (line 4) (column 21) (len 6)))))
     (reference r1 (scope relative) (span (offset 101) (line 4) (column 31) (len 6)) (segments (segment 0 (token "Target") (name "Target") (separator none) (span (offset 101) (line 4) (column 31) (len 6)))))

@@ -78,6 +78,7 @@ package ExternalShapeRefExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 17) (len 20)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 50) (line 2) (column 17) (len 12))) (segment 1 (token "String") (name "String") (separator colon-colon) (span (offset 64) (line 2) (column 31) (len 6)))))
     (reference r1 (scope relative) (span (offset 88) (line 3) (column 17) (len 10)) (segments (segment 0 (token "ShapeItems") (name "ShapeItems") (separator none) (span (offset 88) (line 3) (column 17) (len 10)))))

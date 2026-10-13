@@ -30,6 +30,7 @@ package PilotOccurrenceEndPrefixRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 87) (line 3) (column 22) (len 1)) (segments (segment 0 (token "P") (name "P") (separator none) (span (offset 87) (line 3) (column 22) (len 1)))))
     (reference r1 (scope relative) (span (offset 115) (line 4) (column 26) (len 1)) (segments (segment 0 (token "Q") (name "Q") (separator none) (span (offset 115) (line 4) (column 26) (len 1)))))

@@ -29,6 +29,7 @@ package CommentLoopPerform {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 132) (line 5) (column 16) (len 5)) (segments (segment 0 (token "input") (name "input") (separator none) (span (offset 132) (line 5) (column 16) (len 5)))))
     (reference r1 (scope relative) (span (offset 140) (line 5) (column 24) (len 6)) (segments (segment 0 (token "source") (name "source") (separator none) (span (offset 140) (line 5) (column 24) (len 6)))))

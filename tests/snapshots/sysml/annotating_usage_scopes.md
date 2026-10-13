@@ -103,6 +103,7 @@ package AnnotatingUsageScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 223) (line 7) (column 14) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 223) (line 7) (column 14) (len 8)))))
     (reference r1 (scope relative) (span (offset 265) (line 9) (column 23) (len 1)) (segments (segment 0 (token "I") (name "I") (separator none) (span (offset 265) (line 9) (column 23) (len 1)))))

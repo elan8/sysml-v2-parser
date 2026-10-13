@@ -79,6 +79,7 @@ package '3c-Function-based Behavior-structure mod-3' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 208) (line 10) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 208) (line 10) (column 17) (len 7)))))
     (reference r1 (scope relative) (span (offset 240) (line 11) (column 23) (len 12)) (segments (segment 0 (token "VehicleFrame") (name "VehicleFrame") (separator none) (span (offset 240) (line 11) (column 23) (len 12)))))

@@ -49,6 +49,7 @@ package 'Packet Usage' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 40) (line 2) (column 16) (len 7)) (segments (segment 0 (token "Packets") (name "Packets") (separator none) (span (offset 40) (line 2) (column 16) (len 7)))))
     (reference r1 (scope relative) (span (offset 68) (line 3) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 68) (line 3) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 82) (line 3) (column 31) (len 4)))))

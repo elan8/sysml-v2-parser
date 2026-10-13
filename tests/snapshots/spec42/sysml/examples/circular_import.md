@@ -69,6 +69,7 @@ package CircularImport {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 56) (line 4) (column 17) (len 2)) (segments (segment 0 (token "P2") (name "P2") (separator none) (span (offset 56) (line 4) (column 17) (len 2)))))
     (reference r1 (scope relative) (span (offset 110) (line 8) (column 17) (len 2)) (segments (segment 0 (token "P1") (name "P1") (separator none) (span (offset 110) (line 8) (column 17) (len 2)))))

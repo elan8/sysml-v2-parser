@@ -59,6 +59,7 @@ package CalculationPrefixAlternatives {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 142) (line 6) (column 23) (len 2)) (segments (segment 0 (token "C1") (name "C1") (separator none) (span (offset 142) (line 6) (column 23) (len 2)))))
     (reference r1 (scope relative) (span (offset 146) (line 6) (column 27) (len 2)) (segments (segment 0 (token "C2") (name "C2") (separator none) (span (offset 146) (line 6) (column 27) (len 2)))))

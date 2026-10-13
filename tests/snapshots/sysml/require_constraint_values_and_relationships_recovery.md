@@ -32,6 +32,7 @@ requirement def R {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 113) (line 3) (column 46) (len 6)) (segments (segment 0 (token "target") (name "target") (separator none) (span (offset 113) (line 3) (column 46) (len 6)))))
     (reference r1 (scope relative) (span (offset 220) (line 5) (column 44) (len 5)) (segments (segment 0 (token "other") (name "other") (separator none) (span (offset 220) (line 5) (column 44) (len 5)))))

@@ -16,7 +16,7 @@ package VerifyRequirementKeywordRecovery {
             verify requirement rss.recoverFromStall;
             verify requirement rss.returnToDock;
             verify rss.recoverFromStall;
-            require constraint after;
+            require constraint 'after';
         }
     }
 }
@@ -39,6 +39,7 @@ package VerifyRequirementKeywordRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 383) (line 12) (column 20) (len 20)) (segments (segment 0 (token "rss") (name "rss") (separator none) (span (offset 383) (line 12) (column 20) (len 3))) (segment 1 (token "recoverFromStall") (name "recoverFromStall") (separator dot) (span (offset 387) (line 12) (column 24) (len 16)))))
   )

@@ -112,6 +112,7 @@ package Corpus {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 63) (line 3) (column 24) (len 5)) (segments (segment 0 (token "Cases") (name "Cases") (separator none) (span (offset 63) (line 3) (column 24) (len 5)))))
     (reference r1 (scope relative) (span (offset 94) (line 4) (column 22) (len 12)) (segments (segment 0 (token "System") (name "System") (separator none) (span (offset 94) (line 4) (column 22) (len 6))) (segment 1 (token "user") (name "user") (separator colon-colon) (span (offset 102) (line 4) (column 30) (len 4)))))

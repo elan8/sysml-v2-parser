@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML TypeBody members take a MemberPrefix before the FeaturePrefix, so `protected in c : C;` is one directed feature member and not a `protected` result expression beside it."))
+(snapshot (type semantic) (description "KerML TypeBody members take a MemberPrefix before the FeaturePrefix, so `protected in c : C;` is one directed feature member and not a `protected` result expression beside it.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -29,6 +29,7 @@ package MemberPrefixFeatures {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 88) (line 4) (column 26) (len 1)) (segments (segment 0 (token "C") (name "C") (separator none) (span (offset 88) (line 4) (column 26) (len 1)))))
     (reference r1 (scope relative) (span (offset 115) (line 5) (column 25) (len 1)) (segments (segment 0 (token "C") (name "C") (separator none) (span (offset 115) (line 5) (column 25) (len 1)))))

@@ -73,6 +73,7 @@ package 'Local Clock Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 48) (line 2) (column 17) (len 20)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 48) (line 2) (column 17) (len 12))) (segment 1 (token "String") (name "String") (separator colon-colon) (span (offset 62) (line 2) (column 31) (len 6)))))
     (reference r1 (scope relative) (span (offset 140) (line 8) (column 12) (len 10)) (segments (segment 0 (token "localClock") (name "localClock") (separator none) (span (offset 140) (line 8) (column 12) (len 10)))))

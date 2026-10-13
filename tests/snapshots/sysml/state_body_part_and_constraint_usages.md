@@ -32,6 +32,7 @@ package StateBodyPartAndConstraintUsages {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 142) (line 5) (column 24) (len 7)) (segments (segment 0 (token "Counter") (name "Counter") (separator none) (span (offset 142) (line 5) (column 24) (len 7)))))
     (reference r1 (scope relative) (span (offset 180) (line 6) (column 30) (len 8)) (segments (segment 0 (token "Balanced") (name "Balanced") (separator none) (span (offset 180) (line 6) (column 30) (len 8)))))

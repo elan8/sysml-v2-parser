@@ -165,6 +165,7 @@ package '7a1-Variant Configuration - General Concept-a' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 338) (line 22) (column 21) (len 5)) (segments (segment 0 (token "part3") (name "part3") (separator none) (span (offset 338) (line 22) (column 21) (len 5)))))
     (reference r1 (scope relative) (span (offset 408) (line 26) (column 21) (len 5)) (segments (segment 0 (token "part5") (name "part5") (separator none) (span (offset 408) (line 26) (column 21) (len 5)))))

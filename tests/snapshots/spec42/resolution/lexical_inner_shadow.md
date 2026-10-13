@@ -37,6 +37,7 @@ package C {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 61) (line 5) (column 20) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 61) (line 5) (column 20) (len 1)))))
     (reference r1 (scope relative) (span (offset 92) (line 7) (column 14) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 92) (line 7) (column 14) (len 1)))))

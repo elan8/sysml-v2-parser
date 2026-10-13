@@ -44,6 +44,7 @@ part def Camera {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 34) (line 2) (column 17) (len 13)) (segments (segment 0 (token "PictureTaking") (name "PictureTaking") (separator none) (span (offset 34) (line 2) (column 17) (len 13)))))
     (reference r1 (scope relative) (span (offset 88) (line 4) (column 35) (len 26)) (segments (segment 0 (token "PictureTaking") (name "PictureTaking") (separator none) (span (offset 88) (line 4) (column 35) (len 13))) (segment 1 (token "takePicture") (name "takePicture") (separator colon-colon) (span (offset 103) (line 4) (column 50) (len 11)))))

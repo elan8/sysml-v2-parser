@@ -36,6 +36,7 @@ package NestedEndUsageEmit {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 98) (line 3) (column 44) (len 6)) (segments (segment 0 (token "things") (name "things") (separator none) (span (offset 98) (line 3) (column 44) (len 6)))))
     (reference r1 (scope relative) (span (offset 109) (line 3) (column 55) (len 13)) (segments (segment 0 (token "separateSpace") (name "separateSpace") (separator none) (span (offset 109) (line 3) (column 55) (len 13)))))

@@ -87,6 +87,7 @@ package 'Allocation Definition Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 225) (line 9) (column 25) (len 12)) (segments (segment 0 (token "ProvidePower") (name "ProvidePower") (separator none) (span (offset 225) (line 9) (column 25) (len 12)))))
     (reference r1 (scope relative) (span (offset 267) (line 10) (column 28) (len 14)) (segments (segment 0 (token "GenerateTorque") (name "GenerateTorque") (separator none) (span (offset 267) (line 10) (column 28) (len 14)))))

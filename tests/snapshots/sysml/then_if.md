@@ -41,6 +41,7 @@ package ThenIf {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 66) (line 3) (column 17) (len 5)) (segments (segment 0 (token "ready") (name "ready") (separator none) (span (offset 66) (line 3) (column 17) (len 5)))))
     (reference r1 (scope relative) (span (offset 155) (line 9) (column 17) (len 6)) (segments (segment 0 (token "active") (name "active") (separator none) (span (offset 155) (line 9) (column 17) (len 6)))))

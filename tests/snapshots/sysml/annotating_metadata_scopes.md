@@ -72,6 +72,7 @@ package AnnotatingMetadataScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 67) (line 3) (column 6) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 67) (line 3) (column 6) (len 8)))))
     (reference r1 (scope relative) (span (offset 105) (line 4) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 105) (line 4) (column 10) (len 8)))))

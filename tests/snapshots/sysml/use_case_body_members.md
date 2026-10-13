@@ -76,6 +76,7 @@ package UseCaseBodyMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 274) (line 9) (column 24) (len 6)) (segments (segment 0 (token "Person") (name "Person") (separator none) (span (offset 274) (line 9) (column 24) (len 6)))))
     (reference r1 (scope relative) (span (offset 321) (line 10) (column 40) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 321) (line 10) (column 40) (len 1)))))

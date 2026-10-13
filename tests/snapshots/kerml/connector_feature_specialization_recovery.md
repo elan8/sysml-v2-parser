@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "KerML FeatureSpecialization has no `specializes` spelling (that keyword belongs to classifier SuperclassingPart), so a connector written with it is recovered with an exact span and the following valid connector is preserved."))
+(snapshot (type recovery) (description "KerML FeatureSpecialization has no `specializes` spelling (that keyword belongs to classifier SuperclassingPart), so a connector written with it is recovered with an exact span and the following valid connector is preserved.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -28,6 +28,7 @@ package Connectors {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 123) (line 4) (column 26) (len 17)) (segments (segment 0 (token "Links") (name "Links") (separator none) (span (offset 123) (line 4) (column 26) (len 5))) (segment 1 (token "BinaryLink") (name "BinaryLink") (separator colon-colon) (span (offset 130) (line 4) (column 33) (len 10)))))
   )

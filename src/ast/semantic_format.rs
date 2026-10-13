@@ -76,7 +76,12 @@ impl ParsedDocument {
             SemanticWriter::new(self, &mut sink_output, &mut labels).write_root()?;
         }
 
-        output.write_str("(parsed-document\n  (references")?;
+        output.write_str("(parsed-document\n  (name-language ")?;
+        output.write_str(match self.name_language {
+            super::NameLanguage::Sysml => "sysml",
+            super::NameLanguage::Kerml => "kerml",
+        })?;
+        output.write_str(")\n  (references")?;
         for (index, id) in labels.in_order.iter().copied().enumerate() {
             write_reference_definition(self, &mut output, index, id)?;
         }
@@ -173,9 +178,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// spelling and its bare equivalent project identically; authored quoting is emitter
     /// provenance, not semantics.
     fn write_name(&mut self, name: DeclarationName) -> io::Result<()> {
-        match self.document.decoded_declaration_name(name) {
-            Some(decoded) => write_quoted(self.writer, &decoded),
-            None => Err(invalid_span("declaration name", name.span())),
+        match name.state() {
+            super::DeclarationNameState::Parsed => {
+                match self.document.decoded_declaration_name(name) {
+                    Some(decoded) => write_quoted(self.writer, &decoded),
+                    None => Err(invalid_span("declaration name", name.span())),
+                }
+            }
+            super::DeclarationNameState::ReservedKeyword => {
+                self.writer
+                    .write_str("(invalid-name (reason reserved-keyword) (token ")?;
+                let authored = self
+                    .document
+                    .source
+                    .slice(name.span())
+                    .ok_or_else(|| invalid_span("declaration name", name.span()))?;
+                write_quoted(self.writer, authored)?;
+                self.writer.write_str(") ")?;
+                write_span(self.writer, name.span())?;
+                self.writer.write_str(")")
+            }
         }
     }
 
@@ -7506,7 +7528,7 @@ mod tests {
             .expect("stream semantic AST");
 
         let rendered = String::from_utf8(writer.bytes).expect("UTF-8 semantic AST");
-        assert!(rendered.starts_with("(parsed-document\n  (references"));
+        assert!(rendered.starts_with("(parsed-document\n  (name-language sysml)\n  (references"));
         assert!(rendered.ends_with("\n)"));
     }
 }

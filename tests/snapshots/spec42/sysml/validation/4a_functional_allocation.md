@@ -209,6 +209,7 @@ package '4a-Functional Allocation' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 53) (line 2) (column 17) (len 26)) (segments (segment 0 (token "'2a-Parts Interconnection'") (name "2a-Parts Interconnection") (separator none) (span (offset 53) (line 2) (column 17) (len 26)))))
     (reference r1 (scope relative) (span (offset 100) (line 3) (column 17) (len 30)) (segments (segment 0 (token "'3a-Function-based Behavior-1'") (name "3a-Function-based Behavior-1") (separator none) (span (offset 100) (line 3) (column 17) (len 30)))))

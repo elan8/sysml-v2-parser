@@ -124,6 +124,7 @@ package '11a-View-Viewpoint' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 73) (line 4) (column 18) (len 2)) (segments (segment 0 (token "SI") (name "SI") (separator none) (span (offset 73) (line 4) (column 18) (len 2)))))
     (reference r1 (scope relative) (span (offset 183) (line 11) (column 18) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 183) (line 11) (column 18) (len 7)))))

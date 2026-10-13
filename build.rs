@@ -16,6 +16,39 @@ fn main() {
         );
     }
 
+    let keywords = parse_target(
+        &fs::read_to_string("docs/conformance-keywords").expect("read keyword inventory"),
+    );
+    println!("cargo:rerun-if-changed=docs/conformance-keywords");
+    assert_eq!(
+        keywords.get("grammar_content_hash"),
+        fields.get("grammar_content_hash"),
+        "keyword inventory must match the authoritative grammar pin"
+    );
+    let mut generated = String::new();
+    for language in ["sysml", "kerml"] {
+        let words = keywords
+            .get(language)
+            .expect("language keyword inventory")
+            .split_whitespace()
+            .collect::<Vec<_>>();
+        assert!(
+            words.windows(2).all(|pair| pair[0] < pair[1]),
+            "keyword inventory must be sorted and unique"
+        );
+        generated.push_str(&format!(
+            "pub(crate) const {}: &[&str] = &{:?};\n",
+            language.to_ascii_uppercase(),
+            words
+        ));
+    }
+    fs::write(
+        Path::new(&std::env::var("OUT_DIR").expect("output directory"))
+            .join("reserved_keywords.rs"),
+        generated,
+    )
+    .expect("write keyword tables");
+
     let bnf_root = Path::new("sysml-v2-release/bnf");
     let sysml = bnf_root.join("SysML-textual-bnf.kebnf");
     let kerml = bnf_root.join("KerML-textual-bnf.kebnf");

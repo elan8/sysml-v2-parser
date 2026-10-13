@@ -54,6 +54,15 @@ pub struct UnsupportedGrammarNode {
     pub production: UnsupportedProduction,
     pub diagnostic: ParseErrorNode,
 }
+/// Recognition state of an authored declaration-name token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DeclarationNameState {
+    Parsed,
+    /// An unquoted keyword retained as explicit malformed NAME syntax.
+    ReservedKeyword,
+}
+
 /// An authored declaration name or short name (`NAME`: `BASIC_NAME` or `UNRESTRICTED_NAME`).
 ///
 /// The document source is authoritative for the spelling, so this is a typed span into it rather
@@ -67,12 +76,18 @@ pub struct UnsupportedGrammarNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeclarationName {
+    pub(crate) state: DeclarationNameState,
     pub(crate) span: Span,
 }
 
 impl DeclarationName {
-    pub(crate) fn new(span: Span) -> Self {
-        Self { span }
+    pub(crate) fn new(span: Span, state: DeclarationNameState) -> Self {
+        Self { span, state }
+    }
+
+    /// Whether the token is a NAME or retained malformed keyword syntax.
+    pub fn state(self) -> DeclarationNameState {
+        self.state
     }
 
     /// The exact source span of the authored token.

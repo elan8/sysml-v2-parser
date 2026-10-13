@@ -130,6 +130,7 @@ package '3e-Function-based Behavior-item' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 59) (line 2) (column 16) (len 11)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 59) (line 2) (column 16) (len 11)))))
     (reference r1 (scope relative) (span (offset 162) (line 7) (column 32) (len 15)) (segments (segment 0 (token "VehicleAssembly") (name "VehicleAssembly") (separator none) (span (offset 162) (line 7) (column 32) (len 15)))))

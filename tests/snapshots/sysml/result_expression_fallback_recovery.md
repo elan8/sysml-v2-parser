@@ -40,6 +40,7 @@ package FallbackRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 108) (line 5) (column 9) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 108) (line 5) (column 9) (len 1)))))
   )

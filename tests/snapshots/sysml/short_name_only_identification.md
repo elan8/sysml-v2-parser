@@ -84,6 +84,7 @@ package ShortNameOnly {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 86) (line 4) (column 20) (len 12)) (segments (segment 0 (token "AnalysisType") (name "AnalysisType") (separator none) (span (offset 86) (line 4) (column 20) (len 12)))))
     (reference r1 (scope relative) (span (offset 207) (line 8) (column 19) (len 11)) (segments (segment 0 (token "ConcernType") (name "ConcernType") (separator none) (span (offset 207) (line 8) (column 19) (len 11)))))

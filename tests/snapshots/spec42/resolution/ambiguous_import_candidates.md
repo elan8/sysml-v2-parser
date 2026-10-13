@@ -40,6 +40,7 @@ package Use {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 93) (line 4) (column 20) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 93) (line 4) (column 20) (len 1)))))
     (reference r1 (scope relative) (span (offset 118) (line 5) (column 20) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 118) (line 5) (column 20) (len 1)))))

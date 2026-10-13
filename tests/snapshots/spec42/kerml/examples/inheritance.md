@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Pinned KerML Simple Tests/Inheritance.kerml source: the nested `feature y: A` TypeBody retains its AliasMember before the following feature redefinition (KerML textual BNF TypeBodyElement; Pilot agrees)."))
+(snapshot (type semantic) (description "Pinned KerML Simple Tests/Inheritance.kerml source: the nested `feature y: A` TypeBody retains its AliasMember before the following feature redefinition (KerML textual BNF TypeBodyElement; Pilot agrees).") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -57,6 +57,7 @@ package Inheritance {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 72) (line 6) (column 22) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 72) (line 6) (column 22) (len 1)))))
     (reference r1 (scope relative) (span (offset 97) (line 10) (column 13) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 97) (line 10) (column 13) (len 1)))))

@@ -30,6 +30,14 @@ fn main() {
 - `parse_for_editor(input)` — partial `ParsedDocument` + diagnostics for editors and language
   servers
 
+The default entry points use SysML reserved names. For a KerML source, use
+`parse_with_name_language(input, ast::NameLanguage::Kerml)` or the corresponding owned/editor
+entry point. `ParsedDocument::name_language` travels with the atomic document, including its
+serialized envelope. This option selects the lexical name vocabulary; it does not restrict the
+parser's structural production subset to one language. Unquoted reserved declaration names are
+retained as `DeclarationNameState::ReservedKeyword`, produce `reserved_declaration_name` diagnostics,
+and have no decoded valid name. Quote keyword names with single quotes to make them valid names.
+
 Semantic references in the AST are opaque, document-local identities. Resolve them through
 `ParsedDocument::qualified_reference` to borrow their authored segments, separator kinds, and
 source spans without splitting or reparsing display strings.
@@ -172,3 +180,10 @@ until the profile contains enough steady-state samples for the question being in
 | Conformance target & scorecard | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) |
 | Compliance gap | [`docs/SYSML_V2_COMPLIANCE_GAP.md`](docs/SYSML_V2_COMPLIANCE_GAP.md) |
 | Technical debt | [`docs/PARSER_TECHNICAL_DEBT.md`](docs/PARSER_TECHNICAL_DEBT.md) |
+
+Snapshot META may end with `(name-language kerml)` or `(name-language sysml)` after its description;
+omitting it selects SysML. The snapshot and serialization corpus share the same authored metadata
+reader, and emission round trips preserve the selected vocabulary. Keyword tables are generated
+from the pinned `RESERVED_KEYWORD` productions with
+`python tools/generate_reserved_keywords.py --bnf-root sysml-v2-release/bnf`; use `--check` to verify
+both the grammar-content pin and the inventory without rewriting it.

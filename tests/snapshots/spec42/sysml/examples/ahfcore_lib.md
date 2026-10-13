@@ -116,6 +116,7 @@ library package AHFCoreLib {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 86) (line 3) (column 17) (len 13)) (segments (segment 0 (token "AHFProfileLib") (name "AHFProfileLib") (separator none) (span (offset 86) (line 3) (column 17) (len 13)))))
     (reference r1 (scope relative) (span (offset 120) (line 4) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 120) (line 4) (column 17) (len 12)))))

@@ -50,6 +50,7 @@ package AnnotatingEnumerationBody {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 251) (line 8) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 251) (line 8) (column 10) (len 8)))))
   )

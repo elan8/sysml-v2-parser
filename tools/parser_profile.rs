@@ -14,20 +14,33 @@ fn main() {
         .unwrap_or(1_000);
     assert!(iterations > 0, "iteration count must be positive");
 
+    eprintln!(
+        "representation bytes: declaration-name {}, optional-name {}, parsed-document {}",
+        std::mem::size_of::<sysml_v2_parser::ast::DeclarationName>(),
+        std::mem::size_of::<Option<sysml_v2_parser::ast::DeclarationName>>(),
+        std::mem::size_of::<sysml_v2_parser::ast::ParsedDocument>()
+    );
+
     let sources = parser_corpus::snapshot_sources().expect("load parser snapshot corpus");
     let corpus_bytes: usize = sources.iter().map(|source| source.text.len()).sum();
 
     // Populate lazy runtime state before Samply's measured steady-state loop.
     for source in &sources {
         black_box(&source.name);
-        black_box(sysml_v2_parser::parse_with_diagnostics(&source.text));
+        black_box(sysml_v2_parser::parse_for_editor_with_name_language(
+            &source.text,
+            source.name_language,
+        ));
     }
 
     let started = Instant::now();
     let mut checksum = 0usize;
     for _ in 0..iterations {
         for source in &sources {
-            let result = sysml_v2_parser::parse_with_diagnostics(black_box(&source.text));
+            let result = sysml_v2_parser::parse_for_editor_with_name_language(
+                black_box(&source.text),
+                source.name_language,
+            );
             checksum = checksum.wrapping_add(result.document.root.elements.len());
             checksum = checksum.wrapping_add(result.document.qualified_references.len());
             checksum = checksum.wrapping_add(result.errors.len());

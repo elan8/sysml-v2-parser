@@ -33,6 +33,7 @@ package VerificationCaseUsageExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 68) (line 2) (column 30) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 68) (line 2) (column 30) (len 7)))))
   )

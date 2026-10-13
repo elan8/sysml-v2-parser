@@ -27,6 +27,7 @@ package DerivationEndRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 37) (line 2) (column 6) (len 10)) (segments (segment 0 (token "derivation") (name "derivation") (separator none) (span (offset 37) (line 2) (column 6) (len 10)))))
     (reference r1 (scope relative) (span (offset 74) (line 3) (column 14) (len 7)) (segments (segment 0 (token "mystery") (name "mystery") (separator none) (span (offset 74) (line 3) (column 14) (len 7)))))

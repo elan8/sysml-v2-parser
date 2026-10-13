@@ -45,6 +45,7 @@ package 'State Exhibition Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 53) (line 2) (column 17) (len 20)) (segments (segment 0 (token "'Transition Actions'") (name "Transition Actions") (separator none) (span (offset 53) (line 2) (column 17) (len 20)))))
     (reference r1 (scope relative) (span (offset 96) (line 4) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 96) (line 4) (column 17) (len 7)))))

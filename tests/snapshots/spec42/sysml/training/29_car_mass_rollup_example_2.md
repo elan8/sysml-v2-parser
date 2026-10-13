@@ -81,6 +81,7 @@ package 'Car Mass Rollup 1' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 46) (line 2) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 46) (line 2) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 79) (line 3) (column 17) (len 11)) (segments (segment 0 (token "MassRollup2") (name "MassRollup2") (separator none) (span (offset 79) (line 3) (column 17) (len 11)))))

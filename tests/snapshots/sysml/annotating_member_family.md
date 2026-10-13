@@ -75,6 +75,7 @@ package AnnotatingMemberFamily {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 71) (line 3) (column 23) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 71) (line 3) (column 23) (len 1)))))
     (reference r1 (scope relative) (span (offset 76) (line 3) (column 28) (len 1)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 76) (line 3) (column 28) (len 1)))))

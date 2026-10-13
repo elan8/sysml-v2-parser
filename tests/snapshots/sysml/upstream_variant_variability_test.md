@@ -44,6 +44,7 @@ package VariabilityTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 169) (line 8) (column 26) (len 1)) (segments (segment 0 (token "Q") (name "Q") (separator none) (span (offset 169) (line 8) (column 26) (len 1)))))
     (reference r1 (scope relative) (span (offset 199) (line 9) (column 27) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 199) (line 9) (column 27) (len 1)))))

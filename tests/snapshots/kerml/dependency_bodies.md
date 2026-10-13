@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "A dependency's braced RelationshipBody accepts owned feature members alongside the annotation subset (spec42 Gap 37), and the unbodied forms stay unchanged."))
+(snapshot (type semantic) (description "A dependency's braced RelationshipBody accepts owned feature members alongside the annotation subset (spec42 Gap 37), and the unbodied forms stay unchanged.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -39,6 +39,7 @@ package DependencyBodies {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 81) (line 4) (column 25) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 81) (line 4) (column 25) (len 1)))))
     (reference r1 (scope relative) (span (offset 86) (line 4) (column 30) (len 1)) (segments (segment 0 (token "y") (name "y") (separator none) (span (offset 86) (line 4) (column 30) (len 1)))))

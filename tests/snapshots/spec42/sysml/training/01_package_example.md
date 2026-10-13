@@ -36,6 +36,7 @@ package 'Package Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 43) (line 2) (column 16) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 43) (line 2) (column 16) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 48) (line 2) (column 21) (len 11)))))
     (reference r1 (scope relative) (span (offset 77) (line 3) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 77) (line 3) (column 17) (len 12)))))

@@ -14,7 +14,7 @@ package VerifyFeatureChainRecovery {
             require constraint before;
             verify rss.;
             verify rss.recoverFromStall;
-            require constraint after;
+            require constraint 'after';
         }
     }
 }
@@ -36,6 +36,7 @@ package VerifyFeatureChainRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 262) (line 10) (column 20) (len 20)) (segments (segment 0 (token "rss") (name "rss") (separator none) (span (offset 262) (line 10) (column 20) (len 3))) (segment 1 (token "recoverFromStall") (name "recoverFromStall") (separator dot) (span (offset 266) (line 10) (column 24) (len 16)))))
   )

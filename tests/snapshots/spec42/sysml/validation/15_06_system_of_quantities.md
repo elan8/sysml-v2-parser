@@ -98,6 +98,7 @@ package '15_06-System of Quantities' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 58) (line 2) (column 20) (len 3)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 58) (line 2) (column 20) (len 3)))))
   )

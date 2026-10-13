@@ -74,6 +74,7 @@ package CalculationExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 45) (line 2) (column 17) (len 3)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 45) (line 2) (column 17) (len 3)))))
     (reference r1 (scope relative) (span (offset 69) (line 3) (column 17) (len 18)) (segments (segment 0 (token "NumericalFunctions") (name "NumericalFunctions") (separator none) (span (offset 69) (line 3) (column 17) (len 18)))))

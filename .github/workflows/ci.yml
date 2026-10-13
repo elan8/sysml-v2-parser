@@ -48,6 +48,9 @@ jobs:
       - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
 
+      - name: Pinned reserved keyword inventory
+        run: python3 tools/generate_reserved_keywords.py --check
+
       - name: Semantic parser snapshot drift
         run: |
           cargo snapshot update

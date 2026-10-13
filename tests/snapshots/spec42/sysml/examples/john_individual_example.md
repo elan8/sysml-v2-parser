@@ -132,6 +132,7 @@ package JohnIndividualExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 168) (line 9) (column 19) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 168) (line 9) (column 19) (len 12))) (segment 1 (token "Natural") (name "Natural") (separator colon-colon) (span (offset 182) (line 9) (column 33) (len 7)))))
     (reference r1 (scope relative) (span (offset 360) (line 19) (column 30) (len 6)) (segments (segment 0 (token "Person") (name "Person") (separator none) (span (offset 360) (line 19) (column 30) (len 6)))))

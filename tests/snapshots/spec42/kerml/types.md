@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML Simple Tests: Types"))
+(snapshot (type semantic) (description "KerML Simple Tests: Types") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -83,6 +83,7 @@ package Types {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 45) (line 2) (column 30) (len 14)) (segments (segment 0 (token "Base") (name "Base") (separator none) (span (offset 45) (line 2) (column 30) (len 4))) (segment 1 (token "Anything") (name "Anything") (separator colon-colon) (span (offset 51) (line 2) (column 36) (len 8)))))
     (reference r1 (scope relative) (span (offset 85) (line 3) (column 25) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 85) (line 3) (column 25) (len 1)))))

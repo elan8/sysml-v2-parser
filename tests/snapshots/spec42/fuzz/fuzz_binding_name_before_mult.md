@@ -26,6 +26,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "P") (body brace (binding-connector-usage))))

@@ -58,6 +58,7 @@ package ServerSequenceModelOutside {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 52) (line 2) (column 16) (len 19)) (segments (segment 0 (token "ServerSequenceModel") (name "ServerSequenceModel") (separator none) (span (offset 52) (line 2) (column 16) (len 19)))))
     (reference r1 (scope relative) (span (offset 140) (line 5) (column 12) (len 8)) (segments (segment 0 (token "producer") (name "producer") (separator none) (span (offset 140) (line 5) (column 12) (len 8)))))

@@ -26,6 +26,7 @@ alias Foo for Bar {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (malformed (code "expected_keyword") (found "alias Foo for Bar {") (span (offset 0) (line 1) (column 1) (len 49))))

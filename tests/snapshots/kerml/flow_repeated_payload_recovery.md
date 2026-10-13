@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A malformed repeated KerML flow payload clause recovers as one exact malformed member without leaking its first payload reference or consuming the following valid flow sibling. KerML textual BNF 1303-1334; Pilot KerML.xtext 995-1035."))
+(snapshot (type recovery) (description "A malformed repeated KerML flow payload clause recovers as one exact malformed member without leaking its first payload reference or consuming the following valid flow sibling. KerML textual BNF 1303-1334; Pilot KerML.xtext 995-1035.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -28,6 +28,7 @@ package FlowPayloadRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 98) (line 4) (column 17) (len 8)) (segments (segment 0 (token "Retained") (name "Retained") (separator none) (span (offset 98) (line 4) (column 17) (len 8)))))
     (reference r1 (scope relative) (span (offset 112) (line 4) (column 31) (len 6)) (segments (segment 0 (token "source") (name "source") (separator none) (span (offset 112) (line 4) (column 31) (len 6)))))

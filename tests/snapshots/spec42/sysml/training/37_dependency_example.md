@@ -61,6 +61,7 @@ package 'Dependency Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 284) (line 22) (column 18) (len 39)) (segments (segment 0 (token "'System Assembly'") (name "System Assembly") (separator none) (span (offset 284) (line 22) (column 18) (len 17))) (segment 1 (token "'Computer Subsystem'") (name "Computer Subsystem") (separator colon-colon) (span (offset 303) (line 22) (column 37) (len 20)))))
     (reference r1 (scope relative) (span (offset 327) (line 22) (column 61) (len 17)) (segments (segment 0 (token "'Software Design'") (name "Software Design") (separator none) (span (offset 327) (line 22) (column 61) (len 17)))))

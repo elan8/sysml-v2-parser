@@ -62,6 +62,7 @@ package 'Variation Usages' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 45) (line 2) (column 17) (len 23)) (segments (segment 0 (token "'Variation Definitions'") (name "Variation Definitions") (separator none) (span (offset 45) (line 2) (column 17) (len 23)))))
     (reference r1 (scope relative) (span (offset 206) (line 9) (column 32) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 206) (line 9) (column 32) (len 7)))))

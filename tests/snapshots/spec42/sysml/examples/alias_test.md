@@ -59,6 +59,7 @@ package AliasTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 36) (line 2) (column 17) (len 21)) (segments (segment 0 (token "ISQSpaceTime") (name "ISQSpaceTime") (separator none) (span (offset 36) (line 2) (column 17) (len 12))) (segment 1 (token "breadth") (name "breadth") (separator colon-colon) (span (offset 50) (line 2) (column 31) (len 7)))))
     (reference r1 (scope relative) (span (offset 169) (line 7) (column 23) (len 6)) (segments (segment 0 (token "porig1") (name "porig1") (separator none) (span (offset 169) (line 7) (column 23) (len 6)))))

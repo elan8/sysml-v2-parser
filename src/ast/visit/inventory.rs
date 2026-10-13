@@ -59,7 +59,16 @@ macro_rules! ast_traversal {
 
             /// Called for every declaration name and short name; the default reports its span.
             fn visit_declaration_name(&mut self, name: &$($mutability)? DeclarationName) {
-                self.visit_span(&$($mutability)? name.span);
+                let DeclarationName { span, state } = name;
+                self.visit_span(span);
+                self.visit_declaration_name_state(state);
+            }
+
+            /// Visits the explicit lexical validity of a declaration name.
+            fn visit_declaration_name_state(&mut self, state: &$($mutability)? DeclarationNameState) {
+                match state {
+                    DeclarationNameState::Parsed | DeclarationNameState::ReservedKeyword => {},
+                }
             }
 
             /// Visits [`BinaryOperator`]; the default implementation walks its children.

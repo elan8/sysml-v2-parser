@@ -95,6 +95,7 @@ package 'Viewpoint Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 350) (line 12) (column 20) (len 18)) (segments (segment 0 (token "'Systems Engineer'") (name "Systems Engineer") (separator none) (span (offset 350) (line 12) (column 20) (len 18)))))
     (reference r1 (scope relative) (span (offset 390) (line 13) (column 21) (len 6)) (segments (segment 0 (token "'IV&V'") (name "IV&V") (separator none) (span (offset 390) (line 13) (column 21) (len 6)))))

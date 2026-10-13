@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Coverage: Standalone relationship declarations (disjoining, typing, subsetting, redefinition)"))
+(snapshot (type semantic) (description "Coverage: Standalone relationship declarations (disjoining, typing, subsetting, redefinition)") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -65,6 +65,7 @@ package RelationshipCoverage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 176) (line 11) (column 28) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 176) (line 11) (column 28) (len 1)))))
     (reference r1 (scope relative) (span (offset 183) (line 11) (column 35) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 183) (line 11) (column 35) (len 1)))))

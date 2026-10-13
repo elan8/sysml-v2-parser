@@ -31,6 +31,7 @@ package AnalysisIndividualExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 84) (line 2) (column 49) (len 21)) (segments (segment 0 (token "FuelEconomyAnalysis_1") (name "FuelEconomyAnalysis_1") (separator none) (span (offset 84) (line 2) (column 49) (len 21)))))
   )

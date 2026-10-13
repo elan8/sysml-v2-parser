@@ -85,6 +85,7 @@ package 'Conditional Succession Example-1' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 97) (line 4) (column 18) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 97) (line 4) (column 18) (len 12))) (segment 1 (token "Boolean") (name "Boolean") (separator colon-colon) (span (offset 111) (line 4) (column 32) (len 7)))))
     (reference r1 (scope relative) (span (offset 175) (line 8) (column 32) (len 5)) (segments (segment 0 (token "Scene") (name "Scene") (separator none) (span (offset 175) (line 8) (column 32) (len 5)))))

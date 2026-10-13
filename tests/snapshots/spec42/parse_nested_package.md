@@ -27,6 +27,7 @@ package Outer {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "Outer") (body brace (package (name "Inner") (body brace)))))

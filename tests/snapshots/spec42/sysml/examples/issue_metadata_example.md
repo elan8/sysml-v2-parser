@@ -69,6 +69,7 @@ package IssueMetadataExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 47) (line 2) (column 17) (len 23)) (segments (segment 0 (token "ModelingMetadata") (name "ModelingMetadata") (separator none) (span (offset 47) (line 2) (column 17) (len 16))) (segment 1 (token "Issue") (name "Issue") (separator colon-colon) (span (offset 65) (line 2) (column 35) (len 5)))))
     (reference r1 (scope relative) (span (offset 190) (line 6) (column 44) (len 5)) (segments (segment 0 (token "Issue") (name "Issue") (separator none) (span (offset 190) (line 6) (column 44) (len 5)))))

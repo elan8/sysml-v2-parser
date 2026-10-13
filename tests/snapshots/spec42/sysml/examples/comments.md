@@ -55,6 +55,7 @@ package Comments {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 150) (line 7) (column 24) (len 3)) (segments (segment 0 (token "cmt") (name "cmt") (separator none) (span (offset 150) (line 7) (column 24) (len 3)))))
     (reference r1 (scope relative) (span (offset 199) (line 9) (column 16) (len 1)) (segments (segment 0 (token "C") (name "C") (separator none) (span (offset 199) (line 9) (column 16) (len 1)))))

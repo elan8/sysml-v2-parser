@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A malformed repeated KerML feature specialization is captured without consuming the following valid feature or leaking speculative qualified-reference arena entries."))
+(snapshot (type recovery) (description "A malformed repeated KerML feature specialization is captured without consuming the following valid feature or leaking speculative qualified-reference arena entries.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -26,6 +26,7 @@ package FeatureSpecializationRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 115) (line 3) (column 30) (len 5)) (segments (segment 0 (token "valid") (name "valid") (separator none) (span (offset 115) (line 3) (column 30) (len 5)))))
   )

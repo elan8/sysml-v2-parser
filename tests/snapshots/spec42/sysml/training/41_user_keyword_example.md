@@ -81,6 +81,7 @@ package 'User Keyword Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 49) (line 2) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 49) (line 2) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 63) (line 2) (column 31) (len 4)))))
     (reference r1 (scope relative) (span (offset 85) (line 3) (column 17) (len 27)) (segments (segment 0 (token "'Semantic Metadata Example'") (name "Semantic Metadata Example") (separator none) (span (offset 85) (line 3) (column 17) (len 27)))))

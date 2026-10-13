@@ -63,6 +63,7 @@ package PortPrefixOwningScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 133) (line 5) (column 34) (len 9)) (segments (segment 0 (token "PowerPort") (name "PowerPort") (separator none) (span (offset 133) (line 5) (column 34) (len 9)))))
     (reference r1 (scope relative) (span (offset 171) (line 6) (column 28) (len 9)) (segments (segment 0 (token "PowerPort") (name "PowerPort") (separator none) (span (offset 171) (line 6) (column 28) (len 9)))))

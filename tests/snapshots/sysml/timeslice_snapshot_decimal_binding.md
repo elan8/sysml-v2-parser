@@ -34,6 +34,7 @@ package TimesliceSnapshotDecimalBinding {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 118) (line 4) (column 17) (len 10)) (segments (segment 0 (token "elapseTime") (name "elapseTime") (separator none) (span (offset 118) (line 4) (column 17) (len 10)))))
     (reference r1 (scope relative) (span (offset 136) (line 4) (column 35) (len 1)) (segments (segment 0 (token "s") (name "s") (separator none) (span (offset 136) (line 4) (column 35) (len 1)))))

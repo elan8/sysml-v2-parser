@@ -116,6 +116,29 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_declaration_name(&mut self, name: &DeclarationName) {
+        let span = name.span();
+        if span.len == 0 || !self.document.source.validates_span(span) {
+            self.check(Err(
+                "declaration name requires a nonempty valid source span".to_owned(),
+            ));
+            return;
+        }
+        self.check(self.owned(span, "declaration name"));
+        if let Some(authored) = self.document.source.slice(span) {
+            let reserved = self.document.name_language.is_reserved(authored);
+            let agrees = match name.state() {
+                DeclarationNameState::Parsed => !reserved,
+                DeclarationNameState::ReservedKeyword => reserved,
+            };
+            if !agrees {
+                self.check(Err(
+                    "declaration name state disagrees with the document name language".to_owned(),
+                ));
+            }
+        }
+    }
+
     fn visit_import(&mut self, node: &Node<Import>) {
         match node.value.membership.visibility {
             Some(visibility) => {

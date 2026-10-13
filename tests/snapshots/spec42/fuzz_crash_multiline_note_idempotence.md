@@ -50,6 +50,7 @@ er E specializes C intersects A, B;
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "ers") (body brace (malformed (code "unrecognized_declaration_in_scope") (found "specializaaaaaaaaaaaaaaaaaaaaaaaaaaA specializes B;") (span (offset 58) (line 4) (column 2) (len 51))) (malformed (code "unrecognized_declaration_in_scope") (found "specialization swbclassifier B :> A;") (span (offset 111) (line 5) (column 2) (len 36))) (malformed (code "unrecognized_declaration_in_scope") (found "Uubclassifier C s cializes A;") (span (offset 150) (line 7) (column 2) (len 29))) (classifier-declaration) (malformed (code "unrecognized_declaration_in_scope") (found "caassifier D disjoint fr_m C differences A, B;") (span (offset 248) (line 9) (column 3) (len 46))) (malformed (code "unrecognized_declaration_in_scope") (found "cla[sifie Conjugation {") (span (offset 296) (line 10) (column 2) (len 93))))))

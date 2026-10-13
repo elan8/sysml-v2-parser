@@ -45,6 +45,7 @@ package 'Variation Configuration' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 52) (line 2) (column 17) (len 18)) (segments (segment 0 (token "'Variation Usages'") (name "Variation Usages") (separator none) (span (offset 52) (line 2) (column 17) (len 18)))))
     (reference r1 (scope relative) (span (offset 98) (line 4) (column 22) (len 13)) (segments (segment 0 (token "vehicleFamily") (name "vehicleFamily") (separator none) (span (offset 98) (line 4) (column 22) (len 13)))))

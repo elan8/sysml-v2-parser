@@ -30,6 +30,7 @@ package SimpleVehicleModel {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 67) (line 2) (column 39) (len 10)) (segments (segment 0 (token "TradeStudy") (name "TradeStudy") (separator none) (span (offset 67) (line 2) (column 39) (len 10)))))
   )

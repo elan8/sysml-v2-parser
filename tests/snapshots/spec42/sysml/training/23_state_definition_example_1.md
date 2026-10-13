@@ -67,6 +67,7 @@ package 'State Definition Example-1' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 185) (line 8) (column 15) (len 3)) (segments (segment 0 (token "off") (name "off") (separator none) (span (offset 185) (line 8) (column 15) (len 3)))))
     (reference r1 (scope relative) (span (offset 247) (line 13) (column 10) (len 3)) (segments (segment 0 (token "off") (name "off") (separator none) (span (offset 247) (line 13) (column 10) (len 3)))))

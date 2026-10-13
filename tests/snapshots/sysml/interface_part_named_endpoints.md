@@ -27,6 +27,7 @@ package InterfacePartNamedEndpoints {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 76) (line 3) (column 23) (len 1)) (segments (segment 0 (token "I") (name "I") (separator none) (span (offset 76) (line 3) (column 23) (len 1)))))
     (reference r1 (scope relative) (span (offset 100) (line 3) (column 47) (len 11)) (segments (segment 0 (token "source") (name "source") (separator none) (span (offset 100) (line 3) (column 47) (len 6))) (segment 1 (token "port") (name "port") (separator dot) (span (offset 107) (line 3) (column 54) (len 4)))))

@@ -48,6 +48,7 @@ package 'Flow Usage Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 47) (line 2) (column 17) (len 14)) (segments (segment 0 (token "'Port Example'") (name "Port Example") (separator none) (span (offset 47) (line 2) (column 17) (len 14)))))
     (reference r1 (scope relative) (span (offset 105) (line 6) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 105) (line 6) (column 17) (len 7)))))

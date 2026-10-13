@@ -42,6 +42,7 @@ package GenericReferenceUsageHeaders {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 96) (line 3) (column 29) (len 7)) (segments (segment 0 (token "Message") (name "Message") (separator none) (span (offset 96) (line 3) (column 29) (len 7)))))
     (reference r1 (scope relative) (span (offset 105) (line 3) (column 38) (len 6)) (segments (segment 0 (token "Action") (name "Action") (separator none) (span (offset 105) (line 3) (column 38) (len 6)))))

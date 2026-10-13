@@ -23,6 +23,7 @@ x ` y
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (malformed (code "expected_keyword") (found "x ` y") (span (offset 0) (line 1) (column 1) (len 5))))

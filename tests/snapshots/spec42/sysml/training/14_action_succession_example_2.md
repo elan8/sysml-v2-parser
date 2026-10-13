@@ -72,6 +72,7 @@ package 'Action Definition Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 124) (line 6) (column 32) (len 5)) (segments (segment 0 (token "Scene") (name "Scene") (separator none) (span (offset 124) (line 6) (column 32) (len 5)))))
     (reference r1 (scope relative) (span (offset 143) (line 6) (column 51) (len 5)) (segments (segment 0 (token "Image") (name "Image") (separator none) (span (offset 143) (line 6) (column 51) (len 5)))))

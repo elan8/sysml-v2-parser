@@ -136,7 +136,7 @@ const CASES: &[(Context, &str)] = &[
     (Context::Package, "calc <'SN'> cl : CLD;"),
     (Context::Package, "constraint <'SN'> cn : CND;"),
     // Usages in a definition body.
-    (Context::PartDef, "attribute <'SN'> at : AD;"),
+    (Context::PartDef, "attribute <'SN'> attr : AD;"),
     (Context::PartDef, "enum <'SN'> en : ED;"),
     (Context::PartDef, "item <'SN'> it : ID;"),
     (Context::PartDef, "part <'SN'> pt : T;"),

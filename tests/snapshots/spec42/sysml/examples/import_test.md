@@ -55,6 +55,7 @@ package ImportTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 60) (line 3) (column 21) (len 25)) (segments (segment 0 (token "Pkg2") (name "Pkg2") (separator none) (span (offset 60) (line 3) (column 21) (len 4))) (segment 1 (token "Pkg21") (name "Pkg21") (separator colon-colon) (span (offset 66) (line 3) (column 27) (len 5))) (segment 2 (token "Pkg211") (name "Pkg211") (separator colon-colon) (span (offset 73) (line 3) (column 34) (len 6))) (segment 3 (token "P211") (name "P211") (separator colon-colon) (span (offset 81) (line 3) (column 42) (len 4)))))
     (reference r1 (scope relative) (span (offset 107) (line 4) (column 21) (len 11)) (segments (segment 0 (token "Pkg2") (name "Pkg2") (separator none) (span (offset 107) (line 4) (column 21) (len 4))) (segment 1 (token "Pkg21") (name "Pkg21") (separator colon-colon) (span (offset 113) (line 4) (column 27) (len 5)))))

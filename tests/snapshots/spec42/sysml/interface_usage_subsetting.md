@@ -27,6 +27,7 @@ package InterfaceUsageSubsettingExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 84) (line 4) (column 19) (len 1)) (segments (segment 0 (token "I") (name "I") (separator none) (span (offset 84) (line 4) (column 19) (len 1)))))
     (reference r1 (scope relative) (span (offset 103) (line 4) (column 38) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 103) (line 4) (column 38) (len 1)))))

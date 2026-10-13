@@ -852,141 +852,14 @@ pub(crate) fn skip_to_next_root_element(mut input: Input<'_>) -> IResult<Input<'
 /// from an arbitrary (non-keyword) identifier when a body-recovery diagnostic reports an
 /// "unexpected token" -- an unrecognized identifier like `test` or `distancePerVolume` is an input
 /// defect, not a grammar gap, and should not be reported as `unexpected keyword` (GH-18).
-const SYSML_RESERVED_KEYWORDS: &[&str] = &[
-    "about",
-    "abstract",
-    "accept",
-    "action",
-    "actor",
-    "after",
-    "alias",
-    "all",
-    "allocate",
-    "allocation",
-    "analysis",
-    "and",
-    "as",
-    "assert",
-    "assign",
-    "assume",
-    "at",
-    "attribute",
-    "bind",
-    "binding",
-    "by",
-    "calc",
-    "case",
-    "comment",
-    "concern",
-    "connect",
-    "connection",
-    "constant",
-    "constraint",
-    "crosses",
-    "decide",
-    "def",
-    "default",
-    "defined",
-    "dependency",
-    "derived",
-    "do",
-    "doc",
-    "else",
-    "end",
-    "entry",
-    "enum",
-    "event",
-    "exhibit",
-    "exit",
-    "expose",
-    "false",
-    "filter",
-    "first",
-    "flow",
-    "for",
-    "fork",
-    "frame",
-    "from",
-    "hastype",
-    "if",
-    "implies",
-    "import",
-    "in",
-    "include",
-    "individual",
-    "inout",
-    "interface",
-    "istype",
-    "item",
-    "join",
-    "language",
-    "library",
-    "locale",
-    "loop",
-    "merge",
-    "message",
-    "meta",
-    "metadata",
-    "nonunique",
-    "not",
-    "null",
-    "objective",
-    "occurrence",
-    "of",
-    "or",
-    "ordered",
-    "out",
-    "package",
-    "parallel",
-    "part",
-    "perform",
-    "port",
-    "private",
-    "protected",
-    "public",
-    "redefines",
-    "ref",
-    "references",
-    "render",
-    "rendering",
-    "rep",
-    "require",
-    "requirement",
-    "return",
-    "satisfy",
-    "send",
-    "snapshot",
-    "specializes",
-    "stakeholder",
-    "standard",
-    "state",
-    "subject",
-    "subsets",
-    "succession",
-    "terminate",
-    "then",
-    "timeslice",
-    "to",
-    "transition",
-    "true",
-    "until",
-    "use",
-    "variant",
-    "variation",
-    "verification",
-    "verify",
-    "via",
-    "view",
-    "viewpoint",
-    "when",
-    "while",
-    "xor",
-];
-
 /// Whether `word` (a bare identifier-like byte slice, no trailing punctuation) is one of the
 /// reserved keywords of the SysML v2 textual notation.
+pub(crate) fn is_reserved_keyword_in(input: Input<'_>, word: &[u8]) -> bool {
+    std::str::from_utf8(word).is_ok_and(|word| input.extra.name_language().is_reserved(word))
+}
+
 pub(crate) fn is_reserved_keyword(word: &[u8]) -> bool {
-    std::str::from_utf8(word).is_ok_and(|s| SYSML_RESERVED_KEYWORDS.contains(&s))
+    std::str::from_utf8(word).is_ok_and(|s| crate::ast::NameLanguage::Sysml.is_reserved(s))
 }
 
 pub(crate) fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
@@ -1219,7 +1092,15 @@ pub(crate) fn recover_body_element<'a>(
 /// decoded here. Use [`name_bytes`] when a parser needs to inspect the spelling.
 pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, DeclarationName> {
     let (rest, span) = reference_name_span(input)?;
-    Ok((rest, DeclarationName::new(span)))
+    let word = std::str::from_utf8(&input.fragment()[..span.len]).map_err(|_| {
+        nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Verify))
+    })?;
+    let state = if input.extra.name_language().is_reserved(word) {
+        crate::ast::DeclarationNameState::ReservedKeyword
+    } else {
+        crate::ast::DeclarationNameState::Parsed
+    };
+    Ok((rest, DeclarationName::new(span, state)))
 }
 
 /// The authored bytes of `name`, which must have been parsed from `input` or a position after
@@ -1339,7 +1220,7 @@ fn segment_is_reserved_keyword(input: Input<'_>) -> bool {
         .iter()
         .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
         .count();
-    length > 0 && is_reserved_keyword(&fragment[..length])
+    length > 0 && is_reserved_keyword_in(input, &fragment[..length])
 }
 
 fn source_backed_reference(
@@ -1655,8 +1536,8 @@ pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identificat
 
 /// `Identification` in a production whose next mandatory token after it is a keyword:
 /// `'alias' Identification 'for' …`, `'flow' UsageDeclaration ('of' … | 'from' …)`. Both halves
-/// of `Identification` are optional, and `name` accepts keyword spellings (models and libraries
-/// do use names like `item` or `entry`), so plain [`identification`] would read `alias <'A'>
+/// of `Identification` are optional, and recovery `name` retains invalid keyword spellings,
+/// so plain [`identification`] would read `alias <'A'>
 /// for T;` as an alias *named* `for`. A bare word equal to one of `follow` therefore ends the
 /// identification instead; a quoted `'for'` is still a name.
 pub(crate) fn identification_before<'a>(

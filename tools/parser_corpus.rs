@@ -3,12 +3,13 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const SNAPSHOT_ROOT: &str = "tests/snapshots";
-const SOURCE_START: &str = "# SOURCE\n~~~sysml\n";
-const SOURCE_END: &str = "\n~~~\n# DIAGNOSTICS";
+#[path = "snapshot_tool/metadata.rs"]
+mod metadata;
 
 pub struct SnapshotSource {
     pub name: String,
     pub text: String,
+    pub name_language: sysml_v2_parser::ast::NameLanguage,
 }
 
 pub fn snapshot_sources() -> io::Result<Vec<SnapshotSource>> {
@@ -21,14 +22,12 @@ pub fn snapshot_sources() -> io::Result<Vec<SnapshotSource>> {
         .into_iter()
         .map(|path| {
             let markdown = fs::read_to_string(&path)?;
-            let source_start = markdown
-                .find(SOURCE_START)
-                .map(|offset| offset + SOURCE_START.len())
-                .ok_or_else(|| invalid_snapshot(&path, "missing canonical SOURCE section"))?;
-            let source_end = markdown[source_start..]
-                .find(SOURCE_END)
-                .map(|offset| source_start + offset)
-                .ok_or_else(|| invalid_snapshot(&path, "missing canonical DIAGNOSTICS boundary"))?;
+            let metadata::AuthoredSections {
+                meta: _meta,
+                source,
+                name_language,
+            } = metadata::authored_sections(&markdown.replace("\r\n", "\n"))
+                .map_err(|message| invalid_snapshot(&path, &message))?;
             let name = path
                 .strip_prefix(&root)
                 .unwrap_or(&path)
@@ -38,7 +37,8 @@ pub fn snapshot_sources() -> io::Result<Vec<SnapshotSource>> {
                 .to_owned();
             Ok(SnapshotSource {
                 name,
-                text: markdown[source_start..source_end].to_owned(),
+                text: source,
+                name_language,
             })
         })
         .collect::<io::Result<_>>()?;

@@ -28,6 +28,7 @@ package EndDeclIntroducerRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 101) (line 4) (column 25) (len 5)) (segments (segment 0 (token "Thing") (name "Thing") (separator none) (span (offset 101) (line 4) (column 25) (len 5)))))
   )

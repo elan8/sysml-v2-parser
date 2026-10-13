@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML TypeBody FeatureMember -> OwnedFeatureMember owns MemberPrefix visibility before every FeatureElement alternative, including `inv`. The class and behavior owners retain private, protected, public, and absent visibility through canonical emission."))
+(snapshot (type semantic) (description "KerML TypeBody FeatureMember -> OwnedFeatureMember owns MemberPrefix visibility before every FeatureElement alternative, including `inv`. The class and behavior owners retain private, protected, public, and absent visibility through canonical emission.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -48,6 +48,7 @@ package InvariantMemberVisibility {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
   )
   (root (package (name "InvariantMemberVisibility") (body brace (kerml-classifier (keyword class) (abstract false) (name "C") (multiplicity none) (specializes none) (conjugates none) (body brace (invariant) (invariant))) (kerml-classifier (keyword behavior) (abstract false) (name "B") (multiplicity none) (specializes none) (conjugates none) (body brace (invariant) (invariant))))))

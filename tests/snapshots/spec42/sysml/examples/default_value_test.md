@@ -51,6 +51,7 @@ package DefaultValueTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 107) (line 8) (column 12) (len 1)) (segments (segment 0 (token "V") (name "V") (separator none) (span (offset 107) (line 8) (column 12) (len 1)))))
     (reference r1 (scope relative) (span (offset 127) (line 9) (column 17) (len 1)) (segments (segment 0 (token "m") (name "m") (separator none) (span (offset 127) (line 9) (column 17) (len 1)))))

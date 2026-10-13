@@ -53,6 +53,7 @@ package MultiplicityModifiers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "MultiplicityModifiers") (body brace (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (extended-library-declaration) (malformed (code "unrecognized_declaration_in_scope") (found "readonly attribute rejectedReadonly : Real;") (span (offset 495) (line 11) (column 5) (len 43))) (attribute-usage) (malformed (code "unrecognized_declaration_in_scope") (found "variable attribute rejectedVariable : Real;") (span (offset 579) (line 13) (column 5) (len 43))) (attribute-usage))))

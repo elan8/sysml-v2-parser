@@ -22,6 +22,7 @@ private import ScalarValues::*;
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 15) (line 1) (column 16) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 15) (line 1) (column 16) (len 12)))))
   )

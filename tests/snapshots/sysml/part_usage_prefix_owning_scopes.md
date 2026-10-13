@@ -83,6 +83,7 @@ package PartPrefixOwningScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 124) (line 5) (column 29) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 124) (line 5) (column 29) (len 6)))))
     (reference r1 (scope relative) (span (offset 137) (line 6) (column 6) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 137) (line 6) (column 6) (len 3)))))

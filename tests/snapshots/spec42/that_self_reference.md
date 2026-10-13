@@ -56,6 +56,7 @@ package ThatSelfReference {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 71) (line 3) (column 24) (len 8)) (segments (segment 0 (token "Anything") (name "Anything") (separator none) (span (offset 71) (line 3) (column 24) (len 8)))))
     (reference r1 (scope relative) (span (offset 91) (line 3) (column 44) (len 6)) (segments (segment 0 (token "things") (name "things") (separator none) (span (offset 91) (line 3) (column 44) (len 6)))))

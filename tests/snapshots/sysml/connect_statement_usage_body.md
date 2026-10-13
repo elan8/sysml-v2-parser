@@ -49,6 +49,7 @@ package ConnectStatementUsageBody {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 280) (line 9) (column 27) (len 7)) (segments (segment 0 (token "Conduit") (name "Conduit") (separator none) (span (offset 280) (line 9) (column 27) (len 7)))))
   )

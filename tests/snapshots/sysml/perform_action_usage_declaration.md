@@ -28,6 +28,7 @@ package PerformActionUsageDeclaration {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 118) (line 3) (column 63) (len 17)) (segments (segment 0 (token "Camera") (name "Camera") (separator none) (span (offset 118) (line 3) (column 63) (len 6))) (segment 1 (token "takePhoto") (name "takePhoto") (separator colon-colon) (span (offset 126) (line 3) (column 71) (len 9)))))
     (reference r1 (scope relative) (span (offset 138) (line 3) (column 83) (len 13)) (segments (segment 0 (token "selectedPhoto") (name "selectedPhoto") (separator none) (span (offset 138) (line 3) (column 83) (len 13)))))

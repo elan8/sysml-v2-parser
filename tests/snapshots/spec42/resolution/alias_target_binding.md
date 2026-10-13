@@ -26,6 +26,7 @@ package AliasCoverage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 71) (line 3) (column 27) (len 6)) (segments (segment 0 (token "Device") (name "Device") (separator none) (span (offset 71) (line 3) (column 27) (len 6)))))
     (reference r1 (scope relative) (span (offset 97) (line 4) (column 19) (len 11)) (segments (segment 0 (token "DeviceAlias") (name "DeviceAlias") (separator none) (span (offset 97) (line 4) (column 19) (len 11)))))

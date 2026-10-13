@@ -128,6 +128,7 @@ package 'Flashlight Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 238) (line 16) (column 23) (len 12)) (segments (segment 0 (token "OnOffCmdPort") (name "OnOffCmdPort") (separator none) (span (offset 238) (line 16) (column 23) (len 12)))))
     (reference r1 (scope relative) (span (offset 263) (line 17) (column 12) (len 29)) (segments (segment 0 (token "illuminateRegion") (name "illuminateRegion") (separator none) (span (offset 263) (line 17) (column 12) (len 16))) (segment 1 (token "sendOnOffCmd") (name "sendOnOffCmd") (separator dot) (span (offset 280) (line 17) (column 29) (len 12)))))

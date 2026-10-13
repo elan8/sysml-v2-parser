@@ -29,6 +29,7 @@ package ActionAcceptPayload {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 78) (line 3) (column 26) (len 6)) (segments (segment 0 (token "Signal") (name "Signal") (separator none) (span (offset 78) (line 3) (column 26) (len 6)))))
     (reference r1 (scope relative) (span (offset 89) (line 3) (column 37) (len 9)) (segments (segment 0 (token "inputPort") (name "inputPort") (separator none) (span (offset 89) (line 3) (column 37) (len 9)))))

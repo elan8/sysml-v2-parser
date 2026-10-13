@@ -63,6 +63,7 @@ package UsageBodyConnectorOwners {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 109) (line 5) (column 17) (len 4)) (segments (segment 0 (token "left") (name "left") (separator none) (span (offset 109) (line 5) (column 17) (len 4)))))
     (reference r1 (scope relative) (span (offset 117) (line 5) (column 25) (len 5)) (segments (segment 0 (token "right") (name "right") (separator none) (span (offset 117) (line 5) (column 25) (len 5)))))

@@ -30,6 +30,7 @@ package EnumeratedValueFullUsage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 88) (line 3) (column 33) (len 5)) (segments (segment 0 (token "Level") (name "Level") (separator none) (span (offset 88) (line 3) (column 33) (len 5)))))
     (reference r1 (scope relative) (span (offset 196) (line 6) (column 28) (len 5)) (segments (segment 0 (token "Level") (name "Level") (separator none) (span (offset 196) (line 6) (column 28) (len 5)))))

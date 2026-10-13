@@ -28,6 +28,7 @@ package AssignTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "AssignTest") (body brace (action-def (name "A") (modifiers) (specializes none) (body brace (assign) (assign) (assign))))))

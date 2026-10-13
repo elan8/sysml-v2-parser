@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "SysML-only Message declarations in a KerML type body are recovered as whole invalid members, including the MemberPrefix spelling, without swallowing valid following Flow and Feature members."))
+(snapshot (type recovery) (description "SysML-only Message declarations in a KerML type body are recovered as whole invalid members, including the MemberPrefix spelling, without swallowing valid following Flow and Feature members.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -38,6 +38,7 @@ package MessageTypeBodyRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 127) (line 5) (column 14) (len 3)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 127) (line 5) (column 14) (len 1))) (segment 1 (token "y") (name "y") (separator dot) (span (offset 129) (line 5) (column 16) (len 1)))))
     (reference r1 (scope relative) (span (offset 134) (line 5) (column 21) (len 4)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 134) (line 5) (column 21) (len 1))) (segment 1 (token "x1") (name "x1") (separator dot) (span (offset 136) (line 5) (column 23) (len 2)))))

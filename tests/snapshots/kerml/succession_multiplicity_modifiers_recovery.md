@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type malformed) (description "Duplicate succession declaration modifier slots and missing ends produce recovery nodes while later succession and feature siblings remain typed."))
+(snapshot (type malformed) (description "Duplicate succession declaration modifier slots and missing ends produce recovery nodes while later succession and feature siblings remain typed.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -39,6 +39,7 @@ class C {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 112) (line 3) (column 48) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 112) (line 3) (column 48) (len 1)))))
     (reference r1 (scope relative) (span (offset 119) (line 3) (column 55) (len 1)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 119) (line 3) (column 55) (len 1)))))

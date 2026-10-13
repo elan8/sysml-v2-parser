@@ -29,6 +29,7 @@ package EnumeratedValueFullUsageRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 120) (line 4) (column 35) (len 5)) (segments (segment 0 (token "Level") (name "Level") (separator none) (span (offset 120) (line 4) (column 35) (len 5)))))
     (reference r1 (scope relative) (span (offset 151) (line 5) (column 21) (len 5)) (segments (segment 0 (token "Level") (name "Level") (separator none) (span (offset 151) (line 5) (column 21) (len 5)))))

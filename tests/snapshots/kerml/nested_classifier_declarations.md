@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML classifier-keyword declarations (struct, classifier, behavior, datatype) nested inside part usage, part definition, and attribute definition bodies dispatch to the typed KermlClassifierDecl production (spec42 Gap 38)."))
+(snapshot (type semantic) (description "KerML classifier-keyword declarations (struct, classifier, behavior, datatype) nested inside part usage, part definition, and attribute definition bodies dispatch to the typed KermlClassifierDecl production (spec42 Gap 38).") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -38,6 +38,7 @@ package NestedClassifiers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 93) (line 4) (column 30) (len 5)) (segments (segment 0 (token "Wheel") (name "Wheel") (separator none) (span (offset 93) (line 4) (column 30) (len 5)))))
   )

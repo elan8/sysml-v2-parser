@@ -32,6 +32,7 @@ standard library package <USCU> USCustomaryUnits {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (library-package (name "USCustomaryUnits") (standard true) (body brace (attribute-usage))))

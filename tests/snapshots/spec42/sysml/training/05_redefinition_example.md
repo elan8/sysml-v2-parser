@@ -65,6 +65,7 @@ package 'Redefinition Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 67) (line 4) (column 14) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 67) (line 4) (column 14) (len 6)))))
     (reference r1 (scope relative) (span (offset 132) (line 7) (column 19) (len 11)) (segments (segment 0 (token "SmallEngine") (name "SmallEngine") (separator none) (span (offset 132) (line 7) (column 19) (len 11)))))

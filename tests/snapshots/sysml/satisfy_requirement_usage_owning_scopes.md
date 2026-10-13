@@ -55,6 +55,7 @@ package SatisfyOwningScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 85) (line 4) (column 13) (len 4)) (segments (segment 0 (token "Spec") (name "Spec") (separator none) (span (offset 85) (line 4) (column 13) (len 4)))))
     (reference r1 (scope relative) (span (offset 93) (line 4) (column 21) (len 6)) (segments (segment 0 (token "target") (name "target") (separator none) (span (offset 93) (line 4) (column 21) (len 6)))))

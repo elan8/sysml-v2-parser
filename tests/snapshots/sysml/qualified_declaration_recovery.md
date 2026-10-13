@@ -26,6 +26,7 @@ package Live::Valid;
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 42) (line 2) (column 9) (len 11)) (segments (segment 0 (token "Live") (name "Live") (separator none) (span (offset 42) (line 2) (column 9) (len 4))) (segment 1 (token "Valid") (name "Valid") (separator colon-colon) (span (offset 48) (line 2) (column 15) (len 5)))))
   )

@@ -65,6 +65,7 @@ package RequirementBodyUsageMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 96) (line 3) (column 27) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 96) (line 3) (column 27) (len 7)))))
     (reference r1 (scope relative) (span (offset 171) (line 5) (column 25) (len 8)) (segments (segment 0 (token "FuelTank") (name "FuelTank") (separator none) (span (offset 171) (line 5) (column 25) (len 8)))))

@@ -609,7 +609,7 @@ pub(crate) fn default_reference_usage(
                 .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
                 .count();
             if is_reserved_shorthand_starter(&fragment[..word_len])
-                || crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
+                || crate::parser::lex::is_reserved_keyword_in(cursor, &fragment[..word_len])
             {
                 return Err(nom::Err::Error(nom::error::Error::new(
                     input,
@@ -634,7 +634,8 @@ fn default_reference_usage_inner(
     let (input, identification) = identification(input)?;
     if identification.name.is_some_and(|name| {
         let bytes = crate::parser::lex::name_bytes(identification_start, name);
-        is_reserved_shorthand_starter(bytes) || crate::parser::lex::is_reserved_keyword(bytes)
+        is_reserved_shorthand_starter(bytes)
+            || crate::parser::lex::is_reserved_keyword_in(identification_start, bytes)
     }) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,

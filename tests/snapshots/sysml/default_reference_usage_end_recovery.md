@@ -35,6 +35,7 @@ package DefaultReferenceUsageEndRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 168) (line 6) (column 33) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 168) (line 6) (column 33) (len 1)))))
     (reference r1 (scope relative) (span (offset 240) (line 9) (column 26) (len 2)) (segments (segment 0 (token "d1") (name "d1") (separator none) (span (offset 240) (line 9) (column 26) (len 2)))))

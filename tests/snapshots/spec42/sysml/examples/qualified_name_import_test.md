@@ -44,6 +44,7 @@ package QualifiedNameImportTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 112) (line 7) (column 18) (len 2)) (segments (segment 0 (token "P1") (name "P1") (separator none) (span (offset 112) (line 7) (column 18) (len 2)))))
     (reference r1 (scope relative) (span (offset 218) (line 11) (column 11) (len 6)) (segments (segment 0 (token "P2a") (name "P2a") (separator none) (span (offset 218) (line 11) (column 11) (len 3))) (segment 1 (token "A") (name "A") (separator colon-colon) (span (offset 223) (line 11) (column 16) (len 1)))))

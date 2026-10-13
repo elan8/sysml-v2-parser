@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML TypeBody routes directed keyword-less Feature declarations through FeaturePrefix rather than the SysML action-parameter node. The fixture retains all three FeatureDirection spellings, typing, multiplicity modifiers, a value, and anonymous redefinition while the companion calculation body continues to use its ActionBody-owned directed parameter form."))
+(snapshot (type semantic) (description "KerML TypeBody routes directed keyword-less Feature declarations through FeaturePrefix rather than the SysML action-parameter node. The fixture retains all three FeatureDirection spellings, typing, multiplicity modifiers, a value, and anonymous redefinition while the companion calculation body continues to use its ActionBody-owned directed parameter form.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -42,6 +42,7 @@ package DirectedKeywordlessFeatures {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 86) (line 3) (column 20) (len 5)) (segments (segment 0 (token "Input") (name "Input") (separator none) (span (offset 86) (line 3) (column 20) (len 5)))))
     (reference r1 (scope relative) (span (offset 156) (line 5) (column 24) (len 6)) (segments (segment 0 (token "source") (name "source") (separator none) (span (offset 156) (line 5) (column 24) (len 6)))))

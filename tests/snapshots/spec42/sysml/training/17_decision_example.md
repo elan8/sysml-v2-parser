@@ -83,6 +83,7 @@ package 'Decision Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 45) (line 2) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 45) (line 2) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 175) (line 9) (column 43) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 175) (line 9) (column 43) (len 4)))))

@@ -52,6 +52,7 @@ package UpstreamGapMultiplicities {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 56) (line 2) (column 21) (len 7)) (segments (segment 0 (token "Reading") (name "Reading") (separator none) (span (offset 56) (line 2) (column 21) (len 7)))))
     (reference r1 (scope relative) (span (offset 117) (line 3) (column 29) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 117) (line 3) (column 29) (len 4)))))

@@ -39,6 +39,7 @@ enum def Color {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 271) (line 13) (column 6) (len 7)) (segments (segment 0 (token "Palette") (name "Palette") (separator none) (span (offset 271) (line 13) (column 6) (len 7)))))
   )

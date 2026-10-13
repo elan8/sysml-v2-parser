@@ -96,6 +96,7 @@ package 'Connections Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 325) (line 15) (column 23) (len 8)) (segments (segment 0 (token "TireBead") (name "TireBead") (separator none) (span (offset 325) (line 15) (column 23) (len 8)))))
     (reference r1 (scope relative) (span (offset 364) (line 16) (column 30) (len 15)) (segments (segment 0 (token "TireMountingRim") (name "TireMountingRim") (separator none) (span (offset 364) (line 16) (column 30) (len 15)))))

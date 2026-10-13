@@ -74,6 +74,7 @@ package EndDeclIntroducers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 115) (line 4) (column 29) (len 5)) (segments (segment 0 (token "Thing") (name "Thing") (separator none) (span (offset 115) (line 4) (column 29) (len 5)))))
     (reference r1 (scope relative) (span (offset 153) (line 5) (column 32) (len 6)) (segments (segment 0 (token "Target") (name "Target") (separator none) (span (offset 153) (line 5) (column 32) (len 6)))))

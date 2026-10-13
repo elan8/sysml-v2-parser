@@ -27,6 +27,7 @@ also broken
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (malformed (code "expected_keyword") (found "not valid") (span (offset 0) (line 1) (column 1) (len 10))) (malformed (code "expected_keyword") (found "also broken") (span (offset 10) (line 2) (column 1) (len 11))))

@@ -29,6 +29,7 @@ part def Container {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 66) (line 3) (column 26) (len 9)) (segments (segment 0 (token "Component") (name "Component") (separator none) (span (offset 66) (line 3) (column 26) (len 9)))))
   )

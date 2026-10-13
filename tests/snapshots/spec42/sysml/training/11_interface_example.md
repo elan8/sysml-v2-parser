@@ -52,6 +52,7 @@ package 'Interface Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 46) (line 2) (column 17) (len 14)) (segments (segment 0 (token "'Port Example'") (name "Port Example") (separator none) (span (offset 46) (line 2) (column 17) (len 14)))))
     (reference r1 (scope relative) (span (offset 140) (line 7) (column 22) (len 11)) (segments (segment 0 (token "FuelOutPort") (name "FuelOutPort") (separator none) (span (offset 140) (line 7) (column 22) (len 11)))))

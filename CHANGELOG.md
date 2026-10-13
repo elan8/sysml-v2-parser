@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Reserved declaration names carry explicit recovery state (breaking AST change,
+  `PARSE_AST_VERSION` 279).** Strict and editor parses share exact token diagnostics for unquoted
+  reserved names. Quoted names and case-distinct names remain valid. Name-language selection uses
+  generated pinned SysML or KerML keyword tables and travels in the serialized document; malformed
+  names retain their authored spelling without becoming decoded names. Connector-end spans now
+  include their declaration names, and constraint-body `ref` members use the typed action owner.
+
 - Imports require explicit public, private or protected visibility, as specified by both pinned
   grammars. Bare imports become recovery nodes with `missing_import_visibility` on the import
   keyword; source emission retains their statements and valid later siblings. Visibility keywords

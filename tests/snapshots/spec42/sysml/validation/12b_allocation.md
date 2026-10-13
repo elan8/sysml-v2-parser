@@ -68,6 +68,7 @@ package '12b-Allocation' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 43) (line 2) (column 17) (len 12)) (segments (segment 0 (token "LogicalModel") (name "LogicalModel") (separator none) (span (offset 43) (line 2) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 76) (line 3) (column 17) (len 13)) (segments (segment 0 (token "PhysicalModel") (name "PhysicalModel") (separator none) (span (offset 76) (line 3) (column 17) (len 13)))))

@@ -105,6 +105,7 @@ package KermlFeaturePrefixSlots {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 318) (line 11) (column 43) (len 8)) (segments (segment 0 (token "Anything") (name "Anything") (separator none) (span (offset 318) (line 11) (column 43) (len 8)))))
     (reference r1 (scope relative) (span (offset 337) (line 11) (column 62) (len 6)) (segments (segment 0 (token "values") (name "values") (separator none) (span (offset 337) (line 11) (column 62) (len 6)))))

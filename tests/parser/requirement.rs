@@ -316,7 +316,7 @@ fn test_verification_return_ref_parses_return_expression() {
 
 #[test]
 fn test_analysis_ref_redefinition_is_structured_not_other() {
-    let input = "package P { analysis def A { ref :>> inheritedResult { return true; } subject s : S; } part def S; }";
+    let input = "package P { analysis def A { ref :>> inheritedResult { return result : Boolean; } subject s : S; } part def S; }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,

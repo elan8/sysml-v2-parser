@@ -36,6 +36,7 @@ package ControlNodePrefixes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 64) (line 3) (column 14) (len 1)) (segments (segment 0 (token "f") (name "f") (separator none) (span (offset 64) (line 3) (column 14) (len 1)))))
     (reference r1 (scope relative) (span (offset 83) (line 4) (column 17) (len 1)) (segments (segment 0 (token "g") (name "g") (separator none) (span (offset 83) (line 4) (column 17) (len 1)))))

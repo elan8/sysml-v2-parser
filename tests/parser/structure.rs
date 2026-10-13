@@ -1033,7 +1033,7 @@ occurrence rover subsets BaseOccurrence redefines LegacyOccurrence;
 #[test]
 fn test_occurrence_usage_accepts_typed_by_and_specialization_clauses() {
     let input = r#"package P {
-occurrence event typed by Mission::Event subsets events redefines oldEvent;
+occurrence occurrenceEvent typed by Mission::Event subsets events redefines oldEvent;
 }"#;
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
@@ -1050,7 +1050,7 @@ occurrence event typed by Mission::Event subsets events redefines oldEvent;
     };
     assert_eq!(
         occ.value.name.and_then(|n| result.declaration_name(n)),
-        Some("event")
+        Some("occurrenceEvent")
     );
     assert!(occ.value.type_name.is_some());
     assert_eq!(

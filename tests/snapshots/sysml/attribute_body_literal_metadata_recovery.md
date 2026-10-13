@@ -33,6 +33,7 @@ package AttributeBodyLiteralMetadataRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 158) (line 6) (column 18) (len 16)) (segments (segment 0 (token "ExternalShapeRef") (name "ExternalShapeRef") (separator none) (span (offset 158) (line 6) (column 18) (len 16)))))
     (reference r1 (scope relative) (span (offset 189) (line 7) (column 13) (len 7)) (segments (segment 0 (token "purpose") (name "purpose") (separator none) (span (offset 189) (line 7) (column 13) (len 7)))))

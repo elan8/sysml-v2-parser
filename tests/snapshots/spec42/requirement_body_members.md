@@ -60,6 +60,7 @@ package RequirementBodyMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 92) (line 3) (column 36) (len 4)) (segments (segment 0 (token "Part") (name "Part") (separator none) (span (offset 92) (line 3) (column 36) (len 4)))))
     (reference r1 (scope relative) (span (offset 174) (line 7) (column 28) (len 11)) (segments (segment 0 (token "ControlPort") (name "ControlPort") (separator none) (span (offset 174) (line 7) (column 28) (len 11)))))

@@ -66,6 +66,7 @@ package RefDeclarationScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 70) (line 3) (column 20) (len 4)) (segments (segment 0 (token "Port") (name "Port") (separator none) (span (offset 70) (line 3) (column 20) (len 4)))))
     (reference r1 (scope relative) (span (offset 79) (line 3) (column 29) (len 12)) (segments (segment 0 (token "Object") (name "Object") (separator none) (span (offset 79) (line 3) (column 29) (len 6))) (segment 1 (token "self") (name "self") (separator colon-colon) (span (offset 87) (line 3) (column 37) (len 4)))))

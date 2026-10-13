@@ -65,6 +65,7 @@ package 'Individuals and Time Slices' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 56) (line 2) (column 17) (len 35)) (segments (segment 0 (token "'Individuals and Snapshots Example'") (name "Individuals and Snapshots Example") (separator none) (span (offset 56) (line 2) (column 17) (len 35)))))
     (reference r1 (scope relative) (span (offset 128) (line 4) (column 31) (len 6)) (segments (segment 0 (token "Person") (name "Person") (separator none) (span (offset 128) (line 4) (column 31) (len 6)))))

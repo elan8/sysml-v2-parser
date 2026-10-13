@@ -75,6 +75,7 @@ package AuthoredNameEmission {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 371) (line 14) (column 34) (len 7)) (segments (segment 0 (token "Payload") (name "Payload") (separator none) (span (offset 371) (line 14) (column 34) (len 7)))))
     (reference r1 (scope relative) (span (offset 597) (line 29) (column 20) (len 8)) (segments (segment 0 (token "Filtered") (name "Filtered") (separator none) (span (offset 597) (line 29) (column 20) (len 8)))))

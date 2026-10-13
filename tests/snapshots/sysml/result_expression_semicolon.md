@@ -18,7 +18,7 @@ package ResultTerminators {
     constraint good { value == 1 }
     calc def goodCalculation { value + 1 }
     function goodFunction { value + 1 }
-    attribute after = 3;
+    attribute 'after' = 3;
 }
 ~~~
 # DIAGNOSTICS
@@ -66,12 +66,13 @@ package ResultTerminators {
     function goodFunction {
         value + 1
     }
-    attribute after = 3;
+    attribute 'after' = 3;
 }
 ~~~
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 408) (line 12) (column 23) (len 5)) (segments (segment 0 (token "value") (name "value") (separator none) (span (offset 408) (line 12) (column 23) (len 5)))))
     (reference r1 (scope relative) (span (offset 452) (line 13) (column 32) (len 5)) (segments (segment 0 (token "value") (name "value") (separator none) (span (offset 452) (line 13) (column 32) (len 5)))))

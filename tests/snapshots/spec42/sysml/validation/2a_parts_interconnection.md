@@ -379,6 +379,7 @@ package '2a-Parts Interconnection' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 52) (line 2) (column 16) (len 11)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 52) (line 2) (column 16) (len 11)))))
     (reference r1 (scope relative) (span (offset 83) (line 3) (column 16) (len 6)) (segments (segment 0 (token "Usages") (name "Usages") (separator none) (span (offset 83) (line 3) (column 16) (len 6)))))

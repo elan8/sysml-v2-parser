@@ -25,6 +25,7 @@ package MessageUsageExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 21) (len 7)) (segments (segment 0 (token "Payload") (name "Payload") (separator none) (span (offset 50) (line 2) (column 21) (len 7)))))
     (reference r1 (scope relative) (span (offset 63) (line 2) (column 34) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 63) (line 2) (column 34) (len 1)))))
