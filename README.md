@@ -187,3 +187,5 @@ reader, and emission round trips preserve the selected vocabulary. Keyword table
 from the pinned `RESERVED_KEYWORD` productions with
 `python tools/generate_reserved_keywords.py --bnf-root sysml-v2-release/bnf`; use `--check` to verify
 both the grammar-content pin and the inventory without rewriting it.
+
+Syntax consumers can borrow `NameLanguage::reserved_keywords()` to use the same pinned vocabulary.

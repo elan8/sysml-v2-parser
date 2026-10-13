@@ -62,13 +62,17 @@ mod reserved_keywords {
 }
 
 impl NameLanguage {
-    /// Classify a bare lexical token using the pinned language keyword inventory.
-    pub fn is_reserved(self, word: &str) -> bool {
-        let words = match self {
+    /// Borrow the sorted pinned keyword inventory, without maintaining a consumer-owned copy.
+    pub const fn reserved_keywords(self) -> &'static [&'static str] {
+        match self {
             Self::Sysml => reserved_keywords::SYSML,
             Self::Kerml => reserved_keywords::KERML,
-        };
-        words.binary_search(&word).is_ok()
+        }
+    }
+
+    /// Classify a bare lexical token using the pinned language keyword inventory.
+    pub fn is_reserved(self, word: &str) -> bool {
+        self.reserved_keywords().binary_search(&word).is_ok()
     }
 }
 
