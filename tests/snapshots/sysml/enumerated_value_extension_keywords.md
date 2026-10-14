@@ -28,6 +28,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 87) (line 3) (column 16) (len 19)) (segments (segment 0 (token "ClassificationLevel") (name "ClassificationLevel") (separator none) (span (offset 87) (line 3) (column 16) (len 19)))))
     (reference r1 (scope relative) (span (offset 121) (line 4) (column 10) (len 8)) (segments (segment 0 (token "Security") (name "Security") (separator none) (span (offset 121) (line 4) (column 10) (len 8)))))

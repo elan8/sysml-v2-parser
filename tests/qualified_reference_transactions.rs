@@ -15,7 +15,7 @@ fn resolved(
 
 #[test]
 fn malformed_import_branch_does_not_publish_its_allocated_target() {
-    let source = "import Ghost::Target unexpected;\nimport Live::Target;";
+    let source = "private import Ghost::Target unexpected;\nprivate import Live::Target;";
     let result = parse_with_diagnostics(source);
     assert!(!result.errors.is_empty(), "malformed import should recover");
     let import = result

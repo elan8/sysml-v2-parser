@@ -23,19 +23,13 @@ package ConstraintBodyMembers {
 )
 ~~~
 # FORMAT
-~~~sysml
-package ConstraintBodyMembers {
-    attribute def T;
-    constraint def C {
-        attribute a : T;
-        private attribute b : T;
-        a <= 1;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 98) (line 4) (column 23) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 98) (line 4) (column 23) (len 1)))))
     (reference r1 (scope relative) (span (offset 131) (line 5) (column 31) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 131) (line 5) (column 31) (len 1)))))

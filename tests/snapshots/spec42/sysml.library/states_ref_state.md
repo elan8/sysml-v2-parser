@@ -34,6 +34,7 @@ standard library package States {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 123) (line 3) (column 25) (len 11)) (segments (segment 0 (token "StateAction") (name "StateAction") (separator none) (span (offset 123) (line 3) (column 25) (len 11)))))
     (reference r1 (scope relative) (span (offset 139) (line 3) (column 41) (len 12)) (segments (segment 0 (token "Action") (name "Action") (separator none) (span (offset 139) (line 3) (column 41) (len 6))) (segment 1 (token "self") (name "self") (separator colon-colon) (span (offset 147) (line 3) (column 49) (len 4)))))

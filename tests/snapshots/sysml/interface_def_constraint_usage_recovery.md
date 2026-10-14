@@ -10,7 +10,7 @@ package InterfaceDefConstraintUsageRecovery {
         constraint later : Limit;
         broken ???;
         constraint {
-            1 == 1;
+            1 == 1
         }
     }
 }
@@ -33,6 +33,7 @@ package InterfaceDefConstraintUsageRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 132) (line 4) (column 28) (len 5)) (segments (segment 0 (token "Limit") (name "Limit") (separator none) (span (offset 132) (line 4) (column 28) (len 5)))))
   )

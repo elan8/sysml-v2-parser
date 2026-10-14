@@ -116,6 +116,73 @@ impl ProvenanceValidator<'_> {
 }
 
 impl Visitor for ProvenanceValidator<'_> {
+    fn visit_declaration_name(&mut self, name: &DeclarationName) {
+        let span = name.span();
+        if span.len == 0 || !self.document.source.validates_span(span) {
+            self.check(Err(
+                "declaration name requires a nonempty valid source span".to_owned(),
+            ));
+            return;
+        }
+        self.check(self.owned(span, "declaration name"));
+        if let Some(authored) = self.document.source.slice(span) {
+            let reserved = self.document.name_language.is_reserved(authored);
+            let agrees = match name.state() {
+                DeclarationNameState::Parsed => !reserved,
+                DeclarationNameState::ReservedKeyword => reserved,
+            };
+            if !agrees {
+                self.check(Err(
+                    "declaration name state disagrees with the document name language".to_owned(),
+                ));
+            }
+        }
+    }
+
+    fn visit_import(&mut self, node: &Node<Import>) {
+        match node.value.membership.visibility {
+            Some(visibility) => {
+                if !self
+                    .document
+                    .source
+                    .validates_span(&node.value.membership.span)
+                {
+                    self.check(Err(
+                        "import visibility is not a valid source span".to_owned()
+                    ));
+                }
+                let keyword = match visibility {
+                    Visibility::Private => "private",
+                    Visibility::Protected => "protected",
+                    Visibility::Public => "public",
+                };
+                self.check(self.delimiter(
+                    &node.value.membership.span,
+                    keyword,
+                    "import visibility",
+                ));
+                self.check(sigil_within(
+                    &node.value.membership.span,
+                    &node.span,
+                    "import visibility",
+                ));
+            }
+            None => self.check(Err("an import requires explicit visibility".to_owned())),
+        }
+        super::visit::walk_import(self, node);
+    }
+    fn visit_parse_error_node_value(&mut self, error: &ParseErrorNode) {
+        if let Some(span) = &error.diagnostic_span {
+            if !self.document.source.validates_span(span) || span.len == 0 {
+                self.check(Err(
+                    "recovery diagnostic span is not a nonempty source span".to_owned(),
+                ));
+            }
+            self.check(self.owned(span, "recovery diagnostic"));
+        }
+        super::visit::walk_parse_error_node_value(self, error);
+    }
+
     fn visit_succession_usage(&mut self, node: &Node<SuccessionUsage>) {
         if let Some(span) = &node.value.succession_keyword_span {
             self.check(self.delimiter(span, "succession", "succession usage keyword"));

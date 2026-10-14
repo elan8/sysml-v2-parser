@@ -62,6 +62,7 @@ package 'Comment Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 204) (line 7) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 204) (line 7) (column 16) (len 10)))))
     (reference r1 (scope relative) (span (offset 344) (line 14) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 344) (line 14) (column 16) (len 10)))))

@@ -48,6 +48,7 @@ package Power {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 74) (line 3) (column 32) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 74) (line 3) (column 32) (len 4)))))
     (reference r1 (scope relative) (span (offset 137) (line 7) (column 20) (len 11)) (segments (segment 0 (token "DevicePower") (name "DevicePower") (separator none) (span (offset 137) (line 7) (column 20) (len 11)))))

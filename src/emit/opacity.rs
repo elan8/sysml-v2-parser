@@ -66,6 +66,20 @@ pub fn opacity_report(root: &RootNamespace) -> OpacityReport {
             RootElement::Member(m) => walk_package_body_element(&mut report, &path, &m.value),
         }
     }
+    struct NameRecovery<'a>(&'a mut OpacityReport);
+    impl crate::ast::visit::Visitor for NameRecovery<'_> {
+        fn visit_declaration_name(&mut self, name: &crate::ast::DeclarationName) {
+            match name.state() {
+                crate::ast::DeclarationNameState::Parsed => {}
+                crate::ast::DeclarationNameState::ReservedKeyword => hit(
+                    self.0,
+                    &format!("declaration-name@{}", name.span().offset),
+                    OpacityKind::ParseError,
+                ),
+            }
+        }
+    }
+    crate::ast::visit::Visitor::visit_root_namespace(&mut NameRecovery(&mut report), root);
     report
 }
 
@@ -309,6 +323,9 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
             InterfaceDefBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)
             }
+            InterfaceDefBodyElement::PartUsage(part) => {
+                walk_part_usage_body(report, &p, &part.value.body)
+            }
             InterfaceDefBodyElement::RefDecl(reference) => {
                 walk_ref_body(report, &p, &reference.value.body)
             }
@@ -371,7 +388,8 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
-            ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::Expression(_)
+            | ConstraintDefBodyElement::ReturnExpression(_) => {}
         }
     }
 }
@@ -420,7 +438,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             | CalcDefBodyElement::Succession(_)
             | CalcDefBodyElement::Import(_) => {}
             CalcDefBodyElement::ReturnDecl(n) => walk_calc_def_body(report, &p, &n.value.body),
-            CalcDefBodyElement::Expression(_) => {}
+            CalcDefBodyElement::Expression(_) | CalcDefBodyElement::ReturnExpression(_) => {}
         }
     }
 }
@@ -1433,7 +1451,6 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             }
             UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
-            | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)
             | UseCaseDefBodyElement::CaseReturnDecl(_)
             | UseCaseDefBodyElement::Assign(_)
             | UseCaseDefBodyElement::Expression(_) => {}
@@ -1703,7 +1720,8 @@ fn walk_constraint_body_elements(
             ConstraintDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
-            ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::Expression(_)
+            | ConstraintDefBodyElement::ReturnExpression(_) => {}
         }
     }
 }
@@ -1786,6 +1804,9 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
             }
             InterfaceUsageBodyElement::InterfaceUsage(n) => {
                 walk_interface_usage(report, &p, &n.value)
+            }
+            InterfaceUsageBodyElement::PartUsage(part) => {
+                walk_part_usage_body(report, &p, &part.value.body)
             }
             InterfaceUsageBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)

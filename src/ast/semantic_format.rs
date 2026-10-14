@@ -76,7 +76,12 @@ impl ParsedDocument {
             SemanticWriter::new(self, &mut sink_output, &mut labels).write_root()?;
         }
 
-        output.write_str("(parsed-document\n  (references")?;
+        output.write_str("(parsed-document\n  (name-language ")?;
+        output.write_str(match self.name_language {
+            super::NameLanguage::Sysml => "sysml",
+            super::NameLanguage::Kerml => "kerml",
+        })?;
+        output.write_str(")\n  (references")?;
         for (index, id) in labels.in_order.iter().copied().enumerate() {
             write_reference_definition(self, &mut output, index, id)?;
         }
@@ -173,9 +178,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// spelling and its bare equivalent project identically; authored quoting is emitter
     /// provenance, not semantics.
     fn write_name(&mut self, name: DeclarationName) -> io::Result<()> {
-        match self.document.decoded_declaration_name(name) {
-            Some(decoded) => write_quoted(self.writer, &decoded),
-            None => Err(invalid_span("declaration name", name.span())),
+        match name.state() {
+            super::DeclarationNameState::Parsed => {
+                match self.document.decoded_declaration_name(name) {
+                    Some(decoded) => write_quoted(self.writer, &decoded),
+                    None => Err(invalid_span("declaration name", name.span())),
+                }
+            }
+            super::DeclarationNameState::ReservedKeyword => {
+                self.writer
+                    .write_str("(invalid-name (reason reserved-keyword) (token ")?;
+                let authored = self
+                    .document
+                    .source
+                    .slice(name.span())
+                    .ok_or_else(|| invalid_span("declaration name", name.span()))?;
+                write_quoted(self.writer, authored)?;
+                self.writer.write_str(") ")?;
+                write_span(self.writer, name.span())?;
+                self.writer.write_str(")")
+            }
         }
     }
 
@@ -711,6 +733,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_optional_quoted(self.writer, error.found.as_deref())?;
         self.writer.write_str(") ")?;
         write_span(self.writer, span)?;
+        if let Some(diagnostic_span) = &error.diagnostic_span {
+            self.writer.write_str(" (diagnostic-span ")?;
+            write_span(self.writer, diagnostic_span)?;
+            self.writer.write_char(')')?;
+        }
         self.writer.write_char(')')
     }
 
@@ -1175,7 +1202,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 Some(reference) => self.write_reference(reference)?,
                                 None => self.writer.write_str("none")?,
                             }
-                            self.writer.write_str(") (multiplicity ")?;
+                            self.writer.write_str(") ")?;
+                            self.write_optional_subsetting(
+                                "redefines",
+                                actor.value.redefines.as_ref(),
+                            )?;
+                            self.writer.write_str(" (multiplicity ")?;
                             self.write_multiplicity_clause(actor.value.multiplicity.as_ref())?;
                             self.writer.write_char(')')?;
                             // Written only when present, so actors without a value keep
@@ -1186,14 +1218,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 self.writer.write_char(')')?;
                             }
                             self.writer.write_char(')')?;
-                        }
-                        UseCaseDefBodyElement::ActorRedefinitionAssignment(actor) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(actor-redefinition (target ")?;
-                            self.write_reference(actor.value.target)?;
-                            self.writer.write_str(") (value ")?;
-                            self.write_expression(&actor.value.value)?;
-                            self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::Objective(objective) => {
                             self.write_item_prefix(&mut first)?;
@@ -2918,6 +2942,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_expression(expression)?;
                         }
+                        super::ConstraintDefBodyElement::ReturnExpression(expression) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(return-expression ")?;
+                            self.write_expression(expression)?;
+                            self.writer.write_char(')')?;
+                        }
                         super::ConstraintDefBodyElement::InOutDecl(_member) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
                         }
@@ -3183,6 +3213,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 super::CalcDefBodyElement::Expression(expression) => {
                     self.write_item_prefix(&mut first)?;
                     self.writer.write_str("(expression ")?;
+                    self.write_expression(expression)?;
+                    self.writer.write_char(')')?;
+                }
+                super::CalcDefBodyElement::ReturnExpression(expression) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.writer.write_str("(return-expression ")?;
                     self.write_expression(expression)?;
                     self.writer.write_char(')')?;
                 }
@@ -3743,6 +3779,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
+                        InterfaceDefBodyElement::PartUsage(part) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_part_usage(&part.value)?;
+                        }
                         InterfaceDefBodyElement::FlowUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&usage.value)?;
@@ -3948,6 +3988,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") ")?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        for (label, relationship) in [
+            ("references", &usage.references),
+            ("crosses", &usage.crosses),
+            ("intersects", &usage.intersects),
+        ] {
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting(label, relationship.as_deref())?;
+        }
         self.writer.write_str(" (value ")?;
         if let Some(value) = &usage.value {
             self.write_feature_value(&value.value)?;
@@ -5293,8 +5341,19 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    /// A `ConnectorEnd`: its declared name and operator spelling when authored, then the target.
+    /// A `ConnectorEnd`: its span when it extends past the target, its multiplicity and its
+    /// declared name and operator spelling when authored, then the target.
     fn write_connection_end(&mut self, end: &super::ConnectionEnd) -> io::Result<()> {
+        if end.declared_name.is_some() || end.multiplicity.is_some() {
+            self.writer.write_str("(end-span ")?;
+            write_span(self.writer, &end.span)?;
+            self.writer.write_str(") ")?;
+        }
+        if let Some(multiplicity) = &end.multiplicity {
+            self.writer.write_str("(multiplicity ")?;
+            self.write_multiplicity_clause(Some(multiplicity))?;
+            self.writer.write_str(") ")?;
+        }
         if let Some(declared) = &end.declared_name {
             self.writer.write_str("(declared-name ")?;
             self.write_name(declared.name)?;
@@ -5524,6 +5583,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::InterfaceUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_interface_usage(&usage.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::PartUsage(part) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_part_usage(&part.value)?;
                         }
                         super::InterfaceUsageBodyElement::PortUsage(port) => {
                             self.write_item_prefix(&mut first)?;
@@ -7466,7 +7529,7 @@ mod tests {
     fn semantic_ast_streams_through_partial_io_writer() {
         let document = crate::parse(
             r#"package Demo {
-                import Domain::Types;
+                private import Domain::Types;
                 use case def Analysis {
                     return part :>> Outputs::choice : Types::Item = Factory(input = Source::value);
                 }
@@ -7489,7 +7552,7 @@ mod tests {
             .expect("stream semantic AST");
 
         let rendered = String::from_utf8(writer.bytes).expect("UTF-8 semantic AST");
-        assert!(rendered.starts_with("(parsed-document\n  (references"));
+        assert!(rendered.starts_with("(parsed-document\n  (name-language sysml)\n  (references"));
         assert!(rendered.ends_with("\n)"));
     }
 }

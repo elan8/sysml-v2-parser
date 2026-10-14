@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML classifier declarations cover metaclass/datatype/assoc/struct/class families with all-sufficiency, compound assoc struct, disjoint-from/unions/intersects clauses, feature members with prefixes and inverse-of, kinded step/expr features, and named and anonymous invariants."))
+(snapshot (type semantic) (description "KerML classifier declarations cover metaclass/datatype/assoc/struct/class families with all-sufficiency, compound assoc struct, disjoint-from/unions/intersects clauses, feature members with prefixes and inverse-of, kinded step/expr features, and named and anonymous invariants.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -50,14 +50,14 @@ standard library package Occurrences {
     }
     datatype UnitBoundedReal :> Real {
         inv unitBound {
-            -1.0 <= that & that <= 1.0;
+            -1.0 <= that & that <= 1.0
         }
     }
     assoc all HappensBefore specializes HappensLink, Without {
         end feature source : Occurrence subsets participant[1];
         feature all spaceShotOf : Occurrence subsets spaceSliceOf[0..*] inverse of spaceShots;
         inv {
-            isClosed == true;
+            isClosed == true
         }
     }
     assoc struct LinkObject specializes Link, Object intersects Link, Object {
@@ -80,6 +80,7 @@ standard library package Occurrences {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 83) (line 2) (column 45) (len 7)) (segments (segment 0 (token "Element") (name "Element") (separator none) (span (offset 83) (line 2) (column 45) (len 7)))))
     (reference r1 (scope relative) (span (offset 140) (line 3) (column 48) (len 7)) (segments (segment 0 (token "Element") (name "Element") (separator none) (span (offset 140) (line 3) (column 48) (len 7)))))

@@ -36,6 +36,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 71) (line 3) (column 37) (len 14)) (segments (segment 0 (token "MassConstraint") (name "MassConstraint") (separator none) (span (offset 71) (line 3) (column 37) (len 14)))))
     (reference r1 (scope relative) (span (offset 110) (line 4) (column 23) (len 10)) (segments (segment 0 (token "partMasses") (name "partMasses") (separator none) (span (offset 110) (line 4) (column 23) (len 10)))))

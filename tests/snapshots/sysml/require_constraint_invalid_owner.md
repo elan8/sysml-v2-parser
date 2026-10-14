@@ -36,7 +36,7 @@ package RequirementConstraintOwners {
     part def Bad {
         require constraint invalid : Bound;
         assume constraint assumed {
-            true;
+            true
         }
         require existing;
         attribute retained;
@@ -46,6 +46,7 @@ package RequirementConstraintOwners {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 126) (line 4) (column 36) (len 5)) (segments (segment 0 (token "Bound") (name "Bound") (separator none) (span (offset 126) (line 4) (column 36) (len 5)))))
     (reference r1 (scope relative) (span (offset 195) (line 7) (column 38) (len 5)) (segments (segment 0 (token "Bound") (name "Bound") (separator none) (span (offset 195) (line 7) (column 38) (len 5)))))

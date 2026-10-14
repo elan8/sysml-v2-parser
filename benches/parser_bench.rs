@@ -14,7 +14,10 @@ fn bench_snapshot_corpus(c: &mut Criterion) {
             source,
             |b, source| {
                 b.iter(|| {
-                    let result = sysml_v2_parser::parse_with_diagnostics(black_box(&source.text));
+                    let result = sysml_v2_parser::parse_for_editor_with_name_language(
+                        black_box(&source.text),
+                        source.name_language,
+                    );
                     black_box(result.document.root.elements.len());
                     black_box(result.document.qualified_references.len());
                     black_box(result.errors.len());
@@ -30,7 +33,10 @@ fn bench_snapshot_corpus(c: &mut Criterion) {
     corpus.bench_function("all_sources", |b| {
         b.iter(|| {
             for source in &sources {
-                let result = sysml_v2_parser::parse_with_diagnostics(black_box(&source.text));
+                let result = sysml_v2_parser::parse_for_editor_with_name_language(
+                    black_box(&source.text),
+                    source.name_language,
+                );
                 black_box(result.document.root.elements.len());
                 black_box(result.document.qualified_references.len());
                 black_box(result.errors.len());
@@ -38,6 +44,23 @@ fn bench_snapshot_corpus(c: &mut Criterion) {
         });
     });
     corpus.finish();
+
+    // Strict parsing of the same corpus. The recovery and malformed fixtures make this the
+    // measurement for how much work the strict entry point does on invalid input.
+    let mut strict = c.benchmark_group("snapshot_strict_parser_corpus");
+    strict.throughput(Throughput::Bytes(corpus_bytes));
+    strict.bench_function("all_sources", |b| {
+        b.iter(|| {
+            for source in &sources {
+                let result = sysml_v2_parser::parse_with_name_language(
+                    black_box(&source.text),
+                    source.name_language,
+                );
+                black_box(result.is_ok());
+            }
+        });
+    });
+    strict.finish();
 }
 
 criterion_group!(benches, bench_snapshot_corpus);

@@ -31,6 +31,7 @@ package 'Variation Definitions' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 81) (line 2) (column 48) (len 8)) (segments (segment 0 (token "Diameter") (name "Diameter") (separator none) (span (offset 81) (line 2) (column 48) (len 8)))))
     (reference r1 (scope relative) (span (offset 137) (line 3) (column 46) (len 2)) (segments (segment 0 (token "mm") (name "mm") (separator none) (span (offset 137) (line 3) (column 46) (len 2)))))

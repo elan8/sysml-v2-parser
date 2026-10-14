@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Direct upstream KerML Simple Tests/Features.kerml excerpt: TypeFeaturingPart follows a typed and subsetted feature declaration."))
+(snapshot (type semantic) (description "Direct upstream KerML Simple Tests/Features.kerml excerpt: TypeFeaturingPart follows a typed and subsetted feature declaration.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -46,6 +46,7 @@ package Features {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 108) (line 6) (column 24) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 108) (line 6) (column 24) (len 1)))))
     (reference r1 (scope relative) (span (offset 111) (line 6) (column 27) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 111) (line 6) (column 27) (len 1)))))

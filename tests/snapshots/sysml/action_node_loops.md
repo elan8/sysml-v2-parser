@@ -39,6 +39,7 @@ package ActionNodeLoops {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 100) (line 3) (column 42) (len 4)) (segments (segment 0 (token "Step") (name "Step") (separator none) (span (offset 100) (line 3) (column 42) (len 4)))))
     (reference r1 (scope relative) (span (offset 155) (line 5) (column 17) (len 8)) (segments (segment 0 (token "finished") (name "finished") (separator none) (span (offset 155) (line 5) (column 17) (len 8)))))

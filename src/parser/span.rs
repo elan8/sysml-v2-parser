@@ -15,6 +15,7 @@ use std::cell::RefCell;
 /// immutable arena stored in the parsed-document envelope.
 #[derive(Debug, Default)]
 pub(crate) struct ParseContext {
+    name_language: crate::ast::NameLanguage,
     qualified_references: RefCell<QualifiedReferenceArenaBuilder>,
     /// Byte offset at which each line starts, `line_starts[line - 1]` for the 1-indexed line
     /// `LocatedSpan` tracks. Built once per document by [`ParseContext::input`], so a column is
@@ -24,8 +25,14 @@ pub(crate) struct ParseContext {
 }
 
 impl ParseContext {
+    #[cfg(test)]
     pub(crate) fn new() -> Self {
+        Self::with_name_language(crate::ast::NameLanguage::Sysml)
+    }
+
+    pub(crate) fn with_name_language(name_language: crate::ast::NameLanguage) -> Self {
         Self {
+            name_language,
             qualified_references: RefCell::new(QualifiedReferenceArenaBuilder::new()),
             line_starts: RefCell::new(Vec::new()),
         }
@@ -52,6 +59,9 @@ pub(crate) struct ParseContextRef<'a> {
 }
 
 impl ParseContextRef<'_> {
+    pub(crate) fn name_language(self) -> crate::ast::NameLanguage {
+        self.owner.name_language
+    }
     /// Mark the current arena length before a parser branch performs speculative allocation.
     pub(crate) fn reference_checkpoint(self) -> QualifiedReferenceArenaCheckpoint {
         self.owner.qualified_references.borrow().checkpoint()

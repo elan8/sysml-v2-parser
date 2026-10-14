@@ -37,7 +37,7 @@ package ImplicitThatReference {
     }
     datatype UnitBoundedReal :> Real {
         inv unitBound {
-            -1.0 <= that & that <= 1.0;
+            -1.0 <= that & that <= 1.0
         }
     }
     part def Casts {
@@ -50,6 +50,7 @@ package ImplicitThatReference {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 62) (line 2) (column 31) (len 8)) (segments (segment 0 (token "Anything") (name "Anything") (separator none) (span (offset 62) (line 2) (column 31) (len 8)))))
     (reference r1 (scope relative) (span (offset 113) (line 3) (column 24) (len 8)) (segments (segment 0 (token "Anything") (name "Anything") (separator none) (span (offset 113) (line 3) (column 24) (len 8)))))

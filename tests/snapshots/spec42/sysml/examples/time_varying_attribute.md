@@ -103,6 +103,7 @@ package TimeVaryingAttribute {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 20) (len 5)) (segments (segment 0 (token "SI") (name "SI") (separator none) (span (offset 50) (line 2) (column 20) (len 2))) (segment 1 (token "s") (name "s") (separator colon-colon) (span (offset 54) (line 2) (column 24) (len 1)))))
     (reference r1 (scope relative) (span (offset 112) (line 5) (column 29) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 112) (line 5) (column 29) (len 12))) (segment 1 (token "Integer") (name "Integer") (separator colon-colon) (span (offset 126) (line 5) (column 43) (len 7)))))

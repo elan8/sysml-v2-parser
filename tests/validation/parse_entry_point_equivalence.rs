@@ -4,12 +4,9 @@
 //! when both say yes, build the same AST. See `docs/CONFORMANCE.md`'s "Entry points" section
 //! for guidance on which one callers should use.
 //!
-//! Both currently loop over the same per-element parser (`package::root_element`) under the
-//! hood -- `parse_root` via `many0(root_element)`, `parse_with_diagnostics` via a manual
-//! recovery loop -- so they should already agree on clean input. This is the regression test
-//! GH-70 asks for: a future change to either loop (or to root-level recovery/collection) that
-//! makes them diverge on some clean input should fail here instead of surfacing later as a
-//! roundtrip harness false positive (the original GH-66/GH-69 bug class).
+//! Strict validation consumes the same atomic parse document and diagnostics as editor parsing.
+//! Clean documents must agree in source, arenas and syntax; malformed input must also report
+//! the same first diagnostic through every borrowed and owned entry point.
 
 use sysml_v2_parser::{parse, parse_for_editor};
 
@@ -97,4 +94,27 @@ fn validation_fixture_2a_parts_interconnection() {
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     assert_entry_points_agree(&input, "2a-Parts Interconnection.sysml");
+}
+
+#[test]
+fn invalid_inputs_report_the_same_diagnostic_through_every_entry_point() {
+    for source in [
+        "import A::*; private import B::*;",
+        "// Unicode note: é
+import A::*;",
+        "package P { import A::*; attribute retained = 1; }",
+        "constraint bad { value == 1; }",
+        "package P {",
+    ] {
+        let editor = parse_for_editor(source);
+        let owned_editor = sysml_v2_parser::parse_for_editor_owned(source.to_owned());
+        let expected = editor.errors.first().expect("the fixture is invalid");
+        assert_eq!(&parse(source).expect_err("strict rejection"), expected);
+        assert_eq!(
+            &sysml_v2_parser::parse_owned(source.to_owned()).expect_err("owned strict rejection"),
+            expected
+        );
+        assert_eq!(editor.errors, owned_editor.errors);
+        assert_eq!(editor.document, owned_editor.document);
+    }
 }

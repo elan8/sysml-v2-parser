@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML Connector declarations take the full FeatureSpecializationPart (KerML BNF Connector/FeatureDeclaration 573-576, Pilot KerML.xtext 824-830): typing, subsetting, reference subsetting, redefinition, ordered/nonunique, and multiplicity in either position are retained as ordered typed specializations, both with body-owned ends and with from/to ends."))
+(snapshot (type semantic) (description "KerML Connector declarations take the full FeatureSpecializationPart (KerML BNF Connector/FeatureDeclaration 573-576, Pilot KerML.xtext 824-830): typing, subsetting, reference subsetting, redefinition, ordered/nonunique, and multiplicity in either position are retained as ordered typed specializations, both with body-owned ends and with from/to ends.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -49,6 +49,7 @@ package Connectors {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 127) (line 6) (column 26) (len 17)) (segments (segment 0 (token "Links") (name "Links") (separator none) (span (offset 127) (line 6) (column 26) (len 5))) (segment 1 (token "BinaryLink") (name "BinaryLink") (separator colon-colon) (span (offset 134) (line 6) (column 33) (len 10)))))
     (reference r1 (scope relative) (span (offset 166) (line 6) (column 65) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 166) (line 6) (column 65) (len 1)))))

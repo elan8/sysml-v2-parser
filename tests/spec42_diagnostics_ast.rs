@@ -125,7 +125,10 @@ fn send_payload_on_control_node_action() {
     let send = send_usage.send.as_ref().expect("send payload");
     match send {
         sysml_v2_parser::ast::SendPayload::Typed(p) => {
-            assert_eq!(root.declaration_name(p.name), Some("message"));
+            assert_eq!(
+                root.decoded_declaration_name(p.name).as_deref(),
+                Some("message")
+            );
             assert!(p.type_name.is_some());
             assert!(p.name.span().len > 0);
             assert!(p.type_span.is_some());

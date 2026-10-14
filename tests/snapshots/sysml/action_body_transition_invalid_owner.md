@@ -39,6 +39,7 @@ package ActionBodyTransitions {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 147) (line 6) (column 26) (len 4)) (segments (segment 0 (token "idle") (name "idle") (separator none) (span (offset 147) (line 6) (column 26) (len 4)))))
     (reference r1 (scope relative) (span (offset 155) (line 6) (column 34) (len 6)) (segments (segment 0 (token "notify") (name "notify") (separator none) (span (offset 155) (line 6) (column 34) (len 6)))))

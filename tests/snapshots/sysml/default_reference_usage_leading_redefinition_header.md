@@ -30,6 +30,7 @@ package DefaultReferenceUsageLeadingRedefinitionHeader {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 84) (line 2) (column 28) (len 4)) (segments (segment 0 (token "Unit") (name "Unit") (separator none) (span (offset 84) (line 2) (column 28) (len 4)))))
     (reference r1 (scope relative) (span (offset 120) (line 3) (column 30) (len 22)) (segments (segment 0 (token "ConversionByConvention") (name "ConversionByConvention") (separator none) (span (offset 120) (line 3) (column 30) (len 22)))))

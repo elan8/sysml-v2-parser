@@ -179,7 +179,12 @@ fn run(args: &Args) -> ExitCode {
 
 fn parse_both(source: &str, kerml: bool) -> Outcome {
     let ours = std::panic::catch_unwind(|| {
-        let result = sysml_v2_parser::parse_for_editor(source);
+        let language = if kerml {
+            sysml_v2_parser::ast::NameLanguage::Kerml
+        } else {
+            sysml_v2_parser::ast::NameLanguage::Sysml
+        };
+        let result = sysml_v2_parser::parse_for_editor_with_name_language(source, language);
         result.errors.first().map(|error| {
             let line = error.line.map(|line| line.to_string()).unwrap_or_default();
             format!("{}:{}", line, error.message)

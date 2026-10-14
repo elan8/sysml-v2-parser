@@ -44,6 +44,7 @@ package Views {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "Views") (body brace (rendering-usage) (rendering-usage))))

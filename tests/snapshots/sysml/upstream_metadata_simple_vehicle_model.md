@@ -37,6 +37,7 @@ package SimpleVehicleModel {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 76) (line 3) (column 10) (len 4)) (segments (segment 0 (token "Risk") (name "Risk") (separator none) (span (offset 76) (line 3) (column 10) (len 4)))))
     (reference r1 (scope relative) (span (offset 87) (line 3) (column 21) (len 44)) (segments (segment 0 (token "engineTradeOffAnalysis") (name "engineTradeOffAnalysis") (separator none) (span (offset 87) (line 3) (column 21) (len 22))) (segment 1 (token "vehicle_b_engine4cyl") (name "vehicle_b_engine4cyl") (separator colon-colon) (span (offset 111) (line 3) (column 45) (len 20)))))

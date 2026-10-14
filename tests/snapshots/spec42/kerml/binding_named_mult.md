@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML binding connector with named form + multiplicity + 'of' disambiguation"))
+(snapshot (type semantic) (description "KerML binding connector with named form + multiplicity + 'of' disambiguation") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -27,6 +27,7 @@ package BindingNamedMult {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
   )
   (root (package (name "BindingNamedMult") (body brace (binding-connector-usage) (binding-connector-usage) (binding-connector-usage) (binding-connector-usage))))

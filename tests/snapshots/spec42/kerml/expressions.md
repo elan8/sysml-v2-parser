@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML Simple Tests: Expressions"))
+(snapshot (type semantic) (description "KerML Simple Tests: Expressions") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -112,7 +112,7 @@ package Expressions {
         inout v : Integer;
         step : ControlPerformances::LoopPerformance {
             in expr whileTest {
-                v > 3;
+                v > 3
             }
             in step body {
                 step decrement {
@@ -134,7 +134,7 @@ package Expressions {
     function TotalMass {
         in partMass;
         in subparts;
-        partMass + (subparts->collect { in p; totalMass(partMass, subparts) }->reduce('+') ?? 0.0);
+        partMass + (subparts->collect { in p; totalMass(partMass, subparts) }->reduce('+') ?? 0.0)
     }
     expr totalMass : TotalMass {
         in mass;
@@ -165,6 +165,7 @@ package Expressions {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 38) (line 2) (column 17) (len 15)) (segments (segment 0 (token "ScalarFunctions") (name "ScalarFunctions") (separator none) (span (offset 38) (line 2) (column 17) (len 15)))))
     (reference r1 (scope relative) (span (offset 74) (line 3) (column 17) (len 23)) (segments (segment 0 (token "BaseFunctions") (name "BaseFunctions") (separator none) (span (offset 74) (line 3) (column 17) (len 13))) (segment 1 (token "ToString") (name "ToString") (separator colon-colon) (span (offset 89) (line 3) (column 32) (len 8)))))

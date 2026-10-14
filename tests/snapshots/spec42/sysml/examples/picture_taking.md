@@ -46,6 +46,7 @@ package PictureTaking {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 76) (line 4) (column 31) (len 8)) (segments (segment 0 (token "Exposure") (name "Exposure") (separator none) (span (offset 76) (line 4) (column 31) (len 8)))))
     (reference r1 (scope relative) (span (offset 116) (line 5) (column 29) (len 8)) (segments (segment 0 (token "Exposure") (name "Exposure") (separator none) (span (offset 116) (line 5) (column 29) (len 8)))))

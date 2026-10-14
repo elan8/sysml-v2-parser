@@ -33,6 +33,7 @@ package ActionNodeLoopRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 148) (line 6) (column 17) (len 4)) (segments (segment 0 (token "done") (name "done") (separator none) (span (offset 148) (line 6) (column 17) (len 4)))))
     (reference r1 (scope relative) (span (offset 168) (line 7) (column 15) (len 5)) (segments (segment 0 (token "ready") (name "ready") (separator none) (span (offset 168) (line 7) (column 15) (len 5)))))

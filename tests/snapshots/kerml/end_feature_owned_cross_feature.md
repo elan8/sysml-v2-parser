@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML type-body end features: `end y;` and `end bool g;` (TransitionPerformances.kerml) are one Feature member each, not refused as misplaced keywords; `end x feature y;` carries `x` as the OwnedCrossFeature (KerML BNF 584/592/595) while `end y;` has no cross."))
+(snapshot (type semantic) (description "KerML type-body end features: `end y;` and `end bool g;` (TransitionPerformances.kerml) are one Feature member each, not refused as misplaced keywords; `end x feature y;` carries `x` as the OwnedCrossFeature (KerML BNF 584/592/595) while `end y;` has no cross.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -30,6 +30,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 126) (line 6) (column 34) (len 1)) (segments (segment 0 (token "V") (name "V") (separator none) (span (offset 126) (line 6) (column 34) (len 1)))))
   )

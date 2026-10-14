@@ -32,6 +32,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 32) (line 2) (column 21) (len 9)) (segments (segment 0 (token "Client") (name "Client") (separator none) (span (offset 32) (line 2) (column 21) (len 6))) (segment 1 (token "A") (name "A") (separator colon-colon) (span (offset 40) (line 2) (column 29) (len 1)))))
     (reference r1 (scope absolute) (span (offset 45) (line 2) (column 34) (len 14)) (segments (segment 0 (token "Supplier") (name "Supplier") (separator none) (span (offset 48) (line 2) (column 37) (len 8))) (segment 1 (token "B") (name "B") (separator colon-colon) (span (offset 58) (line 2) (column 47) (len 1)))))

@@ -38,6 +38,7 @@ package MembershipOwners {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 138) (line 6) (column 16) (len 9)) (segments (segment 0 (token "Component") (name "Component") (separator none) (span (offset 138) (line 6) (column 16) (len 9)))))
     (reference r1 (scope relative) (span (offset 164) (line 7) (column 16) (len 6)) (segments (segment 0 (token "asTree") (name "asTree") (separator none) (span (offset 164) (line 7) (column 16) (len 6)))))

@@ -68,19 +68,14 @@ fn test_parse_with_diagnostics_partial_ast_and_multiple_errors() {
 }
 
 #[test]
-fn test_parse_error_expected_end_of_input_has_found() {
-    // Trailing text after valid packages: parse succeeds for "package Foo; package Bar;" then rest "garbage" triggers "expected end of input"
+fn test_trailing_root_text_has_the_editor_diagnostic_and_found_token() {
     let input = "package Foo; package Bar; garbage";
-    let result = parse(input);
-    let err = result.unwrap_err();
-    assert!(
-        err.message.contains("expected end of input"),
-        "error should be 'expected end of input': {}",
-        err
-    );
+    let err = parse(input).expect_err("invalid trailing token");
+    let editor = parse_with_diagnostics(input);
+    assert_eq!(&err, editor.errors.first().expect("editor diagnostic"));
     assert!(
         err.found.is_some(),
-        "expected end of input error should have 'found': {}",
+        "trailing root token diagnostic should have 'found': {}",
         err
     );
     assert!(
@@ -88,7 +83,7 @@ fn test_parse_error_expected_end_of_input_has_found() {
         "found should show trailing text: {:?}",
         err.found
     );
-    assert_eq!(err.code.as_deref(), Some("expected_end_of_input"));
+    assert_eq!(err.code.as_deref(), Some("expected_keyword"));
 }
 
 #[test]

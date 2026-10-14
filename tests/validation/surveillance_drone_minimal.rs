@@ -201,7 +201,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
 fn test_import_filter_package() {
     super::init_log();
     let input = r#"package P {
-    import MyPkg [ 1 ] [ 2 + 3 ];
+    private import MyPkg [ 1 ] [ 2 + 3 ];
     attribute def Real;
 }"#;
     let result = parse(input);

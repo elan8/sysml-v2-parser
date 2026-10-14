@@ -28,7 +28,7 @@ package VehicleRequirementDerivation {
         subject mass :> ISQ::mass;
         attribute massLimit :> ISQ::mass;
         require constraint {
-            mass <= massLimit;
+            mass <= massLimit
         }
     }
 }
@@ -36,6 +36,7 @@ package VehicleRequirementDerivation {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 101) (line 3) (column 25) (len 9)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 101) (line 3) (column 25) (len 3))) (segment 1 (token "mass") (name "mass") (separator colon-colon) (span (offset 106) (line 3) (column 30) (len 4)))))
     (reference r1 (scope relative) (span (offset 183) (line 5) (column 30) (len 4)) (segments (segment 0 (token "mass") (name "mass") (separator none) (span (offset 183) (line 5) (column 30) (len 4)))))

@@ -33,6 +33,13 @@ fn interface_def_body_element(
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
+    // An `end`-led kind-keyworded usage is that family's node with an `end` head; give
+    // `part_usage` first refusal ahead of the keyword-less `EndDecl`, which would read `part`
+    // as the end's name. `part_usage` refuses by lookahead unless `part` follows the prefix.
+    if let Ok((next, usage)) = crate::parser::part::part_usage(input) {
+        let elem = InterfaceDefBodyElement::PartUsage(Box::new(usage));
+        return Ok((next, node_from_to(start, next, elem)));
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,

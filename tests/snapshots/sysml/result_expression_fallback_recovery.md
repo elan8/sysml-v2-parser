@@ -34,26 +34,13 @@ package FallbackRecovery {
 )
 ~~~
 # FORMAT
-~~~sysml
-package FallbackRecovery {
-    constraint def C {
-        objective o;
-        private objective p;
-        x < 10;
-    }
-    calc def K {
-        objective o;
-        1;
-    }
-    class Kc {
-        objective o;
-        1;
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 108) (line 5) (column 9) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 108) (line 5) (column 9) (len 1)))))
   )

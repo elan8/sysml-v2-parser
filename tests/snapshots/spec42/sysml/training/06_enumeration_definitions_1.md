@@ -51,6 +51,7 @@ package 'Enumeration Definitions-1' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 54) (line 2) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 68) (line 2) (column 31) (len 4)))))
     (reference r1 (scope relative) (span (offset 204) (line 11) (column 28) (len 17)) (segments (segment 0 (token "TrafficLightColor") (name "TrafficLightColor") (separator none) (span (offset 204) (line 11) (column 28) (len 17)))))

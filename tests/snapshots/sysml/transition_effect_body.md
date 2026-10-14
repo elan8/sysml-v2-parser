@@ -46,6 +46,7 @@ package TransitionEffectBodies {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 77) (line 3) (column 27) (len 6)) (segments (segment 0 (token "signal") (name "signal") (separator none) (span (offset 77) (line 3) (column 27) (len 6)))))
     (reference r1 (scope relative) (span (offset 119) (line 4) (column 24) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 119) (line 4) (column 24) (len 6)))))

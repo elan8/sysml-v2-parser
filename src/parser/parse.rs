@@ -74,97 +74,45 @@ pub fn parse_root(input: &str) -> Result<ParsedDocument, ParseError> {
 /// Parse an owned source buffer without cloning the complete document.
 #[allow(clippy::result_large_err)]
 pub fn parse_root_owned(input: String) -> Result<ParsedDocument, ParseError> {
-    parse_root_source(SourceStorage::new(input))
+    parse_root_source(SourceStorage::new(input), crate::ast::NameLanguage::Sysml)
 }
 
 #[allow(clippy::result_large_err)]
 fn parse_root_inner(input: &str) -> Result<ParsedDocument, ParseError> {
-    parse_root_source(SourceStorage::new(input.to_owned()))
+    parse_root_source(
+        SourceStorage::new(input.to_owned()),
+        crate::ast::NameLanguage::Sysml,
+    )
 }
 
 #[allow(clippy::result_large_err)]
-fn parse_root_source(source: SourceStorage) -> Result<ParsedDocument, ParseError> {
-    let context = ParseContext::new();
-    let root = parse_root_namespace(source.as_str(), &context)?;
-    Ok(ParsedDocument {
-        source,
-        qualified_references: context.finish(),
-        root,
-    })
+fn parse_root_source(
+    source: SourceStorage,
+    name_language: crate::ast::NameLanguage,
+) -> Result<ParsedDocument, ParseError> {
+    // Diagnostics are ordered by offset, so nothing after the first root-level failure can
+    // precede it: stop recovering there instead of collecting errors only to discard them.
+    let ParseResult { document, errors } =
+        parse_source_with_root_error_limit(source, name_language, 1);
+    match errors.into_iter().next() {
+        Some(error) => Err(error),
+        None => Ok(document),
+    }
 }
 
 #[allow(clippy::result_large_err)]
-fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootNamespace, ParseError> {
-    let bytes = source.as_bytes();
-    let located = context.input(bytes);
-    let delimiters = DelimiterScan::new(bytes);
-    if let Some(error) = nesting_limit_error(bytes, &delimiters) {
-        return Err(error);
-    }
-    match package::root_namespace(located) {
-        Ok((rest, root)) => {
-            if !rest.fragment().is_empty() && delimiters.has_unclosed_brace() {
-                return Err(missing_closing_brace_error_at_eof(bytes));
-            }
-            if rest.fragment().is_empty() {
-                if let Some(error) = collect_recovery_errors(source, &root).into_iter().next() {
-                    log::debug!(
-                        "parse_root: rejecting document with embedded recovery diagnostic: {:?}",
-                        error.code
-                    );
-                    return Err(error);
-                }
-                log::debug!("parse_root: success, {} top-level elements", root.elements.len());
-                Ok(root)
-            } else if trim_ascii_start(rest.fragment()).starts_with(b"}") {
-                Err(unexpected_closing_brace_parse_error(rest))
-            } else {
-                let offset = located.location_offset() + located.fragment().len() - rest.fragment().len();
-                let unconsumed = rest.fragment();
-                let first_80 = unconsumed.get(..80.min(unconsumed.len())).unwrap_or(unconsumed);
-                log::debug!(
-                    "parse_root: expected end of input; parsed {} elements; unconsumed len={}, offset={}, first 80 bytes: {:?}",
-                    root.elements.len(),
-                    unconsumed.len(),
-                    offset,
-                    first_80,
-                );
-                log::debug!(
-                    "parse_root: unconsumed as str: {:?}",
-                    String::from_utf8_lossy(first_80),
-                );
-                let (found_snippet, found_len) = fragment_to_found_snippet(rest.fragment());
-                let mut pe = ParseError::new("expected end of input")
-                    .with_location(offset, rest.location_line(), crate::parser::span::column_of(&rest))
-                    .with_length(found_len.max(1))
-                    .with_code("expected_end_of_input")
-                    .with_category(DiagnosticCategory::ParseError);
-                if !found_snippet.is_empty() {
-                    pe = pe.with_found(found_snippet);
-                }
-                Err(pe)
-            }
-        }
-        Err(nom::Err::Error(e)) => Err(missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
-            nom_err_to_parse_error(
-                &e,
-                None,
-                Some("package-body element at root (package, namespace, import, definition, or usage)"),
-            )
-        })),
-        Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
-            nom_err_to_parse_error(
-                &e,
-                None,
-                Some("package-body element at root (package, namespace, import, definition, or usage)"),
-            )
-        })),
-        Err(nom::Err::Incomplete(_)) => Err(
-            ParseError::new("unexpected end of input")
-                .with_code("unexpected_eof")
-                .with_category(DiagnosticCategory::ParseError),
-        ),
-    }
+pub fn parse_root_owned_with_name_language(
+    input: String,
+    language: crate::ast::NameLanguage,
+) -> Result<ParsedDocument, ParseError> {
+    parse_root_source(SourceStorage::new(input), language)
+}
+
+pub fn parse_with_diagnostics_owned_with_name_language(
+    input: String,
+    language: crate::ast::NameLanguage,
+) -> ParseResult {
+    parse_with_diagnostics_source(SourceStorage::new(input), language)
 }
 
 const MAX_RECOVERY_ERRORS: usize = 100;
@@ -177,18 +125,34 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
 
 /// Parse an owned source buffer for editor use without cloning the complete document.
 pub fn parse_with_diagnostics_owned(input: String) -> ParseResult {
-    parse_with_diagnostics_source(SourceStorage::new(input))
+    parse_with_diagnostics_source(SourceStorage::new(input), crate::ast::NameLanguage::Sysml)
 }
 
 fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
-    parse_with_diagnostics_source(SourceStorage::new(input.to_owned()))
+    parse_with_diagnostics_source(
+        SourceStorage::new(input.to_owned()),
+        crate::ast::NameLanguage::Sysml,
+    )
 }
 
-fn parse_with_diagnostics_source(source: SourceStorage) -> ParseResult {
-    let context = ParseContext::new();
-    let (root, errors) = parse_with_diagnostics_document(source.as_str(), &context);
+fn parse_with_diagnostics_source(
+    source: SourceStorage,
+    name_language: crate::ast::NameLanguage,
+) -> ParseResult {
+    parse_source_with_root_error_limit(source, name_language, MAX_RECOVERY_ERRORS)
+}
+
+fn parse_source_with_root_error_limit(
+    source: SourceStorage,
+    name_language: crate::ast::NameLanguage,
+    max_root_errors: usize,
+) -> ParseResult {
+    let context = ParseContext::with_name_language(name_language);
+    let (root, errors) =
+        parse_with_diagnostics_document(source.as_str(), &context, max_root_errors);
     ParseResult {
         document: ParsedDocument {
+            name_language,
             source,
             qualified_references: context.finish(),
             root,
@@ -200,6 +164,7 @@ fn parse_with_diagnostics_source(source: SourceStorage) -> ParseResult {
 fn parse_with_diagnostics_document(
     source: &str,
     context: &ParseContext,
+    max_root_errors: usize,
 ) -> (RootNamespace, Vec<ParseError>) {
     let bytes = source.as_bytes();
     let delimiters = DelimiterScan::new(bytes);
@@ -225,7 +190,7 @@ fn parse_with_diagnostics_document(
         }
     };
 
-    while errors.len() < MAX_RECOVERY_ERRORS {
+    while errors.len() < max_root_errors {
         // Skip leading whitespace and notes; if nothing left, we're done (avoids parsing "" as
         // root_element). A bare `/* ... */` is left for `root_element`, because at a member
         // boundary it is the `Comment` production rather than trivia.
@@ -265,6 +230,7 @@ fn parse_with_diagnostics_document(
                     if let Ok((rest, _)) = lex::skip_to_next_balanced_sync_point(input) {
                         if rest.location_offset() > input.location_offset() {
                             let recovery = ParseErrorNode {
+                                diagnostic_span: None,
                                 message: pe.message,
                                 code: pe
                                     .code
@@ -302,19 +268,23 @@ fn parse_with_diagnostics_document(
                         }
                     }
                 }
-                let pe = missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
+                let grammar_diagnostic = super::import::missing_visibility_error(input);
+                let pe = grammar_diagnostic.as_ref().map(|error| {
+                    super::recovery::parse_error_from_recovery_node(&crate::parser::span_from_to(input, input), error)
+                }).unwrap_or_else(|| missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
                     nom_err_to_parse_error(
                         &e,
                         None,
                         Some("package-body element at root (package, namespace, import, definition, or usage)"),
                     )
-                });
+                }));
                 let recovery_start = input;
                 errors.push(pe.clone());
                 let skip_result = lex::skip_to_next_balanced_sync_point(recovery_start);
                 match skip_result {
                     Ok((rest, _)) if rest.location_offset() > recovery_start.location_offset() => {
-                        let recovery = ParseErrorNode {
+                        let recovery = grammar_diagnostic.unwrap_or_else(|| ParseErrorNode {
+                            diagnostic_span: None,
                             message: pe.message,
                             code: pe
                                 .code
@@ -323,7 +293,7 @@ fn parse_with_diagnostics_document(
                             found: pe.found,
                             suggestion: pe.suggestion,
                             category: pe.category,
-                        };
+                        });
                         let error =
                             PackageBodyElement::Error(node_from_to(recovery_start, rest, recovery));
                         let member = node_from_to(recovery_start, rest, error);

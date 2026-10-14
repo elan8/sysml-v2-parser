@@ -41,6 +41,7 @@ package ConstraintBodyAliasMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 107) (line 3) (column 34) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 107) (line 3) (column 34) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 112) (line 3) (column 39) (len 11)))))
     (reference r1 (scope relative) (span (offset 266) (line 8) (column 31) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 266) (line 8) (column 31) (len 6)))))

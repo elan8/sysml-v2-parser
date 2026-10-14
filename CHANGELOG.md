@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Interface bodies retain end-prefixed part usages.** Part usages use the shared declaration
+  header and preserve references, crosses and intersects; interface definition and interface
+  usage bodies carry them as parts (`InterfaceDefBodyElement::PartUsage` is new) rather than
+  misreading `part` as an end name. The shared header accepts a multiplicity and
+  `ordered`/`nonunique` after the specializations (`part x : T :> a [1] ordered;`), and
+  `part default = 3;` is an anonymous part with a default value, not a reserved name.
+- The `result_expression_semicolon` diagnostic is confined to bodies that own a
+  `ResultExpressionMember` (calculations, constraints, KerML functions, predicates, `expr` and
+  `bool` features, invariants); KerML type bodies such as classifiers no longer report it.
+- Recovery diagnostics classify keywords by the document's name language, so in a KerML document
+  `feature` or `connector` is an `unexpected_keyword_in_scope` and a SysML-only word such as
+  `message` is an `unrecognized_declaration_in_scope`.
+- Connector ends written with a multiplicity have the same span in every owner. Semantic
+  snapshots project an end's span and multiplicity when either extends it past its target.
+- Strict parsing stops at the first root-level failure instead of recovering the rest of the
+  document only to discard its diagnostics.
+- **Actor usages retain anonymous redefinitions (breaking AST change, `PARSE_AST_VERSION` 280).**
+  `ActorUsage::redefines` owns every authored target. Identification is optional, including bare
+  actor usages. Redefinitions with values use the same actor node and typed FeatureValue as other
+  actor declarations; the overlapping ActorRedefinitionAssignment node is removed. The
+  differential oracle selects the source's name language explicitly.
+
+- **Reserved declaration names carry explicit recovery state (breaking AST change,
+  `PARSE_AST_VERSION` 279).** Strict and editor parses share exact token diagnostics for unquoted
+  reserved names. Quoted names and case-distinct names remain valid. Name-language selection uses
+  generated pinned SysML or KerML keyword tables and travels in the serialized document; malformed
+  names retain their authored spelling without becoming decoded names. Connector-end spans now
+  include their declaration names, and constraint-body `ref` members use the typed action owner.
+
+- Imports require explicit public, private or protected visibility, as specified by both pinned
+  grammars. Bare imports become recovery nodes with `missing_import_visibility` on the import
+  keyword; source emission retains their statements and valid later siblings. Visibility keywords
+  are source-backed tokens, notes may separate import tokens, and serialization validates the
+  mandatory prefix. Strict parsing now validates the same parsed document and diagnostics as
+  editor parsing, including precise errors on bare root imports.
+
+- **Recovery diagnostics can identify an offending token independently of the retained malformed
+  slice (breaking AST change, `PARSE_AST_VERSION` 278).** `ParseErrorNode::diagnostic_span` is
+  source-backed and visited by the canonical span validation and normalization boundary.
+  Constraint, calculation and KerML function result expressions ending in a semicolon are recovered with the stable
+  `result_expression_semicolon` diagnostic on that semicolon; later members remain available.
+  Result-expression emission omits semicolons. Explicit return expressions have distinct
+  `ReturnExpression` variants and retain their `return` keyword during emission.
+
 - **Succession declaration modifiers survive parsing and emission (breaking AST change,
   `PARSE_AST_VERSION` 277).** `KermlSuccessionMember::multiplicity_modifiers` retains ordering
   and uniqueness keyword slots. Semantic snapshots project the complete succession declaration

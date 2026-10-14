@@ -59,6 +59,7 @@ package ActionBodyDeclarations {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 115) (line 4) (column 29) (len 12)) (segments (segment 0 (token "GetNextState") (name "GetNextState") (separator none) (span (offset 115) (line 4) (column 29) (len 12)))))
     (reference r1 (scope relative) (span (offset 416) (line 15) (column 22) (len 8)) (segments (segment 0 (token "Dynamics") (name "Dynamics") (separator none) (span (offset 416) (line 15) (column 22) (len 8)))))

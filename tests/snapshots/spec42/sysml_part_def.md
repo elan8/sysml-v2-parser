@@ -23,6 +23,7 @@ part def Vehicle {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (part-def (name "Vehicle") (modifiers) (body brace)))

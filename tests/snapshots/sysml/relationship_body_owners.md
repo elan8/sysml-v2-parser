@@ -59,6 +59,7 @@ package RelationshipBodyOwners {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 70) (line 3) (column 16) (len 6)) (segments (segment 0 (token "client") (name "client") (separator none) (span (offset 70) (line 3) (column 16) (len 6)))))
     (reference r1 (scope relative) (span (offset 80) (line 3) (column 26) (len 8)) (segments (segment 0 (token "supplier") (name "supplier") (separator none) (span (offset 80) (line 3) (column 26) (len 8)))))

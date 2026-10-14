@@ -11,7 +11,7 @@ package RequirementDefinitionBodyMembers {
         requirement;
         port evidence : EvidencePort;
         allocate source to target;
-        attribute after : Boolean;
+        attribute 'after' : Boolean;
     }
 }
 ~~~
@@ -33,13 +33,14 @@ package RequirementDefinitionBodyMembers {
         requirement ;
         port evidence : EvidencePort;
         allocate source to target;
-        attribute after : Boolean;
+        attribute 'after' : Boolean;
     }
 }
 ~~~
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 98) (line 3) (column 28) (len 13)) (segments (segment 0 (token "VehicleSafety") (name "VehicleSafety") (separator none) (span (offset 98) (line 3) (column 28) (len 13)))))
     (reference r1 (scope relative) (span (offset 190) (line 6) (column 25) (len 12)) (segments (segment 0 (token "EvidencePort") (name "EvidencePort") (separator none) (span (offset 190) (line 6) (column 25) (len 12)))))

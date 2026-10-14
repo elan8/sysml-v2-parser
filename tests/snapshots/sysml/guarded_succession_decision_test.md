@@ -39,6 +39,7 @@ action def DecisionTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 71) (line 4) (column 24) (len 2)) (segments (segment 0 (token "A1") (name "A1") (separator none) (span (offset 71) (line 4) (column 24) (len 2)))))
     (reference r1 (scope relative) (span (offset 85) (line 5) (column 12) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 85) (line 5) (column 12) (len 1)))))

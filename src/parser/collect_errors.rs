@@ -73,6 +73,28 @@ struct RecoveryErrorCollector<'source> {
 }
 
 impl Visitor for RecoveryErrorCollector<'_> {
+    fn visit_declaration_name(&mut self, name: &crate::ast::DeclarationName) {
+        match name.state() {
+            crate::ast::DeclarationNameState::Parsed => {}
+            crate::ast::DeclarationNameState::ReservedKeyword => {
+                let span = name.span();
+                let diagnostic =
+                    ParseError::new("a reserved keyword cannot be an unquoted declaration name")
+                        .with_location(span.offset, span.line, span.column)
+                        .with_length(span.len)
+                        .with_code("reserved_declaration_name")
+                        .with_severity(DiagnosticSeverity::Error)
+                        .with_category(DiagnosticCategory::ParseError)
+                        .with_suggestion("Quote the name using single quotes.");
+                let diagnostic = match self.source.get(span.offset..span.offset + span.len) {
+                    Some(authored) => diagnostic.with_found(authored),
+                    None => diagnostic,
+                };
+                self.errors.push(diagnostic);
+            }
+        }
+    }
+
     /// Text the parser could not recognize, kept in place with its authored span.
     fn visit_parse_error_node(&mut self, node: &Node<ParseErrorNode>) {
         self.errors

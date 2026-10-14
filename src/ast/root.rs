@@ -47,6 +47,35 @@ pub struct RootNamespace {
     pub elements: Vec<Node<RootElement>>,
 }
 
+/// Language whose lexical NAME rules govern one parsed document.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+pub enum NameLanguage {
+    #[default]
+    Sysml,
+    Kerml,
+}
+
+mod reserved_keywords {
+    include!(concat!(env!("OUT_DIR"), "/reserved_keywords.rs"));
+}
+
+impl NameLanguage {
+    /// Borrow the sorted pinned keyword inventory, without maintaining a consumer-owned copy.
+    pub const fn reserved_keywords(self) -> &'static [&'static str] {
+        match self {
+            Self::Sysml => reserved_keywords::SYSML,
+            Self::Kerml => reserved_keywords::KERML,
+        }
+    }
+
+    /// Classify a bare lexical token using the pinned language keyword inventory.
+    pub fn is_reserved(self, word: &str) -> bool {
+        self.reserved_keywords().binary_search(&word).is_ok()
+    }
+}
+
 /// One parsed SysML/KerML source file and all document-local identities referenced by its AST.
 ///
 /// [`RootNamespace`] nodes use opaque qualified-reference identities whose source spelling and
@@ -55,6 +84,8 @@ pub struct RootNamespace {
 /// identities as globally stable or interpreting an AST without the arena that owns them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedDocument {
+    /// Lexical name vocabulary used to interpret the source and retained recovery states.
+    pub name_language: NameLanguage,
     /// BOM-stripped source text whose byte offsets back AST/reference spans.
     pub source: SourceStorage,
     /// Document-local qualified references shared by all semantic AST nodes.
@@ -98,12 +129,14 @@ fn send_sync_structural_proof(document: ParsedDocument) {
     // Exhaustive by construction: adding or renaming a field of `ParsedDocument` fails here, so a
     // new field cannot reach the `unsafe impl`s without an assertion of its own below.
     let ParsedDocument {
+        name_language,
         source,
         qualified_references,
         root,
     } = document;
-    let _ = (&source, &qualified_references, &root);
+    let _ = (&name_language, &source, &qualified_references, &root);
 
+    assert_send_sync::<NameLanguage>();
     assert_send_sync::<SourceStorage>();
     assert_send_sync::<QualifiedReferenceArena>();
     // The expensive one: this is the full structural walk of the AST type graph, the proof the
@@ -134,9 +167,15 @@ impl ParsedDocument {
 
     /// Decoded `NAME` value of a declaration name: a basic name as written, or the contents of
     /// an unrestricted name with its quotes removed and `\'` escapes decoded. Only an escaped
-    /// unrestricted name allocates.
+    /// unrestricted name allocates. Retained reserved-keyword syntax has no valid decoded name
+    /// and returns `None`, as does a span outside this document.
     pub fn decoded_declaration_name(&self, name: DeclarationName) -> Option<Cow<'_, str>> {
-        decode_authored_name(self.declaration_name(name)?)
+        match name.state() {
+            super::DeclarationNameState::Parsed => {
+                decode_authored_name(self.declaration_name(name)?)
+            }
+            super::DeclarationNameState::ReservedKeyword => None,
+        }
     }
 
     /// Authored spelling of a real literal.
@@ -206,6 +245,7 @@ impl serde::Serialize for ParsedDocument {
         validate_serialized_document(self).map_err(S::Error::custom)?;
         ParsedDocumentWireRef {
             ast_version: crate::PARSE_AST_VERSION,
+            name_language: self.name_language,
             source: &self.source,
             qualified_references: &self.qualified_references,
             root: &self.root,
@@ -231,6 +271,7 @@ impl<'de> serde::Deserialize<'de> for ParsedDocument {
             )));
         }
         let document = Self {
+            name_language: wire.name_language,
             source: wire.source,
             qualified_references: wire.qualified_references,
             root: wire.root,
@@ -244,6 +285,7 @@ impl<'de> serde::Deserialize<'de> for ParsedDocument {
 #[derive(serde::Serialize)]
 struct ParsedDocumentWireRef<'a> {
     ast_version: u32,
+    name_language: NameLanguage,
     source: &'a SourceStorage,
     qualified_references: &'a QualifiedReferenceArena,
     root: &'a RootNamespace,
@@ -253,6 +295,7 @@ struct ParsedDocumentWireRef<'a> {
 #[derive(serde::Deserialize)]
 struct ParsedDocumentWire {
     ast_version: u32,
+    name_language: NameLanguage,
     source: SourceStorage,
     qualified_references: QualifiedReferenceArena,
     root: RootNamespace,
@@ -280,6 +323,7 @@ mod serde_tests {
     fn serialize_unvalidated_wire(document: &ParsedDocument) -> serde_json::Value {
         serde_json::to_value(ParsedDocumentWireRef {
             ast_version: crate::PARSE_AST_VERSION,
+            name_language: document.name_language,
             source: &document.source,
             qualified_references: &document.qualified_references,
             root: &document.root,
@@ -293,6 +337,90 @@ mod serde_tests {
         let encoded = serialize_unvalidated_wire(&document);
         serde_json::from_value::<ParsedDocument>(encoded)
             .expect_err("deserialization must reject the typed provenance corruption");
+    }
+
+    #[test]
+    fn malformed_name_cannot_be_serialized_as_a_successful_name() {
+        struct HideInvalidName;
+        impl VisitorMut for HideInvalidName {
+            fn visit_declaration_name(&mut self, name: &mut DeclarationName) {
+                if name.state == crate::ast::DeclarationNameState::ReservedKeyword {
+                    name.state = crate::ast::DeclarationNameState::Parsed;
+                }
+            }
+        }
+        assert_typed_corruption_is_rejected("package P { part def port; }", |document| {
+            HideInvalidName.visit_root_namespace(&mut document.root);
+        });
+    }
+
+    struct CorruptRecoveryDiagnostic(Span);
+
+    impl VisitorMut for CorruptRecoveryDiagnostic {
+        fn visit_parse_error_node_value(&mut self, error: &mut crate::ast::ParseErrorNode) {
+            assert!(
+                error.diagnostic_span.is_some(),
+                "the fixture must exercise a token diagnostic"
+            );
+            error.diagnostic_span = Some(self.0);
+        }
+    }
+
+    #[test]
+    fn recovery_token_span_is_validated_with_its_source_and_owner() {
+        let source = "constraint bad { 1 == 1; }";
+        let document = crate::parse_for_editor(source).document;
+        let wire = serde_json::to_value(&document).expect("valid recovered document serializes");
+        let restored: ParsedDocument =
+            serde_json::from_value(wire).expect("valid token span roundtrips");
+        assert_eq!(document, restored);
+        for span in [
+            // Valid source coordinates, outside this malformed expression's owner.
+            Span {
+                offset: 0,
+                line: 1,
+                column: 1,
+                len: 1,
+            },
+            // The offending token's offset with a fabricated line.
+            Span {
+                offset: 22,
+                line: 2,
+                column: 23,
+                len: 1,
+            },
+            Span {
+                offset: 22,
+                line: 1,
+                column: 23,
+                len: 0,
+            },
+            Span {
+                offset: usize::MAX,
+                line: 1,
+                column: 1,
+                len: 1,
+            },
+        ] {
+            assert_typed_corruption_is_rejected(source, |document| {
+                apply_visitor(&mut CorruptRecoveryDiagnostic(span), document);
+            });
+        }
+    }
+
+    struct RemoveImportVisibility;
+
+    impl VisitorMut for RemoveImportVisibility {
+        fn visit_import(&mut self, node: &mut Node<crate::ast::Import>) {
+            node.value.membership.visibility = None;
+        }
+    }
+
+    #[test]
+    fn import_requires_visibility_in_the_serialized_document() {
+        assert_typed_corruption_is_rejected("private import A::*;", |document| {
+            apply_visitor(&mut RemoveImportVisibility, document);
+        });
     }
 
     struct CorruptDirectedActionKind(bool);
@@ -501,6 +629,7 @@ mod serde_tests {
             )],
         };
         ParsedDocument {
+            name_language: NameLanguage::Sysml,
             source,
             qualified_references: builder.finish(),
             root,
@@ -603,7 +732,7 @@ mod serde_tests {
 
     #[test]
     fn parsed_document_rejects_tampered_import_suffix_token_provenance() {
-        let document = crate::parse("import A:: /* wildcard */ *;").expect("parse import");
+        let document = crate::parse("private import A:: /* wildcard */ *;").expect("parse import");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
         let marker = find_field_mut(&mut encoded, "marker_span").expect("marker span");
         marker["len"] = serde_json::json!(2);
@@ -615,7 +744,7 @@ mod serde_tests {
 
     #[test]
     fn parsed_document_rejects_tampered_combined_suffix_provenance() {
-        let document = crate::parse("import A::* /* gap */ ::**;").expect("parse import");
+        let document = crate::parse("private import A::* /* gap */ ::**;").expect("parse import");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
         let combined = find_field_mut(&mut encoded, "combined_recursive_suffix_span")
             .expect("combined suffix span");
@@ -695,8 +824,8 @@ mod serde_tests {
     #[test]
     fn parsed_document_validates_imports_nested_beneath_action_and_use_case_members() {
         for source in [
-            "action def A { part p { import Nested::ActionTarget::*; } }",
-            "use case def U { part p { import Nested::UseCaseTarget::*; } }",
+            "action def A { part p { private import Nested::ActionTarget::*; } }",
+            "use case def U { part p { private import Nested::UseCaseTarget::*; } }",
         ] {
             let document = crate::parse(source).expect("nested import");
             let mut encoded = serde_json::to_value(document).expect("serialize document");

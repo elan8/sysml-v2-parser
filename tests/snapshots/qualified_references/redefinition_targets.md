@@ -45,6 +45,7 @@ package RedefinitionTargets {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 88) (line 3) (column 23) (len 4)) (segments (segment 0 (token "name") (name "name") (separator none) (span (offset 88) (line 3) (column 23) (len 4)))))
     (reference r1 (scope relative) (span (offset 130) (line 4) (column 23) (len 26)) (segments (segment 0 (token "researchAndDevelopmentCost") (name "researchAndDevelopmentCost") (separator none) (span (offset 130) (line 4) (column 23) (len 26)))))

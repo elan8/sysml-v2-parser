@@ -67,7 +67,7 @@ package 'Requirement Definitions' {
         attribute massActual : MassValue;
         attribute massReqd : MassValue;
         require constraint {
-            massActual <= massReqd;
+            massActual <= massReqd
         }
     }
     part def Vehicle {
@@ -81,7 +81,7 @@ package 'Requirement Definitions' {
         subject vehicle : Vehicle;
         :>> massActual = vehicle.dryMass + vehicle.fuelMass;
         assume constraint {
-            vehicle.fuelMass > 0[kg];
+            vehicle.fuelMass > 0[kg]
         }
     }
     port def ClutchPort;
@@ -101,6 +101,7 @@ package 'Requirement Definitions' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 52) (line 2) (column 17) (len 3)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 52) (line 2) (column 17) (len 3)))))
     (reference r1 (scope relative) (span (offset 76) (line 3) (column 17) (len 2)) (segments (segment 0 (token "SI") (name "SI") (separator none) (span (offset 76) (line 3) (column 17) (len 2)))))

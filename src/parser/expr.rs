@@ -1352,7 +1352,8 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                     .fragment()
                     .first()
                     .is_some_and(|&b| b == b'\'' || b.is_ascii_alphabetic() || b == b'_')
-                    && !crate::parser::lex::is_reserved_keyword(
+                    && !crate::parser::lex::is_reserved_keyword_in(
+                        after_name,
                         &after_name.fragment()[..leading_word_len],
                     );
                 if takes_function_ref {

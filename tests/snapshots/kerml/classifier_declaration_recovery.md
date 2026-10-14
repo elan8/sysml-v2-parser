@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A malformed member inside a KerML metaclass body recovers as an explicit calc-body error node while the following feature member still parses."))
+(snapshot (type recovery) (description "A malformed member inside a KerML metaclass body recovers as an explicit calc-body error node while the following feature member still parses.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -28,6 +28,7 @@ standard library package Broken {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 62) (line 2) (column 29) (len 7)) (segments (segment 0 (token "Element") (name "Element") (separator none) (span (offset 62) (line 2) (column 29) (len 7)))))
     (reference r1 (scope relative) (span (offset 112) (line 4) (column 26) (len 7)) (segments (segment 0 (token "Element") (name "Element") (separator none) (span (offset 112) (line 4) (column 26) (len 7)))))

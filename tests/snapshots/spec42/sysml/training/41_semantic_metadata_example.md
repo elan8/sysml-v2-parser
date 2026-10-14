@@ -64,6 +64,7 @@ library package 'Semantic Metadata Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 62) (line 2) (column 17) (len 23)) (segments (segment 0 (token "'Model Library Example'") (name "Model Library Example") (separator none) (span (offset 62) (line 2) (column 17) (len 23)))))
     (reference r1 (scope relative) (span (offset 106) (line 3) (column 17) (len 29)) (segments (segment 0 (token "Metaobjects") (name "Metaobjects") (separator none) (span (offset 106) (line 3) (column 17) (len 11))) (segment 1 (token "SemanticMetadata") (name "SemanticMetadata") (separator colon-colon) (span (offset 119) (line 3) (column 30) (len 16)))))

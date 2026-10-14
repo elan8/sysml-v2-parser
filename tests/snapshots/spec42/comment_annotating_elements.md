@@ -66,6 +66,7 @@ package CommentAnnotatingElements {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 532) (line 14) (column 26) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 532) (line 14) (column 26) (len 4)))))
   )

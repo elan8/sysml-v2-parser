@@ -15,7 +15,7 @@ use crate::parser::lex::{
 };
 use crate::parser::usage::{feature_usage_header, redefinition};
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node_from_span, node_from_to};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -313,7 +313,7 @@ pub(crate) fn constraint_def_body_element(
         if let Ok((next, decl)) = return_decl(input) {
             (next, ConstraintDefBodyElement::ReturnDecl(Box::new(decl)))
         } else if let Ok((next, expr)) = return_expression_stmt(input) {
-            (next, ConstraintDefBodyElement::Expression(expr))
+            (next, ConstraintDefBodyElement::ReturnExpression(expr))
         } else {
             let (next, node) = other_return_recovery(
                 input,
@@ -323,21 +323,19 @@ pub(crate) fn constraint_def_body_element(
             )?;
             (next, ConstraintDefBodyElement::Error(node))
         }
-    } else if let Some((next, member)) =
-        ((starts_with_any_keyword(
-            after_visibility.fragment(),
-            crate::parser::lex::CALCULATION_ACTION_STARTERS,
-        ) && !starts_with_keyword(after_visibility.fragment(), b"ref"))
-            || prefixed_control_node_follows(input))
-        .then(|| {
-            // Transactional: when the action parser declines (`if a ? b else c` is a result
-            // expression), the references it allocated must not stay in the arena.
-            crate::parser::span::reference_transaction(
-                input,
-                crate::parser::action::action_def_body_element,
-            )
-        })
-        .and_then(Result::ok)
+    } else if let Some((next, member)) = (starts_with_any_keyword(
+        after_visibility.fragment(),
+        crate::parser::lex::CALCULATION_ACTION_STARTERS,
+    ) || prefixed_control_node_follows(input))
+    .then(|| {
+        // Transactional: when the action parser declines (`if a ? b else c` is a result
+        // expression), the references it allocated must not stay in the arena.
+        crate::parser::span::reference_transaction(
+            input,
+            crate::parser::action::action_def_body_element,
+        )
+    })
+    .and_then(Result::ok)
     {
         // `CalculationBodyItem = ActionBodyItem | ...` (SysML BNF 1366-1368): the same action-body
         // dispatch `calculation_body_element` makes for the one `CalculationBody` production, and
@@ -345,9 +343,9 @@ pub(crate) fn constraint_def_body_element(
         // feature name. When the action parser declines (`if c ? a else b` is a result
         // expression, not an `if` action), the remaining arms decide as before.
         //
-        // `ref` members keep this scope's own route below: the action-body `ref` parser drops a
-        // `default` feature value (`ref :>> a, b default that.that;` would lose `default
-        // that.that`), which the keyword-less binding retains.
+        // `ref` members take this route too: the action-body `ref` parser retains a `default`
+        // feature value (`ref :>> a, b default that.that;`), so they no longer need the
+        // keyword-less binding below.
         (
             next,
             ConstraintDefBodyElement::ActionMember(Box::new(member)),
@@ -365,10 +363,43 @@ pub(crate) fn constraint_def_body_element(
             nom::error::ErrorKind::Tag,
         )));
     } else {
-        map(expression, ConstraintDefBodyElement::Expression).parse(input)?
+        let (rest, result) = result_expression_member(input)?;
+        (
+            rest,
+            match result {
+                Ok(expression) => ConstraintDefBodyElement::Expression(expression),
+                Err(error) => ConstraintDefBodyElement::Error(error),
+            },
+        )
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// SysML CalculationBody and KerML FunctionBody share ResultExpressionMember:
+/// an OwnedExpression without a terminating semicolon.
+fn result_expression_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Result<Node<Expression>, Node<ParseErrorNode>>> {
+    let checkpoint = input.extra.reference_checkpoint();
+    let (rest, expression) = expression(input)?;
+    let (semicolon_start, _) = ws_and_comments(rest)?;
+    if semicolon_start.fragment().starts_with(b";") {
+        let (end, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        // The rejected expression's references must not survive arena publication.
+        input.extra.rollback_references(checkpoint);
+        let error = ParseErrorNode {
+            diagnostic_span: Some(span_from_to(semicolon_start, end)),
+            message: "a result expression must not end with a semicolon".to_owned(),
+            code: "result_expression_semicolon".to_owned(),
+            expected: Some("a result expression without a semicolon".to_owned()),
+            found: Some(";".to_owned()),
+            suggestion: Some("Remove the semicolon after the result expression.".to_owned()),
+            category: Some(crate::error::DiagnosticCategory::ParseError),
+        };
+        return Ok((end, Err(node_from_to(input, end, error))));
+    }
+    Ok((rest, Ok(expression)))
 }
 
 /// Calculation usage: `OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
@@ -562,6 +593,25 @@ fn calc_def_body_package_member(input: Input<'_>) -> IResult<Input<'_>, CalcDefB
 
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
     calc_body_with_element_parser(input, calc_def_body_element)
+}
+
+/// [`calc_def_body`] for a KerML `TypeBody` (classifier, behavior, connector, plain feature):
+/// the same members, but no `ResultExpressionMember`, so the result-expression semicolon
+/// diagnostic does not apply.
+pub(crate) fn type_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
+    calc_body_with_element_parser(input, type_body_element)
+}
+
+/// [`calc_def_body`] or [`type_body`], by whether the owner has a `ResultExpressionMember`.
+pub(crate) fn calc_or_type_body(
+    input: Input<'_>,
+    owns_result_expression: bool,
+) -> IResult<Input<'_>, CalcDefBody> {
+    if owns_result_expression {
+        calc_def_body(input)
+    } else {
+        type_body(input)
+    }
 }
 
 /// `CalculationBody : Type = ';' | '{' CalculationBodyPart '}'`, whose items are
@@ -854,7 +904,7 @@ fn kerml_connector_member_inner(
         )
         .parse(input),
     ) {
-        let (rest, body) = calc_def_body(rest)?;
+        let (rest, body) = type_body(rest)?;
         return Ok((
             rest,
             node_from_to(
@@ -916,7 +966,7 @@ fn kerml_connector_member_inner(
         Some((from, to)) => (Some(from), Some(to)),
         None => (None, None),
     };
-    let (input, body) = calc_def_body(input)?;
+    let (input, body) = type_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -1052,7 +1102,7 @@ fn kerml_binding_member_inner(
         }
         (input, Some(pair))
     };
-    let (input, body) = calc_def_body(input)?;
+    let (input, body) = type_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -1668,7 +1718,15 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     specializations.extend(part.specializations);
     let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, body) = calc_def_body(input)?;
+    // `expr` and `bool` features own an `ExpressionBody` (KerML BNF 863/895); the others a
+    // `TypeBody`.
+    let owns_result_expression = kind.as_ref().is_some_and(|kind| {
+        matches!(
+            kind.value,
+            crate::ast::KermlFeatureKind::Expr | crate::ast::KermlFeatureKind::Bool
+        )
+    });
+    let (input, body) = calc_or_type_body(input, owns_result_expression)?;
     Ok((
         input,
         node_from_to(
@@ -1824,6 +1882,20 @@ const PART_USAGE_PREFIX_STARTERS: &[&[u8]] = &[
 
 pub(crate) fn calc_def_body_element(
     input: Input<'_>,
+) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
+    body_element(input, true)
+}
+
+fn type_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
+    body_element(input, false)
+}
+
+/// Shared member parser of calculation, function and KerML type bodies. Only an owner with a
+/// `ResultExpressionMember` (`owns_result_expression`) diagnoses a semicolon after its result
+/// expression; a type body keeps reading `expr;` as an expression member.
+fn body_element(
+    input: Input<'_>,
+    owns_result_expression: bool,
 ) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
@@ -2157,7 +2229,7 @@ pub(crate) fn calc_def_body_element(
         if let Ok((input, decl)) = return_decl(input) {
             (input, CalcDefBodyElement::ReturnDecl(Box::new(decl)))
         } else if let Ok((input, expr)) = return_expression_stmt(input) {
-            (input, CalcDefBodyElement::Expression(expr))
+            (input, CalcDefBodyElement::ReturnExpression(expr))
         } else {
             let (next, node) = other_return_recovery(
                 input,
@@ -2192,7 +2264,19 @@ pub(crate) fn calc_def_body_element(
             nom::error::ErrorKind::Tag,
         )));
     } else {
-        map(expression, CalcDefBodyElement::Expression).parse(input)?
+        let (rest, result) = if owns_result_expression {
+            result_expression_member(input)?
+        } else {
+            let (rest, expression) = expression(input)?;
+            (rest, Ok(expression))
+        };
+        (
+            rest,
+            match result {
+                Ok(expression) => CalcDefBodyElement::Expression(expression),
+                Err(error) => CalcDefBodyElement::Error(error),
+            },
+        )
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -2230,7 +2314,7 @@ fn refuses_result_expression_fallback(input: Input<'_>) -> bool {
         .count();
     let word = &fragment[..word_len];
     word_len > 0
-        && crate::parser::lex::is_reserved_keyword(word)
+        && crate::parser::lex::is_reserved_keyword_in(input, word)
         && !EXPRESSION_KEYWORDS.contains(&word)
 }
 
@@ -2532,7 +2616,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     // `;` or a `{ ... }` result body (`return positionVector : Position3dVector[1] {
     // attribute :>> mRef = ...; }`, Domain Libraries `SpatialItems.sysml`).
-    let (input, body) = calc_def_body(input)?;
+    let (input, body) = type_body(input)?;
     Ok((
         input,
         node_from_to(

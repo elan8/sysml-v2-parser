@@ -267,6 +267,7 @@ standard library package StandardViewDefinitions {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 178) (line 5) (column 19) (len 5)) (segments (segment 0 (token "SysML") (name "SysML") (separator none) (span (offset 178) (line 5) (column 19) (len 5)))))
     (reference r1 (scope relative) (span (offset 1940) (line 33) (column 47) (len 19)) (segments (segment 0 (token "InterconnectionView") (name "InterconnectionView") (separator none) (span (offset 1940) (line 33) (column 47) (len 19)))))

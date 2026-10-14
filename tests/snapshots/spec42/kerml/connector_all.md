@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML connector with 'all' keyword (stdlib patterns from OccurrenceFunctions/TransitionPerformances)"))
+(snapshot (type semantic) (description "KerML connector with 'all' keyword (stdlib patterns from OccurrenceFunctions/TransitionPerformances)") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -32,6 +32,7 @@ package ConnectorAll {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 49) (line 2) (column 27) (len 13)) (segments (segment 0 (token "HappensDuring") (name "HappensDuring") (separator none) (span (offset 49) (line 2) (column 27) (len 13)))))
     (reference r1 (scope relative) (span (offset 68) (line 2) (column 46) (len 4)) (segments (segment 0 (token "self") (name "self") (separator none) (span (offset 68) (line 2) (column 46) (len 4)))))

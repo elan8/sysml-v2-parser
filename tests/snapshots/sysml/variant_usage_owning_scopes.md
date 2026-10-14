@@ -39,6 +39,7 @@ package VariantUsageOwningScopes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 528) (line 16) (column 17) (len 19)) (segments (segment 0 (token "existingAlternative") (name "existingAlternative") (separator none) (span (offset 528) (line 16) (column 17) (len 19)))))
   )

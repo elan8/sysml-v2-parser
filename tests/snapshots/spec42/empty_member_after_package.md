@@ -27,6 +27,7 @@ in newX : Real;
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 29) (line 1) (column 30) (len 4)) (segments (segment 0 (token "Real") (name "Real") (separator none) (span (offset 29) (line 1) (column 30) (len 4)))))
   )

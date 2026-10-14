@@ -54,6 +54,7 @@ package PortPrefixScopeRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 149) (line 5) (column 45) (len 9)) (segments (segment 0 (token "PowerPort") (name "PowerPort") (separator none) (span (offset 149) (line 5) (column 45) (len 9)))))
     (reference r1 (scope relative) (span (offset 215) (line 7) (column 44) (len 9)) (segments (segment 0 (token "PowerPort") (name "PowerPort") (separator none) (span (offset 215) (line 7) (column 44) (len 9)))))

@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Direct upstream KerML Simple Tests/Inverses.kerml: featured-by remains ordered before the following inverse-of relationship."))
+(snapshot (type semantic) (description "Direct upstream KerML Simple Tests/Inverses.kerml: featured-by remains ordered before the following inverse-of relationship.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -33,6 +33,7 @@ package Inverses {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 53) (line 3) (column 21) (len 1)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 53) (line 3) (column 21) (len 1)))))
     (reference r1 (scope relative) (span (offset 66) (line 3) (column 34) (len 4)) (segments (segment 0 (token "B") (name "B") (separator none) (span (offset 66) (line 3) (column 34) (len 1))) (segment 1 (token "g") (name "g") (separator colon-colon) (span (offset 69) (line 3) (column 37) (len 1)))))

@@ -94,7 +94,10 @@ pub enum ConstraintDefBodyElement {
     /// identification, target, relationship body, and membership.
     AliasDef(Node<crate::ast::AliasDef>),
     InOutDecl(Box<Node<InOutDecl>>),
-    Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
+    /// Terminal ResultExpressionMember, without a semicolon.
+    Expression(Node<Expression>),
+    /// An explicitly introduced `return expression;` member.
+    ReturnExpression(Node<Expression>),
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems
     /// Library's `RequirementConstraintCheck::assumptions`/`::constraints`, redefined/subset
     /// from another constraint). Not boxed: `ConstraintUsage` is a small struct and the
@@ -319,7 +322,10 @@ pub enum CalcDefBodyElement {
     /// `VectorValues.kerml`).
     DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
     ReturnDecl(Box<Node<ReturnDecl>>),
-    Expression(Node<Expression>), // formula
+    /// Terminal ResultExpressionMember, without a semicolon.
+    Expression(Node<Expression>),
+    /// An explicitly introduced `return expression;` member.
+    ReturnExpression(Node<Expression>), // formula
     /// Nested `calc` usage inside a calc body (validation `10b` rollups).
     CalcUsage(Box<Node<CalcUsage>>),
     /// Nested `calc def` inside a calc body (Domain Libraries `SampledFunctions.sysml`'s

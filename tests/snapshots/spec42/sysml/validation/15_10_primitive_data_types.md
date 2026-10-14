@@ -135,7 +135,7 @@ package '15.10-Primitive Data Types' {
 		 */
         attribute x : Real :>> self;
         assert constraint {
-            x >= 0.0;
+            x >= 0.0
         }
     }
     private import ScalarValues::String {
@@ -188,6 +188,7 @@ package '15.10-Primitive Data Types' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 244) (line 8) (column 17) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 244) (line 8) (column 17) (len 12))) (segment 1 (token "Integer") (name "Integer") (separator colon-colon) (span (offset 258) (line 8) (column 31) (len 7)))))
     (reference r1 (scope relative) (span (offset 387) (line 15) (column 17) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 387) (line 15) (column 17) (len 12))) (segment 1 (token "Natural") (name "Natural") (separator colon-colon) (span (offset 401) (line 15) (column 31) (len 7)))))

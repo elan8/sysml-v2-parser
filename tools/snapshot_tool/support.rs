@@ -7,9 +7,11 @@ use std::thread;
 
 use sysml_v2_parser::ast::WriteSemanticAst;
 use sysml_v2_parser::{
-    emit_recovered_sysml, emit_sysml, parse, parse_for_editor, DiagnosticCategory,
-    DiagnosticSeverity, EmitError, ParseError,
+    emit_recovered_sysml, emit_sysml, DiagnosticCategory, DiagnosticSeverity, EmitError, ParseError,
 };
+
+#[cfg(test)]
+use sysml_v2_parser::parse;
 
 pub(crate) const DEFAULT_SNAPSHOT_ROOT: &str = "tests/snapshots";
 
@@ -88,148 +90,11 @@ impl Snapshot {
     }
 }
 
-struct AuthoredSections {
-    meta: String,
-    source: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SnapshotType {
-    Semantic,
-    Provenance,
-    Recovery,
-    Malformed,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum MetaToken {
-    Open,
-    Close,
-    Symbol(String),
-    String(String),
-}
-
-fn leading_fenced_section<'a>(
-    text: &'a str,
-    heading: &str,
-    fence: &str,
-) -> Result<(String, &'a str), String> {
-    let marker = format!("# {heading}\n");
-    let after_heading = text
-        .strip_prefix(&marker)
-        .ok_or_else(|| format!("expected `{marker}` as the next snapshot section"))?;
-    let (opening_fence, after_fence) = after_heading
-        .split_once('\n')
-        .ok_or_else(|| format!("missing opening fence after `{marker}`"))?;
-    let expected_fence = format!("~~~{fence}");
-    if opening_fence != expected_fence {
-        return Err(format!(
-            "`{marker}` must use `{expected_fence}`, found `{opening_fence}`"
-        ));
-    }
-    let (content, remainder) = after_fence
-        .split_once("\n~~~\n")
-        .ok_or_else(|| format!("missing closing fence after `{marker}`"))?;
-    Ok((content.to_owned(), remainder))
-}
-
-fn tokenize_meta(text: &str) -> Result<Vec<MetaToken>, String> {
-    let mut tokens = Vec::new();
-    let mut characters = text.chars().peekable();
-    while let Some(character) = characters.next() {
-        match character {
-            character if character.is_whitespace() => {}
-            '(' => tokens.push(MetaToken::Open),
-            ')' => tokens.push(MetaToken::Close),
-            '"' => {
-                let mut value = String::new();
-                let mut closed = false;
-                while let Some(character) = characters.next() {
-                    match character {
-                        '"' => {
-                            closed = true;
-                            break;
-                        }
-                        '\\' => {
-                            let escaped = characters.next().ok_or_else(|| {
-                                "META description ends after an escape".to_owned()
-                            })?;
-                            match escaped {
-                                '\\' => value.push('\\'),
-                                '"' => value.push('"'),
-                                'n' => value.push('\n'),
-                                'r' => value.push('\r'),
-                                't' => value.push('\t'),
-                                other => {
-                                    return Err(format!(
-                                        "META description has unsupported escape `\\{other}`"
-                                    ));
-                                }
-                            }
-                        }
-                        other => value.push(other),
-                    }
-                }
-                if !closed {
-                    return Err("META description is missing its closing quote".to_owned());
-                }
-                tokens.push(MetaToken::String(value));
-            }
-            first => {
-                let mut symbol = String::from(first);
-                while let Some(next) = characters.peek().copied() {
-                    if next.is_whitespace() || matches!(next, '(' | ')' | '"') {
-                        break;
-                    }
-                    symbol.push(next);
-                    characters.next();
-                }
-                tokens.push(MetaToken::Symbol(symbol));
-            }
-        }
-    }
-    Ok(tokens)
-}
-
-fn validate_meta(text: &str) -> Result<(), String> {
-    let tokens = tokenize_meta(text)?;
-    let [MetaToken::Open, MetaToken::Symbol(snapshot), MetaToken::Open, MetaToken::Symbol(type_field), MetaToken::Symbol(snapshot_type), MetaToken::Close, MetaToken::Open, MetaToken::Symbol(description_field), MetaToken::String(description), MetaToken::Close, MetaToken::Close] =
-        tokens.as_slice()
-    else {
-        return Err("META must be `(snapshot (type <type>) (description \"...\"))`".to_owned());
-    };
-    if snapshot != "snapshot" || type_field != "type" || description_field != "description" {
-        return Err("META must be `(snapshot (type <type>) (description \"...\"))`".to_owned());
-    }
-    let parsed_type = match snapshot_type.as_str() {
-        "semantic" => SnapshotType::Semantic,
-        "provenance" => SnapshotType::Provenance,
-        "recovery" => SnapshotType::Recovery,
-        "malformed" => SnapshotType::Malformed,
-        unknown => {
-            return Err(format!(
-                "unknown META snapshot type `{unknown}`; expected semantic, provenance, recovery, or malformed"
-            ));
-        }
-    };
-    match parsed_type {
-        SnapshotType::Semantic
-        | SnapshotType::Provenance
-        | SnapshotType::Recovery
-        | SnapshotType::Malformed => {}
-    }
-    if description.trim().is_empty() {
-        return Err("META description must not be empty".to_owned());
-    }
-    Ok(())
-}
-
-fn authored_sections(text: &str) -> Result<AuthoredSections, String> {
-    let (meta, remainder) = leading_fenced_section(text, "META", "sexpr")?;
-    validate_meta(&meta)?;
-    let (source, _derived_sections) = leading_fenced_section(remainder, "SOURCE", "sysml")?;
-    Ok(AuthoredSections { meta, source })
-}
+#[path = "metadata.rs"]
+mod metadata;
+use metadata::authored_sections;
+#[cfg(test)]
+use metadata::validate_meta;
 
 pub(crate) fn snapshot_paths(root: &Path, fixture: Option<&Path>) -> Result<Vec<PathBuf>, String> {
     let target = match fixture {
@@ -391,12 +256,13 @@ fn validate_canonical_output(
     original: &sysml_v2_parser::ast::ParsedDocument,
     emitted: &str,
 ) -> Result<(), String> {
-    let reparsed = parse(emitted).map_err(|error| {
-        format!(
-            "{}: formatted output failed strict reparse: {error}",
-            path.display()
-        )
-    })?;
+    let reparsed = sysml_v2_parser::parse_with_name_language(emitted, original.name_language)
+        .map_err(|error| {
+            format!(
+                "{}: formatted output failed strict reparse: {error}",
+                path.display()
+            )
+        })?;
     let original_projection = comparison_projection(original, &path.display().to_string())?;
     let reparsed_projection = comparison_projection(&reparsed, &path.display().to_string())?;
     if original_projection != reparsed_projection {
@@ -426,17 +292,22 @@ fn ensure_stable_output(path: &Path, emitted: &str, reemitted: &str) -> Result<(
     Ok(())
 }
 
-fn actual_snapshot(path: &Path, meta: String, source: String) -> Result<Snapshot, String> {
+fn actual_snapshot(
+    path: &Path,
+    meta: String,
+    source: String,
+    name_language: sysml_v2_parser::ast::NameLanguage,
+) -> Result<Snapshot, String> {
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| format!("snapshot filename is not UTF-8: {}", path.display()))?;
-    let editor = parse_for_editor(&source);
+    let editor = sysml_v2_parser::parse_for_editor_with_name_language(&source, name_language);
     let mut diagnostics = Vec::new();
     write_diagnostics(&mut diagnostics, file_name, &editor.errors)
         .map_err(|error| format!("{}: diagnostics write failed: {error}", path.display()))?;
     let strict = if editor.errors.is_empty() {
-        let strict = parse(&source)
+        let strict = sysml_v2_parser::parse_with_name_language(&source, name_language)
             .map_err(|error| format!("{}: strict parse failed: {error}", path.display()))?;
         if strict.normalize_for_test_comparison()
             != editor.document.root.normalize_for_test_comparison()
@@ -490,7 +361,7 @@ pub(crate) fn regenerate_snapshot(fixture: &str, path: &Path) -> Result<String, 
     let normalized = fixture.replace("\r\n", "\n");
     let authored =
         authored_sections(&normalized).map_err(|error| format!("{}: {error}", path.display()))?;
-    let snapshot = actual_snapshot(path, authored.meta, authored.source)?;
+    let snapshot = actual_snapshot(path, authored.meta, authored.source, authored.name_language)?;
     let mut rendered = Vec::new();
     snapshot
         .write_to(&mut rendered)
@@ -651,11 +522,11 @@ mod tests {
 
     #[test]
     fn changed_format_must_reparse_to_the_same_semantic_projection() {
-        let original = parse("package P { import A::*; }").expect("parse original");
+        let original = parse("package P { private import A::*; }").expect("parse original");
         let error = validate_canonical_output(
             Path::new("semantic-change.md"),
             &original,
-            "package P {\n    import B::*;\n}",
+            "package P {\n    private import B::*;\n}",
         )
         .expect_err("changed reference must be rejected");
 

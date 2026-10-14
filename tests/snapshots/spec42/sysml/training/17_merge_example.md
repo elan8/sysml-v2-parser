@@ -101,6 +101,7 @@ package 'Merge Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 117) (line 6) (column 37) (len 5)) (segments (segment 0 (token "Scene") (name "Scene") (separator none) (span (offset 117) (line 6) (column 37) (len 5)))))
     (reference r1 (scope relative) (span (offset 141) (line 6) (column 61) (len 5)) (segments (segment 0 (token "Image") (name "Image") (separator none) (span (offset 141) (line 6) (column 61) (len 5)))))

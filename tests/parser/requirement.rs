@@ -62,7 +62,7 @@ fn test_objective_parses_named_typed_requirement_usage() {
 
 #[test]
 fn test_objective_body_preserves_structured_requirement_members() {
-    let input = "package P { use case def U { objective verificationObjective { doc /* verify behavior */ require constraint { true; } } } }";
+    let input = "package P { use case def U { objective verificationObjective { doc /* verify behavior */ require constraint { true } } } }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -316,7 +316,7 @@ fn test_verification_return_ref_parses_return_expression() {
 
 #[test]
 fn test_analysis_ref_redefinition_is_structured_not_other() {
-    let input = "package P { analysis def A { ref :>> inheritedResult { return true; } subject s : S; } part def S; }";
+    let input = "package P { analysis def A { ref :>> inheritedResult { return result : Boolean; } subject s : S; } part def S; }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -506,7 +506,7 @@ fn test_parse_part_usage_body_satisfy_shorthand() {
 
 #[test]
 fn test_parse_require_constraint_keeps_inner_members() {
-    let input = "package P {\nrequirement def R {\nrequire constraint {\ndoc /* requirement logic */\nin x : Real;\nout y : Real;\nx >= y;\n}\n}\n}";
+    let input = "package P {\nrequirement def R {\nrequire constraint {\ndoc /* requirement logic */\nin x : Real;\nout y : Real;\nx >= y\n}\n}\n}";
     let result = parse(input).expect("require constraint body should parse");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -667,7 +667,7 @@ requirement def VehicleMassRequirement {
   attribute targetMass : Real = (a - (b - c));
   require constraint {
     in actualMass : Real;
-    actualMass >= targetMass;
+    actualMass >= targetMass
   }
 }
 

@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML explicit relationship declarations at package and type-body scope (specialization/subclassifier/typing/subset/redefinition/disjoining/inverse/featuring), general type declarations with unions/intersects/differences, bare classifier forward declarations as typed nodes, plain feature members, and keyword-less implicit-feature package members."))
+(snapshot (type semantic) (description "KerML explicit relationship declarations at package and type-body scope (specialization/subclassifier/typing/subset/redefinition/disjoining/inverse/featuring), general type declarations with unions/intersects/differences, bare classifier forward declarations as typed nodes, plain feature members, and keyword-less implicit-feature package members.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -71,6 +71,7 @@ package RelationshipCoverage {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 67) (line 3) (column 17) (len 7)) (segments (segment 0 (token "Integer") (name "Integer") (separator none) (span (offset 67) (line 3) (column 17) (len 7)))))
     (reference r1 (scope relative) (span (offset 126) (line 5) (column 36) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 126) (line 5) (column 36) (len 1)))))

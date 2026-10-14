@@ -79,6 +79,7 @@ package 'Requirement Groups' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 47) (line 2) (column 17) (len 25)) (segments (segment 0 (token "'Requirement Definitions'") (name "Requirement Definitions") (separator none) (span (offset 47) (line 2) (column 17) (len 25)))))
     (reference r1 (scope relative) (span (offset 93) (line 3) (column 17) (len 20)) (segments (segment 0 (token "'Requirement Usages'") (name "Requirement Usages") (separator none) (span (offset 93) (line 3) (column 17) (len 20)))))

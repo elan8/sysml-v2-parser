@@ -65,6 +65,7 @@ package ViewDeclarationForms {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 96) (line 6) (column 12) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 96) (line 6) (column 12) (len 1)))))
     (reference r1 (scope relative) (span (offset 116) (line 7) (column 18) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 116) (line 7) (column 18) (len 1)))))

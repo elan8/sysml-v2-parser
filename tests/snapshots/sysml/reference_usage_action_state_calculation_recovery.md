@@ -37,6 +37,7 @@ package GenericReferenceUsageRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 142) (line 4) (column 30) (len 6)) (segments (segment 0 (token "Action") (name "Action") (separator none) (span (offset 142) (line 4) (column 30) (len 6)))))
     (reference r1 (scope relative) (span (offset 153) (line 4) (column 41) (len 14)) (segments (segment 0 (token "previousAction") (name "previousAction") (separator none) (span (offset 153) (line 4) (column 41) (len 14)))))

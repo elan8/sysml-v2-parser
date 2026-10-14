@@ -30,6 +30,7 @@ package EVSample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 32) (len 15)) (segments (segment 0 (token "VehicleAnalysis") (name "VehicleAnalysis") (separator none) (span (offset 50) (line 2) (column 32) (len 15)))))
   )

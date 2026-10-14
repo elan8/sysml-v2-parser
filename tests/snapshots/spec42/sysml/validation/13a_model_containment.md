@@ -124,6 +124,7 @@ package '13a-Model Containment' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 17) (len 26)) (segments (segment 0 (token "'2a-Parts Interconnection'") (name "2a-Parts Interconnection") (separator none) (span (offset 50) (line 2) (column 17) (len 26)))))
     (reference r1 (scope relative) (span (offset 97) (line 3) (column 17) (len 16)) (segments (segment 0 (token "'8-Requirements'") (name "8-Requirements") (separator none) (span (offset 97) (line 3) (column 17) (len 16)))))

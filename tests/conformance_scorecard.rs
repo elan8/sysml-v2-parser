@@ -11,7 +11,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
-use sysml_v2_parser::{parse_with_diagnostics, ParseError};
+use sysml_v2_parser::{parse_for_editor_with_name_language, ParseError};
 
 use common::{
     classify_all, load_bnf_productions, load_conformance_target, load_release_stamp, manifest_dir,
@@ -178,7 +178,12 @@ fn scan_library(dir: &Path) -> LibraryScan {
         let content = fs::read_to_string(file).unwrap_or_else(|err| {
             panic!("failed to read {}: {err}", file.display());
         });
-        let result = parse_with_diagnostics(&content);
+        let language = match file.extension().and_then(|extension| extension.to_str()) {
+            Some("kerml") => sysml_v2_parser::ast::NameLanguage::Kerml,
+            Some("sysml") => sysml_v2_parser::ast::NameLanguage::Sysml,
+            other => panic!("unexpected library source extension: {other:?}"),
+        };
+        let result = parse_for_editor_with_name_language(&content, language);
         if !result.errors.is_empty() && !is_pinned_policy_recovery(file, &result.errors) {
             scan.files_with_diagnostics += 1;
             scan.diagnostic_count += result.errors.len();

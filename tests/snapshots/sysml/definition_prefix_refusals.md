@@ -32,6 +32,7 @@ package DefinitionPrefixRefusals {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "DefinitionPrefixRefusals") (body brace (extended-library-declaration) (metadata-def (name "AcceptedMetadata") (abstract false) (specializes none) (body semicolon)) (extended-library-declaration) (enum-def (name "AcceptedEnumAfterAbstract") (body semicolon)) (extended-library-declaration) (enum-def (name "AcceptedEnumAfterVariation") (body semicolon)))))

@@ -27,6 +27,7 @@ package M {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "M") (body brace (part-def (name "P") (modifiers) (body semicolon)) (analysis-case-def (modifiers)))))

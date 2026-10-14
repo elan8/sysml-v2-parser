@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "A KerML feature binding body owns AnnotatingElement members. Its manual loop must retain a regular comment between the binding header and its nested binding member."))
+(snapshot (type semantic) (description "A KerML feature binding body owns AnnotatingElement members. Its manual loop must retain a regular comment between the binding header and its nested binding member.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -29,6 +29,7 @@ package CommentLoopFeatureBinding {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 66) (line 3) (column 17) (len 5)) (segments (segment 0 (token "value") (name "value") (separator none) (span (offset 66) (line 3) (column 17) (len 5)))))
     (reference r1 (scope relative) (span (offset 74) (line 3) (column 25) (len 4)) (segments (segment 0 (token "self") (name "self") (separator none) (span (offset 74) (line 3) (column 25) (len 4)))))

@@ -56,6 +56,7 @@ package UseCaseRefDeclarations {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 83) (line 3) (column 29) (len 7)) (segments (segment 0 (token "UseCase") (name "UseCase") (separator none) (span (offset 83) (line 3) (column 29) (len 7)))))
     (reference r1 (scope relative) (span (offset 95) (line 3) (column 41) (len 10)) (segments (segment 0 (token "Case") (name "Case") (separator none) (span (offset 95) (line 3) (column 41) (len 4))) (segment 1 (token "self") (name "self") (separator colon-colon) (span (offset 101) (line 3) (column 47) (len 4)))))

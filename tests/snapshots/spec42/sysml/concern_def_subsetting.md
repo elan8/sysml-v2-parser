@@ -26,6 +26,7 @@ package ConcernDefSubsettingExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 70) (line 2) (column 33) (len 16)) (segments (segment 0 (token "RequirementCheck") (name "RequirementCheck") (separator none) (span (offset 70) (line 2) (column 33) (len 16)))))
     (reference r1 (scope relative) (span (offset 113) (line 4) (column 19) (len 11)) (segments (segment 0 (token "baseConcern") (name "baseConcern") (separator none) (span (offset 113) (line 4) (column 19) (len 11)))))

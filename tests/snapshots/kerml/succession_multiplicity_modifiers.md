@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Succession declaration multiplicity modifiers retain authored ordering and uniqueness, including anonymous declarations, both keyword orders, specialization clauses, quoted names, and distinct endpoint multiplicities and references."))
+(snapshot (type semantic) (description "Succession declaration multiplicity modifiers retain authored ordering and uniqueness, including anonymous declarations, both keyword orders, specialization clauses, quoted names, and distinct endpoint multiplicities and references.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -42,6 +42,7 @@ class C {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 55) (line 2) (column 46) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 55) (line 2) (column 46) (len 1)))))
     (reference r1 (scope relative) (span (offset 62) (line 2) (column 53) (len 1)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 62) (line 2) (column 53) (len 1)))))

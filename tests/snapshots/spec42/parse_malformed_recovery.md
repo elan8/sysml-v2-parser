@@ -26,6 +26,7 @@ package Foo {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "Foo") (body brace (malformed (code "recovered_package_body_element") (found "+ bad stuff;") (span (offset 18) (line 2) (column 5) (len 12))) (part-def (name "Bar") (modifiers) (body semicolon)))))

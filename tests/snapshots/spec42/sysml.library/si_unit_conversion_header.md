@@ -31,6 +31,7 @@ standard library package SI {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (library-package (name "SI") (standard true) (body brace (attribute-usage))))

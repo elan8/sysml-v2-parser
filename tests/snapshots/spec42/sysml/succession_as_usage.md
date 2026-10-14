@@ -25,6 +25,7 @@ package SuccessionAsUsageExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 64) (line 2) (column 30) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 64) (line 2) (column 30) (len 1)))))
     (reference r1 (scope relative) (span (offset 71) (line 2) (column 37) (len 1)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 71) (line 2) (column 37) (len 1)))))

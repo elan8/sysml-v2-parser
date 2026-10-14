@@ -28,6 +28,7 @@ part def Part {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 30) (line 2) (column 15) (len 4)) (segments (segment 0 (token "Part") (name "Part") (separator none) (span (offset 30) (line 2) (column 15) (len 4)))))
     (reference r1 (scope relative) (span (offset 39) (line 2) (column 24) (len 10)) (segments (segment 0 (token "Item") (name "Item") (separator none) (span (offset 39) (line 2) (column 24) (len 4))) (segment 1 (token "self") (name "self") (separator colon-colon) (span (offset 45) (line 2) (column 30) (len 4)))))

@@ -58,6 +58,7 @@ package Gap61KermlTypeBodyRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 125) (line 4) (column 39) (len 15)) (segments (segment 0 (token "Target") (name "Target") (separator none) (span (offset 125) (line 4) (column 39) (len 6))) (segment 1 (token "feature") (name "feature") (separator colon-colon) (span (offset 133) (line 4) (column 47) (len 7)))))
     (reference r1 (scope relative) (span (offset 155) (line 5) (column 14) (len 3)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 155) (line 5) (column 14) (len 1))) (segment 1 (token "y") (name "y") (separator dot) (span (offset 157) (line 5) (column 16) (len 1)))))

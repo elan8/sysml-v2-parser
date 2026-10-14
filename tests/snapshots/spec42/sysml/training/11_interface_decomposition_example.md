@@ -61,6 +61,7 @@ package 'Interface Decomposition Example' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 190) (line 10) (column 29) (len 10)) (segments (segment 0 (token "SpigotBank") (name "SpigotBank") (separator none) (span (offset 190) (line 10) (column 29) (len 10)))))
     (reference r1 (scope relative) (span (offset 217) (line 11) (column 15) (len 6)) (segments (segment 0 (token "Spigot") (name "Spigot") (separator none) (span (offset 217) (line 11) (column 15) (len 6)))))

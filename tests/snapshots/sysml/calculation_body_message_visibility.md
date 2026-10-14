@@ -26,6 +26,7 @@ package CalculationBodyMessageVisibility {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 89) (line 3) (column 30) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 89) (line 3) (column 30) (len 1)))))
   )

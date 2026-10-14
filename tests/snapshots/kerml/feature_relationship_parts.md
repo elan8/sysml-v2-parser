@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML FeatureDeclaration retains an ordered, repeatable FeatureRelationshipPart tail, including a comma-separated featured-by target list and a value after the tail."))
+(snapshot (type semantic) (description "KerML FeatureDeclaration retains an ordered, repeatable FeatureRelationshipPart tail, including a comma-separated featured-by target list and a value after the tail.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -26,6 +26,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 46) (line 3) (column 21) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 46) (line 3) (column 21) (len 1)))))
     (reference r1 (scope relative) (span (offset 51) (line 3) (column 26) (len 1)) (segments (segment 0 (token "S") (name "S") (separator none) (span (offset 51) (line 3) (column 26) (len 1)))))

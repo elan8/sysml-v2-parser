@@ -82,6 +82,7 @@ standard library package AnalysisTooling {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 179) (line 8) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 179) (line 8) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 386) (line 17) (column 24) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 386) (line 17) (column 24) (len 6)))))

@@ -77,6 +77,7 @@ package '15_12-Compound Value Type' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 54) (line 2) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 87) (line 3) (column 17) (len 22)) (segments (segment 0 (token "USCustomaryUnits") (name "USCustomaryUnits") (separator none) (span (offset 87) (line 3) (column 17) (len 16))) (segment 1 (token "'in'") (name "in") (separator colon-colon) (span (offset 105) (line 3) (column 35) (len 4)))))

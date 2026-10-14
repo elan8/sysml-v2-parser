@@ -470,7 +470,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
     }
 }
 
-/// Whether the next unquoted identifier token spells a reserved SysML keyword.
+/// Whether the next unquoted identifier token spells a reserved keyword in the selected name language.
 ///
 /// A reserved keyword can never be an unquoted declaration name, so a production whose next slot
 /// is a declaration label uses this to refuse a sibling family's kind keyword instead of reading
@@ -484,7 +484,7 @@ pub(crate) fn next_word_is_reserved(input: Input<'_>) -> bool {
         .iter()
         .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
         .count();
-    word_len > 0 && crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
+    word_len > 0 && crate::parser::lex::is_reserved_keyword_in(input, &fragment[..word_len])
 }
 
 /// Whether the first byte can open any slot of the production.

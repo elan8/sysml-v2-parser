@@ -28,6 +28,7 @@ package ControlNodePrefixRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 101) (line 4) (column 17) (len 1)) (segments (segment 0 (token "g") (name "g") (separator none) (span (offset 101) (line 4) (column 17) (len 1)))))
   )

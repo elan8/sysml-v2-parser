@@ -42,6 +42,7 @@ package SubjectDeclarations {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 76) (line 3) (column 26) (len 10)) (segments (segment 0 (token "Case") (name "Case") (separator none) (span (offset 76) (line 3) (column 26) (len 4))) (segment 1 (token "subj") (name "subj") (separator colon-colon) (span (offset 82) (line 3) (column 32) (len 4)))))
     (reference r1 (scope relative) (span (offset 139) (line 6) (column 21) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 139) (line 6) (column 21) (len 7)))))

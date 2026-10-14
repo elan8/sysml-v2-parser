@@ -26,6 +26,7 @@ package CaseAnalysisSubsettingExample {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 57) (line 2) (column 18) (len 2)) (segments (segment 0 (token "A1") (name "A1") (separator none) (span (offset 57) (line 2) (column 18) (len 2)))))
     (reference r1 (scope relative) (span (offset 63) (line 2) (column 24) (len 12)) (segments (segment 0 (token "baseAnalysis") (name "baseAnalysis") (separator none) (span (offset 63) (line 2) (column 24) (len 12)))))

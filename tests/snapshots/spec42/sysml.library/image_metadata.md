@@ -166,6 +166,7 @@ standard library package ImageMetadata {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 288) (line 9) (column 17) (len 20)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 288) (line 9) (column 17) (len 12))) (segment 1 (token "String") (name "String") (separator colon-colon) (span (offset 302) (line 9) (column 31) (len 6)))))
     (reference r1 (scope relative) (span (offset 473) (line 18) (column 23) (len 6)) (segments (segment 0 (token "String") (name "String") (separator none) (span (offset 473) (line 18) (column 23) (len 6)))))

@@ -29,6 +29,7 @@ package BareRedefinitionShorthand {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 75) (line 3) (column 13) (len 69)) (segments (segment 0 (token "ThermodynamicTemperatureUnit") (name "ThermodynamicTemperatureUnit") (separator none) (span (offset 75) (line 3) (column 13) (len 28))) (segment 1 (token "quantityDimension") (name "quantityDimension") (separator colon-colon) (span (offset 105) (line 3) (column 43) (len 17))) (segment 2 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator colon-colon) (span (offset 124) (line 3) (column 62) (len 20)))))
     (reference r1 (scope relative) (span (offset 146) (line 3) (column 84) (len 66)) (segments (segment 0 (token "TemperatureDifferenceUnit") (name "TemperatureDifferenceUnit") (separator none) (span (offset 146) (line 3) (column 84) (len 25))) (segment 1 (token "quantityDimension") (name "quantityDimension") (separator colon-colon) (span (offset 173) (line 3) (column 111) (len 17))) (segment 2 (token "quantityPowerFactors") (name "quantityPowerFactors") (separator colon-colon) (span (offset 192) (line 3) (column 130) (len 20)))))

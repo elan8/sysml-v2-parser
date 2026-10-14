@@ -43,6 +43,7 @@ package ViewBodyRenderingAndAliasRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 185) (line 7) (column 39) (len 13)) (segments (segment 0 (token "RenderingType") (name "RenderingType") (separator none) (span (offset 185) (line 7) (column 39) (len 13)))))
     (reference r1 (scope relative) (span (offset 252) (line 9) (column 33) (len 11)) (segments (segment 0 (token "AliasTarget") (name "AliasTarget") (separator none) (span (offset 252) (line 9) (column 33) (len 11)))))

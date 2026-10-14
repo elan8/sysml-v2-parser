@@ -29,6 +29,7 @@ package BareCommentMemberRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 146) (line 5) (column 21) (len 8)) (segments (segment 0 (token "Anything") (name "Anything") (separator none) (span (offset 146) (line 5) (column 21) (len 8)))))
     (reference r1 (scope relative) (span (offset 162) (line 5) (column 37) (len 1)) (segments (segment 0 (token "h") (name "h") (separator none) (span (offset 162) (line 5) (column 37) (len 1)))))

@@ -81,6 +81,7 @@ package 'Enumeration Definitions-2' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 54) (line 2) (column 17) (len 12)))))
     (reference r1 (scope relative) (span (offset 87) (line 3) (column 17) (len 27)) (segments (segment 0 (token "'Enumeration Definitions-1'") (name "Enumeration Definitions-1") (separator none) (span (offset 87) (line 3) (column 17) (len 27)))))

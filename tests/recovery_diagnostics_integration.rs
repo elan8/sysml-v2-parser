@@ -930,7 +930,7 @@ fn constraint_def_recovery_inserts_error_node_and_keeps_later_sibling() {
     let input = r#"package P {
     constraint def MyConstraint {
         @@@ bad_token;
-        thrust >= weight;
+        thrust >= weight
     }
     part def Sibling;
 }"#;

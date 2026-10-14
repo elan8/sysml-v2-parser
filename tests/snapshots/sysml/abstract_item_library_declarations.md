@@ -38,6 +38,7 @@ library package Items {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 27) (len 4)) (segments (segment 0 (token "Item") (name "Item") (separator none) (span (offset 50) (line 2) (column 27) (len 4)))))
     (reference r1 (scope relative) (span (offset 74) (line 2) (column 51) (len 7)) (segments (segment 0 (token "objects") (name "objects") (separator none) (span (offset 74) (line 2) (column 51) (len 7)))))

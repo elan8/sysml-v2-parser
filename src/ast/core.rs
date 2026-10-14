@@ -890,9 +890,9 @@ impl Eq for SubsettingRelationship {}
 
 /// A connector/interface endpoint, wrapping the endpoint's path expression with its own span
 /// (PAR-004 item 3). Distinguishes an endpoint from an arbitrary standalone
-/// [`Expression`]/[`Node<Expression>`] appearing elsewhere in the AST, even though today the
-/// endpoint's own `span` and the inner `Node<Expression>`'s span are identical (the expression
-/// itself already carries a real span from `path_expression` parsing).
+/// [`Expression`]/[`Node<Expression>`] appearing elsewhere in the AST. The endpoint's own `span`
+/// runs from its multiplicity or declared name, when present, to the end of the target
+/// expression; for an unadorned endpoint it equals the expression's span.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionEnd {

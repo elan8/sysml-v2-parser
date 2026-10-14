@@ -43,7 +43,7 @@ fn calc_body_parses_return_expression_without_swallowing_siblings() {
         let expressions: Vec<_> = elements
             .iter()
             .filter_map(|e| match &e.value {
-                CalcDefBodyElement::Expression(expr) => Some(expr),
+                CalcDefBodyElement::ReturnExpression(expr) => Some(expr),
                 _ => None,
             })
             .collect();

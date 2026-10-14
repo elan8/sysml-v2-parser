@@ -8,7 +8,7 @@ package RequirementConstraintOwnerRecovery {
     part def Holder {
         require constraint broken : Missing::;
         require constraint retained : Bound;
-        attribute after;
+        attribute 'after';
     }
 }
 ~~~
@@ -29,6 +29,7 @@ package RequirementConstraintOwnerRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 152) (line 4) (column 39) (len 5)) (segments (segment 0 (token "Bound") (name "Bound") (separator none) (span (offset 152) (line 4) (column 39) (len 5)))))
   )

@@ -33,6 +33,7 @@ package ConstraintBodyAliasRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 144) (line 4) (column 43) (len 18)) (segments (segment 0 (token "Target") (name "Target") (separator none) (span (offset 144) (line 4) (column 43) (len 6))) (segment 1 (token "definition") (name "definition") (separator colon-colon) (span (offset 152) (line 4) (column 51) (len 10)))))
     (reference r1 (scope relative) (span (offset 260) (line 8) (column 38) (len 13)) (segments (segment 0 (token "Target") (name "Target") (separator none) (span (offset 260) (line 8) (column 38) (len 6))) (segment 1 (token "usage") (name "usage") (separator colon-colon) (span (offset 268) (line 8) (column 46) (len 5)))))

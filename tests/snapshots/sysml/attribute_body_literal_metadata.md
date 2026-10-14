@@ -33,6 +33,7 @@ package AttributeBodyLiteralMetadata {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 83) (line 3) (column 18) (len 16)) (segments (segment 0 (token "ExternalShapeRef") (name "ExternalShapeRef") (separator none) (span (offset 83) (line 3) (column 18) (len 16)))))
     (reference r1 (scope relative) (span (offset 114) (line 4) (column 13) (len 7)) (segments (segment 0 (token "purpose") (name "purpose") (separator none) (span (offset 114) (line 4) (column 13) (len 7)))))

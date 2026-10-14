@@ -47,6 +47,7 @@ package '12a-Dependency' {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 131) (line 7) (column 22) (len 19)) (segments (segment 0 (token "'Application Layer'") (name "Application Layer") (separator none) (span (offset 131) (line 7) (column 22) (len 19)))))
     (reference r1 (scope relative) (span (offset 154) (line 7) (column 45) (len 15)) (segments (segment 0 (token "'Service Layer'") (name "Service Layer") (separator none) (span (offset 154) (line 7) (column 45) (len 15)))))

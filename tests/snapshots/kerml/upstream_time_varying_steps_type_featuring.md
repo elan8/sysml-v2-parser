@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Direct upstream KerML Variable Feature Examples/Enhancements/TimeVaryingSteps.kerml excerpt: nested member steps and features retain TypeFeaturingPart targets and bodies."))
+(snapshot (type semantic) (description "Direct upstream KerML Variable Feature Examples/Enhancements/TimeVaryingSteps.kerml excerpt: nested member steps and features retain TypeFeaturingPart targets and bodies.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -88,6 +88,7 @@ package TimeVaryingSteps {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 82) (line 3) (column 29) (len 37)) (segments (segment 0 (token "ControlPerformances") (name "ControlPerformances") (separator none) (span (offset 82) (line 3) (column 29) (len 19))) (segment 1 (token "MergePerformance") (name "MergePerformance") (separator colon-colon) (span (offset 103) (line 3) (column 50) (len 16)))))
     (reference r1 (scope relative) (span (offset 139) (line 3) (column 86) (len 21)) (segments (segment 0 (token "TakePicture_snapshots") (name "TakePicture_snapshots") (separator none) (span (offset 139) (line 3) (column 86) (len 21)))))

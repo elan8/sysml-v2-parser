@@ -11,141 +11,7 @@ fn usage_ordered_modifier(
     crate::parser::usage::multiplicity_modifier_slots_after(prior, input)
 }
 
-/// Everything a `PartUsage` head recognizes before the declaration.
-///
-/// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623), and `Usage` opens with
-/// `Identification`, whose `( '<' ShortName '>' )?` half is read once at the head rather than in
-/// each of the three declaration tails. `MemberPrefix`'s visibility belongs to the
-/// `OccurrenceUsageMember`/`PackageMember` around the usage, not to the prefix, so it travels
-/// here as a [`Membership`] and is stored as one.
-///
-/// The tails take this by reference and clone it into the node they build. Before this seam each
-/// tail defaulted six prefix fields and each head assigned over them one by one, which is how
-/// `part_def_or_usage` came to accept a different set of slots than `part_usage`.
 use crate::ast::DeclarationName;
-
-pub(crate) struct PartUsageHead {
-    prefix: crate::ast::OccurrenceUsagePrefix,
-    /// `SourceSuccessionMember`'s `then`, which precedes the membership and therefore the prefix.
-    then_span: Option<crate::ast::Span>,
-    short_name: Option<DeclarationName>,
-    membership: Membership,
-}
-
-/// Part usage redefines-only: (`:>>` | `redefines`) qualified_name multiplicity? ordered? value? body.
-fn part_usage_redefines_only<'a>(
-    start: Input<'a>,
-    input: Input<'a>,
-    head: &PartUsageHead,
-) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, (_, redefines_qname)) = prefix_redefinition_target(input)?;
-    // GH-92.2: an explicit `: Type` clause may follow the redefines target, e.g. `part redefines
-    // rb : LightRollBar[0..1];` (`v1 Spec Examples/8.4.5 Constraining Decomposition/Vehicle
-    // Decomposition - Updated.sysml:43`) -- previously only the type-less bare (`part redefines
-    // lb;`) and braced-body (`part redefines engine { ... }`) forms were accepted.
-    let (input, type_result) = optional_typings(input)?;
-    let (type_ref_span, _, typing) =
-        crate::parser::usage::typing_reference_fields_from_result(type_result);
-    let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, multiplicity_modifiers) =
-        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
-    let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
-    let (input, body) = part_usage_body(input)?;
-    // This form has no declaration name; the target spelling lives only in `redefines`.
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            PartUsage {
-                prefix: head.prefix.clone(),
-                then_span: head.then_span,
-                name: None,
-                short_name: head.short_name,
-                typing,
-                multiplicity: multiplicity_opt,
-                multiplicity_modifiers,
-                subsets: None,
-                redefines: Some(redefines_qname),
-                value,
-                body,
-                type_ref_span,
-                membership: head.membership.clone(),
-            },
-        ),
-    ))
-}
-
-/// Part usage with name (and optional type, redefines, etc.): (':>>')? name ':' type_name? ...
-fn part_usage_named<'a>(
-    start: Input<'a>,
-    input: Input<'a>,
-    head: &PartUsageHead,
-) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, multiplicity_modifiers) =
-        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
-    let (input, early_typing) = optional_typings(input)?;
-    let (input, trailing_multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
-    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
-    let (input, leading_clauses) = specialization_clauses(input)?;
-    // Typing may follow redefinition: `in part anEngine :>> alternative : Engine;` (validation `10b`).
-    let (input, type_result) = if early_typing.is_some() {
-        (input, early_typing)
-    } else {
-        optional_typings(input)?
-    };
-    let type_ref_span = type_result.as_ref().map(|(span, _, _, _)| *span);
-    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
-        typing_node(span, is_conjugated, targets, spelling)
-    });
-    let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
-    let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
-    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
-    let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
-    let (input, body) = part_usage_body(input)?;
-    let (input, trailing_clauses) = specialization_clauses(input)?;
-    let subsets = trailing_clauses
-        .subsets
-        .clone()
-        .or(leading_clauses.subsets.clone());
-    let redefines = trailing_clauses
-        .redefines
-        .clone()
-        .or(leading_clauses.redefines.clone());
-    let input = if trailing_clauses.had_any {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            PartUsage {
-                prefix: head.prefix.clone(),
-                then_span: head.then_span,
-                name: Some(name_str),
-                short_name: head.short_name,
-                typing,
-                multiplicity: multiplicity_opt,
-                multiplicity_modifiers,
-                subsets,
-                redefines,
-                value,
-                body,
-                type_ref_span,
-                membership: head.membership.clone(),
-            },
-        ),
-    ))
-}
 
 /// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623).
 ///
@@ -196,83 +62,71 @@ fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
             nom::error::ErrorKind::Tag,
         )));
     }
-    let input = if (after_kw.fragment().starts_with(b":")
-        && !after_kw.fragment().starts_with(b":>")
-        && !after_kw.fragment().starts_with(b":>>"))
-        || starts_with_keyword(after_kw.fragment(), b"defined")
-    {
-        after_kw
-    } else {
-        let (input, _) = ws1(input)?;
-        input
-    };
-    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
-    // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
-    // citation. Parsed once here at the dispatch level rather than inside each of the three
-    // declaration tails below, which is why it travels in [`PartUsageHead`].
-    let (input, short_name) = short_name_prefix(input)?;
-    // Consume (not just peek) whitespace/comments after the short name's closing `>` -- see
-    // `attribute::attribute_usage`'s identical fix for why this can't reuse `ws1`'s earlier
-    // consumption (a short name leaves fresh un-consumed whitespace after it).
-    let (input, _) = ws_and_comments(input)?;
-    let head = PartUsageHead {
-        prefix,
-        then_span,
-        short_name,
-        membership: Membership::feature(visibility, visibility_span),
-    };
-    let peek = input;
-    if (peek.fragment().starts_with(b":")
-        && !peek.fragment().starts_with(b":>")
-        && !peek.fragment().starts_with(b":>>"))
-        || starts_with_keyword(peek.fragment(), b"defined")
-    {
-        return anonymous_part_usage(start, input, &head);
-    }
-    if let Ok((input, usage)) = part_usage_redefines_only(start, input, &head) {
-        return Ok((input, usage));
-    }
-    part_usage_named(start, input, &head)
-}
-
-fn anonymous_part_usage<'a>(
-    start: Input<'a>,
-    input: Input<'a>,
-    head: &PartUsageHead,
-) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
-    let (input, multiplicity_modifiers) =
-        usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
-    let (input, (type_ref_span, is_conjugated, targets, spelling)) = typings(input)?;
-    let typing = Some(typing_node(type_ref_span, is_conjugated, targets, spelling));
-    let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
-    let multiplicity_opt = multiplicity_before.or(multiplicity_after);
-    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
-    let (input, clauses) = specialization_clauses(input)?;
-    let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
-    let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
-    let (input, multiplicity_modifiers) = usage_ordered_modifier(multiplicity_modifiers, input)?;
+    // UsageDeclaration owns Identification followed by FeatureSpecializationPart.
+    let (input, identification) = crate::parser::lex::identification_before(
+        after_kw,
+        &[
+            b"redefines",
+            b"subsets",
+            b"references",
+            b"crosses",
+            b"intersects",
+            b"defined",
+            b"typed",
+            b"specializes",
+            b"ordered",
+            b"nonunique",
+            // `ValuePart = FeatureValue`, which may open with `default`.
+            b"default",
+        ],
+    )?;
+    let (input, mut header) = crate::parser::usage::feature_usage_header(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
+    // Retain the established body-trailing specialization spelling used by the Apollo corpus.
+    // Every relationship uses the same target merge as the declaration's shared clause parser.
+    let (input, trailing) = specialization_clauses(input)?;
+    let input = if trailing.had_any {
+        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        if let Some((relationship, value)) = trailing.subsets {
+            header.subsets = crate::parser::usage::merge_groups(header.subsets, Some(relationship));
+            header.subsetting_value = header.subsetting_value.or(value);
+        }
+        header.redefines = crate::parser::usage::merge_groups(header.redefines, trailing.redefines);
+        header.references =
+            crate::parser::usage::merge_groups(header.references, trailing.references);
+        header.crosses = crate::parser::usage::merge_groups(header.crosses, trailing.crosses);
+        header.intersects =
+            crate::parser::usage::merge_groups(header.intersects, trailing.intersects);
+        input
+    } else {
+        input
+    };
+    let type_ref_span = header.typing.as_ref().map(|typing| typing.span);
     Ok((
         input,
         node_from_to(
             start,
             input,
             PartUsage {
-                prefix: head.prefix.clone(),
-                then_span: head.then_span,
-                name: None,
-                short_name: head.short_name,
-                typing,
-                multiplicity: multiplicity_opt,
-                multiplicity_modifiers,
-                subsets: clauses.subsets,
-                redefines: clauses.redefines,
+                prefix,
+                then_span,
+                name: identification.name,
+                short_name: identification.short_name,
+                typing: header.typing,
+                multiplicity: header.multiplicity,
+                multiplicity_modifiers: header.multiplicity_modifiers,
+                subsets: header
+                    .subsets
+                    .map(|relationship| (relationship, header.subsetting_value)),
+                redefines: header.redefines,
+                references: header.references.map(Box::new),
+                crosses: header.crosses.map(Box::new),
+                intersects: header.intersects.map(Box::new),
                 value,
                 body,
-                type_ref_span: Some(type_ref_span),
-                membership: head.membership.clone(),
+                type_ref_span,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -788,8 +642,16 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
             start,
             input,
             Connect {
-                from: connection_end_with_multiplicity(from_multiplicity, from_name, from_expr),
-                to: connection_end_with_multiplicity(to_multiplicity, to_name, to_expr),
+                from: crate::parser::connector::connection_end_full(
+                    from_multiplicity,
+                    from_name,
+                    from_expr,
+                ),
+                to: crate::parser::connector::connection_end_full(
+                    to_multiplicity,
+                    to_name,
+                    to_expr,
+                ),
                 body,
                 subsets,
                 redefines,
@@ -800,23 +662,6 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 
 /// Wrap a parsed endpoint expression and its optional §6 G24 multiplicity in a `ConnectionEnd`
 /// node, reusing the expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
-fn connection_end_with_multiplicity(
-    multiplicity: Option<Node<crate::ast::Multiplicity>>,
-    declared_name: Option<crate::ast::ConnectorEndName>,
-    expr: Node<Expression>,
-) -> Node<ConnectionEnd> {
-    let span = expr.span;
-    Node::new(
-        span,
-        ConnectionEnd {
-            declared_name,
-            expression: expr,
-            multiplicity,
-            span,
-        },
-    )
-}
-
 /// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end`, the
 /// existing flow/message/succession-flow production, or `PerformActionUsage`.
 fn interface_usage_body_element(
@@ -842,6 +687,10 @@ fn interface_usage_body_element(
                 Node::new(span, InterfaceUsageBodyElement::PortUsage(Box::new(port)))
             },
         ),
+        map(part_usage, |part| {
+            let span = part.span;
+            Node::new(span, InterfaceUsageBodyElement::PartUsage(Box::new(part)))
+        }),
         map(interface_usage_end_decl, |end| {
             let span = end.span;
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))

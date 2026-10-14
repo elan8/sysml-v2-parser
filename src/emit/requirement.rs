@@ -825,6 +825,9 @@ fn emit_use_case_body_element(
             if let Some(mult) = &a.value.multiplicity {
                 emit_multiplicity(w, &mult.value)?;
             }
+            if let Some(redefines) = &a.value.redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
             if let Some(value) = &a.value.value {
                 super::expr::emit_feature_value(w, value)?;
             }
@@ -905,14 +908,6 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::CaseReturnDecl(c) => emit_case_return_decl(w, &c.value),
         UseCaseDefBodyElement::ReturnRef(return_ref) => emit_return_ref(w, path, &return_ref.value),
-        UseCaseDefBodyElement::ActorRedefinitionAssignment(a) => {
-            w.push_str("actor :>> ");
-            w.push_qualified_reference(&format!("{path}/target"), a.value.target)?;
-            w.push_str(" = ");
-            emit_expression(w, &a.value.value.value)?;
-            w.push_char(';');
-            Ok(())
-        }
         UseCaseDefBodyElement::RefRedefinition(r) => {
             w.push_str("ref :>> ");
             w.push_qualified_reference(&format!("{path}/target"), r.value.target)?;

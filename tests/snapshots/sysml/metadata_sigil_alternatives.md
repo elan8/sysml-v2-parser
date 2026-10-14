@@ -99,6 +99,7 @@ package MetadataSigilAlternatives {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 170) (line 7) (column 10) (len 12)) (segments (segment 0 (token "Profile") (name "Profile") (separator none) (span (offset 170) (line 7) (column 10) (len 7))) (segment 1 (token "Tag") (name "Tag") (separator colon-colon) (span (offset 179) (line 7) (column 19) (len 3)))))
     (reference r1 (scope absolute) (span (offset 193) (line 8) (column 10) (len 42)) (segments (segment 0 (token "MetadataSigilAlternatives") (name "MetadataSigilAlternatives") (separator none) (span (offset 196) (line 8) (column 13) (len 25))) (segment 1 (token "Profile") (name "Profile") (separator colon-colon) (span (offset 223) (line 8) (column 40) (len 7))) (segment 2 (token "Tag") (name "Tag") (separator colon-colon) (span (offset 232) (line 8) (column 49) (len 3)))))

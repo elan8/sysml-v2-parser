@@ -95,7 +95,7 @@ fn an_alias_member_reaches_the_ast() {
 
 #[test]
 fn an_import_member_reaches_the_ast() {
-    let (_, members) = metadata_body_members("import X::*;");
+    let (_, members) = metadata_body_members("private import X::*;");
     assert!(
         matches!(&members[0], MetadataBodyElement::Import(_)),
         "got {:?}",

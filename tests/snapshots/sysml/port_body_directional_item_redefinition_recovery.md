@@ -28,6 +28,7 @@ package P {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 80) (line 4) (column 27) (len 10)) (segments (segment 0 (token "fuelReturn") (name "fuelReturn") (separator none) (span (offset 80) (line 4) (column 27) (len 10)))))
   )

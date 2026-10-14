@@ -40,6 +40,7 @@ package SpecializationClauseAccumulation {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 96) (line 3) (column 37) (len 1)) (segments (segment 0 (token "T") (name "T") (separator none) (span (offset 96) (line 3) (column 37) (len 1)))))
     (reference r1 (scope relative) (span (offset 120) (line 3) (column 61) (len 1)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 120) (line 3) (column 61) (len 1)))))

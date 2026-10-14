@@ -50,6 +50,7 @@ package Annotated {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 75) (line 5) (column 7) (len 10)) (segments (segment 0 (token "Classified") (name "Classified") (separator none) (span (offset 75) (line 5) (column 7) (len 10)))))
     (reference r1 (scope relative) (span (offset 92) (line 5) (column 24) (len 9)) (segments (segment 0 (token "Annotated") (name "Annotated") (separator none) (span (offset 92) (line 5) (column 24) (len 9)))))

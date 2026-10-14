@@ -269,22 +269,15 @@ fn a_comment_may_separate_the_production_keywords() {
             result.errors
         );
     }
-    // The crate-wide boundary rule, stated as the shared fact it is.
-    for (satisfy_form, baseline) in [
-        (
-            "package P {\n    satisfy/* c */ r by p;\n}\n",
-            "package P {\n    part/* c */ a;\n}\n",
-        ),
-        (
-            "package P {\n    assert/* c */ satisfy r by p;\n}\n",
-            "package P {\n    import/* c */ A::*;\n}\n",
-        ),
+    // Comments are lexical token boundaries even without surrounding whitespace.
+    for source in [
+        "package P { satisfy/* c */ r by p; }",
+        "package P { assert/* c */ satisfy r by p; }",
+        "package P { private/* c */import/* c */A::*; }",
     ] {
         assert!(
-            !parse_for_editor(satisfy_form).errors.is_empty()
-                && !parse_for_editor(baseline).errors.is_empty(),
-            "a keyword abutting a comment is rejected crate-wide; this asserts satisfy is not \
-             special. If the boundary predicate is widened, both of these change together."
+            parse_for_editor(source).errors.is_empty(),
+            "comment boundary: {source}"
         );
     }
 }

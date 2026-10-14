@@ -31,6 +31,7 @@ package ShortNameRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "ShortNameRecovery") (body brace (extended-library-declaration) (verification-case-usage (name none) (short-name "Retained")) (part-def (name "Owner") (modifiers) (body brace (malformed (code "recovered_part_def_body_element") (found "exhibit state <> : S;") (span (offset 115) (line 5) (column 9) (len 30))) (exhibit (declaration none) (short-name "RetainedState") (state none)))))))

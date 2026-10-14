@@ -607,6 +607,7 @@ fn definition_header_has_invalid_specialization_colon(header: &[u8]) -> bool {
 /// keyword, instead of reaching a scope's generic recovery as "`composite` is not a SysML
 /// keyword" -- which is both wrong and unusable to a consumer that wants the authored modifier.
 pub(crate) fn invalid_end_feature_prefix_diagnostic(
+    language: crate::ast::NameLanguage,
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     /// Every `BasicFeaturePrefix` slot keyword except `const`, which both alternatives admit.
@@ -658,13 +659,13 @@ pub(crate) fn invalid_end_feature_prefix_diagnostic(
     // exclusive `FeaturePrefix`/`UnextendedUsagePrefix` choice. Followed by a plain name it is
     // `DefaultReferenceUsage`, which spells `'end'? RefPrefix` and is legal.
     //
-    // `is_reserved_keyword` alone is not the test: its table is the SysML reserved-word list and
-    // carries none of KerML's feature-kind keywords, so `end derived feature f;` would read as a
-    // usage named `feature`.
+    // The document's reserved words alone are not the test: the SysML table carries none of
+    // KerML's feature-kind keywords, so `end derived feature f;` would read as a usage named
+    // `feature`.
     let introduces_a_keyworded_declaration = |word: &[u8]| {
         const KERML_FEATURE_KEYWORDS: &[&[u8]] =
             &[b"feature", b"step", b"expr", b"bool", b"inv", b"invariant"];
-        KERML_FEATURE_KEYWORDS.contains(&word) || lex::is_reserved_keyword(word)
+        KERML_FEATURE_KEYWORDS.contains(&word) || is_reserved_in(language, word)
     };
     let after_end =
         after_end.filter(|_| terminator.is_some_and(introduces_a_keyworded_declaration));
@@ -1043,7 +1044,12 @@ pub(crate) fn invalid_digit_leading_identifier_diagnostic(
     Some(digit_leading_identifier_parts(&text))
 }
 
+fn is_reserved_in(language: crate::ast::NameLanguage, word: &[u8]) -> bool {
+    std::str::from_utf8(word).is_ok_and(|word| language.is_reserved(word))
+}
+
 pub(crate) fn unexpected_keyword_in_scope_diagnostic(
+    language: crate::ast::NameLanguage,
     fragment: &[u8],
     starters: &[&[u8]],
     scope_label: &str,
@@ -1064,8 +1070,8 @@ pub(crate) fn unexpected_keyword_in_scope_diagnostic(
         return None;
     }
     let keyword_text = String::from_utf8_lossy(keyword);
-    if lex::is_reserved_keyword(keyword) {
-        // A real SysML keyword used somewhere it isn't valid in this scope -- a grammar-context
+    if is_reserved_in(language, keyword) {
+        // A real keyword of the document's language used somewhere it isn't valid in this scope -- a grammar-context
         // mismatch, so "unexpected keyword" is accurate.
         let suggestion = if keyword == b"return" && !return_parameter_scope(scope_label) {
             // `ReturnParameterMember` belongs to `CalculationBodyItem`, not `ActionBodyItem`.

@@ -38,6 +38,7 @@ package StateActionTargets {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 74) (line 3) (column 22) (len 19)) (segments (segment 0 (token "Actions") (name "Actions") (separator none) (span (offset 74) (line 3) (column 22) (len 7))) (segment 1 (token "initialize") (name "initialize") (separator colon-colon) (span (offset 83) (line 3) (column 31) (len 10)))))
     (reference r1 (scope relative) (span (offset 106) (line 4) (column 12) (len 26)) (segments (segment 0 (token "Controller") (name "Controller") (separator none) (span (offset 106) (line 4) (column 12) (len 10))) (segment 1 (token "'provide power'") (name "provide power") (separator dot) (span (offset 117) (line 4) (column 23) (len 15)))))

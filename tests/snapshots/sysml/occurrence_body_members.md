@@ -31,6 +31,7 @@ package OccurrenceBodyMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "OccurrenceBodyMembers") (body brace (occurrence-def (modifiers)))))

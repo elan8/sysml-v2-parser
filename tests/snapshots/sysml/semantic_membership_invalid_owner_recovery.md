@@ -12,7 +12,7 @@ package MembershipOwnerRecovery {
         verify requirement retained : RequirementType;
         render leaked : ;
         render retained : RenderingType;
-        attribute after;
+        attribute 'after';
     }
     part def Later;
 }
@@ -35,6 +35,7 @@ package MembershipOwnerRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 66) (line 3) (column 12) (len 8)) (segments (segment 0 (token "retained") (name "retained") (separator none) (span (offset 66) (line 3) (column 12) (len 8)))))
     (reference r1 (scope relative) (span (offset 180) (line 6) (column 39) (len 15)) (segments (segment 0 (token "RequirementType") (name "RequirementType") (separator none) (span (offset 180) (line 6) (column 39) (len 15)))))

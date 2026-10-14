@@ -25,6 +25,7 @@ package Vehicles {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "Vehicles") (body brace (part-def (name "Car") (modifiers) (body semicolon)) (part-def (name "Truck") (modifiers) (body semicolon)))))

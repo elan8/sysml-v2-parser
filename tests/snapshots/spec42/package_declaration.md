@@ -23,6 +23,7 @@ package MyPkg {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "MyPkg") (body brace)))

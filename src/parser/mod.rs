@@ -65,7 +65,8 @@ pub(crate) use feature_value::feature_value_part;
 pub(crate) use span::{advance, node_from_to, span_from_to, with_span, Input};
 
 pub use parse::{
-    parse_root, parse_root_owned, parse_with_diagnostics, parse_with_diagnostics_owned, ParseResult,
+    parse_root, parse_root_owned, parse_root_owned_with_name_language, parse_with_diagnostics,
+    parse_with_diagnostics_owned, parse_with_diagnostics_owned_with_name_language, ParseResult,
 };
 
 pub(crate) use recovery::{build_recovery_error_node, build_recovery_error_node_from_span};

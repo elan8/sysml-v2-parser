@@ -98,6 +98,7 @@ package MetadataTest {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 39) (line 2) (column 17) (len 25)) (segments (segment 0 (token "'User Defined Extensions'") (name "User Defined Extensions") (separator none) (span (offset 39) (line 2) (column 17) (len 25)))))
     (reference r1 (scope relative) (span (offset 122) (line 6) (column 4) (len 8)) (segments (segment 0 (token "Security") (name "Security") (separator none) (span (offset 122) (line 6) (column 4) (len 8)))))

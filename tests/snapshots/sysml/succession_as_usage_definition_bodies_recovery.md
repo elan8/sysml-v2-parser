@@ -47,6 +47,7 @@ package SuccessionDefinitionBodyRecovery {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
   )
   (root (package (name "SuccessionDefinitionBodyRecovery") (body brace (occurrence-def (modifiers)) (item-def (name "ItemSequence") (modifiers) (individual false) (specializes none) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (event true) (declaration "firstEvent") (short-name none) (target none) (body semicolon)) (malformed (code "recovered_attribute_body_element") (found "first firstEvent then;") (span (offset 271) (line 10) (column 9) (len 31))) (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (event true) (declaration "afterRecovery") (short-name none) (target none) (body semicolon)))))))

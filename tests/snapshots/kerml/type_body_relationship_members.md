@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "KerML type bodies structure connector, binding, succession, end-cross-feature, nested classifier, import, attribute, and keyword-less binding members that were previously captured opaquely without diagnostics."))
+(snapshot (type semantic) (description "KerML type bodies structure connector, binding, succession, end-cross-feature, nested classifier, import, attribute, and keyword-less binding members that were previously captured opaquely without diagnostics.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -83,6 +83,7 @@ standard library package Occurrences {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language kerml)
   (references
     (reference r0 (scope relative) (span (offset 58) (line 2) (column 20) (len 17)) (segments (segment 0 (token "SequenceFunctions") (name "SequenceFunctions") (separator none) (span (offset 58) (line 2) (column 20) (len 17)))))
     (reference r1 (scope relative) (span (offset 113) (line 3) (column 34) (len 13)) (segments (segment 0 (token "HappensDuring") (name "HappensDuring") (separator none) (span (offset 113) (line 3) (column 34) (len 13)))))

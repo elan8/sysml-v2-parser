@@ -86,6 +86,7 @@ package PortPrefixAlternatives {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 307) (line 13) (column 30) (len 9)) (segments (segment 0 (token "PowerPort") (name "PowerPort") (separator none) (span (offset 307) (line 13) (column 30) (len 9)))))
     (reference r1 (scope relative) (span (offset 349) (line 14) (column 32) (len 9)) (segments (segment 0 (token "PowerPort") (name "PowerPort") (separator none) (span (offset 349) (line 14) (column 32) (len 9)))))

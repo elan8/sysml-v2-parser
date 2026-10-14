@@ -701,7 +701,7 @@ fn merge_clause(existing: &mut Node<SubsettingRelationship>, next: Node<Subsetti
 }
 
 /// [`merge_clause`] over two optional clauses, keeping `leading`'s source order first.
-fn merge_groups(
+pub(crate) fn merge_groups(
     leading: Option<Node<SubsettingRelationship>>,
     trailing: Option<Node<SubsettingRelationship>>,
 ) -> Option<Node<SubsettingRelationship>> {
@@ -990,6 +990,26 @@ fn modifier_keyword<'a>(input: Input<'a>, keyword: &'static [u8]) -> Option<(Inp
     Some((rest, span))
 }
 
+/// Merge two consecutive specialization groups of one declaration on the same grounds as
+/// [`merge_usage_header`].
+fn merge_clauses(
+    first: SpecializationClauses,
+    second: SpecializationClauses,
+) -> SpecializationClauses {
+    let subsets = match (first.subsets, second.subsets) {
+        (Some((a, av)), Some((b, bv))) => merge_groups(Some(a), Some(b)).map(|r| (r, av.or(bv))),
+        (a, b) => a.or(b),
+    };
+    SpecializationClauses {
+        subsets,
+        redefines: merge_groups(first.redefines, second.redefines),
+        references: merge_groups(first.references, second.references),
+        crosses: merge_groups(first.crosses, second.crosses),
+        intersects: merge_groups(first.intersects, second.intersects),
+        had_any: first.had_any || second.had_any,
+    }
+}
+
 fn merge_usage_header(
     leading: SpecializationClauses,
     trailing: SpecializationClauses,
@@ -1042,8 +1062,31 @@ pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, Usage
     let (input, modifiers) = multiplicity_modifier_slots(input)?;
     let (input, trailing_type_result) = optional_typings(input)?;
     let (input, trailing) = specialization_clauses(input)?;
+    // `FeatureSpecialization+ MultiplicityPart? FeatureSpecialization*`: a multiplicity and its
+    // modifiers may also follow the specializations (`:> a [1] ordered :> b`).
+    let had_multiplicity = leading_multiplicity.is_some() || trailing_multiplicity.is_some();
+    let (input, post_clause_multiplicity, modifiers, trailing) =
+        if leading.had_any || trailing.had_any {
+            let (input, post_clause_multiplicity) = if had_multiplicity {
+                (input, None)
+            } else {
+                opt(multiplicity_node).parse(input)?
+            };
+            let (input, modifiers) = multiplicity_modifier_slots_after(modifiers, input)?;
+            let (input, after) = specialization_clauses(input)?;
+            (
+                input,
+                post_clause_multiplicity,
+                modifiers,
+                merge_clauses(trailing, after),
+            )
+        } else {
+            (input, None, modifiers, trailing)
+        };
     let mut header = merge_usage_header(leading, trailing, type_result.or(trailing_type_result));
-    header.multiplicity = trailing_multiplicity.or(leading_multiplicity);
+    header.multiplicity = trailing_multiplicity
+        .or(leading_multiplicity)
+        .or(post_clause_multiplicity);
     header.multiplicity_modifiers = modifiers;
     Ok((input, header))
 }

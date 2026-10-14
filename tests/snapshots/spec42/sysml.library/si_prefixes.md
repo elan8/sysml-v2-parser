@@ -225,6 +225,7 @@ standard library package SIPrefixes {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 136) (line 7) (column 17) (len 21)) (segments (segment 0 (token "MeasurementReferences") (name "MeasurementReferences") (separator none) (span (offset 136) (line 7) (column 17) (len 21)))))
   )

@@ -96,6 +96,7 @@ package Gap61KermlTypeBodyMembers {
 # AST
 ~~~sexpr
 (parsed-document
+  (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 81) (line 3) (column 14) (len 3)) (segments (segment 0 (token "a") (name "a") (separator none) (span (offset 81) (line 3) (column 14) (len 1))) (segment 1 (token "y") (name "y") (separator dot) (span (offset 83) (line 3) (column 16) (len 1)))))
     (reference r1 (scope relative) (span (offset 88) (line 3) (column 21) (len 4)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 88) (line 3) (column 21) (len 1))) (segment 1 (token "x1") (name "x1") (separator dot) (span (offset 90) (line 3) (column 23) (len 2)))))
