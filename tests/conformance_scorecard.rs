@@ -396,21 +396,21 @@ Parser version: `{parser_version}`
 
 ## Layers
 
-### L1 â€” Syntax acceptance (claimed)
+### L1 — Syntax acceptance (claimed)
 
 Status: **{l1_status}**
 
 - Implemented productions: {total_impl} / {total_expected}
 - Partial / opaque / fallback / untested / not_supported: {partial} / {opaque} / {fallback} / {untested} / {not_supported}
 
-### L2 â€” Structured AST (claimed)
+### L2 — Structured AST (claimed)
 
 Status: **{l2_status}**
 
 {systems_md}
 {full_md}
 
-### L3 â€” Semantics (not claimed)
+### L3 — Semantics (not claimed)
 
 Status: **not_claimed**
 
