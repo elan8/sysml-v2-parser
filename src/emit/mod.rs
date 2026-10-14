@@ -51,8 +51,9 @@ impl Default for EmitOptions {
 /// Failure while emitting SysML from an AST.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmitError {
-    /// An opaque / recovery node was encountered; emission refuses to reprint raw text.
-    Opaque { path: String, kind: OpacityKind },
+    /// An opaque / recovery node was encountered; emission refuses to reprint raw text. `span` is
+    /// the first such node's source, in [`opacity_report`] order.
+    Opaque { span: Span, kind: OpacityKind },
     /// A structured construct is not yet implemented by the emitter.
     Unsupported { path: String, construct: String },
     /// An arena identity could not be resolved or contained invalid source-backed metadata.
@@ -67,8 +68,12 @@ pub enum EmitError {
 impl std::fmt::Display for EmitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Opaque { path, kind } => {
-                write!(f, "opaque AST at {path}: {kind:?}")
+            Self::Opaque { span, kind } => {
+                write!(
+                    f,
+                    "opaque AST at line {}, column {}: {kind:?}",
+                    span.line, span.column
+                )
             }
             Self::Unsupported { path, construct } => {
                 write!(f, "unsupported emit construct at {path}: {construct}")
@@ -111,7 +116,7 @@ pub fn emit_sysml_with_options(
     if !report.is_clean() {
         let hit = &report.hits[0];
         return Err(EmitError::Opaque {
-            path: hit.path.clone(),
+            span: hit.span,
             kind: hit.kind,
         });
     }

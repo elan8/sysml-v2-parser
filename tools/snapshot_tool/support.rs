@@ -465,7 +465,7 @@ mod tests {
         let section = FormatSection::from_emit_result(
             "package P;",
             Err(EmitError::Opaque {
-                path: "root.elements[0]".to_owned(),
+                span: sysml_v2_parser::ast::Span::dummy(),
                 kind: sysml_v2_parser::OpacityKind::UnsupportedGrammar,
             }),
         )

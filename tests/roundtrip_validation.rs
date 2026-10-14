@@ -331,15 +331,18 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
                 .hits
                 .iter()
                 .take(5)
-                .map(|h| format!("{}:{:?}", h.path, h.kind))
+                .map(|h| format!("{}:{}:{:?}", h.span.line, h.span.column, h.kind))
                 .collect::<Vec<_>>()
         ));
     }
 
     let emitted = match emit_sysml(&ast1) {
         Ok(s) => s,
-        Err(EmitError::Opaque { path, kind }) => {
-            return RoundtripOutcome::Failed(format!("emit opaque at {path}: {kind:?}"))
+        Err(EmitError::Opaque { span, kind }) => {
+            return RoundtripOutcome::Failed(format!(
+                "emit opaque at {}:{}: {kind:?}",
+                span.line, span.column
+            ))
         }
         Err(EmitError::Unsupported { path, construct }) => {
             return RoundtripOutcome::Failed(format!("emit unsupported at {path}: {construct}"))

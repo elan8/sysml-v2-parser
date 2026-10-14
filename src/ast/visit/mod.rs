@@ -96,5 +96,6 @@ mod inventory;
 
 mod immutable;
 pub mod mutable;
+pub(crate) mod recovery;
 
 pub use immutable::*;
