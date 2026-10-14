@@ -1448,7 +1448,6 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             }
             UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
-            | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)
             | UseCaseDefBodyElement::CaseReturnDecl(_)
             | UseCaseDefBodyElement::Assign(_)
             | UseCaseDefBodyElement::Expression(_) => {}
@@ -1802,6 +1801,9 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
             }
             InterfaceUsageBodyElement::InterfaceUsage(n) => {
                 walk_interface_usage(report, &p, &n.value)
+            }
+            InterfaceUsageBodyElement::PartUsage(part) => {
+                walk_part_usage_body(report, &p, &part.value.body)
             }
             InterfaceUsageBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)

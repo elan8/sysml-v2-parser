@@ -832,15 +832,6 @@ pub struct ThenUseCaseUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectRef {}
 
-/// `actor :>> <name> = <expr>;` redefinition/assignment used in SysML v2 release fixtures.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ActorRedefinitionAssignment {
-    pub target: QualifiedReferenceId,
-    /// Structured assignment value with its exact authored expression span.
-    pub value: Node<Expression>,
-}
-
 /// `ref :>> <name> { ... }` redefinition used in SysML v2 release fixtures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -934,7 +925,6 @@ pub enum UseCaseDefBodyElement {
     /// `subject;` shorthand.
     SubjectRef(Node<SubjectRef>),
     ActorUsage(Node<ActorUsage>),
-    ActorRedefinitionAssignment(Node<ActorRedefinitionAssignment>),
     Objective(Node<Objective>),
     /// `first <node>;` initial-node marker. A case body is a SysML `ActionBody`
     /// (`CaseBodyItem : ActionBodyItem`), so this reuses the action-body `FirstStmt` node
@@ -1010,6 +1000,8 @@ pub struct ActorUsage {
     /// `None` for the bare untyped form `actor environment;` / `actor passenger [0..4];`
     /// (OMG spec Annex A; spec42 Gap 46).
     pub type_name: Option<QualifiedReferenceId>,
+    /// The actor's authored redefinition, including anonymous `actor :>> user;`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Optional multiplicity after the type, e.g. `[0..4]` in `actor passengers : Person[0..4];`
     /// (validation `18-Use Case`).
     pub multiplicity: Option<Node<Multiplicity>>,

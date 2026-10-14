@@ -9,7 +9,7 @@ both-reject	negative/extensions/x06-history-member.sysml
 both-reject	negative/extensions/x07-transition-to.sysml
 theirs-rejects	negative/extensions/x08-require-outside-requirement-body.sysml
 both-reject	negative/grammar/g01-unclosed-package-body.sysml
-theirs-rejects	negative/grammar/g02-import-without-visibility.sysml
+both-reject	negative/grammar/g02-import-without-visibility.sysml
 both-reject	negative/grammar/g03-alias-without-for.sysml
 both-reject	negative/grammar/g04-specialization-without-target.sysml
 both-reject	negative/grammar/g05-typing-without-type.sysml
@@ -22,7 +22,7 @@ both-reject	negative/grammar/g11-assignment-without-target.sysml
 both-reject	negative/grammar/g12-unterminated-block-comment.sysml
 theirs-rejects	negative/grammar/g13-entry-then-without-target.sysml
 both-reject	negative/grammar/g14-connect-without-to.sysml
-theirs-rejects	negative/grammar/g15-keyword-as-name.sysml
+both-reject	negative/grammar/g15-keyword-as-name.sysml
 both-reject	negative/grammar/g16-expose-without-name.sysml
 both-reject	negative/grammar/g17-render-without-usage.sysml
 theirs-rejects	negative/grammar/g18-require-without-constraint.sysml
@@ -44,7 +44,7 @@ both-reject	negative/grammar/g33-while-without-condition.sysml
 both-reject	negative/grammar/g34-for-without-in.sysml
 both-reject	negative/grammar/g35-accept-without-payload.sysml
 both-reject	negative/grammar/g36-direction-without-feature.sysml
-theirs-rejects	negative/grammar/g37-redefines-without-target.sysml
+both-reject	negative/grammar/g37-redefines-without-target.sysml
 both-reject	negative/grammar/g38-references-without-target.sysml
 both-reject	negative/grammar/g39-redefinition-symbol-without-target.sysml
 both-reject	negative/grammar/g40-modulo-without-operand.sysml
@@ -67,7 +67,7 @@ both-reject	negative/grammar/g56-qualified-name-trailing-separator.sysml
 both-reject	negative/grammar/g57-unterminated-unrestricted-name.sysml
 both-reject	negative/grammar/g58-satisfy-without-reference.sysml
 both-reject	negative/grammar/g59-crosses-without-target.sysml
-theirs-rejects	negative/grammar/g60-alias-keyword-as-name.sysml
+both-reject	negative/grammar/g60-alias-keyword-as-name.sysml
 both-reject	negative/grammar/g61-actor-outside-requirement-body.sysml
 ours-rejects	negative/grammar/g62-subject-outside-requirement-body.sysml
 ours-rejects	negative/grammar/g63-objective-outside-case-body.sysml
@@ -88,7 +88,7 @@ both-reject	negative/grammar/k07-conjugation-without-target.kerml
 both-reject	negative/grammar/k08-return-without-feature.kerml
 both-reject	negative/grammar/k09-inverting-without-target.kerml
 both-reject	negative/grammar/k10-featuring-without-type.kerml
-theirs-rejects	negative/grammar/k11-namespace-prefix-metadata-without-name.kerml
+both-reject	negative/grammar/k11-namespace-prefix-metadata-without-name.kerml
 both-reject	negative/grammar/k12-multiplicity-subset-without-target.kerml
 both-reject	negative/grammar/k13-step-without-declaration.kerml
 both-reject	negative/grammar/k14-flow-without-payload-target.kerml

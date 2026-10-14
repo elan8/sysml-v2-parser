@@ -1,8 +1,8 @@
 use crate::ast::{
-    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CaseReturnDecl, DeclarationName,
-    IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
-    ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenIncludeUseCase, ThenUseCaseUsage,
-    UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
+    ActorDecl, ActorUsage, CaseReturnDecl, DeclarationName, IncludeUseCase, Membership, Node,
+    Objective, ParseErrorNode, RefRedefinition, ReturnRef, ReturnRefBody, ReturnRefBodyElement,
+    SubjectRef, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
+    UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
@@ -52,8 +52,8 @@ mod use_case_member_tests {
         assert!(node.value.multiplicity.is_some());
 
         assert!(
-            actor_usage(input("actor ;")).is_err(),
-            "bare actor; must not parse"
+            actor_usage(input("actor ;")).is_ok(),
+            "Identification and specialization are optional in ActorUsage's Usage declaration"
         );
     }
 
@@ -208,41 +208,6 @@ fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseU
     Ok((
         input,
         node_from_to(start, input, ThenUseCaseUsage { use_case }),
-    ))
-}
-
-fn actor_redefinition_assignment(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
-    // Speculated at member starts it does not own; refuse unless one of this production's
-    // leading words follows the trivia, before entering an arena transaction.
-    {
-        let (cursor, _) = ws_and_comments(input)?;
-        if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"actor") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    }
-    crate::parser::span::reference_transaction(input, actor_redefinition_assignment_inner)
-}
-
-fn actor_redefinition_assignment_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
-    let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b":>>"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, target) = qualified_reference(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
-    let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(start, input, ActorRedefinitionAssignment { target, value }),
     ))
 }
 
@@ -698,10 +663,6 @@ pub(crate) fn use_case_def_body_element(
             map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
             map(subject_ref, UseCaseDefBodyElement::SubjectRef),
             map(actor_usage, UseCaseDefBodyElement::ActorUsage),
-            map(
-                actor_redefinition_assignment,
-                UseCaseDefBodyElement::ActorRedefinitionAssignment,
-            ),
             map(objective, UseCaseDefBodyElement::Objective),
             // A case body is a SysML `ActionBody` (`CaseBodyItem : ActionBodyItem`), so
             // `first <node>;` / `then <target>;` use the shared action-flow parsers exactly as
@@ -867,25 +828,6 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
             nom::error::ErrorKind::Tag,
         )));
     }
-    // `actor :>> target = value;` is the sibling redefinition-assignment form, which this
-    // parser never accepts; refuse it without a transaction.
-    {
-        let (cursor, _) = ws_and_comments(input)?;
-        let (cursor, _) = visibility_prefix(cursor)?;
-        let (cursor, _) = ws_and_comments(cursor)?;
-        if crate::parser::lex::starts_with_keyword(cursor.fragment(), b"actor") {
-            let (cursor, _) =
-                nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(b"actor".len())
-                    .parse(cursor)?;
-            let (cursor, _) = ws_and_comments(cursor)?;
-            if cursor.fragment().starts_with(b":>>") {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-        }
-    }
     crate::parser::span::reference_transaction(input, actor_usage_inner)
 }
 
@@ -897,33 +839,24 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` (SysML BNF 42), reached
     // through `ActorUsage : PartUsage = 'actor' Usage`, so both halves are optional and either
     // may be written alone.
-    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    // SysML allows anonymous actors: `actor : User;` (Identification may be empty).
-    let (after_gap, _) = ws_and_comments(input)?;
-    let (input, n) = if after_gap.fragment().starts_with(b":")
-        && !after_gap.fragment().starts_with(b":>")
-        && !after_gap.fragment().starts_with(b":>>")
-    {
-        (after_gap, None)
-    } else {
-        let (input, _) = ws1(input)?;
-        let (input, n) = name(input)?;
-        (input, Some(n))
-    };
+    let (input, identity) = crate::parser::lex::identification_before(input, &[b"redefines"])?;
+    let short_name = identity.short_name;
+    let n = identity.name;
+    let (input, leading_redefines) = crate::parser::usage::optional_redefinition(input)?;
     // The typing is optional: `actor environment;` / `actor passenger [0..4];` (OMG spec
-    // Annex A; spec42 Gap 46). A bare `actor;` still fails (no name and no type).
+    // Annex A; spec42 Gap 46). Identification may also be empty.
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    if n.is_none() && type_name.is_none() {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
+    let (input, trailing_redefines) = if leading_redefines.is_none() {
+        crate::parser::usage::optional_redefinition(input)?
+    } else {
+        (input, None)
+    };
+    let redefines = leading_redefines.or(trailing_redefines);
     // `ActorUsage : PartUsage = 'actor' Usage`, whose `UsageDeclaration ValuePart?` gives an
     // actor a value: `actor user = UseSystem::user;`.
     let (input, value) = opt(preceded(
@@ -941,6 +874,7 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
                 name: n,
                 short_name,
                 type_name,
+                redefines,
                 multiplicity,
                 value: value.map(Box::new),
                 membership: Membership::actor(visibility, visibility_span),

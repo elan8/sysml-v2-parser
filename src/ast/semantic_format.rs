@@ -1202,7 +1202,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 Some(reference) => self.write_reference(reference)?,
                                 None => self.writer.write_str("none")?,
                             }
-                            self.writer.write_str(") (multiplicity ")?;
+                            self.writer.write_str(") ")?;
+                            self.write_optional_subsetting(
+                                "redefines",
+                                actor.value.redefines.as_ref(),
+                            )?;
+                            self.writer.write_str(" (multiplicity ")?;
                             self.write_multiplicity_clause(actor.value.multiplicity.as_ref())?;
                             self.writer.write_char(')')?;
                             // Written only when present, so actors without a value keep
@@ -1213,14 +1218,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 self.writer.write_char(')')?;
                             }
                             self.writer.write_char(')')?;
-                        }
-                        UseCaseDefBodyElement::ActorRedefinitionAssignment(actor) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(actor-redefinition (target ")?;
-                            self.write_reference(actor.value.target)?;
-                            self.writer.write_str(") (value ")?;
-                            self.write_expression(&actor.value.value)?;
-                            self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::Objective(objective) => {
                             self.write_item_prefix(&mut first)?;
@@ -3987,6 +3984,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") ")?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        for (label, relationship) in [
+            ("references", &usage.references),
+            ("crosses", &usage.crosses),
+            ("intersects", &usage.intersects),
+        ] {
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting(label, relationship.as_deref())?;
+        }
         self.writer.write_str(" (value ")?;
         if let Some(value) = &usage.value {
             self.write_feature_value(&value.value)?;
@@ -5563,6 +5568,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::InterfaceUsageBodyElement::InterfaceUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_interface_usage(&usage.value)?;
+                        }
+                        super::InterfaceUsageBodyElement::PartUsage(part) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_part_usage(&part.value)?;
                         }
                         super::InterfaceUsageBodyElement::PortUsage(port) => {
                             self.write_item_prefix(&mut first)?;

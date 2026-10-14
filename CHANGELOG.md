@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Interface bodies retain end-prefixed part usages.** Part usages use the shared declaration
+  header and preserve references, crosses and intersects; interface bodies carry them as parts
+  rather than misreading `part` as an end name.
+- **Actor usages retain anonymous redefinitions (breaking AST change, `PARSE_AST_VERSION` 280).**
+  `ActorUsage::redefines` owns every authored target. Identification is optional, including bare
+  actor usages. Redefinitions with values use the same actor node and typed FeatureValue as other
+  actor declarations; the overlapping ActorRedefinitionAssignment node is removed. The
+  differential oracle selects the source's name language explicitly.
+
 - **Reserved declaration names carry explicit recovery state (breaking AST change,
   `PARSE_AST_VERSION` 279).** Strict and editor parses share exact token diagnostics for unquoted
   reserved names. Quoted names and case-distinct names remain valid. Name-language selection uses

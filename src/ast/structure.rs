@@ -577,6 +577,9 @@ pub struct PartUsage {
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Box<Node<SubsettingRelationship>>>,
+    pub crosses: Option<Box<Node<SubsettingRelationship>>>,
+    pub intersects: Option<Box<Node<SubsettingRelationship>>>,
     /// Value expression (= expr, default = expr, := expr).
     pub value: Option<Node<FeatureValue>>,
     pub body: PartUsageBody,
@@ -600,6 +603,9 @@ impl PartialEq for PartUsage {
             && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
+            && self.references == other.references
+            && self.crosses == other.crosses
+            && self.intersects == other.intersects
             && self.value == other.value
             && self.body == other.body
             && self.membership == other.membership
@@ -2320,6 +2326,8 @@ pub enum InterfaceUsageBodyElement {
     /// `PortUsage = OccurrenceUsagePrefix 'port' Usage` with an `end` head: `end port p3 : P
     /// ::> p.p1;` (`ConjugationTest.sysml`), reached through `UsageBody = DefinitionBody`.
     PortUsage(Box<Node<PortUsage>>),
+    /// StructureUsageElement also admits PartUsage, including an end-prefixed part usage.
+    PartUsage(Box<Node<PartUsage>>),
     /// A behavior occurrence usage in an interface body. `InterfaceOccurrenceUsageElement`
     /// admits `BehaviorUsageElement`; this direct, typed member retains the flow nested in the
     /// VehicleUsages `driveShaft` interface rather than recovering the enclosing interface.

@@ -701,7 +701,7 @@ fn merge_clause(existing: &mut Node<SubsettingRelationship>, next: Node<Subsetti
 }
 
 /// [`merge_clause`] over two optional clauses, keeping `leading`'s source order first.
-fn merge_groups(
+pub(crate) fn merge_groups(
     leading: Option<Node<SubsettingRelationship>>,
     trailing: Option<Node<SubsettingRelationship>>,
 ) -> Option<Node<SubsettingRelationship>> {

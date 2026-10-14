@@ -1270,11 +1270,6 @@ macro_rules! ast_traversal {
                 walk_subject_ref(self, node)
             }
 
-            /// Visits [`ActorRedefinitionAssignment`]; the default implementation walks its children.
-            fn visit_actor_redefinition_assignment(&mut self, node: &$($mutability)? Node<ActorRedefinitionAssignment>) {
-                walk_actor_redefinition_assignment(self, node)
-            }
-
             /// Visits [`RefRedefinition`]; the default implementation walks its children.
             fn visit_ref_redefinition(&mut self, node: &$($mutability)? Node<RefRedefinition>) {
                 walk_ref_redefinition(self, node)
@@ -3136,7 +3131,7 @@ macro_rules! ast_traversal {
         pub fn walk_part_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PartUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PartUsage { prefix, then_span, name, short_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, value, body, type_ref_span, membership } = &$($mutability)? node.value;
+            let PartUsage { prefix, then_span, name, short_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, type_ref_span, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = then_span {
                 visitor.visit_span(inner);
@@ -3162,6 +3157,9 @@ macro_rules! ast_traversal {
                 }
             }
             if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            for inner in [references, crosses, intersects].into_iter().flatten() {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = value {
@@ -5007,6 +5005,7 @@ macro_rules! ast_traversal {
                 InterfaceUsageBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
+                InterfaceUsageBodyElement::PartUsage(node) => visitor.visit_part_usage(node),
                 InterfaceUsageBodyElement::SuccessionUsage(field_0) => {
                     visitor.visit_succession_usage(&$($mutability)? **field_0);
                 }
@@ -7149,15 +7148,6 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_actor_redefinition_assignment<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActorRedefinitionAssignment>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let ActorRedefinitionAssignment { target, value } = &$($mutability)? node.value;
-            visitor.visit_qualified_reference(target);
-            visitor.visit_expression(value);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
         pub fn walk_ref_redefinition<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RefRedefinition>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
@@ -7285,9 +7275,6 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::ActorUsage(field_0) => {
                     visitor.visit_actor_usage(field_0);
                 }
-                UseCaseDefBodyElement::ActorRedefinitionAssignment(field_0) => {
-                    visitor.visit_actor_redefinition_assignment(field_0);
-                }
                 UseCaseDefBodyElement::Objective(field_0) => {
                     visitor.visit_objective(field_0);
                 }
@@ -7373,7 +7360,7 @@ macro_rules! ast_traversal {
         pub fn walk_actor_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActorUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActorUsage { name, short_name, type_name, multiplicity, value, membership } = &$($mutability)? node.value;
+            let ActorUsage { name, short_name, type_name, redefines, multiplicity, value, membership } = &$($mutability)? node.value;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
@@ -7382,6 +7369,9 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);

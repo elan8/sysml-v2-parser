@@ -93,6 +93,12 @@ pub(crate) fn emit_part_usage(
             emit_subsetting_clause(w, &redefines.value)?;
         }
     }
+    for relationship in [&usage.references, &usage.crosses, &usage.intersects]
+        .into_iter()
+        .flatten()
+    {
+        emit_subsetting_clause(w, &relationship.value)?;
+    }
     if redefines_only {
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
@@ -1321,6 +1327,7 @@ fn emit_interface_usage_body_element(
         InterfaceUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         InterfaceUsageBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
         InterfaceUsageBodyElement::PortUsage(port) => emit_port_usage(w, path, &port.value),
+        InterfaceUsageBodyElement::PartUsage(part) => emit_part_usage(w, path, &part.value),
         InterfaceUsageBodyElement::SuccessionUsage(s) => {
             super::behavior::emit_succession_usage(w, path, &s.value)
         }
