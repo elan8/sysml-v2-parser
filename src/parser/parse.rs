@@ -90,7 +90,10 @@ fn parse_root_source(
     source: SourceStorage,
     name_language: crate::ast::NameLanguage,
 ) -> Result<ParsedDocument, ParseError> {
-    let ParseResult { document, errors } = parse_with_diagnostics_source(source, name_language);
+    // Diagnostics are ordered by offset, so nothing after the first root-level failure can
+    // precede it: stop recovering there instead of collecting errors only to discard them.
+    let ParseResult { document, errors } =
+        parse_source_with_root_error_limit(source, name_language, 1);
     match errors.into_iter().next() {
         Some(error) => Err(error),
         None => Ok(document),
@@ -136,8 +139,17 @@ fn parse_with_diagnostics_source(
     source: SourceStorage,
     name_language: crate::ast::NameLanguage,
 ) -> ParseResult {
+    parse_source_with_root_error_limit(source, name_language, MAX_RECOVERY_ERRORS)
+}
+
+fn parse_source_with_root_error_limit(
+    source: SourceStorage,
+    name_language: crate::ast::NameLanguage,
+    max_root_errors: usize,
+) -> ParseResult {
     let context = ParseContext::with_name_language(name_language);
-    let (root, errors) = parse_with_diagnostics_document(source.as_str(), &context);
+    let (root, errors) =
+        parse_with_diagnostics_document(source.as_str(), &context, max_root_errors);
     ParseResult {
         document: ParsedDocument {
             name_language,
@@ -152,6 +164,7 @@ fn parse_with_diagnostics_source(
 fn parse_with_diagnostics_document(
     source: &str,
     context: &ParseContext,
+    max_root_errors: usize,
 ) -> (RootNamespace, Vec<ParseError>) {
     let bytes = source.as_bytes();
     let delimiters = DelimiterScan::new(bytes);
@@ -177,7 +190,7 @@ fn parse_with_diagnostics_document(
         }
     };
 
-    while errors.len() < MAX_RECOVERY_ERRORS {
+    while errors.len() < max_root_errors {
         // Skip leading whitespace and notes; if nothing left, we're done (avoids parsing "" as
         // root_element). A bare `/* ... */` is left for `root_element`, because at a member
         // boundary it is the `Comment` production rather than trivia.

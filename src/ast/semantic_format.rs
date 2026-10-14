@@ -3779,6 +3779,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
+                        InterfaceDefBodyElement::PartUsage(part) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_part_usage(&part.value)?;
+                        }
                         InterfaceDefBodyElement::FlowUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_flow_usage(&usage.value)?;
@@ -5337,8 +5341,19 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    /// A `ConnectorEnd`: its declared name and operator spelling when authored, then the target.
+    /// A `ConnectorEnd`: its span when it extends past the target, its multiplicity and its
+    /// declared name and operator spelling when authored, then the target.
     fn write_connection_end(&mut self, end: &super::ConnectionEnd) -> io::Result<()> {
+        if end.declared_name.is_some() || end.multiplicity.is_some() {
+            self.writer.write_str("(end-span ")?;
+            write_span(self.writer, &end.span)?;
+            self.writer.write_str(") ")?;
+        }
+        if let Some(multiplicity) = &end.multiplicity {
+            self.writer.write_str("(multiplicity ")?;
+            self.write_multiplicity_clause(Some(multiplicity))?;
+            self.writer.write_str(") ")?;
+        }
         if let Some(declared) = &end.declared_name {
             self.writer.write_str("(declared-name ")?;
             self.write_name(declared.name)?;

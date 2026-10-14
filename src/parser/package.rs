@@ -1197,7 +1197,14 @@ fn kerml_classifier_structured_inner(
     // KerML type relationship clauses: `disjoint from A, B`, `unions A, B`, `intersects A, B`
     // (`Occurrences.kerml`, `VectorValues.kerml`). Any order, repeatable.
     let (input, type_relationships) = kerml_type_relationship_clauses(input)?;
-    let (input, body) = crate::parser::constraint::calc_def_body(input)?;
+    // Only a `function` or `predicate` has a `FunctionBody` with a `ResultExpressionMember`.
+    let owns_result_expression = matches!(
+        keyword,
+        crate::ast::KermlClassifierKeyword::Function
+            | crate::ast::KermlClassifierKeyword::Predicate
+    );
+    let (input, body) =
+        crate::parser::constraint::calc_or_type_body(input, owns_result_expression)?;
     Ok((
         input,
         node_from_to(

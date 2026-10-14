@@ -76,6 +76,8 @@ fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
             b"specializes",
             b"ordered",
             b"nonunique",
+            // `ValuePart = FeatureValue`, which may open with `default`.
+            b"default",
         ],
     )?;
     let (input, mut header) = crate::parser::usage::feature_usage_header(input)?;
@@ -640,8 +642,16 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
             start,
             input,
             Connect {
-                from: connection_end_with_multiplicity(from_multiplicity, from_name, from_expr),
-                to: connection_end_with_multiplicity(to_multiplicity, to_name, to_expr),
+                from: crate::parser::connector::connection_end_full(
+                    from_multiplicity,
+                    from_name,
+                    from_expr,
+                ),
+                to: crate::parser::connector::connection_end_full(
+                    to_multiplicity,
+                    to_name,
+                    to_expr,
+                ),
                 body,
                 subsets,
                 redefines,
@@ -652,23 +662,6 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 
 /// Wrap a parsed endpoint expression and its optional §6 G24 multiplicity in a `ConnectionEnd`
 /// node, reusing the expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
-fn connection_end_with_multiplicity(
-    multiplicity: Option<Node<crate::ast::Multiplicity>>,
-    declared_name: Option<crate::ast::ConnectorEndName>,
-    expr: Node<Expression>,
-) -> Node<ConnectionEnd> {
-    let span = expr.span;
-    Node::new(
-        span,
-        ConnectionEnd {
-            declared_name,
-            expression: expr,
-            multiplicity,
-            span,
-        },
-    )
-}
-
 /// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end`, the
 /// existing flow/message/succession-flow production, or `PerformActionUsage`.
 fn interface_usage_body_element(

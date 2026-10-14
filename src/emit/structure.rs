@@ -992,6 +992,7 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::PortDef(p) => emit_port_def(w, path, &p.value),
         InterfaceDefBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
         InterfaceDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        InterfaceDefBodyElement::PartUsage(part) => emit_part_usage(w, path, &part.value),
         InterfaceDefBodyElement::FlowUsage(f) => {
             super::behavior::emit_flow_usage(w, path, &f.value)
         }

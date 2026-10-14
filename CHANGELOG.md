@@ -10,8 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Interface bodies retain end-prefixed part usages.** Part usages use the shared declaration
-  header and preserve references, crosses and intersects; interface bodies carry them as parts
-  rather than misreading `part` as an end name.
+  header and preserve references, crosses and intersects; interface definition and interface
+  usage bodies carry them as parts (`InterfaceDefBodyElement::PartUsage` is new) rather than
+  misreading `part` as an end name. The shared header accepts a multiplicity and
+  `ordered`/`nonunique` after the specializations (`part x : T :> a [1] ordered;`), and
+  `part default = 3;` is an anonymous part with a default value, not a reserved name.
+- The `result_expression_semicolon` diagnostic is confined to bodies that own a
+  `ResultExpressionMember` (calculations, constraints, KerML functions, predicates, `expr` and
+  `bool` features, invariants); KerML type bodies such as classifiers no longer report it.
+- Recovery diagnostics classify keywords by the document's name language, so in a KerML document
+  `feature` or `connector` is an `unexpected_keyword_in_scope` and a SysML-only word such as
+  `message` is an `unrecognized_declaration_in_scope`.
+- Connector ends written with a multiplicity have the same span in every owner. Semantic
+  snapshots project an end's span and multiplicity when either extends it past its target.
+- Strict parsing stops at the first root-level failure instead of recovering the rest of the
+  document only to discard its diagnostics.
 - **Actor usages retain anonymous redefinitions (breaking AST change, `PARSE_AST_VERSION` 280).**
   `ActorUsage::redefines` owns every authored target. Identification is optional, including bare
   actor usages. Redefinitions with values use the same actor node and typed FeatureValue as other

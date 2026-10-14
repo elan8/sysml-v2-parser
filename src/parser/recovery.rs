@@ -203,7 +203,7 @@ fn classify_recovery(
     // Ahead of the keyword-in-scope classifications: those would report the *scope* as the
     // problem, when the authored prefix is what has no derivation.
     if let Some((code, message, expected, suggestion)) =
-        invalid_end_feature_prefix_diagnostic(trimmed)
+        invalid_end_feature_prefix_diagnostic(input.extra.name_language(), trimmed)
     {
         return RecoveryClassification::InvalidEndFeaturePrefix {
             code: code.to_string(),
@@ -337,9 +337,12 @@ fn classify_recovery(
         };
     }
 
-    if let Some((code, message, expected, suggestion)) =
-        unexpected_keyword_in_scope_diagnostic(trimmed, starters, scope_label)
-    {
+    if let Some((code, message, expected, suggestion)) = unexpected_keyword_in_scope_diagnostic(
+        input.extra.name_language(),
+        trimmed,
+        starters,
+        scope_label,
+    ) {
         return RecoveryClassification::UnexpectedKeywordInScope {
             code: code.to_string(),
             message,

@@ -453,7 +453,9 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     ))
 }
 
-fn connection_end_full(
+/// Every `ConnectorEnd` constructor goes through here so an end's span is the same wherever the
+/// end is written.
+pub(crate) fn connection_end_full(
     multiplicity: Option<Node<crate::ast::Multiplicity>>,
     declared_name: Option<crate::ast::ConnectorEndName>,
     expr: Node<crate::ast::Expression>,

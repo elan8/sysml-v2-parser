@@ -323,6 +323,9 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
             InterfaceDefBodyElement::PortUsage(port) => {
                 walk_port_body(report, &p, &port.value.body)
             }
+            InterfaceDefBodyElement::PartUsage(part) => {
+                walk_part_usage_body(report, &p, &part.value.body)
+            }
             InterfaceDefBodyElement::RefDecl(reference) => {
                 walk_ref_body(report, &p, &reference.value.body)
             }

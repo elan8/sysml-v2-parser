@@ -1,12 +1,12 @@
 //! Shared imports for part submodules.
 
 pub(crate) use crate::ast::{
-    Allocate, Bind, Connect, ConnectionEnd, ConnectionUsageMember, DefinitionPrefix, ExhibitState,
-    Expression, InOut, InterfaceEnd, InterfaceEndMember, InterfaceEndReferenceOperator,
-    InterfaceEndTarget, InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node,
-    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    Perform, PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
-    RefDecl, VariantTypedUsage, VariantUsage, VariantUsageForm,
+    Allocate, Bind, Connect, ConnectionUsageMember, DefinitionPrefix, ExhibitState, InOut,
+    InterfaceEnd, InterfaceEndMember, InterfaceEndReferenceOperator, InterfaceEndTarget,
+    InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node, PartDef,
+    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform,
+    PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefDecl,
+    VariantTypedUsage, VariantUsage, VariantUsageForm,
 };
 pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};

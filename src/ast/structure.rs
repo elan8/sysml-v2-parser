@@ -1469,6 +1469,9 @@ pub enum InterfaceDefBodyElement {
     /// [5] connect a to b;` inside `interface def WheelHubInterface` (SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml).
     InterfaceUsage(Box<Node<InterfaceUsage>>),
+    /// StructureUsageElement also admits PartUsage, including an end-prefixed part usage
+    /// (`end part p : P;`), as in [`InterfaceUsageBodyElement::PartUsage`].
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 /// The immediate declaration introducer after an `end` prefix.

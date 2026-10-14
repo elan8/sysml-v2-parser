@@ -3981,6 +3981,7 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
+                InterfaceDefBodyElement::PartUsage(node) => visitor.visit_part_usage(node),
                 InterfaceDefBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }

@@ -858,10 +858,6 @@ pub(crate) fn is_reserved_keyword_in(input: Input<'_>, word: &[u8]) -> bool {
     std::str::from_utf8(word).is_ok_and(|word| input.extra.name_language().is_reserved(word))
 }
 
-pub(crate) fn is_reserved_keyword(word: &[u8]) -> bool {
-    std::str::from_utf8(word).is_ok_and(|s| crate::ast::NameLanguage::Sysml.is_reserved(s))
-}
-
 pub(crate) fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
     // Candidates are tested against the same position in long starter lists (52 entries for a
     // package body), so the cheap discriminating test comes first: nearly every candidate fails on
@@ -1092,10 +1088,10 @@ pub(crate) fn recover_body_element<'a>(
 /// decoded here. Use [`name_bytes`] when a parser needs to inspect the spelling.
 pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, DeclarationName> {
     let (rest, span) = reference_name_span(input)?;
-    let word = std::str::from_utf8(&input.fragment()[..span.len]).map_err(|_| {
-        nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Verify))
-    })?;
-    let state = if input.extra.name_language().is_reserved(word) {
+    let word = &input.fragment()[..span.len];
+    // A quoted UNRESTRICTED_NAME is never a reserved word, so only a BASIC_NAME pays for the
+    // keyword lookup.
+    let state = if !word.starts_with(b"'") && is_reserved_keyword_in(input, word) {
         crate::ast::DeclarationNameState::ReservedKeyword
     } else {
         crate::ast::DeclarationNameState::Parsed
