@@ -10,15 +10,8 @@
 //! the order [`crate::parser::parse`] expects before it deduplicates and suppresses cascades.
 
 use super::recovery::parse_error_from_recovery_node;
-use crate::ast::visit::{
-    walk_classifier_decl, walk_extended_library_decl, walk_feature_decl, walk_kerml_feature_decl,
-    walk_kerml_semantic_decl, walk_parse_error_node, walk_textual_representation,
-    walk_unsupported_grammar_node, Visitor,
-};
-use crate::ast::{
-    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlFeatureDecl, KermlSemanticDecl, Node,
-    ParseErrorNode, RootNamespace, Span, TextualRepresentation, UnsupportedGrammarNode,
-};
+use crate::ast::visit::recovery::{scan_recovery_content, RecoveryContent};
+use crate::ast::{ExtendedLibraryDecl, Node, RootNamespace, Span, TextualRepresentation};
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 fn textual_rep_language_diagnostic(
@@ -65,137 +58,86 @@ fn unsupported_fallback_diagnostic(span: &Span, production: &str) -> ParseError 
     .with_category(DiagnosticCategory::UnsupportedGrammarForm)
 }
 
-struct RecoveryErrorCollector<'source> {
-    /// The document text the tree's spans index; the tree does not carry it, and the document
-    /// envelope that will is not built until after diagnostics are collected.
-    source: &'source str,
-    errors: Vec<ParseError>,
-}
-
-impl Visitor for RecoveryErrorCollector<'_> {
-    fn visit_declaration_name(&mut self, name: &crate::ast::DeclarationName) {
-        match name.state() {
-            crate::ast::DeclarationNameState::Parsed => {}
-            crate::ast::DeclarationNameState::ReservedKeyword => {
-                let span = name.span();
-                let diagnostic =
-                    ParseError::new("a reserved keyword cannot be an unquoted declaration name")
-                        .with_location(span.offset, span.line, span.column)
-                        .with_length(span.len)
-                        .with_code("reserved_declaration_name")
-                        .with_severity(DiagnosticSeverity::Error)
-                        .with_category(DiagnosticCategory::ParseError)
-                        .with_suggestion("Quote the name using single quotes.");
-                let diagnostic = match self.source.get(span.offset..span.offset + span.len) {
-                    Some(authored) => diagnostic.with_found(authored),
-                    None => diagnostic,
-                };
-                self.errors.push(diagnostic);
-            }
+pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec<ParseError> {
+    let mut errors = Vec::new();
+    scan_recovery_content(root, |content| match content {
+        RecoveryContent::ReservedDeclarationName(name) => {
+            let span = name.span();
+            let diagnostic =
+                ParseError::new("a reserved keyword cannot be an unquoted declaration name")
+                    .with_location(span.offset, span.line, span.column)
+                    .with_length(span.len)
+                    .with_code("reserved_declaration_name")
+                    .with_severity(DiagnosticSeverity::Error)
+                    .with_category(DiagnosticCategory::ParseError)
+                    .with_suggestion("Quote the name using single quotes.");
+            errors.push(match source.get(span.offset..span.offset + span.len) {
+                Some(authored) => diagnostic.with_found(authored),
+                None => diagnostic,
+            });
         }
-    }
-
-    /// Text the parser could not recognize, kept in place with its authored span.
-    fn visit_parse_error_node(&mut self, node: &Node<ParseErrorNode>) {
-        self.errors
-            .push(parse_error_from_recovery_node(&node.span, &node.value));
-        walk_parse_error_node(self, node);
-    }
-
-    /// A spec production that parses but has no structural representation yet; it carries the
-    /// diagnostic the parser already classified.
-    fn visit_unsupported_grammar_node(&mut self, node: &Node<UnsupportedGrammarNode>) {
-        self.errors.push(parse_error_from_recovery_node(
-            &node.span,
-            &node.value.diagnostic,
-        ));
-        walk_unsupported_grammar_node(self, node);
-    }
-
-    /// A `rep` body must name its language; both the missing and the empty spelling are errors.
-    fn visit_textual_representation(&mut self, node: &Node<TextualRepresentation>) {
-        if let Some(diagnostic) =
-            textual_rep_language_diagnostic(self.source, &node.span, &node.value)
-        {
-            self.errors.push(diagnostic);
+        RecoveryContent::ParseError(node) => {
+            errors.push(parse_error_from_recovery_node(&node.span, &node.value));
         }
-        walk_textual_representation(self, node);
-    }
-
-    /// An extended-library fallback keeps the declaration the grammar could not model. Some of
-    /// those declarations are recognizable dialect forms with specific guidance to offer, so
-    /// classify the node's own text here: the alternative -- searching the whole document for the
-    /// dialect's spelling -- cannot tell a declaration from the same words inside a comment or a
-    /// string literal.
-    fn visit_extended_library_decl(&mut self, node: &Node<ExtendedLibraryDecl>) {
-        if let Some((code, message, expected, suggestion)) = self
-            .source
-            .get(
-                node.value.text.span().offset
-                    ..node.value.text.span().offset + node.value.text.span().len,
-            )
-            .and_then(|text| {
-                crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
-                    text.as_bytes(),
-                )
-            })
-        {
-            self.errors.push(
-                ParseError::new(message)
-                    .with_location(node.span.offset, node.span.line, node.span.column)
-                    .with_length(node.span.len)
-                    .with_code(code)
-                    .with_expected(expected)
-                    .with_suggestion(suggestion)
-                    .with_category(DiagnosticCategory::ParseError),
-            );
-        } else {
-            self.errors.push(unsupported_fallback_diagnostic(
+        // It carries the diagnostic the parser already classified.
+        RecoveryContent::UnsupportedGrammar(node) => {
+            errors.push(parse_error_from_recovery_node(
                 &node.span,
-                "extended-library declaration",
+                &node.value.diagnostic,
             ));
         }
-        walk_extended_library_decl(self, node);
-    }
-
-    fn visit_feature_decl(&mut self, node: &Node<FeatureDecl>) {
-        self.errors.push(unsupported_fallback_diagnostic(
+        // A `rep` body must name its language; both the missing and the empty spelling are
+        // errors.
+        RecoveryContent::TextualRepresentation(node) => {
+            errors.extend(textual_rep_language_diagnostic(
+                source,
+                &node.span,
+                &node.value,
+            ));
+        }
+        RecoveryContent::ExtendedLibraryDecl(node) => {
+            errors.push(extended_library_decl_diagnostic(source, node));
+        }
+        RecoveryContent::FeatureDecl(node) => errors.push(unsupported_fallback_diagnostic(
             &node.span,
             "KerML feature declaration",
-        ));
-        walk_feature_decl(self, node);
-    }
-
-    fn visit_classifier_decl(&mut self, node: &Node<ClassifierDecl>) {
-        self.errors.push(unsupported_fallback_diagnostic(
+        )),
+        RecoveryContent::ClassifierDecl(node) => errors.push(unsupported_fallback_diagnostic(
             &node.span,
             "KerML classifier declaration",
-        ));
-        walk_classifier_decl(self, node);
-    }
-
-    fn visit_kerml_semantic_decl(&mut self, node: &Node<KermlSemanticDecl>) {
-        self.errors.push(unsupported_fallback_diagnostic(
+        )),
+        RecoveryContent::KermlSemanticDecl(node) => errors.push(unsupported_fallback_diagnostic(
             &node.span,
             "KerML semantic declaration",
-        ));
-        walk_kerml_semantic_decl(self, node);
-    }
-
-    fn visit_kerml_feature_decl(&mut self, node: &Node<KermlFeatureDecl>) {
-        self.errors.push(unsupported_fallback_diagnostic(
+        )),
+        RecoveryContent::KermlFeatureDecl(node) => errors.push(unsupported_fallback_diagnostic(
             &node.span,
             "KerML feature form",
-        ));
-        walk_kerml_feature_decl(self, node);
-    }
+        )),
+    });
+    errors
 }
 
-pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec<ParseError> {
-    let mut collector = RecoveryErrorCollector {
-        source,
-        errors: Vec::new(),
-    };
-    collector.visit_root_namespace(root);
-    collector.errors
+/// An extended-library fallback keeps the declaration the grammar could not model. Some of those
+/// declarations are recognizable dialect forms with specific guidance to offer, so classify the
+/// node's own text here: the alternative -- searching the whole document for the dialect's
+/// spelling -- cannot tell a declaration from the same words inside a comment or a string literal.
+fn extended_library_decl_diagnostic(source: &str, node: &Node<ExtendedLibraryDecl>) -> ParseError {
+    let text = node.value.text.span();
+    match source
+        .get(text.offset..text.offset + text.len)
+        .and_then(|text| {
+            crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
+                text.as_bytes(),
+            )
+        }) {
+        Some((code, message, expected, suggestion)) => ParseError::new(message)
+            .with_location(node.span.offset, node.span.line, node.span.column)
+            .with_length(node.span.len)
+            .with_code(code)
+            .with_expected(expected)
+            .with_suggestion(suggestion)
+            .with_category(DiagnosticCategory::ParseError),
+        None => unsupported_fallback_diagnostic(&node.span, "extended-library declaration"),
+    }
 }

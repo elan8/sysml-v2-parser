@@ -61,6 +61,32 @@ fn bench_snapshot_corpus(c: &mut Criterion) {
         });
     });
     strict.finish();
+
+    // Opacity scanning and emission over already-parsed documents, so parsing is not measured.
+    let documents: Vec<_> = sources
+        .iter()
+        .map(|source| {
+            sysml_v2_parser::parse_for_editor_with_name_language(&source.text, source.name_language)
+                .document
+        })
+        .collect();
+    let mut emit = c.benchmark_group("snapshot_emit_corpus");
+    emit.throughput(Throughput::Bytes(corpus_bytes));
+    emit.bench_function("opacity_report", |b| {
+        b.iter(|| {
+            for document in &documents {
+                black_box(sysml_v2_parser::opacity_report(black_box(&document.root)).is_clean());
+            }
+        });
+    });
+    emit.bench_function("emit_sysml", |b| {
+        b.iter(|| {
+            for document in &documents {
+                black_box(sysml_v2_parser::emit_sysml(black_box(document)).is_ok());
+            }
+        });
+    });
+    emit.finish();
 }
 
 criterion_group!(benches, bench_snapshot_corpus);

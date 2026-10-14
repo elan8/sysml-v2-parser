@@ -371,12 +371,24 @@ pub(crate) fn emit_package_body_element(
         }
         PackageBodyElement::ExtendedDefinition(d) => emit_extended_definition(w, path, &d.value),
         PackageBodyElement::ExtendedUsage(u) => structure::emit_extended_usage(w, path, &u.value),
-        PackageBodyElement::FeatureDecl(_)
-        | PackageBodyElement::ClassifierDecl(_)
-        | PackageBodyElement::KermlSemanticDecl(_)
-        | PackageBodyElement::KermlFeatureDecl(_)
-        | PackageBodyElement::ExtendedLibraryDecl(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
+        PackageBodyElement::FeatureDecl(node) => Err(EmitError::Opaque {
+            span: node.span,
+            kind: super::OpacityKind::FeatureDecl,
+        }),
+        PackageBodyElement::ClassifierDecl(node) => Err(EmitError::Opaque {
+            span: node.span,
+            kind: super::OpacityKind::ClassifierDecl,
+        }),
+        PackageBodyElement::KermlSemanticDecl(node) => Err(EmitError::Opaque {
+            span: node.span,
+            kind: super::OpacityKind::KermlSemanticDecl,
+        }),
+        PackageBodyElement::KermlFeatureDecl(node) => Err(EmitError::Opaque {
+            span: node.span,
+            kind: super::OpacityKind::KermlFeatureDecl,
+        }),
+        PackageBodyElement::ExtendedLibraryDecl(node) => Err(EmitError::Opaque {
+            span: node.span,
             kind: super::OpacityKind::ExtendedLibraryDecl,
         }),
         PackageBodyElement::KermlBareDeclaration(declaration) => {

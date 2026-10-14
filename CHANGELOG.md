@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The opacity report shares the recovery-diagnostic traversal (breaking API change).**
+  `opacity_report` is one pass over the AST visitor, the same scan that turns recovered and
+  unmodelled nodes into parse diagnostics, replacing a hand-written walk over every body scope
+  that ran beside a second visitor pass. A tree is now opaque exactly when parsing found such
+  content; across the snapshot, release and oracle corpora this changes no document's
+  clean/opaque result, and adds recovery nodes the old walk missed inside KerML connector
+  bodies. `OpacityHit::path` and `EmitError::Opaque::path` (tree-path strings such as
+  `root[0]/body[1]`) are replaced by the node's source `span`, and the never-produced
+  `OpacityKind::RawRhsString` is removed. `opacity_report` is about 3.9x and `emit_sysml` about
+  35% faster on the snapshot corpus (`snapshot_emit_corpus` benchmark). An emitter refusal of a
+  KerML fallback declaration reports that declaration's own kind instead of always
+  `ExtendedLibraryDecl` (#194).
 - **Interface bodies retain end-prefixed part usages.** Part usages use the shared declaration
   header and preserve references, crosses and intersects; interface definition and interface
   usage bodies carry them as parts (`InterfaceDefBodyElement::PartUsage` is new) rather than
