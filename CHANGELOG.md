@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consumers no longer need a raised `recursion_limit` for AST content.** `Node<T>` implements
+  `Send`, `Sync`, `Unpin`, `UnwindSafe` and `RefUnwindSafe` for every AST payload type, so an
+  auto-trait proof stops at the first `Node` instead of walking the whole AST type graph (over
+  120 types deep, beyond rustc's default limit of 128). This covers documents, retained
+  expressions and borrowed views into bodies, and rustdoc's auto-trait synthesis for documented
+  types. Each payload's auto traits are asserted structurally in `src/ast/auto_traits.rs`; a
+  new AST node type must be listed there, and the document proof fails to compile until it is.
+  This replaces the explicit `Send`/`Sync` implementations on `ParsedDocument`. `Node<T>` for a
+  non-AST `T` no longer has the auto traits.
 - **The opacity report shares the recovery-diagnostic traversal (breaking API change).**
   `opacity_report` is one pass over the AST visitor, the same scan that turns recovered and
   unmodelled nodes into parse diagnostics, replacing a hand-written walk over every body scope

@@ -94,55 +94,9 @@ pub struct ParsedDocument {
     pub root: RootNamespace,
 }
 
-// SAFETY: every field of `ParsedDocument` is itself `Send` and `Sync`, which is exactly what the
-// automatic implementations would have required. These explicit implementations exist only to stop
-// the *proof* from being recomputed structurally in every consumer.
-//
-// The AST is a deeply mutually recursive tree -- a requirement body holds a part usage holds a
-// perform holds a variant requirement holds a requirement body -- so the longest simple path
-// through its type graph is over 120 distinct types. Proving `ParsedDocument: Send` structurally
-// costs that many trait-solver frames, which is more than rustc's default `recursion_limit` of
-// 128 allows, so every consumer that merely wants to move a document between threads had to raise
-// its own limit. These implementations make the obligation O(1) for them.
-//
-// The safety obligation is not discharged by review: `send_sync_structural_proof` below proves it
-// structurally, field by field, inside this crate (which raises `recursion_limit` for exactly this
-// reason). Adding a field, or changing one to a type that is not `Send`/`Sync` such as `Rc`,
-// `RefCell` or a raw pointer, fails that proof to compile.
-unsafe impl Send for ParsedDocument {}
-// SAFETY: as above -- `send_sync_structural_proof` proves every field `Sync`.
-unsafe impl Sync for ParsedDocument {}
-
-/// The compiler-checked proof that discharges the `unsafe impl Send`/`Sync` above.
-///
-/// This must never assert anything about [`ParsedDocument`] itself: the explicit implementations
-/// would make such an assertion vacuously true and the guard would silently stop guarding. It
-/// asserts the *field types*, which still resolve structurally, and destructures the struct so the
-/// field list cannot drift away from the assertions.
-///
-/// It lives in the library rather than in a test so that it is checked by every build, including
-/// `cargo check`, rather than only when the test suite runs.
-#[allow(dead_code)]
-fn send_sync_structural_proof(document: ParsedDocument) {
-    fn assert_send_sync<T: Send + Sync>() {}
-
-    // Exhaustive by construction: adding or renaming a field of `ParsedDocument` fails here, so a
-    // new field cannot reach the `unsafe impl`s without an assertion of its own below.
-    let ParsedDocument {
-        name_language,
-        source,
-        qualified_references,
-        root,
-    } = document;
-    let _ = (&name_language, &source, &qualified_references, &root);
-
-    assert_send_sync::<NameLanguage>();
-    assert_send_sync::<SourceStorage>();
-    assert_send_sync::<QualifiedReferenceArena>();
-    // The expensive one: this is the full structural walk of the AST type graph, the proof the
-    // `unsafe impl`s stand on and the reason this crate raises `recursion_limit`.
-    assert_send_sync::<RootNamespace>();
-}
+// `Send`, `Sync` and the other auto traits are implemented explicitly, with a structural proof,
+// in `super::auto_traits`: proving them field by field costs downstream crates more trait-solver
+// frames than the default `recursion_limit` allows.
 
 impl ParsedDocument {
     /// Resolve a parser span through this document's canonical source-position index.

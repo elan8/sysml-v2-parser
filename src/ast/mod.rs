@@ -5,6 +5,7 @@ mod kerml_fallback;
 
 pub use core::*;
 pub use kerml_fallback::*;
+mod auto_traits;
 mod behavior;
 mod body;
 mod common;
