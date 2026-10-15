@@ -1365,6 +1365,32 @@ fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLi
         b"part",
         b"port",
     ];
+    // A failed SysML definition must not be relabelled as a spec-valid opaque library
+    // declaration when its header uses KerML-only disjoining. Reuse the definition header
+    // grammar on the original input, so comments, quoted names and nested bodies cannot be
+    // mistaken for a header clause (SysML 8.2.2 DefinitionDeclaration).
+    if input.extra.name_language() == crate::ast::NameLanguage::Sysml {
+        use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+        for keyword in starters.iter().copied() {
+            let mut options = DefinitionPrefixOptions::new(keyword)
+                .def_required()
+                .individual_allowed()
+                .with_captured_visibility()
+                .with_extension_keywords();
+            if matches!(keyword, b"analysis" | b"verification" | b"use") {
+                options = options.with_second_keyword(b"case");
+            }
+            if let Ok((header_end, _)) = parse_definition_prefix(input, options) {
+                let (clause, _) = ws_and_comments(header_end)?;
+                if starts_with_keyword(clause.fragment(), b"disjoint") {
+                    return Err(nom::Err::Failure(nom::error::Error::new(
+                        clause,
+                        nom::error::ErrorKind::Verify,
+                    )));
+                }
+            }
+        }
+    }
     let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,

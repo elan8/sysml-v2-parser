@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SysML definitions reject KerML disjoining headers (spec42#279).** A `disjoint from`
+  clause now produces a syntax error and recovery instead of an unsupported-library warning.
+  KerML classifier disjoining remains valid.
+
 - **Consumers no longer need a raised `recursion_limit` for AST content.** `Node<T>` implements
   `Send`, `Sync`, `Unpin`, `UnwindSafe` and `RefUnwindSafe` for every AST payload type, so an
   auto-trait proof stops at the first `Node` instead of walking the whole AST type graph (over
