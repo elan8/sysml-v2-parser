@@ -4,7 +4,6 @@ use super::usage::{
     perform_usage, variant_usage,
 };
 use crate::parser::action::first_stmt;
-use crate::parser::lex::skip_statement_or_block;
 use crate::parser::package::{library_package_, package_};
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
@@ -400,10 +399,6 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 PartDefBodyElement::AssertConstraint,
             ),
             map(satisfy, |n| PartDefBodyElement::Satisfy(Box::new(n))),
-            map(
-                unsupported_part_member,
-                PartDefBodyElement::UnsupportedMember,
-            ),
         )),
         alt((
             // PAR-002: remaining nested `def`/usage pairs, previously only reachable at package
@@ -625,60 +620,6 @@ fn connection_usage_member_inner(
                 connect_extra_ends,
                 body,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
-            },
-        ),
-    ))
-}
-
-/// Recognize a spec-valid connection-like member whose semantic production is not implemented in
-/// this scope. The complete source span is retained, but no header text is scanned or guessed into
-/// declaration/reference fields.
-fn unsupported_part_member(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::UnsupportedGrammarNode>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    if !starts_with_any_keyword(input.fragment(), &[b"connection"]) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    // `ref connection ...` is now handled structurally by `connection_usage_member`
-    // (`by_reference`), which is tried before this fallback in the same `alt`. Only a bare
-    // `connection ...` that `connection_usage_member` itself failed to parse reaches here.
-    let (production, member_start) = (
-        crate::ast::UnsupportedProduction::ConnectionUsageInPartDefinition,
-        input,
-    );
-    let (mut input, _) = skip_statement_or_block(member_start)?;
-    let (after_ws, _) = ws_and_comments(input)?;
-    if after_ws.fragment().starts_with(b":>") || after_ws.fragment().starts_with(b":>>") {
-        let (after_relationship, _) = skip_statement_or_block(after_ws)?;
-        input = after_relationship;
-    }
-    let diagnostic = crate::ast::ParseErrorNode {
-        diagnostic_span: None,
-        message: "spec-valid connection-like member is not implemented in part definitions"
-            .to_owned(),
-        code: "unsupported_grammar_form".to_owned(),
-        expected: Some("structured connection/reference usage".to_owned()),
-        found: None,
-        suggestion: Some(
-            "Keep this syntax; parser support is incomplete rather than the model being malformed."
-                .to_owned(),
-        ),
-        category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::UnsupportedGrammarNode {
-                production,
-                diagnostic,
             },
         ),
     ))

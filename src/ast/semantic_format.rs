@@ -1926,11 +1926,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_requirement_definition(&definition.value)?;
                         }
                         PartDefBodyElement::OccurrenceDef(definition) => {
-                            self.write_definition_prefix_marker(
-                                &mut first,
-                                "occurrence-def",
-                                definition.value.definition_prefix.as_ref(),
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_occurrence_definition(&definition.value)?;
                         }
                         PartDefBodyElement::ConnectionDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1981,11 +1978,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                         }
                         PartDefBodyElement::RenderingDef(definition) => {
-                            self.write_definition_prefix_marker(
-                                &mut first,
-                                "rendering-def",
-                                definition.value.definition_prefix.as_ref(),
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_definition(&definition.value)?;
                         }
                         PartDefBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
@@ -4422,11 +4416,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "requirement-def")?;
                         }
                         super::PartUsageBodyElement::OccurrenceDef(member) => {
-                            self.write_definition_prefix_marker(
-                                &mut first,
-                                "occurrence-def",
-                                member.value.definition_prefix.as_ref(),
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_occurrence_definition(&member.value)?;
                         }
                         super::PartUsageBodyElement::PortDef(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -4540,11 +4531,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                         }
                         super::PartUsageBodyElement::RenderingDef(definition) => {
-                            self.write_definition_prefix_marker(
-                                &mut first,
-                                "rendering-def",
-                                definition.value.definition_prefix.as_ref(),
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_definition(&definition.value)?;
                         }
                         super::PartUsageBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
@@ -5964,6 +5952,77 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_occurrence_definition(&mut self, definition: &super::OccurrenceDef) -> io::Result<()> {
+        self.writer.write_str("(occurrence-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(definition.identification.short_name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") (specializes ")?;
+        match &definition.specializes {
+            Some(specializes) => self.write_typing(&specializes.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_rendering_definition(&mut self, definition: &super::RenderingDef) -> io::Result<()> {
+        self.writer.write_str("(rendering-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(definition.identification.short_name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") (specializes ")?;
+        match &definition.specializes {
+            Some(specializes) => self.write_typing(&specializes.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_rendering_def_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_rendering_def_body(&mut self, body: &super::RenderingDefBody) -> io::Result<()> {
+        match body {
+            super::RenderingDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::RenderingDefBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    self.write_item_prefix(&mut first)?;
+                    match &element.value {
+                        super::RenderingDefBodyElement::Unsupported(node) => {
+                            self.write_unsupported(&node.value, &element.span)?
+                        }
+                        super::RenderingDefBodyElement::Error(error) => {
+                            self.write_malformed(&error.value, &element.span)?
+                        }
+                        super::RenderingDefBodyElement::Annotating(member) => {
+                            self.write_annotating_member(member)?
+                        }
+                        super::RenderingDefBodyElement::Filter(_) => {
+                            self.writer.write_str("(filter)")?
+                        }
+                        super::RenderingDefBodyElement::ViewRendering(usage) => {
+                            self.write_view_rendering(&usage.value)?
+                        }
+                        super::RenderingDefBodyElement::RefDecl(declaration) => {
+                            self.write_ref_declaration(&declaration.value)?
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_view_def_body(&mut self, body: &super::ViewDefBody) -> io::Result<()> {
         match body {
             super::ViewDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
@@ -7074,11 +7133,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 "viewpoint-def",
                 definition.value.definition_prefix.as_ref(),
             ),
-            PackageBodyElement::RenderingDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "rendering-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::RenderingDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_rendering_definition(&definition.value)
+            }
             PackageBodyElement::ViewUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_view_usage(&usage.value)
@@ -7116,11 +7174,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_enumeration_definition(&definition.value)
             }
-            PackageBodyElement::OccurrenceDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "occurrence-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::OccurrenceDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_occurrence_definition(&definition.value)
+            }
             PackageBodyElement::OccurrenceUsage(occurrence) => {
                 self.write_item_prefix(first)?;
                 self.write_occurrence(&occurrence.value)
@@ -7187,15 +7244,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 usage.value.short_name,
             ),
             PackageBodyElement::UseCaseUsage(_usage) => self.write_marker(first, "use-case-usage"),
-            PackageBodyElement::FeatureDecl(_declaration) => {
-                self.write_marker(first, "feature-declaration")
-            }
-            PackageBodyElement::ClassifierDecl(_declaration) => {
-                self.write_marker(first, "classifier-declaration")
-            }
-            PackageBodyElement::KermlSemanticDecl(_declaration) => {
-                self.write_marker(first, "kerml-semantic-declaration")
-            }
             PackageBodyElement::KermlConnector(connector) => {
                 self.write_item_prefix(first)?;
                 self.write_kerml_connector(&connector.value)
@@ -7233,12 +7281,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str(") (multiplicity ")?;
                 self.write_multiplicity_clause(declaration.value.multiplicity.as_ref())?;
                 self.writer.write_str("))")
-            }
-            PackageBodyElement::KermlFeatureDecl(_declaration) => {
-                self.write_marker(first, "kerml-feature-declaration")
-            }
-            PackageBodyElement::ExtendedLibraryDecl(_declaration) => {
-                self.write_marker(first, "extended-library-declaration")
             }
             PackageBodyElement::AttributeUsage(_usage) => {
                 self.write_marker(first, "attribute-usage")

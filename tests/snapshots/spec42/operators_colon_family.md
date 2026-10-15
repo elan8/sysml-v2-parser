@@ -11,7 +11,7 @@
 (fixture-diagnostics
   (document "operators_colon_family.md"
     (diagnostics
-      (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 0) (line 1) (column 1) (len 18)) (message "expected a specific keyword or punctuation token"))
+      (diagnostic (code "expected_alt") (severity error) (category parseerror) (span (offset 0) (line 1) (column 1) (len 18)) (message "expected a package member (e.g. part, port, attribute, action, requirement, import)"))
     )
   )
 )
@@ -26,6 +26,6 @@
   (name-language sysml)
   (references
   )
-  (root (malformed (code "expected_keyword") (found ": :: :> ::> :>> :=") (span (offset 0) (line 1) (column 1) (len 18))))
+  (root (malformed (code "expected_alt") (found ": :: :> ::> :>> :=") (span (offset 0) (line 1) (column 1) (len 18))))
 )
 ~~~

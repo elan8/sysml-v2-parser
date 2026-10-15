@@ -76,12 +76,6 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
 ];
 
-// Note: "succession" is intentionally NOT in this list — `succession_usage()` in
-// `occurrence_body_element` now parses the standalone succession usage for real (see below).
-// `end` is structured via `OccurrenceBodyElement::EndDecl` (#73 / 12b-Allocation-1).
-const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] =
-    &[b"ref", b"abstract", b"private", b"in", b"connection"];
-
 /// `;` or brace body with occurrence-style members (`attribute`, `part`, `occurrence`, …).
 pub(crate) fn occurrence_definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
     occurrence_definition_body_with_labels(
@@ -124,27 +118,10 @@ fn occurrence_definition_body_with_labels<'a>(
         recovery_code,
         |input| {
             let start = input;
-            // Structured first, opaque capture only as the fallback -- the order every other
-            // body uses. Reversed, the capture claimed every member whose first token is one of
-            // the opaque starters, so `private attribute seBeforeNum : Natural[1] = ...;`
-            // (`sysml.library/Systems Library/Flows.sysml`) was captured whole even though
-            // `attribute_usage` parses a visibility prefix perfectly well.
-            let (input, element) = nom::branch::alt((
-                nom::combinator::map(
-                    occurrence_body_element,
-                    DefinitionBodyElement::OccurrenceMember,
-                ),
-                nom::combinator::map(
-                    |i| {
-                        crate::parser::recovery::unsupported_member(
-                            i,
-                            DEFINITION_BODY_OPAQUE_STARTERS,
-                            "definition body",
-                        )
-                    },
-                    DefinitionBodyElement::Unsupported,
-                ),
-            ))
+            let (input, element) = nom::combinator::map(
+                occurrence_body_element,
+                DefinitionBodyElement::OccurrenceMember,
+            )
             .parse(input)?;
             Ok((input, node_from_to(start, input, element)))
         },

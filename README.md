@@ -60,6 +60,14 @@ assignment or default value; formatting and semantic snapshots consume these typ
 malformed source slice. The enclosing node span remains the authority for recovery emission;
 deserialization rejects diagnostic spans outside it or with invalid source coordinates.
 
+`PARSE_AST_VERSION` 281 removes the opaque declaration variants `ExtendedLibraryDecl`,
+`FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with
+`OpaqueText` and `ParsedDocument::opaque_text`. Consumers should handle typed declarations
+and `ParseErrorNode` recovery. `emit_recovered_sysml` preserves malformed source in place;
+a failed declaration parser reports an error instead of accepting its leading keyword as
+proof of valid grammar. The conformance scorecard now reports `unstructured_nodes` through
+the shared opacity scan.
+
 With the optional `serde` feature, serialize and deserialize `ParsedDocument` as the atomic cache
 unit. Its wire envelope includes `PARSE_AST_VERSION` and rejects version mismatches, invalid arena
 ranges, and dangling AST reference identities during deserialization.

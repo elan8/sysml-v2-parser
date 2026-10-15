@@ -247,12 +247,6 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
             .map(|n| n.value.target.len()),
         Some(1)
     );
-    assert!(
-        !elements
-            .iter()
-            .any(|e| matches!(e.value, PackageBodyElement::ExtendedLibraryDecl(_))),
-        "enum specialization sample should not fall back to ExtendedLibraryDecl"
-    );
 }
 
 #[test]

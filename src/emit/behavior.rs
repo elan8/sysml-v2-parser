@@ -1138,7 +1138,7 @@ pub(crate) fn emit_allocation_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     // Bare `allocate src to dst` (package-level `allocate_usage`) must not be rewritten as
-    // `allocation allocate …` — that form reparses as ExtendedLibraryDecl (validation `12b`).
+    // `allocation allocate …` — that spelling is malformed (validation `12b`).
     let shorthand = usage.name.is_none()
         && usage.short_name.is_none()
         && usage.type_name.is_none()

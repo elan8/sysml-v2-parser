@@ -1,4 +1,4 @@
-//! KerML fallback and modeled declaration nodes.
+//! Typed KerML declarations and relationship clauses.
 
 use crate::ast::{DeclarationName, Multiplicity, Node, Span};
 
@@ -8,7 +8,7 @@ use crate::ast::{DeclarationName, Multiplicity, Node, Span};
 /// `predicate deferredPredicate;` -- a leading KerML classifier/feature keyword, an optional
 /// name, an optional multiplicity, and a terminating `;` with no body. Declarations of the same
 /// keyword that instead carry a `{ ... }` body are a different, larger production and remain
-/// represented by the opaque [`KermlSemanticDecl`]/[`KermlFeatureDecl`] fallback nodes.
+/// parsed by the structured classifier or feature grammar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlBareDeclaration {
@@ -98,80 +98,9 @@ impl KermlBareDeclarationKeyword {
     }
 }
 
-/// Retained source of a declaration the parser recognized but did not model structurally.
-///
-/// A span into the document, trimmed of surrounding trivia; resolve through
-/// [`crate::ast::ParsedDocument::opaque_text`]. It is deliberately not a [`crate::ast::Span`]
-/// in the open: opaque text is a narrowly scoped state, and consumers must not treat it as a
-/// parsed construct.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OpaqueText {
-    pub(crate) span: Span,
-}
-
-impl OpaqueText {
-    pub(crate) fn new(span: Span) -> Self {
-        Self { span }
-    }
-
-    /// The exact source span of the retained text.
-    pub fn span(&self) -> &Span {
-        &self.span
-    }
-}
-
-/// Modeled KerML semantic declaration captured as package-level syntax.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KermlSemanticDecl {
-    /// The starter keyword that classified this declaration (its BNF production name).
-    pub keyword_span: Span,
-    pub text: OpaqueText,
-}
-
-/// Modeled KerML feature declaration family (occurrence/expr/predicate/succession).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KermlFeatureDecl {
-    /// The starter keyword that classified this declaration (its BNF production name).
-    pub keyword_span: Span,
-    pub text: OpaqueText,
-}
-
-/// Package-level KerML feature declaration captured as an explicit dedicated node.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct FeatureDecl {
-    /// The `feature` keyword.
-    pub keyword_span: Span,
-    pub text: OpaqueText,
-}
-
-/// Package-level KerML classifier declaration captured as an explicit dedicated node.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ClassifierDecl {
-    /// The classifier keyword (`class`, `classifier`, `struct`, `structure`, `subclassifier`).
-    pub keyword_span: Span,
-    pub text: OpaqueText,
-}
-
-/// Modeled extended SysML/KerML declaration family not yet represented by
-/// dedicated concrete nodes (e.g. concern/message style library declarations).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExtendedLibraryDecl {
-    /// The starter keyword that classified this declaration (its BNF production name).
-    pub keyword_span: Span,
-    pub text: OpaqueText,
-}
-
 /// Structured KerML classifier declaration with a body, e.g. `abstract function isZero
 /// specializes DataFunctions::isZero { in x; return : Boolean[1]; }` (Kernel Function Library).
-/// Grows one [`KermlClassifierKeyword`] variant per structurally implemented keyword family;
-/// keywords not yet listed still fall through to the opaque
-/// [`KermlSemanticDecl`]/[`KermlFeatureDecl`] fallbacks.
+/// Its keyword selects the concrete classifier family; unrecognized syntax uses error recovery.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlClassifierDecl {

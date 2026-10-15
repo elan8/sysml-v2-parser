@@ -22,8 +22,6 @@ use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
-const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
-
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
@@ -78,21 +76,10 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         map(rendering_usage, ViewDefBodyElement::RenderingUsage),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
-        // Before the opaque fallback, which claims a leading `abstract`.
         map(view_usage, ViewDefBodyElement::ViewUsage),
         map(crate::parser::requirement::satisfy, |n| {
             ViewDefBodyElement::Satisfy(Box::new(n))
         }),
-        map(
-            |i| {
-                crate::parser::recovery::unsupported_member(
-                    i,
-                    VIEW_DEF_OPAQUE_STARTERS,
-                    "view definition body",
-                )
-            },
-            ViewDefBodyElement::Unsupported,
-        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -306,8 +293,6 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
     ))
 }
 
-const RENDERING_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
-
 fn rendering_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
@@ -326,16 +311,6 @@ fn rendering_def_body_element(
         ),
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
-        map(
-            |i| {
-                crate::parser::recovery::unsupported_member(
-                    i,
-                    RENDERING_DEF_OPAQUE_STARTERS,
-                    "rendering definition body",
-                )
-            },
-            RenderingDefBodyElement::Unsupported,
-        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

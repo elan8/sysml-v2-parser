@@ -6,10 +6,7 @@ use super::body::Body;
 use super::common::DeclarationName;
 use super::common::FilterMember;
 use super::common::{AnnotatingMember, Import, ParseErrorNode, UnsupportedGrammarNode};
-use super::kerml_fallback::{
-    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlBareDeclaration, KermlFeatureDecl,
-    KermlSemanticDecl,
-};
+use super::kerml::KermlBareDeclaration;
 use super::requirement::{
     ActorDecl, AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, ConcernUsage, Dependency,
     EnumerationUsage, IncludeUseCase, ItemUsage, RequirementDef, RequirementUsage,
@@ -170,9 +167,6 @@ pub enum PackageBodyElement {
     VerificationCaseDef(Node<VerificationCaseDef>),
     VerificationCaseUsage(Node<VerificationCaseUsage>),
     UseCaseUsage(Node<UseCaseUsage>),
-    FeatureDecl(Node<FeatureDecl>),
-    ClassifierDecl(Node<ClassifierDecl>),
-    KermlSemanticDecl(Node<KermlSemanticDecl>),
     /// Structured KerML classifier declaration with a body (`function` families so far); see
     /// [`crate::ast::KermlClassifierDecl`].
     KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
@@ -189,11 +183,9 @@ pub enum PackageBodyElement {
     /// Complex[1] = rect(0.0, 1.0);`, Kernel Function Library `ComplexFunctions.kerml`); see
     /// [`crate::ast::KermlFeature`].
     KermlFeature(Box<Node<crate::ast::KermlFeature>>),
-    KermlFeatureDecl(Node<KermlFeatureDecl>),
     /// Structurally recognized bare KerML declaration: keyword, optional name, optional
     /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].
     KermlBareDeclaration(Node<KermlBareDeclaration>),
-    ExtendedLibraryDecl(Node<ExtendedLibraryDecl>),
     /// Standalone attribute usage at package level (PAR-002: `PackageMember` in the BNF allows
     /// `DefinitionElement | UsageElement`, so a bare attribute usage is legal package content,
     /// not just attribute definitions).

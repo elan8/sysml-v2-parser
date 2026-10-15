@@ -1455,31 +1455,6 @@ macro_rules! ast_traversal {
                 walk_kerml_bare_declaration_keyword(self, node)
             }
 
-            /// Visits [`KermlSemanticDecl`]; the default implementation walks its children.
-            fn visit_kerml_semantic_decl(&mut self, node: &$($mutability)? Node<KermlSemanticDecl>) {
-                walk_kerml_semantic_decl(self, node)
-            }
-
-            /// Visits [`KermlFeatureDecl`]; the default implementation walks its children.
-            fn visit_kerml_feature_decl(&mut self, node: &$($mutability)? Node<KermlFeatureDecl>) {
-                walk_kerml_feature_decl(self, node)
-            }
-
-            /// Visits [`FeatureDecl`]; the default implementation walks its children.
-            fn visit_feature_decl(&mut self, node: &$($mutability)? Node<FeatureDecl>) {
-                walk_feature_decl(self, node)
-            }
-
-            /// Visits [`ClassifierDecl`]; the default implementation walks its children.
-            fn visit_classifier_decl(&mut self, node: &$($mutability)? Node<ClassifierDecl>) {
-                walk_classifier_decl(self, node)
-            }
-
-            /// Visits [`ExtendedLibraryDecl`]; the default implementation walks its children.
-            fn visit_extended_library_decl(&mut self, node: &$($mutability)? Node<ExtendedLibraryDecl>) {
-                walk_extended_library_decl(self, node)
-            }
-
             /// Visits [`KermlClassifierDecl`]; the default implementation walks its children.
             fn visit_kerml_classifier_decl(&mut self, node: &$($mutability)? Node<KermlClassifierDecl>) {
                 walk_kerml_classifier_decl(self, node)
@@ -2462,15 +2437,6 @@ macro_rules! ast_traversal {
                 PackageBodyElement::UseCaseUsage(field_0) => {
                     visitor.visit_use_case_usage(field_0);
                 }
-                PackageBodyElement::FeatureDecl(field_0) => {
-                    visitor.visit_feature_decl(field_0);
-                }
-                PackageBodyElement::ClassifierDecl(field_0) => {
-                    visitor.visit_classifier_decl(field_0);
-                }
-                PackageBodyElement::KermlSemanticDecl(field_0) => {
-                    visitor.visit_kerml_semantic_decl(field_0);
-                }
                 PackageBodyElement::KermlClassifier(field_0) => {
                     visitor.visit_kerml_classifier_decl(&$($mutability)? **field_0);
                 }
@@ -2486,14 +2452,8 @@ macro_rules! ast_traversal {
                 PackageBodyElement::KermlFeature(field_0) => {
                     visitor.visit_kerml_feature(&$($mutability)? **field_0);
                 }
-                PackageBodyElement::KermlFeatureDecl(field_0) => {
-                    visitor.visit_kerml_feature_decl(field_0);
-                }
                 PackageBodyElement::KermlBareDeclaration(field_0) => {
                     visitor.visit_kerml_bare_declaration(field_0);
-                }
-                PackageBodyElement::ExtendedLibraryDecl(field_0) => {
-                    visitor.visit_extended_library_decl(field_0);
                 }
                 PackageBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
@@ -8093,51 +8053,6 @@ macro_rules! ast_traversal {
                 KermlBareDeclarationKeyword::Succession => {}
                 KermlBareDeclarationKeyword::Classifier => {}
             }
-        }
-
-        pub fn walk_kerml_semantic_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlSemanticDecl>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let KermlSemanticDecl { keyword_span, text } = &$($mutability)? node.value;
-            visitor.visit_span(keyword_span);
-            visitor.visit_span(&$($mutability)? text.span);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_kerml_feature_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureDecl>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeatureDecl { keyword_span, text } = &$($mutability)? node.value;
-            visitor.visit_span(keyword_span);
-            visitor.visit_span(&$($mutability)? text.span);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_feature_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureDecl>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let FeatureDecl { keyword_span, text } = &$($mutability)? node.value;
-            visitor.visit_span(keyword_span);
-            visitor.visit_span(&$($mutability)? text.span);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_classifier_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ClassifierDecl>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let ClassifierDecl { keyword_span, text } = &$($mutability)? node.value;
-            visitor.visit_span(keyword_span);
-            visitor.visit_span(&$($mutability)? text.span);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_extended_library_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedLibraryDecl>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let ExtendedLibraryDecl { keyword_span, text } = &$($mutability)? node.value;
-            visitor.visit_span(keyword_span);
-            visitor.visit_span(&$($mutability)? text.span);
-            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_kerml_classifier_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlClassifierDecl>) {

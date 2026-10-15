@@ -239,7 +239,7 @@ Optional: combine phases 2+3 if diff stays reviewable (&lt; ~800 lines changed).
 - [ ] All existing `cargo test` tests pass
 - [ ] `cargo test -- --include-ignored` passes (validation + library gates)
 - [ ] `cargo clippy -- -W clippy::all` clean (or no new warnings)
-- [ ] No increase in `ExtendedLibraryDecl` in `test_systems_library_node_types_no_extended` / `test_full_library_node_types_no_extended`
+- [ ] Zero unstructured library nodes in `CONFORMANCE_SCORECARD_L2=1 cargo test --test conformance_scorecard`
 - [ ] At least 4 new unit tests on shared primitives (prefix + body)
 - [ ] `PARSER_TECHNICAL_DEBT.md` updated with completion status and opaque-body list
 

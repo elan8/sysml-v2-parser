@@ -14,6 +14,12 @@ This is a meaningful step toward language-server use because malformed regions a
 
 ## Core Behavior
 
+Successful parsing requires a complete grammar production. A recognized opening keyword
+does not establish validity: failed declarations and body members enter structural recovery
+with an error diagnostic and a retained source span. Keyword-only opaque declaration and
+body-member capture paths have been removed. Recovery continues with later siblings, and
+recovered emission writes the malformed source at its original tree position.
+
 ### 1. Grammar-level recovery
 
 Several body parsers recover locally instead of immediately aborting their enclosing construct:

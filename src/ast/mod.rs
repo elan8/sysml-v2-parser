@@ -1,10 +1,10 @@
 //! Abstract syntax tree types for SysML v2 textual notation.
 
 mod core;
-mod kerml_fallback;
+mod kerml;
 
 pub use core::*;
-pub use kerml_fallback::*;
+pub use kerml::*;
 mod auto_traits;
 mod behavior;
 mod body;

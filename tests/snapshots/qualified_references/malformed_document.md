@@ -12,7 +12,7 @@ also broken
 (fixture-diagnostics
   (document "malformed_document.md"
     (diagnostics
-      (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 0) (line 1) (column 1) (len 9)) (message "expected a specific keyword or punctuation token"))
+      (diagnostic (code "expected_alt") (severity error) (category parseerror) (span (offset 0) (line 1) (column 1) (len 9)) (message "expected a package member (e.g. part, port, attribute, action, requirement, import)"))
       (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 10) (line 2) (column 1) (len 11)) (message "expected a specific keyword or punctuation token"))
     )
   )
@@ -30,6 +30,6 @@ also broken
   (name-language sysml)
   (references
   )
-  (root (malformed (code "expected_keyword") (found "not valid") (span (offset 0) (line 1) (column 1) (len 10))) (malformed (code "expected_keyword") (found "also broken") (span (offset 10) (line 2) (column 1) (len 11))))
+  (root (malformed (code "expected_alt") (found "not valid") (span (offset 0) (line 1) (column 1) (len 10))) (malformed (code "expected_keyword") (found "also broken") (span (offset 10) (line 2) (column 1) (len 11))))
 )
 ~~~

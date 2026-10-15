@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Remove permissive declaration and body-member fallbacks (breaking AST change).**
+  Failed grammar now produces source-preserving error recovery. Remove the five opaque
+  declaration node kinds, `OpaqueText` and its document accessor; `PARSE_AST_VERSION` is 281.
+  Conformance checks count all unstructured nodes through the shared opacity scan.
+
 - **Consumers no longer need a raised `recursion_limit` for AST content.** `Node<T>` implements
   `Send`, `Sync`, `Unpin`, `UnwindSafe` and `RefUnwindSafe` for every AST payload type, so an
   auto-trait proof stops at the first `Node` instead of walking the whole AST type graph (over

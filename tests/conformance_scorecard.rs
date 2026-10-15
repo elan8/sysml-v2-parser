@@ -10,7 +10,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
 use sysml_v2_parser::{parse_for_editor_with_name_language, ParseError};
 
 use common::{
@@ -23,9 +22,7 @@ struct LibraryScan {
     files: usize,
     files_with_diagnostics: usize,
     diagnostic_count: usize,
-    extended_library_decl: usize,
-    kerml_semantic_decl: usize,
-    kerml_feature_decl: usize,
+    unstructured_nodes: usize,
 }
 
 /// Output file paths for [`write_scorecard`].
@@ -131,41 +128,6 @@ fn is_pinned_policy_recovery(file: &Path, errors: &[ParseError]) -> bool {
         && errors[1].message.contains(suppressed)
 }
 
-fn collect_package_body_type_counts(root: &RootNamespace, counts: &mut BTreeMap<String, usize>) {
-    for element in &root.elements {
-        match &element.value {
-            RootElement::Package(p) => collect_body_type_counts(&p.value.body, counts),
-            RootElement::LibraryPackage(p) => collect_body_type_counts(&p.value.body, counts),
-            RootElement::Namespace(n) => collect_body_type_counts(&n.value.body, counts),
-            RootElement::Import(_) => {}
-            RootElement::Member(_) => {}
-        }
-    }
-}
-
-fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
-    let PackageBody::Brace { elements, .. } = body else {
-        return;
-    };
-    for element in elements {
-        let key = match &element.value {
-            PackageBodyElement::ExtendedLibraryDecl(_) => "ExtendedLibraryDecl",
-            PackageBodyElement::KermlSemanticDecl(_) => "KermlSemanticDecl",
-            PackageBodyElement::KermlFeatureDecl(_) => "KermlFeatureDecl",
-            PackageBodyElement::Package(n) => {
-                collect_body_type_counts(&n.value.body, counts);
-                "Package"
-            }
-            PackageBodyElement::LibraryPackage(n) => {
-                collect_body_type_counts(&n.value.body, counts);
-                "LibraryPackage"
-            }
-            _ => "Other",
-        };
-        *counts.entry(key.to_string()).or_insert(0) += 1;
-    }
-}
-
 fn scan_library(dir: &Path) -> LibraryScan {
     let mut scan = LibraryScan::default();
     let mut files = find_library_files(dir).unwrap_or_else(|err| {
@@ -188,11 +150,11 @@ fn scan_library(dir: &Path) -> LibraryScan {
             scan.files_with_diagnostics += 1;
             scan.diagnostic_count += result.errors.len();
         }
-        let mut type_counts = BTreeMap::new();
-        collect_package_body_type_counts(&result.document.root, &mut type_counts);
-        scan.extended_library_decl += *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
-        scan.kerml_semantic_decl += *type_counts.get("KermlSemanticDecl").unwrap_or(&0);
-        scan.kerml_feature_decl += *type_counts.get("KermlFeatureDecl").unwrap_or(&0);
+        if !is_pinned_policy_recovery(file, &result.errors) {
+            scan.unstructured_nodes += sysml_v2_parser::opacity_report(&result.document.root)
+                .hits
+                .len();
+        }
     }
     scan
 }
@@ -244,12 +206,10 @@ fn write_scorecard(
     let full = l2.full;
     let l2_skip_reason = l2.skip_reason;
 
-    let l2_systems_ok = systems.is_some_and(|s| {
-        s.files > 0 && s.files_with_diagnostics == 0 && s.extended_library_decl == 0
-    });
-    let l2_full_ok = full.is_some_and(|s| {
-        s.files > 0 && s.files_with_diagnostics == 0 && s.extended_library_decl == 0
-    });
+    let l2_systems_ok = systems
+        .is_some_and(|s| s.files > 0 && s.files_with_diagnostics == 0 && s.unstructured_nodes == 0);
+    let l2_full_ok = full
+        .is_some_and(|s| s.files > 0 && s.files_with_diagnostics == 0 && s.unstructured_nodes == 0);
     let l2_ok = match (systems, full) {
         (Some(_), Some(_)) => l2_systems_ok && l2_full_ok,
         _ => false,
@@ -267,25 +227,15 @@ fn write_scorecard(
 
     let systems_json = match systems {
         Some(s) => format!(
-            r#"{{"files":{},"files_with_diagnostics":{},"diagnostic_count":{},"extended_library_decl":{},"kerml_semantic_decl":{},"kerml_feature_decl":{}}}"#,
-            s.files,
-            s.files_with_diagnostics,
-            s.diagnostic_count,
-            s.extended_library_decl,
-            s.kerml_semantic_decl,
-            s.kerml_feature_decl
+            r#"{{"files":{},"files_with_diagnostics":{},"diagnostic_count":{},"unstructured_nodes":{}}}"#,
+            s.files, s.files_with_diagnostics, s.diagnostic_count, s.unstructured_nodes
         ),
         None => "null".to_string(),
     };
     let full_json = match full {
         Some(s) => format!(
-            r#"{{"files":{},"files_with_diagnostics":{},"diagnostic_count":{},"extended_library_decl":{},"kerml_semantic_decl":{},"kerml_feature_decl":{}}}"#,
-            s.files,
-            s.files_with_diagnostics,
-            s.diagnostic_count,
-            s.extended_library_decl,
-            s.kerml_semantic_decl,
-            s.kerml_feature_decl
+            r#"{{"files":{},"files_with_diagnostics":{},"diagnostic_count":{},"unstructured_nodes":{}}}"#,
+            s.files, s.files_with_diagnostics, s.diagnostic_count, s.unstructured_nodes
         ),
         None => "null".to_string(),
     };
@@ -357,10 +307,10 @@ fn write_scorecard(
 
     let systems_md = match systems {
         Some(s) => format!(
-            "- Systems Library: {} files, {} with diagnostics, ExtendedLibraryDecl={}, status={}",
+            "- Systems Library: {} files, {} with diagnostics, unstructured nodes={}, status={}",
             s.files,
             s.files_with_diagnostics,
-            s.extended_library_decl,
+            s.unstructured_nodes,
             layer_status(l2_systems_ok)
         ),
         None => format!(
@@ -370,10 +320,10 @@ fn write_scorecard(
     };
     let full_md = match full {
         Some(s) => format!(
-            "- Full `sysml.library`: {} files, {} with diagnostics, ExtendedLibraryDecl={}, status={}",
+            "- Full `sysml.library`: {} files, {} with diagnostics, unstructured nodes={}, status={}",
             s.files,
             s.files_with_diagnostics,
-            s.extended_library_decl,
+            s.unstructured_nodes,
             layer_status(l2_full_ok)
         ),
         None => format!(
@@ -596,8 +546,8 @@ fn write_layered_conformance_scorecard() {
             systems.diagnostic_count
         );
         assert_eq!(
-            systems.extended_library_decl, 0,
-            "L2 Systems Library ExtendedLibraryDecl != 0"
+            systems.unstructured_nodes, 0,
+            "L2 Systems Library unstructured nodes != 0"
         );
         assert_eq!(
             full.files_with_diagnostics, 0,
@@ -605,8 +555,8 @@ fn write_layered_conformance_scorecard() {
             full.diagnostic_count
         );
         assert_eq!(
-            full.extended_library_decl, 0,
-            "L2 full library ExtendedLibraryDecl != 0"
+            full.unstructured_nodes, 0,
+            "L2 full library unstructured nodes != 0"
         );
     }
 

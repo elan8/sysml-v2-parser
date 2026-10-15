@@ -25,6 +25,7 @@ use nom::Parser;
 
 const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
+    b"metadata",
     b"attribute",
     b"comment",
     b"@",
@@ -90,27 +91,6 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"variant",
 ];
 
-const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
-    // GH-90.1: `individual item ii : II1;` / `individual item :>> i : II2;` inside `item def`
-    // bodies (Simple Tests/IndividualTest.sysml:4,15) are structured by `item_usage` itself
-    // (which accepts the optional leading `individual`) via `AttributeBodyElement::ItemUsage`
-    // below; `individual` stays here only to opaquely capture non-`item` individual forms that
-    // reach this body.
-    b"individual",
-    b"constraint",
-    b"private",
-    b"derived",
-    b"abstract",
-    b"binding",
-    b"connection",
-    b":>>",
-    b":>",
-    b"attribute",
-    // `MetadataFeature` is an `AnnotatingElement` in AttributeBody. Keep its literal introducer
-    // in the recovery FIRST set so a malformed annotation synchronizes before a valid sibling.
-    b"metadata",
-];
-
 const METADATA_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
     b"attribute",
@@ -138,8 +118,6 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
     b"variation",
 ];
-
-const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
 
 fn is_reserved_shorthand_starter(name: &[u8]) -> bool {
     let Ok(name) = std::str::from_utf8(name) else {
@@ -393,7 +371,6 @@ pub(crate) fn attribute_body_element(
             AttributeBodyElement::AssertConstraint,
         ),
         // `ref` / `ref part` / `ref :>> …` in attribute / item bodies (15_11, 15_19, 17a, 17b).
-        // Before opaque capture so these no longer land in `Other`.
         map(
             crate::parser::connector::ref_decl,
             AttributeBodyElement::RefDecl,
@@ -403,24 +380,13 @@ pub(crate) fn attribute_body_element(
             AttributeBodyElement::PartUsage(Box::new(n))
         }),
         // Nested `item` usage in item / attribute bodies, e.g. `item picture : Picture;` inside
-        // `attribute def Show { ... }`. Before the opaque-capture fallback below so this common
-        // shape gets a structured node -- see `AttributeBodyElement::ItemUsage`'s doc comment.
+        // `attribute def Show { ... }`. See `AttributeBodyElement::ItemUsage`.
         map(crate::parser::item::item_usage, |n| {
             AttributeBodyElement::ItemUsage(Box::new(n))
         }),
         map(
             crate::parser::part::variant_usage,
             AttributeBodyElement::VariantUsage,
-        ),
-        map(
-            |i| {
-                crate::parser::recovery::unsupported_member(
-                    i,
-                    ATTRIBUTE_OPAQUE_STARTERS,
-                    "attribute body",
-                )
-            },
-            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -1242,7 +1208,7 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
         // The same structured members `attribute_body_element` already dispatches (spec42
         // Gap 40): previously this narrower grammar dropped e.g. `ref self : MetadataItem
         // redefines Metaobject::self, Item::self;` (Systems Library `Metadata.sysml`) to
-        // opaque capture. Before the opaque fallback so they get structured nodes.
+        // recovery. Each member is parsed through its own production.
         map(
             crate::parser::connector::ref_decl,
             AttributeBodyElement::RefDecl,
@@ -1257,16 +1223,6 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
         map(
             crate::parser::occurrence_body::assert_constraint_member,
             AttributeBodyElement::AssertConstraint,
-        ),
-        map(
-            |i| {
-                crate::parser::recovery::unsupported_member(
-                    i,
-                    METADATA_OPAQUE_STARTERS,
-                    "metadata body",
-                )
-            },
-            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;

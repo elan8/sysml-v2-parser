@@ -6,11 +6,6 @@ use crate::ast::{RootNamespace, Span};
 /// Kind of opaque or recovery content found in an AST.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpacityKind {
-    ExtendedLibraryDecl,
-    KermlSemanticDecl,
-    KermlFeatureDecl,
-    FeatureDecl,
-    ClassifierDecl,
     ParseError,
     UnsupportedGrammar,
 }
@@ -51,13 +46,6 @@ pub fn opacity_report(root: &RootNamespace) -> OpacityReport {
             RecoveryContent::UnsupportedGrammar(node) => {
                 (node.span, OpacityKind::UnsupportedGrammar)
             }
-            RecoveryContent::ExtendedLibraryDecl(node) => {
-                (node.span, OpacityKind::ExtendedLibraryDecl)
-            }
-            RecoveryContent::FeatureDecl(node) => (node.span, OpacityKind::FeatureDecl),
-            RecoveryContent::ClassifierDecl(node) => (node.span, OpacityKind::ClassifierDecl),
-            RecoveryContent::KermlSemanticDecl(node) => (node.span, OpacityKind::KermlSemanticDecl),
-            RecoveryContent::KermlFeatureDecl(node) => (node.span, OpacityKind::KermlFeatureDecl),
             // A missing or empty `language` is a diagnostic, but the body is typed and emits as
             // authored.
             RecoveryContent::TextualRepresentation(_) => return,
