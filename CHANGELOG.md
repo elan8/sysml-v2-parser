@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Action bodies retain typed views and state actions declare semicolon names** (spec42 #285,
+  #287). `ActionDefBodyElement` and `ActionUsageBodyElement` gain `ViewUsage`; traversal,
+  formatting and serialization retain the complete view. `entry/do/exit action name;` declares
+  an action, while the bare-name forms retain references. Breaking AST change: version 282
+  (281 is used by the separate open fallback-removal PR).
+
 - **Consumers no longer need a raised `recursion_limit` for AST content.** `Node<T>` implements
   `Send`, `Sync`, `Unpin`, `UnwindSafe` and `RefUnwindSafe` for every AST payload type, so an
   auto-trait proof stops at the first `Node` instead of walking the whole AST type graph (over

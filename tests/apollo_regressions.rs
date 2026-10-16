@@ -968,8 +968,8 @@ fn do_action_with_body_declares_the_name_rather_than_referencing_it() {
 
 /// A bare `do action <name>;` (no body, no typing) stays a referenced action usage.
 #[test]
-fn bare_do_action_name_still_references() {
-    let input = "package P {\nstate def S {\ndo action existingAction;\n}\n}";
+fn bare_do_reference_still_references() {
+    let input = "package P {\nstate def S {\ndo existingAction;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(result.errors.is_empty(), "unexpected: {:?}", result.errors);
     let RootElement::Package(p) = &result.document.root.elements[0].value else {

@@ -3386,6 +3386,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             ActionDefBodyElement::StateUsage(state) => self.write_state_usage(&state.value),
             ActionDefBodyElement::ActionUsage(usage) => self.write_action_usage(&usage.value),
+            ActionDefBodyElement::ViewUsage(view) => self.write_view_usage(&view.value),
             ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
             ActionDefBodyElement::ItemUsage(item) => self.write_item_usage(&item.value),
             ActionDefBodyElement::AssertConstraint(_constraint) => {
@@ -4142,6 +4143,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::MetadataUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_usage(&usage.value)?;
+                        }
+                        super::ActionUsageBodyElement::ViewUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_usage(&member.value)?;
                         }
                         super::ActionUsageBodyElement::PartUsage(member) => {
                             self.write_part_usage_member(&mut first, &member.value)?;

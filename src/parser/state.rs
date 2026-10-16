@@ -249,11 +249,10 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
         let next_is_body = peek.fragment().starts_with(b"{");
         let next_is_semicolon = peek.fragment().starts_with(b";");
         // The name introduces a declaration when a `: Type` / `:>>` clause follows it, or -- with
-        // no such clause -- when the `action` keyword was written *and* an owned body follows
-        // (`do action ops { first start; }`, Apollo 11). A bare `do action ops;` / `do ops;` /
+        // no such clause -- whenever the `action` keyword was written
+        // (`do action ops;` or `do action ops { first start; }`). Bare `do ops;` /
         // `do ops { ... }` stays a referenced action usage (a nameless body was handled above).
-        let is_declaration =
-            type_name.is_some() || redefines.is_some() || (has_action_keyword && next_is_body);
+        let is_declaration = type_name.is_some() || redefines.is_some() || has_action_keyword;
         // Whichever form, the head must be terminated by `;` or an owned `{ ... }` body.
         if !is_declaration || !(next_is_semicolon || next_is_body) {
             return Err(nom::Err::Error(nom::error::Error::new(
