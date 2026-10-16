@@ -1295,9 +1295,53 @@ fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanti
     ))
 }
 
+/// A failed SysML definition must not be relabelled as a spec-valid opaque fallback declaration
+/// when its header uses KerML-only disjoining: SysML's `DefinitionDeclaration` is
+/// `Identification SubclassificationPart?` (SysML 8.2.2), and `disjoint from` exists only in KerML
+/// (KerML 7.3.2.5). The definition header grammar is reused on the original input, so comments,
+/// quoted names and nested bodies cannot be mistaken for a header clause. Every fallback that
+/// claims a SysML definition keyword must call this before claiming the text.
+fn reject_sysml_definition_disjoining<'a>(
+    input: Input<'a>,
+    starters: &[&'static [u8]],
+) -> IResult<Input<'a>, ()> {
+    if input.extra.name_language() != crate::ast::NameLanguage::Sysml {
+        return Ok((input, ()));
+    }
+    use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+    for keyword in starters.iter().copied() {
+        let mut options = DefinitionPrefixOptions::new(keyword)
+            .def_required()
+            .individual_allowed()
+            .with_captured_visibility()
+            .with_extension_keywords();
+        // `use case def` is the only two-word definition keyword: analysis and verification
+        // case definitions are `analysis def` and `verification def` (SysML 8.2.2.21, 8.2.2.22).
+        if keyword == b"use" {
+            options = options.with_second_keyword(b"case");
+        }
+        // A lookahead: the fallback re-parses the same bytes, so the probe keeps no references.
+        let header_end = crate::parser::span::reference_probe(input, |probe| {
+            parse_definition_prefix(probe, options).map(|(rest, _)| rest)
+        });
+        if let Ok(header_end) = header_end {
+            let (clause, _) = ws_and_comments(header_end)?;
+            if starts_with_keyword(clause.fragment(), b"disjoint") {
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    clause,
+                    nom::error::ErrorKind::Verify,
+                )));
+            }
+        }
+    }
+    Ok((input, ()))
+}
+
 fn kerml_feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlFeatureDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[b"occurrence", b"expr", b"predicate", b"succession"];
+    // `occurrence def` is a SysML definition this KerML fallback also claims.
+    reject_sysml_definition_disjoining(input, &[b"occurrence"])?;
     let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
@@ -1365,32 +1409,7 @@ fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLi
         b"part",
         b"port",
     ];
-    // A failed SysML definition must not be relabelled as a spec-valid opaque library
-    // declaration when its header uses KerML-only disjoining. Reuse the definition header
-    // grammar on the original input, so comments, quoted names and nested bodies cannot be
-    // mistaken for a header clause (SysML 8.2.2 DefinitionDeclaration).
-    if input.extra.name_language() == crate::ast::NameLanguage::Sysml {
-        use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-        for keyword in starters.iter().copied() {
-            let mut options = DefinitionPrefixOptions::new(keyword)
-                .def_required()
-                .individual_allowed()
-                .with_captured_visibility()
-                .with_extension_keywords();
-            if matches!(keyword, b"analysis" | b"verification" | b"use") {
-                options = options.with_second_keyword(b"case");
-            }
-            if let Ok((header_end, _)) = parse_definition_prefix(input, options) {
-                let (clause, _) = ws_and_comments(header_end)?;
-                if starts_with_keyword(clause.fragment(), b"disjoint") {
-                    return Err(nom::Err::Failure(nom::error::Error::new(
-                        clause,
-                        nom::error::ErrorKind::Verify,
-                    )));
-                }
-            }
-        }
-    }
+    reject_sysml_definition_disjoining(input, starters)?;
     let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
