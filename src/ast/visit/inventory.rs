@@ -5167,6 +5167,9 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::ActionUsage(field_0) => {
                     visitor.visit_action_usage(&$($mutability)? **field_0);
                 }
+                ActionDefBodyElement::ViewUsage(field_0) => {
+                    visitor.visit_view_usage(&$($mutability)? **field_0);
+                }
                 ActionDefBodyElement::PartUsage(field_0) => {
                     visitor.visit_part_usage(&$($mutability)? **field_0);
                 }
@@ -5611,6 +5614,9 @@ macro_rules! ast_traversal {
                 }
                 ActionUsageBodyElement::ActionUsage(field_0) => {
                     visitor.visit_action_usage(&$($mutability)? **field_0);
+                }
+                ActionUsageBodyElement::ViewUsage(field_0) => {
+                    visitor.visit_view_usage(&$($mutability)? **field_0);
                 }
                 ActionUsageBodyElement::PartUsage(field_0) => {
                     visitor.visit_part_usage(&$($mutability)? **field_0);

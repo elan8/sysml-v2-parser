@@ -36,6 +36,7 @@ use nom::IResult;
 use nom::Parser;
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
+    b"view",
     b"import",
     b"public",
     b"private",
@@ -309,6 +310,7 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::Transition(_)
         | ActionDefBodyElement::StateUsage(_)
         | ActionDefBodyElement::ActionUsage(_)
+        | ActionDefBodyElement::ViewUsage(_)
         | ActionDefBodyElement::PartUsage(_)
         | ActionDefBodyElement::ItemUsage(_)
         | ActionDefBodyElement::AssertConstraint(_)
@@ -832,6 +834,16 @@ pub(crate) fn action_def_body_element(
         let (next, member) = annotating_member_stmt(start)?;
         let elem = ActionDefBodyElement::Annotating(member);
         return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, usage)) = crate::parser::view::view_usage(start) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::ViewUsage(Box::new(usage)),
+            ),
+        ));
     }
     // `ActionNodePrefix` may begin with `ref`, which the generic action/ref declaration arms
     // below would otherwise claim before the complete `for` production gets a chance to commit.
@@ -1812,6 +1824,16 @@ pub(crate) fn action_usage_body_element(
         let (next, member) = annotating_member_stmt(start)?;
         let elem = ActionUsageBodyElement::Annotating(member);
         return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, usage)) = crate::parser::view::view_usage(start) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::ViewUsage(Box::new(usage)),
+            ),
+        ));
     }
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see

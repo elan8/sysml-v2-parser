@@ -217,9 +217,9 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
             ));
         }
     }
-    let (input, has_action_keyword) = opt(preceded(ws_and_comments, tag(&b"action"[..])))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, action_keyword) =
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"action")?;
+    let has_action_keyword = action_keyword.is_some();
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
         return Ok((input, StateActionHead::empty(has_action_keyword)));
@@ -249,11 +249,10 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
         let next_is_body = peek.fragment().starts_with(b"{");
         let next_is_semicolon = peek.fragment().starts_with(b";");
         // The name introduces a declaration when a `: Type` / `:>>` clause follows it, or -- with
-        // no such clause -- when the `action` keyword was written *and* an owned body follows
-        // (`do action ops { first start; }`, Apollo 11). A bare `do action ops;` / `do ops;` /
+        // no such clause -- whenever the `action` keyword was written
+        // (`do action ops;` or `do action ops { first start; }`). Bare `do ops;` /
         // `do ops { ... }` stays a referenced action usage (a nameless body was handled above).
-        let is_declaration =
-            type_name.is_some() || redefines.is_some() || (has_action_keyword && next_is_body);
+        let is_declaration = type_name.is_some() || redefines.is_some() || has_action_keyword;
         // Whichever form, the head must be terminated by `;` or an owned `{ ... }` body.
         if !is_declaration || !(next_is_semicolon || next_is_body) {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -271,6 +270,11 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
             },
         ))
     })();
+    // `action` selects UsageDeclaration, not OwnedReferenceSubsetting (SysML 8.2.2.17.2).
+    // A failed declaration must not reinterpret `action P::a` as a reference.
+    if has_action_keyword {
+        return declaration_attempt;
+    }
     if let Ok(result) = declaration_attempt {
         return Ok(result);
     }

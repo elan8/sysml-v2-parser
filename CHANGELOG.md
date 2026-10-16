@@ -11,8 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Remove permissive declaration and body-member fallbacks (breaking AST change).**
   Failed grammar now produces source-preserving error recovery. Remove the five opaque
-  declaration node kinds, `OpaqueText` and its document accessor; `PARSE_AST_VERSION` is 281.
+  declaration node kinds, `OpaqueText` and its document accessor; `PARSE_AST_VERSION` is 283.
   Conformance checks count all unstructured nodes through the shared opacity scan.
+
+- **Action bodies retain typed views and state actions declare semicolon names** (spec42 #285,
+  #287). `ActionDefBodyElement` and `ActionUsageBodyElement` gain `ViewUsage`; traversal,
+  formatting and serialization retain the complete view. `entry/do/exit action name;` declares
+  an action, while the bare-name forms retain references, including names starting with
+  `action`. The keyword cannot prefix a qualified reference. Breaking AST change: version 282.
+
+- **SysML definitions reject KerML disjoining headers (spec42#279).** A `disjoint from`
+  clause now produces a syntax error and recovery instead of an unsupported-library warning.
+  KerML classifier disjoining remains valid.
 
 - **Consumers no longer need a raised `recursion_limit` for AST content.** `Node<T>` implements
   `Send`, `Sync`, `Unpin`, `UnwindSafe` and `RefUnwindSafe` for every AST payload type, so an

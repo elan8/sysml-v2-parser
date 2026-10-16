@@ -95,6 +95,8 @@ pub enum ActionDefBodyElement {
     ActionUsage(Box<Node<ActionUsage>>),
     /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
     PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// ViewUsage via ActionBodyItem / NonBehaviorBodyItem / StructureUsageMember.
+    ViewUsage(Box<Node<crate::ast::ViewUsage>>),
     /// `item` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
     ItemUsage(Node<crate::ast::ItemUsage>),
     /// `assert constraint` via `BehaviorUsageMember` / `AssertConstraintUsage` (GH-13).
@@ -548,6 +550,8 @@ pub enum ActionUsageBodyElement {
     ActionUsage(Box<Node<ActionUsage>>),
     /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
     PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// ViewUsage via ActionBodyItem / NonBehaviorBodyItem / StructureUsageMember.
+    ViewUsage(Box<Node<crate::ast::ViewUsage>>),
     /// `item` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
     ItemUsage(Node<crate::ast::ItemUsage>),
     /// `assert constraint` via `BehaviorUsageMember` / `AssertConstraintUsage` (GH-13).

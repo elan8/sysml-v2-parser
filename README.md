@@ -60,7 +60,7 @@ assignment or default value; formatting and semantic snapshots consume these typ
 malformed source slice. The enclosing node span remains the authority for recovery emission;
 deserialization rejects diagnostic spans outside it or with invalid source coordinates.
 
-`PARSE_AST_VERSION` 281 removes the opaque declaration variants `ExtendedLibraryDecl`,
+`PARSE_AST_VERSION` 283 removes the opaque declaration variants `ExtendedLibraryDecl`,
 `FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with
 `OpaqueText` and `ParsedDocument::opaque_text`. Consumers should handle typed declarations
 and `ParseErrorNode` recovery. `emit_recovered_sysml` preserves malformed source in place;

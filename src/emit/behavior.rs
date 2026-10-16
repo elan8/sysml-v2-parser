@@ -448,6 +448,7 @@ pub(crate) fn emit_action_def_body_element(
         }
         ActionDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
+        ActionDefBodyElement::ViewUsage(v) => super::view::emit_view_usage(w, path, &v.value),
         ActionDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
         ActionDefBodyElement::ItemUsage(i) => {
             super::requirement::emit_item_usage(w, path, &i.value)
@@ -553,6 +554,7 @@ pub(crate) fn emit_action_usage_body_element(
         }
         ActionUsageBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionUsageBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
+        ActionUsageBodyElement::ViewUsage(v) => super::view::emit_view_usage(w, path, &v.value),
         ActionUsageBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
         ActionUsageBodyElement::ItemUsage(i) => {
             super::requirement::emit_item_usage(w, path, &i.value)
