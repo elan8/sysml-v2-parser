@@ -2720,6 +2720,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         )?;
         self.write_usage_declaration_name(feature.name)?;
         self.writer.write_str(") ")?;
+        if let Some(short_name) = feature.short_name {
+            self.writer.write_str("(short-name ")?;
+            self.write_usage_declaration_name(Some(short_name))?;
+            self.writer.write_str(") ")?;
+        }
         self.write_feature_specializations(&feature.specializations)?;
         self.writer.write_str(" (multiplicity ")?;
         self.write_multiplicity_clause(feature.multiplicity.as_ref())?;

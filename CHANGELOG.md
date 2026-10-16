@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `value`; `inv false` is emitted for negation); a package-level KerML `Succession`
   (`PackageBodyElement::KermlSuccession`); an enumeration usage's value
   (`EnumerationUsage::value`); `variation` on verification, use case and state usages
-  (`is_variation`); and the n-ary `allocate ( ... )` form (`AllocationUsage::nary_ends`).
+  (`is_variation`); the n-ary `allocate ( ... )` form (`AllocationUsage::nary_ends`); and a KerML
+  feature short name (`KermlFeature::short_name`).
 
 - **Action bodies retain typed views and state actions declare semicolon names** (spec42 #285,
   #287). `ActionDefBodyElement` and `ActionUsageBodyElement` gain `ViewUsage`; traversal,

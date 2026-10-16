@@ -1695,6 +1695,18 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // The name itself is also optional when a specialization/typing/multiplicity/body follows
     // directly: `step :> monitor.startObservation { ... }`, `private composite step : add
     // { ... }` (`Observation.kerml`, `SequenceFunctions.kerml`).
+    // `FeatureIdentification = '<' declaredShortName = NAME '>' ( declaredName = NAME )? |
+    // declaredName = NAME` (KerML 8.2.4.3.1).
+    let (input, short_name) = if leading_redefines.is_some() {
+        (input, None)
+    } else {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b"<") {
+            crate::parser::lex::short_name_prefix(peek)?
+        } else {
+            (input, None)
+        }
+    };
     let (input, name_str) = if leading_redefines.is_some() {
         (input, None)
     } else {
@@ -1702,6 +1714,10 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         if peek.fragment().starts_with(b":")
             || peek.fragment().starts_with(b"[")
             || peek.fragment().starts_with(b"{")
+            || (short_name.is_some()
+                && (peek.fragment().starts_with(b";")
+                    || peek.fragment().starts_with(b"=")
+                    || peek.fragment().starts_with(b"~")))
         {
             (input, None)
         } else {
@@ -1745,6 +1761,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 prefix,
                 kind,
                 is_all: is_all.is_some(),
+                short_name,
                 name: name_str,
                 specializations,
                 multiplicity: part.multiplicity,

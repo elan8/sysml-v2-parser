@@ -333,6 +333,8 @@ pub struct KermlFeature {
     pub is_all: bool,
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form
     /// (`portion feature redefines spaceBoundary [1];`).
+    /// `<shortName>` of `FeatureIdentification` (`feature <f> myFeature : T;`).
+    pub short_name: Option<DeclarationName>,
     pub name: Option<DeclarationName>,
     /// Ordered `FeatureSpecialization+` alternatives. Clause identity is retained independently
     /// from each clause's target list, so `crosses a crosses b` is not collapsed into the same

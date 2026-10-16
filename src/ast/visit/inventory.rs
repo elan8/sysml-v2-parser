@@ -8181,13 +8181,16 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeature { is_member, prefix, kind, is_all, name, specializations, multiplicity, multiplicity_modifiers, conjugates, relationship_parts, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, short_name, name, specializations, multiplicity, multiplicity_modifiers, conjugates, relationship_parts, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {
                 visitor.visit_kerml_feature_kind(inner);
             }
             let _ = is_all;
+            if let Some(inner) = short_name {
+                visitor.visit_declaration_name(inner);
+            }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }

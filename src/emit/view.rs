@@ -412,8 +412,17 @@ pub(crate) fn emit_kerml_feature(
         head.push("all");
     }
     w.push_str(&head.join(" "));
-    if let Some(name) = feature.name {
+    if feature.short_name.is_some() {
         if !head.is_empty() {
+            w.push_char(' ');
+        }
+        w.push_short_name_prefix(&format!("{path}/short_name"), feature.short_name)?;
+        if feature.name.is_none() {
+            w.trim_trailing_space();
+        }
+    }
+    if let Some(name) = feature.name {
+        if !head.is_empty() && feature.short_name.is_none() {
             w.push_char(' ');
         }
         w.push_declaration_name(&format!("{path}/name"), name)?;
