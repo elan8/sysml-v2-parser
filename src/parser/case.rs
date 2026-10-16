@@ -175,6 +175,11 @@ pub(crate) fn verification_case_usage(
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, variation_kw) = if abstract_kw.is_none() {
+        opt(preceded(tag(&b"variation"[..]), ws1)).parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, _) = tag(&b"verification"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, usage) = case_like_usage_body(
@@ -195,6 +200,7 @@ pub(crate) fn verification_case_usage(
                 subsets: usage.subsets,
                 redefines: usage.redefines,
                 is_abstract: usage.is_abstract,
+                is_variation: variation_kw.is_some(),
                 body: usage.body,
                 membership: usage.membership,
             },

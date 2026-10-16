@@ -717,6 +717,11 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
         nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
     let (input, is_abstract) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_variation) = if is_abstract.is_none() {
+        nom::combinator::opt(preceded(tag(&b"variation"[..]), ws1)).parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, is_reference) =
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, is_individual) =
@@ -777,6 +782,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 direction,
                 is_derived: is_derived.is_some(),
                 is_abstract: is_abstract.is_some(),
+                is_variation: is_variation.is_some(),
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
                 name: n,

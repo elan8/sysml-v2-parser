@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Failed grammar now produces source-preserving error recovery. Remove the five opaque
   declaration node kinds, `OpaqueText` and its document accessor; `PARSE_AST_VERSION` is 283.
   Conformance checks count all unstructured nodes through the shared opacity scan.
+  Spec-valid forms the fallbacks used to label "unsupported" now have typed parsers instead of
+  becoming syntax errors: a KerML feature's `ConjugationPart` (`KermlFeature::conjugates`) and
+  feature-chain type-relationship operands; `inv true|false` with a `FeatureDeclaration`, value
+  and `;` body (`KermlInvariantMember` gains `is_true`, `specializations`, `multiplicity`,
+  `value`; `inv false` is emitted for negation); a package-level KerML `Succession`
+  (`PackageBodyElement::KermlSuccession`); an enumeration usage's value
+  (`EnumerationUsage::value`); `variation` on verification, use case and state usages
+  (`is_variation`); and the n-ary `allocate ( ... )` form (`AllocationUsage::nary_ends`).
 
 - **Action bodies retain typed views and state actions declare semicolon names** (spec42 #285,
   #287). `ActionDefBodyElement` and `ActionUsageBodyElement` gain `ViewUsage`; traversal,

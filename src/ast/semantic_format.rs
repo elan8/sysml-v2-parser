@@ -2725,6 +2725,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_multiplicity_clause(feature.multiplicity.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_multiplicity_modifiers(&feature.multiplicity_modifiers)?;
+        if let Some(conjugation) = &feature.conjugates {
+            self.writer.write_str(match conjugation.value.spelling {
+                super::ConjugationSpelling::Keyword => " (conjugates (keyword ",
+                super::ConjugationSpelling::Operator => " (conjugates (operator ",
+            })?;
+            self.write_reference(conjugation.value.target)?;
+            self.writer.write_str("))")?;
+        }
         self.writer.write_str(" (relationships")?;
         for part in &feature.relationship_parts {
             self.writer.write_char(' ')?;
@@ -7267,7 +7275,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 })?;
                 self.writer.write_str(") (name ")?;
                 self.write_optional_name(invariant.value.name)?;
-                self.writer.write_str("))")
+                self.writer.write_char(')')?;
+                if !invariant.value.specializations.is_empty() {
+                    self.writer.write_char(' ')?;
+                    self.write_feature_specializations(&invariant.value.specializations)?;
+                }
+                self.writer.write_char(')')
+            }
+            PackageBodyElement::KermlSuccession(succession) => {
+                self.write_item_prefix(first)?;
+                self.write_kerml_succession(&succession.value)
             }
             PackageBodyElement::KermlFeature(feature) => {
                 self.write_item_prefix(first)?;

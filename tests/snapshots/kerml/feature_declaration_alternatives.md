@@ -1,0 +1,84 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "KerML FeatureDeclaration alternatives that have typed parsers: a ConjugationPart instead of a FeatureSpecializationPart, feature-chain operands of type relationship parts, an Invariant's true/false keyword with a FeatureDeclaration and a semicolon body, and a package-level Succession whose first is optional.") (name-language kerml))
+~~~
+# SOURCE
+~~~sysml
+package P {
+    classifier A { feature f; feature g; }
+    feature b : A;
+    feature h1;
+    feature conjugatedByOperator ~ A::f;
+    feature conjugatedByKeyword conjugates A::f;
+    feature h2 differences b.f, b.g intersects b.f disjoint from h1;
+    inv false negated { false }
+    inv i :> h1;
+    inv true asserted { true }
+    step s1;
+    step s2;
+    succession [1] s1 then [*] s2;
+    succession all [*] s1 then [1] s2;
+    classifier C {
+        feature nested ~ A::g;
+    }
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "feature_declaration_alternatives.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package P {
+    classifier A {
+        feature f;
+        feature g;
+    }
+    feature b : A;
+    feature h1;
+    feature conjugatedByOperator ~ A::f;
+    feature conjugatedByKeyword conjugates A::f;
+    feature h2 differences b.f, b.g intersects b.f disjoint from h1;
+    inv false negated {
+        false
+    }
+    inv i :> h1;
+    inv true asserted {
+        true
+    }
+    step s1;
+    step s2;
+    succession [1] s1 then [*] s2;
+    succession all [*] s1 then [1] s2;
+    classifier C {
+        feature nested ~ A::g;
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (name-language kerml)
+  (references
+    (reference r0 (scope relative) (span (offset 71) (line 3) (column 17) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 71) (line 3) (column 17) (len 1)))))
+    (reference r1 (scope relative) (span (offset 125) (line 5) (column 36) (len 4)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 125) (line 5) (column 36) (len 1))) (segment 1 (token "f") (name "f") (separator colon-colon) (span (offset 128) (line 5) (column 39) (len 1)))))
+    (reference r2 (scope relative) (span (offset 174) (line 6) (column 44) (len 4)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 174) (line 6) (column 44) (len 1))) (segment 1 (token "f") (name "f") (separator colon-colon) (span (offset 177) (line 6) (column 47) (len 1)))))
+    (reference r3 (scope relative) (span (offset 207) (line 7) (column 28) (len 3)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 207) (line 7) (column 28) (len 1))) (segment 1 (token "f") (name "f") (separator dot) (span (offset 209) (line 7) (column 30) (len 1)))))
+    (reference r4 (scope relative) (span (offset 212) (line 7) (column 33) (len 3)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 212) (line 7) (column 33) (len 1))) (segment 1 (token "g") (name "g") (separator dot) (span (offset 214) (line 7) (column 35) (len 1)))))
+    (reference r5 (scope relative) (span (offset 227) (line 7) (column 48) (len 3)) (segments (segment 0 (token "b") (name "b") (separator none) (span (offset 227) (line 7) (column 48) (len 1))) (segment 1 (token "f") (name "f") (separator dot) (span (offset 229) (line 7) (column 50) (len 1)))))
+    (reference r6 (scope relative) (span (offset 245) (line 7) (column 66) (len 2)) (segments (segment 0 (token "h1") (name "h1") (separator none) (span (offset 245) (line 7) (column 66) (len 2)))))
+    (reference r7 (scope relative) (span (offset 294) (line 9) (column 14) (len 2)) (segments (segment 0 (token "h1") (name "h1") (separator none) (span (offset 294) (line 9) (column 14) (len 2)))))
+    (reference r8 (scope relative) (span (offset 374) (line 13) (column 20) (len 2)) (segments (segment 0 (token "s1") (name "s1") (separator none) (span (offset 374) (line 13) (column 20) (len 2)))))
+    (reference r9 (scope relative) (span (offset 386) (line 13) (column 32) (len 2)) (segments (segment 0 (token "s2") (name "s2") (separator none) (span (offset 386) (line 13) (column 32) (len 2)))))
+    (reference r10 (scope relative) (span (offset 413) (line 14) (column 24) (len 2)) (segments (segment 0 (token "s1") (name "s1") (separator none) (span (offset 413) (line 14) (column 24) (len 2)))))
+    (reference r11 (scope relative) (span (offset 425) (line 14) (column 36) (len 2)) (segments (segment 0 (token "s2") (name "s2") (separator none) (span (offset 425) (line 14) (column 36) (len 2)))))
+    (reference r12 (scope relative) (span (offset 473) (line 16) (column 26) (len 4)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 473) (line 16) (column 26) (len 1))) (segment 1 (token "g") (name "g") (separator colon-colon) (span (offset 476) (line 16) (column 29) (len 1)))))
+  )
+  (root (package (name "P") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "A") (multiplicity none) (specializes none) (conjugates none) (body brace (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "f") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "g") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "b") (specializations (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0))))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "h1") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "conjugatedByOperator") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (conjugates (operator (ref r1))) (relationships) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "conjugatedByKeyword") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (conjugates (keyword (ref r2))) (relationships) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "h2") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships (type-relationship (keyword differences) (targets (ref r3) (ref r4))) (type-relationship (keyword intersects) (targets (ref r5))) (type-relationship (keyword disjoint from) (targets (ref r6)))) (value none) (body semicolon)) (kerml-invariant (negated true) (name "negated")) (kerml-invariant (negated false) (name "i") (specializations (subsetting (relationship (kind subsets) (implied false) (targets (ref r7))) (value none)))) (kerml-invariant (negated false) (name "asserted")) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind step) (member false) (all false) (name "s1") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind step) (member false) (all false) (name "s2") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value none) (body semicolon)) (kerml-succession (visibility none) (all false) (name none) (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (first-keyword false) (first (connector-end (multiplicity (lower none) (upper (expression (span (offset 371) (line 13) (column 17) (len 1)) (integer 1)))) (target (ref r8)) (references none))) (then (connector-end (multiplicity (lower none) (upper (expression (span (offset 383) (line 13) (column 29) (len 1)) (infinity)))) (target (ref r9)) (references none)))) (kerml-succession (visibility none) (all true) (name none) (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (first-keyword false) (first (connector-end (multiplicity (lower none) (upper (expression (span (offset 410) (line 14) (column 21) (len 1)) (infinity)))) (target (ref r10)) (references none))) (then (connector-end (multiplicity (lower none) (upper (expression (span (offset 422) (line 14) (column 33) (len 1)) (integer 1)))) (target (ref r11)) (references none)))) (kerml-classifier (keyword classifier) (abstract false) (name "C") (multiplicity none) (specializes none) (conjugates none) (body brace (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "nested") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (conjugates (operator (ref r12))) (relationships) (value none) (body semicolon)))))))
+)
+~~~

@@ -170,6 +170,7 @@ fn use_case_usage_tail(
             short_name,
             type_name: header.type_reference,
             is_abstract,
+            is_variation: false,
             multiplicity: header.multiplicity,
             subsets: header.subsets,
             redefines: header.redefines,
@@ -533,6 +534,11 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, variation_kw) = if abstract_kw.is_none() {
+        nom::combinator::opt(preceded(tag(&b"variation"[..]), ws1)).parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, _) = tag(&b"use"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
@@ -546,13 +552,14 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
             name: ident,
         },
     ) = crate::parser::lex::identification(input)?;
-    let (input, usage) = use_case_usage_tail(
+    let (input, mut usage) = use_case_usage_tail(
         input,
         ident,
         short_name,
         abstract_kw.is_some(),
         crate::ast::Membership::feature(visibility, visibility_span),
     )?;
+    usage.is_variation = variation_kw.is_some();
     Ok((input, node_from_to(start, input, usage)))
 }
 

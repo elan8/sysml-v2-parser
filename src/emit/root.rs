@@ -380,6 +380,9 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::KermlInvariant(invariant) => {
             super::view::emit_kerml_invariant_member(w, path, &invariant.value)
         }
+        PackageBodyElement::KermlSuccession(succession) => {
+            super::view::emit_kerml_succession_member(w, path, &succession.value)
+        }
         PackageBodyElement::KermlFeature(feature) => {
             super::view::emit_kerml_feature(w, path, &feature.value)
         }

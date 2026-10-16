@@ -565,6 +565,9 @@ pub(crate) fn emit_use_case_usage(
     if usage.is_abstract {
         w.push_str("abstract ");
     }
+    if usage.is_variation {
+        w.push_str("variation ");
+    }
     w.push_str("use case ");
     w.push_short_name_prefix(&format!("{path}/short_name"), usage.short_name)?;
     if let Some(name) = usage.name {
@@ -658,6 +661,9 @@ pub(crate) fn emit_verification_case_usage(
     emit_visibility(w, usage.membership.visibility);
     if usage.is_abstract {
         w.push_str("abstract ");
+    }
+    if usage.is_variation {
+        w.push_str("variation ");
     }
     w.push_str("verification ");
     emit_identification(
@@ -1039,6 +1045,9 @@ pub(crate) fn emit_enumeration_usage(
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
     }
     emit_attribute_body(w, path, &usage.body)
 }

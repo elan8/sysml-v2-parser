@@ -296,6 +296,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::KermlConnector(_)
         | PackageBodyElement::KermlRelationship(_)
         | PackageBodyElement::KermlInvariant(_)
+        | PackageBodyElement::KermlSuccession(_)
         | PackageBodyElement::KermlFeature(_)
         | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::AttributeUsage(_)
@@ -1049,7 +1050,7 @@ fn kerml_classifier_structured_inner(
 /// `SpecializationPart`'s comma-separated `OwnedSubclassification`s. Both spellings are accepted
 /// and which one was authored is recorded, because they are interchangeable in the grammar and
 /// only emission cares.
-fn kerml_conjugation_part(
+pub(crate) fn kerml_conjugation_part(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<Node<crate::ast::Conjugation>>> {
     let (peek, _) = ws_and_comments(input)?;
@@ -1938,6 +1939,16 @@ fn try_package_body_view<'a>(
         crate::parser::constraint::kerml_feature,
         |n| { PackageBodyElement::KermlFeature(Box::new(n)) }
     );
+    // KerML `Succession`, whose `first` is optional (`succession [1] a then [*] b;`). SysML's
+    // `SuccessionAsUsage` requires `first` and was tried above.
+    if input.extra.name_language() == crate::ast::NameLanguage::Kerml {
+        try_package_body_dispatch!(
+            input,
+            start,
+            crate::parser::constraint::kerml_succession_member,
+            |n| { PackageBodyElement::KermlSuccession(Box::new(n)) }
+        );
+    }
     // Bare forward declarations for the keywords the structured productions above do not
     // cover (`inv x;`, `occurrence o;`, `succession s;`, ...).
     try_package_body_dispatch!(

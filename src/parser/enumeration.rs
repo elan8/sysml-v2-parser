@@ -184,6 +184,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
         crate::parser::lex::identification(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -195,6 +196,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
                 short_name,
                 type_name: header.type_reference,
                 multiplicity,
+                value,
                 body,
                 is_end,
                 membership: Membership::feature(visibility, visibility_span),

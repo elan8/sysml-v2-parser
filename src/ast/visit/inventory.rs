@@ -2443,6 +2443,9 @@ macro_rules! ast_traversal {
                 PackageBodyElement::KermlInvariant(field_0) => {
                     visitor.visit_kerml_invariant_member(&$($mutability)? **field_0);
                 }
+                PackageBodyElement::KermlSuccession(field_0) => {
+                    visitor.visit_kerml_succession_member(&$($mutability)? **field_0);
+                }
                 PackageBodyElement::KermlConnector(field_0) => {
                     visitor.visit_kerml_connector_member(&$($mutability)? **field_0);
                 }
@@ -5998,7 +6001,7 @@ macro_rules! ast_traversal {
         pub fn walk_allocation_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AllocationUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AllocationUsage { name, short_name, type_name, type_is_conjugated, subsets, redefines, source, target, body, membership } = &$($mutability)? node.value;
+            let AllocationUsage { name, short_name, type_name, type_is_conjugated, subsets, redefines, source, target, nary_ends, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6019,6 +6022,9 @@ macro_rules! ast_traversal {
                 visitor.visit_kerml_connector_end(inner);
             }
             if let Some(inner) = target {
+                visitor.visit_kerml_connector_end(inner);
+            }
+            for inner in nary_ends {
                 visitor.visit_kerml_connector_end(inner);
             }
             visitor.visit_definition_body(body);
@@ -6227,7 +6233,8 @@ macro_rules! ast_traversal {
         pub fn walk_state_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateUsage { then_span, direction, is_derived, is_abstract, is_reference, is_individual, name, short_name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
+            let StateUsage { then_span, direction, is_derived, is_abstract, is_variation, is_reference, is_individual, name, short_name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
+            let _ = is_variation;
             if let Some(inner) = then_span {
                 visitor.visit_span(inner);
             }
@@ -6730,7 +6737,7 @@ macro_rules! ast_traversal {
         pub fn walk_enumeration_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumerationUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumerationUsage { name, short_name, type_name, multiplicity, body, is_end, membership } = &$($mutability)? node.value;
+            let EnumerationUsage { name, short_name, type_name, multiplicity, value, body, is_end, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6742,6 +6749,9 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             visitor.visit_attribute_body(body);
             let _ = is_end;
@@ -6967,7 +6977,8 @@ macro_rules! ast_traversal {
         pub fn walk_verification_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerificationCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VerificationCaseUsage { name, short_name, type_name, multiplicity, subsets, redefines, is_abstract, body, membership } = &$($mutability)? node.value;
+            let VerificationCaseUsage { name, short_name, type_name, multiplicity, subsets, redefines, is_abstract, is_variation, body, membership } = &$($mutability)? node.value;
+            let _ = is_variation;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6995,7 +7006,8 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseUsage { name, short_name, type_name, is_abstract, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let UseCaseUsage { name, short_name, type_name, is_abstract, is_variation, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let _ = is_variation;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -8169,7 +8181,7 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeature { is_member, prefix, kind, is_all, name, specializations, multiplicity, multiplicity_modifiers, relationship_parts, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, name, specializations, multiplicity, multiplicity_modifiers, conjugates, relationship_parts, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {
@@ -8186,6 +8198,9 @@ macro_rules! ast_traversal {
                 visitor.visit_multiplicity(inner);
             }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some(inner) = conjugates {
+                visitor.visit_conjugation(inner);
+            }
             for inner in relationship_parts {
                 visitor.visit_feature_relationship_part(inner);
             }
@@ -8229,10 +8244,19 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_invariant_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlInvariantMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlInvariantMember { is_negated, name, body, membership } = &$($mutability)? node.value;
-            let _ = is_negated;
+            let KermlInvariantMember { is_negated, is_true, name, specializations, multiplicity, value, body, membership } = &$($mutability)? node.value;
+            let _ = (is_negated, is_true);
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
+            }
+            for inner in specializations {
+                visitor.visit_feature_specialization(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
             }
             visitor.visit_calc_def_body(body);
             visitor.visit_membership(membership);

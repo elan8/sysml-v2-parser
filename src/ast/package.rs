@@ -173,6 +173,9 @@ pub enum PackageBodyElement {
     /// Package-level KerML invariant (`inv piPrecision { ... }`, Kernel Function Library
     /// `TrigFunctions.kerml`); see [`crate::ast::KermlInvariantMember`].
     KermlInvariant(Box<Node<crate::ast::KermlInvariantMember>>),
+    /// Package-level KerML succession (`succession [1] a then [*] b;`, `succession all a then
+    /// b;`), whose `first` is optional; see [`crate::ast::KermlSuccessionMember`].
+    KermlSuccession(Box<Node<crate::ast::KermlSuccessionMember>>),
     /// Package-level KerML connector member (`connector a2 from x.s to y.t;`); see
     /// [`crate::ast::KermlConnectorMember`].
     KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),

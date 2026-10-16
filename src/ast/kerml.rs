@@ -344,6 +344,9 @@ pub struct KermlFeature {
     /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
     /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
+    /// `ConjugationPart`, the alternative to `FeatureSpecializationPart` in a KerML
+    /// `FeatureDeclaration` (KerML 8.2.4.3.1): `feature g ~ B::f;`, `feature g conjugates f;`.
+    pub conjugates: Option<Node<Conjugation>>,
     /// Ordered `FeatureRelationshipPart*` declaration tail. This replaces the
     /// superseded fixed `chains`, `inverse_of`, and `type_relationships` slots:
     /// the grammar permits any alternative to repeat and interleave.
@@ -405,10 +408,17 @@ impl KermlFeatureKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlInvariantMember {
-    /// `inv not` negated form (KerML `isNegated`).
+    /// `inv false` (KerML `isNegated`). The legacy `inv not` spelling is read the same way.
     pub is_negated: bool,
+    /// `inv true`: the explicit, non-negated spelling.
+    pub is_true: bool,
     /// Declared name; empty for the anonymous form.
     pub name: Option<DeclarationName>,
+    /// `FeatureDeclaration`'s `FeatureSpecializationPart` (`inv i :> f;`).
+    pub specializations: Vec<FeatureSpecialization>,
+    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    /// `ValuePart`.
+    pub value: Option<Node<crate::ast::FeatureValue>>,
     /// Body holding the invariant's boolean expression(s) via the shared type-body grammar.
     pub body: crate::ast::CalcDefBody,
     pub membership: crate::ast::Membership,
