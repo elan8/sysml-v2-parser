@@ -217,9 +217,9 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
             ));
         }
     }
-    let (input, has_action_keyword) = opt(preceded(ws_and_comments, tag(&b"action"[..])))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, action_keyword) =
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"action")?;
+    let has_action_keyword = action_keyword.is_some();
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
         return Ok((input, StateActionHead::empty(has_action_keyword)));
@@ -270,6 +270,11 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateAct
             },
         ))
     })();
+    // `action` selects UsageDeclaration, not OwnedReferenceSubsetting (SysML 8.2.2.17.2).
+    // A failed declaration must not reinterpret `action P::a` as a reference.
+    if has_action_keyword {
+        return declaration_attempt;
+    }
     if let Ok(result) = declaration_attempt {
         return Ok(result);
     }
