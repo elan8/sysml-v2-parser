@@ -175,6 +175,39 @@ pub(crate) fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, Constr
 pub(crate) fn constraint_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
+    // CalculationBodyItem delegates extension declarations to ActionBodyItem before
+    // PrefixMetadataMember can consume only their leading tag.
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        let action = node_from_to(
+            input,
+            next,
+            crate::ast::ActionDefBodyElement::ExtendedDefinition(Box::new(member)),
+        );
+        return Ok((
+            next,
+            node_from_to(
+                input,
+                next,
+                ConstraintDefBodyElement::ActionMember(Box::new(action)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        let action = node_from_to(
+            input,
+            next,
+            crate::ast::ActionDefBodyElement::ExtendedUsage(Box::new(member)),
+        );
+        return Ok((
+            next,
+            node_from_to(
+                input,
+                next,
+                ConstraintDefBodyElement::ActionMember(Box::new(action)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -326,7 +359,8 @@ pub(crate) fn constraint_def_body_element(
     } else if let Some((next, member)) = (starts_with_any_keyword(
         after_visibility.fragment(),
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
-    ) || prefixed_control_node_follows(input))
+    ) || prefixed_control_node_follows(input)
+        || crate::parser::occurrence_prefix::hash_extension_follows(input))
     .then(|| {
         // Transactional: when the action parser declines (`if a ? b else c` is a result
         // expression), the references it allocated must not stay in the arena.
@@ -673,6 +707,7 @@ fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef
         action_peek.fragment(),
         crate::parser::lex::CALCULATION_ACTION_STARTERS,
     ) || prefixed_control_node_follows(peek)
+        || crate::parser::occurrence_prefix::hash_extension_follows(peek)
     {
         let start = input;
         // Transactional for the same reason as the constraint-body probe: a declined attempt

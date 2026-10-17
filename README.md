@@ -80,6 +80,12 @@ Read `typing.value.type_name` for all targets in authored order; its operator an
 remain part of that same relationship. Allocation's mirrored `type_is_conjugated` field is
 removed. No scalar first-type compatibility field is retained.
 
+Body-owner enums now expose `ExtendedDefinition` and, where their pinned grammar admits
+`ExtendedUsage`, `ExtendedUsage` members. Both delegate to the existing typed extension nodes.
+`ExtendedDefinition::membership` retains member visibility. Interface and metadata usage
+bodies admit extended definitions, while rejecting direct extended usages as scope errors.
+Enumeration definition bodies retain their restricted grammar.
+
 `PARSE_AST_VERSION` 283 removes the opaque declaration variants `ExtendedLibraryDecl`,
 `FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with
 `OpaqueText` and `ParsedDocument::opaque_text`. Consumers should handle typed declarations

@@ -426,6 +426,9 @@ pub type ViewDefBody = Body<ViewDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     /// A spec-valid member of this body that the parser does not model yet, retained with
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
@@ -500,6 +503,9 @@ pub type RenderingUsageBody = Body<RenderingUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum RenderingUsageBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -559,6 +565,9 @@ pub type RenderingDefBody = Body<RenderingDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     /// A spec-valid member of this body that the parser does not model yet, retained with
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
@@ -623,6 +632,9 @@ pub type ViewBody = Body<ViewBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),

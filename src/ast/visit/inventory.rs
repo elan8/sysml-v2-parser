@@ -2568,7 +2568,7 @@ macro_rules! ast_traversal {
         pub fn walk_extended_definition<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedDefinition>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExtendedDefinition { prefix_keywords, definition_prefix, identification, specializes, body } = &$($mutability)? node.value;
+            let ExtendedDefinition { prefix_keywords, definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
             for inner in prefix_keywords {
                 visitor.visit_metadata_keyword_usage(inner);
             }
@@ -2580,6 +2580,7 @@ macro_rules! ast_traversal {
                 visitor.visit_typing_relationship(inner);
             }
             visitor.visit_package_body(body);
+            visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -2618,6 +2619,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                PartDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                PartDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 PartDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -2986,6 +2989,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                AttributeBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                AttributeBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 AttributeBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3200,6 +3205,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                MetadataBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 MetadataBodyElement::Error(error) => visitor.visit_parse_error_node(error),
                 MetadataBodyElement::Annotating(member) => visitor.visit_annotating_member(member),
                 MetadataBodyElement::Usage(usage) => visitor.visit_metadata_body_usage(usage),
@@ -3256,6 +3262,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                PartUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 PartUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3713,6 +3720,8 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                PortDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                PortDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 PortDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3822,6 +3831,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                PortBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                PortBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 PortBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3931,6 +3942,7 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::ConnectStmt(field_0) => {
                     visitor.visit_connect_stmt(field_0);
                 }
+                InterfaceDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 InterfaceDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4180,6 +4192,8 @@ macro_rules! ast_traversal {
                 ConnectionDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                ConnectionDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ConnectionDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ConnectionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4685,6 +4699,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                OccurrenceBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                OccurrenceBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 OccurrenceBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4957,6 +4973,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                InterfaceUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 InterfaceUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -5136,6 +5153,8 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::UseCaseUsage(member) => {
                     visitor.visit_use_case_usage(&$($mutability)? **member);
                 }
+                ActionDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ActionDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ActionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -5611,6 +5630,8 @@ macro_rules! ast_traversal {
                 ActionUsageBodyElement::UseCaseUsage(member) => {
                     visitor.visit_use_case_usage(&$($mutability)? **member);
                 }
+                ActionUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ActionUsageBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6140,6 +6161,8 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
                 StateDefBodyElement::VariantUsage(member) => visitor.visit_variant_usage(member),
+                StateDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                StateDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 StateDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6373,6 +6396,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                RequirementDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                RequirementDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 RequirementDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7246,6 +7271,8 @@ macro_rules! ast_traversal {
                 ReturnRefBodyElement::Result(field_0) => {
                     visitor.visit_expression(field_0);
                 }
+                ReturnRefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ReturnRefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ReturnRefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7258,6 +7285,8 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
                 UseCaseDefBodyElement::VariantUsage(member) => visitor.visit_variant_usage(member),
+                UseCaseDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                UseCaseDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 UseCaseDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7728,6 +7757,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ViewDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ViewDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ViewDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7815,6 +7846,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                RenderingUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                RenderingUsageBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 RenderingUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7886,6 +7919,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                RenderingDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                RenderingDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 RenderingDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7965,6 +8000,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ViewBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ViewBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ViewBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }

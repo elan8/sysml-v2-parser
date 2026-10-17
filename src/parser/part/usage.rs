@@ -627,6 +627,28 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 fn interface_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                InterfaceUsageBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+
+    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
+    // transactionally before a metadata-prefix arm can split it into unrelated members.
+    if crate::parser::span::reference_probe(input, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     alt((
         interface_usage_ref_redef,
         // An `end`-led kind-keyworded usage is that family's node with an `end` head; give it
@@ -784,13 +806,24 @@ fn interface_usage_body_recovery(
     start: Input<'_>,
     end: Input<'_>,
 ) -> Node<InterfaceUsageBodyElement> {
-    let recovery = build_recovery_error_node_from_span(
+    let mut recovery = build_recovery_error_node_from_span(
         start,
         end,
         INTERFACE_USAGE_BODY_STARTERS,
         "interface usage body",
         "recovered_interface_usage_body_element",
     );
+    if crate::parser::span::reference_probe(start, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        recovery.code = "unexpected_keyword_in_scope".to_string();
+        recovery.message = "extended usage is not permitted in interface usage body".to_string();
+        recovery.expected = Some("valid interface usage body member".to_string());
+        recovery.suggestion =
+            Some("Move this extended usage to a body that admits UsageElement.".to_string());
+        recovery.category = Some(crate::DiagnosticCategory::ParseError);
+    }
+
     node_from_to(
         start,
         end,
@@ -1511,6 +1544,27 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
 }
 
 fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsageBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PartUsageBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PartUsageBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
@@ -1601,10 +1655,6 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 map(
                     crate::parser::connector::end_decl,
                     PartUsageBodyElement::EndDecl,
-                ),
-                map(
-                    crate::parser::metadata_annotation::extended_usage,
-                    |usage| PartUsageBodyElement::ExtendedUsage(Box::new(usage)),
                 ),
                 map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,

@@ -127,12 +127,18 @@ fn state_behavior_action_target(
             transition_effect_assign,
         ))
         .parse(input)?;
-        return Ok((input, crate::ast::StateActionUsage::Effect(effect)));
+        return Ok((
+            input,
+            crate::ast::StateActionUsage::Effect(Box::new(effect)),
+        ));
     }
     let (input, (target, value)) = crate::parser::perform::perform_action_declaration(input)?;
     Ok((
         input,
-        crate::ast::StateActionUsage::Perform { target, value },
+        crate::ast::StateActionUsage::Perform {
+            target,
+            value: value.map(Box::new),
+        },
     ))
 }
 
@@ -391,6 +397,27 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
 }
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                StateDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                StateDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     if !crate::parser::body::starts_bare_comment(start) {
         if let Ok((next, usage)) = crate::parser::part::variant_usage(start) {

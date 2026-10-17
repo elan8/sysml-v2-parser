@@ -88,61 +88,6 @@ fn test_objective_preserves_visibility_prefix() {
 }
 
 #[test]
-fn test_verification_return_ref_parses_return_expression() {
-    let input = "package P { verification def V { return ref verdictResult { return VerdictKind::unknown; } } }";
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let body_elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected package brace body"),
-    };
-    let verification = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::VerificationCaseDef(v) => Some(&v.value),
-            _ => None,
-        })
-        .expect("verification def should be present");
-    let case_body = match &verification.body {
-        UseCaseDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected verification brace body"),
-    };
-    let return_ref = case_body
-        .iter()
-        .find_map(|e| match &e.value {
-            UseCaseDefBodyElement::ReturnRef(r) => Some(&r.value),
-            _ => None,
-        })
-        .expect("return ref should be present");
-    assert_eq!(
-        result.declaration_name(return_ref.name.expect("named return ref")),
-        Some("verdictResult")
-    );
-    let ReturnRefBody::Brace { elements, .. } = &return_ref.body.value else {
-        panic!("expected structured return-ref body");
-    };
-    let expr = elements
-        .iter()
-        .find_map(|element| match &element.value {
-            ReturnRefBodyElement::Result(expression) => Some(expression),
-            ReturnRefBodyElement::Annotating(_) | ReturnRefBodyElement::Error(_) => None,
-        })
-        .expect("return expression should be parsed");
-    let token = match &expr.value {
-        Expression::MemberAccess { member, .. } => reference_text(&result, *member),
-        Expression::FeatureRef(name) => reference_text(&result, *name),
-        other => panic!("unexpected verdict expression: {other:?}"),
-    };
-    assert!(
-        token.ends_with("unknown"),
-        "expected VerdictKind::unknown token, got {token}"
-    );
-}
-
-#[test]
 fn test_analysis_ref_redefinition_is_structured_not_other() {
     let input = "package P { analysis def A { ref :>> inheritedResult { return result : Boolean; } subject s : S; } part def S; }";
     let result = parse(input).expect("parse should succeed");

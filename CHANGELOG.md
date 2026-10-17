@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **State actions retain full declarations and bound values (#200).** Anonymous `entry/do/exit
+- **Retain typed declarations and members across body grammars (#200).** Anonymous `entry/do/exit
   action :>> target;` and valued action declarations preserve their complete `UsageDeclaration`.
   State action alternatives use `StateActionUsage`; the shared perform grammar, emission,
   traversal and semantic projection preserve the declared/reference distinction. Breaking AST
@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bodies retain typed variant membership. State subactions use the canonical action body.
   Item and related usage families retain every typing target, replacing scalar type fields
   with the full `TypingRelationship`; formatting preserves typing operators and conjugation.
+  Extended definitions and usages are dispatched in their grammar-permitted owning bodies;
+  extension visibility, short names and nested members survive traversal and emission.
+  Interface and metadata usage bodies reject disallowed extended usages without splitting them.
+  KerML/SysML reserved-name regressions cover their distinct keyword vocabularies.
 
 - **Remove permissive declaration and body-member fallbacks (breaking AST change).**
   Failed grammar now produces source-preserving error recovery. Remove the five opaque

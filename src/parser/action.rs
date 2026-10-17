@@ -325,6 +325,8 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::AnalysisCaseUsage(_)
         | ActionDefBodyElement::VerificationCaseUsage(_)
         | ActionDefBodyElement::UseCaseUsage(_)
+        | ActionDefBodyElement::ExtendedDefinition(_)
+        | ActionDefBodyElement::ExtendedUsage(_)
         | ActionDefBodyElement::ViewUsage(_)
         | ActionDefBodyElement::PartUsage(_)
         | ActionDefBodyElement::ItemUsage(_)
@@ -835,6 +837,27 @@ fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Action
 pub(crate) fn action_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ActionDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ActionDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ActionDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     use crate::ast::ActionDefBodyElement;
     use crate::parser::state::state_usage;
 
@@ -1924,6 +1947,27 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
 pub(crate) fn action_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ActionUsageBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ActionUsageBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     use crate::parser::state::state_usage;
 
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's

@@ -772,6 +772,12 @@ pub(crate) fn emit_view_def(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::ViewDefBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::ViewDefBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::ViewDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
@@ -876,6 +882,12 @@ pub(crate) fn emit_view_usage(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::ViewBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::ViewBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::ViewBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
@@ -973,6 +985,12 @@ pub(crate) fn emit_view_rendering(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::RenderingUsageBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/render[{i}]"), &error.span)?
                     }
@@ -1075,6 +1093,12 @@ pub(crate) fn emit_rendering_def(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::RenderingDefBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::RenderingDefBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::RenderingDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
@@ -1148,6 +1172,12 @@ pub(crate) fn emit_rendering_usage(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::RenderingUsageBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }

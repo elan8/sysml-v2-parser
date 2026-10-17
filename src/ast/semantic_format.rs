@@ -903,6 +903,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        RequirementDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        RequirementDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         RequirementDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1097,6 +1105,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        ViewBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        ViewBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         ViewBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1157,6 +1173,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::VariantUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_variant_usage(&member.value)?;
+                        }
+                        UseCaseDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        UseCaseDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
                         }
                         UseCaseDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -1296,6 +1320,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                                 self.write_expression(expression)?;
                                                 self.writer.write_char(')')?;
                                             }
+                                            super::ReturnRefBodyElement::ExtendedDefinition(
+                                                member,
+                                            ) => {
+                                                self.write_extended_definition(&member.value)?;
+                                            }
+                                            super::ReturnRefBodyElement::ExtendedUsage(member) => {
+                                                self.write_extended_usage(&member.value)?;
+                                            }
                                             super::ReturnRefBodyElement::Error(error) => {
                                                 self.write_malformed(&error.value, &element.span)?;
                                             }
@@ -1371,6 +1403,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::VariantUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_variant_usage(&member.value)?;
+                        }
+                        StateDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        StateDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
                         }
                         StateDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -1689,6 +1729,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        PartDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        PartDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         PartDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -2495,7 +2543,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (name ")?;
         self.write_optional_name(definition.identification.name)?;
-        self.writer.write_str(") (specializes ")?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(definition.identification.short_name)?;
+        write!(
+            self.writer,
+            ") (visibility {}) (specializes ",
+            visibility_name(definition.membership.visibility)
+        )?;
         if let Some(specializes) = &definition.specializes {
             self.write_typing(&specializes.value)?;
         } else {
@@ -3202,6 +3256,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_verification_case_usage(&member.value)
             }
             ActionDefBodyElement::UseCaseUsage(member) => self.write_use_case_usage(&member.value),
+            ActionDefBodyElement::ExtendedDefinition(member) => {
+                self.write_extended_definition(&member.value)
+            }
+            ActionDefBodyElement::ExtendedUsage(member) => self.write_extended_usage(&member.value),
             ActionDefBodyElement::Error(error) => self.write_malformed(&error.value, span),
             ActionDefBodyElement::Import(import) => {
                 self.writer.write_str("(import ")?;
@@ -3669,7 +3727,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             definition.definition_prefix.as_ref(),
             definition.is_individual,
         )?;
-        self.writer.write_str("))")
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&definition.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_allocation_definition(&mut self, definition: &super::AllocationDef) -> io::Result<()> {
@@ -3679,7 +3739,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             definition.definition_prefix.as_ref(),
             definition.is_individual,
         )?;
-        self.writer.write_str("))")
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&definition.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_interface_body(&mut self, body: &InterfaceDefBody) -> io::Result<()> {
@@ -3708,6 +3770,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::ConnectStmt(connect) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_connect_statement(&connect.value)?;
+                        }
+                        InterfaceDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
                         }
                         InterfaceDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -3788,6 +3854,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::MetadataKeywordUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
+                        }
+                        ConnectionDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        ConnectionDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
                         }
                         ConnectionDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -4117,6 +4191,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_use_case_usage(&member.value)?;
                         }
+                        super::ActionUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::ActionUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -4315,6 +4397,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::PartUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
                         super::PartUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -4686,6 +4772,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         element: &Node<super::AttributeBodyElement>,
     ) -> io::Result<()> {
         match &element.value {
+            super::AttributeBodyElement::ExtendedDefinition(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_definition(&member.value)?;
+            }
+            super::AttributeBodyElement::ExtendedUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_usage(&member.value)?;
+            }
             super::AttributeBodyElement::Error(error) => {
                 self.write_item_prefix(first)?;
                 self.write_malformed(&error.value, &element.span)?;
@@ -4958,6 +5052,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::MetadataBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
                         super::MetadataBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -5560,6 +5658,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::InterfaceUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
                         super::InterfaceUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -5759,6 +5861,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         element: &Node<super::OccurrenceBodyElement>,
     ) -> io::Result<()> {
         match &element.value {
+            super::OccurrenceBodyElement::ExtendedDefinition(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_definition(&member.value)
+            }
+            super::OccurrenceBodyElement::ExtendedUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_usage(&member.value)
+            }
             super::OccurrenceBodyElement::Error(error) => {
                 self.write_item_prefix(first)?;
                 self.write_malformed(&error.value, &element.span)
@@ -6180,6 +6290,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::RenderingDefBodyElement::Unsupported(node) => {
                             self.write_unsupported(&node.value, &element.span)?
                         }
+                        super::RenderingDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_extended_definition(&member.value)?
+                        }
+                        super::RenderingDefBodyElement::ExtendedUsage(member) => {
+                            self.write_extended_usage(&member.value)?
+                        }
                         super::RenderingDefBodyElement::Error(error) => {
                             self.write_malformed(&error.value, &element.span)?
                         }
@@ -6212,6 +6328,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ViewDefBodyElement::Unsupported(node) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_unsupported(&node.value, &element.span)?;
+                        }
+                        super::ViewDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::ViewDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
                         }
                         super::ViewDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -6433,6 +6557,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::RenderingUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::RenderingUsageBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::RenderingUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -6454,6 +6586,33 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
         }
+    }
+
+    fn write_case_definition(&mut self, definition: &super::CaseDef) -> io::Result<()> {
+        self.writer.write_str("(case-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") ")?;
+        self.write_use_case_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_analysis_case_definition(
+        &mut self,
+        definition: &super::AnalysisCaseDef,
+    ) -> io::Result<()> {
+        self.writer.write_str("(analysis-case-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") ")?;
+        self.write_use_case_body(&definition.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_use_case_definition(&mut self, definition: &super::UseCaseDef) -> io::Result<()> {
@@ -7000,6 +7159,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::PortBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::PortBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::PortBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -7075,6 +7242,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PortDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
+                        }
+                        PortDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        PortDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
                         }
                         PortDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -7295,11 +7470,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_view_definition(&definition.value)
             }
-            PackageBodyElement::ViewpointDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "viewpoint-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::ViewpointDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_viewpoint_definition(&definition.value)
+            }
             PackageBodyElement::RenderingDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_rendering_definition(&definition.value)
@@ -7312,8 +7486,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_viewpoint_usage(&usage.value)
             }
-            PackageBodyElement::RenderingUsage(_usage) => {
-                self.write_marker(first, "rendering-usage")
+            PackageBodyElement::RenderingUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_rendering_usage(&usage.value)
             }
             PackageBodyElement::Expose(expose) => {
                 self.write_item_prefix(first)?;
@@ -7371,20 +7546,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_concern_usage(&usage.value)
             }
-            PackageBodyElement::CaseDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "case-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::CaseDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_case_definition(&definition.value)
+            }
             PackageBodyElement::CaseUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_case_usage(&usage.value)
             }
-            PackageBodyElement::AnalysisCaseDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "analysis-case-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::AnalysisCaseDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_analysis_case_definition(&definition.value)
+            }
             PackageBodyElement::AnalysisCaseUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_analysis_case_usage(&usage.value)

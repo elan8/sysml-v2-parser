@@ -110,6 +110,12 @@ fn emit_requirement_body_element(
     el: &RequirementDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        RequirementDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        RequirementDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RequirementDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
@@ -796,6 +802,12 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::VariantUsage(member) => {
             super::structure::emit_variant_usage(w, path, &member.value)
         }
+        UseCaseDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        UseCaseDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         UseCaseDefBodyElement::Import(i) => emit_import(w, &i.value),
         UseCaseDefBodyElement::Annotating(member) => {
@@ -955,6 +967,12 @@ fn emit_return_ref(
                             w.push_str("return ");
                             emit_expression(w, &expression.value)?;
                             w.push_char(';');
+                        }
+                        ReturnRefBodyElement::ExtendedDefinition(member) => {
+                            super::root::emit_extended_definition(w, path, &member.value)?;
+                        }
+                        ReturnRefBodyElement::ExtendedUsage(member) => {
+                            super::structure::emit_extended_usage(w, path, &member.value)?;
                         }
                         ReturnRefBodyElement::Error(error) => w.push_recovery_span(
                             &format!("{path}/return-ref-body[{index}]"),

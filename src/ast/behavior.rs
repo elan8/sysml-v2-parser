@@ -46,6 +46,9 @@ pub type ActionDefBody = Body<ActionDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     PartDef(Box<Node<crate::ast::PartDef>>),
     ItemDef(Box<Node<crate::ast::ItemDef>>),
     ViewDef(Box<Node<crate::ast::ViewDef>>),
@@ -520,6 +523,9 @@ pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     PartDef(Box<Node<crate::ast::PartDef>>),
     ItemDef(Box<Node<crate::ast::ItemDef>>),
     ViewDef(Box<Node<crate::ast::ViewDef>>),
@@ -1134,6 +1140,9 @@ pub type StateDefBody = Body<StateDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StateDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     VariantUsage(Node<crate::ast::VariantUsage>),
 
     Error(Node<ParseErrorNode>),
@@ -1188,9 +1197,9 @@ pub enum StateActionUsage {
     Empty,
     Perform {
         target: crate::ast::PerformActionTarget,
-        value: Option<Node<crate::ast::FeatureValue>>,
+        value: Option<Box<Node<crate::ast::FeatureValue>>>,
     },
-    Effect(TransitionEffect),
+    Effect(Box<TransitionEffect>),
 }
 
 /// A state `entry` member and its typed action usage.

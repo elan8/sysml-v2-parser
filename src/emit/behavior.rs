@@ -460,6 +460,12 @@ pub(crate) fn emit_action_def_body_element(
         ActionDefBodyElement::UseCaseUsage(member) => {
             super::requirement::emit_use_case_usage(w, path, &member.value)
         }
+        ActionDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        ActionDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         ActionDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ActionDefBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionDefBodyElement::AttributeUsage(a) => {
@@ -593,6 +599,12 @@ pub(crate) fn emit_action_usage_body_element(
         }
         ActionUsageBodyElement::UseCaseUsage(member) => {
             super::requirement::emit_use_case_usage(w, path, &member.value)
+        }
+        ActionUsageBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        ActionUsageBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
         }
         ActionUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ActionUsageBodyElement::Import(import) => super::root::emit_import(w, &import.value),
@@ -1033,6 +1045,12 @@ fn emit_state_def_body_element(
     match el {
         StateDefBodyElement::VariantUsage(member) => {
             super::structure::emit_variant_usage(w, path, &member.value)
+        }
+        StateDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        StateDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
         }
         StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
@@ -1811,6 +1829,12 @@ pub(crate) fn emit_occurrence_body_element(
     el: &crate::ast::OccurrenceBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        crate::ast::OccurrenceBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        crate::ast::OccurrenceBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         crate::ast::OccurrenceBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         crate::ast::OccurrenceBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
