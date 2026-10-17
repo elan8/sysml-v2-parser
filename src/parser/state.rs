@@ -8,8 +8,8 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_reference, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
-    ws_and_comments, STATE_BODY_STARTERS,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    visibility_prefix, ws1, ws_and_comments, STATE_BODY_STARTERS,
 };
 
 const UNTIL_BODY: &[u8] = b";{";
@@ -109,6 +109,47 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     Ok((input, members.into_body()))
 }
 
+/// The node keywords of `StateAcceptActionUsage`, `StateSendActionUsage` and
+/// `StateAssignmentActionUsage`.
+const STATE_EFFECT_KEYWORDS: &[&[u8]] = &[b"accept", b"send", b"assign"];
+
+/// The effect parsers themselves, not `transition_effect`: its trailing-`;` leniency would
+/// starve the caller's own body terminator.
+fn state_effect(input: Input<'_>) -> IResult<Input<'_>, crate::ast::TransitionEffect> {
+    alt((
+        transition_effect_accept,
+        transition_effect_send,
+        transition_effect_assign,
+    ))
+    .parse(input)
+}
+
+/// `ActionNodeUsageDeclaration` followed by the node keyword it declares:
+/// `entry action accept S;`, `do action sender send S() to p;`, `exit action a assign x := 1;`.
+fn declared_state_effect(input: Input<'_>) -> IResult<Input<'_>, crate::ast::StateActionUsage> {
+    crate::parser::span::reference_transaction(input, |input| {
+        let (input, declaration) = crate::parser::action::action_node_usage_declaration_before(
+            input,
+            STATE_EFFECT_KEYWORDS,
+        )?;
+        let (input, _) = ws_and_comments(input)?;
+        if !starts_with_any_keyword(input.fragment(), STATE_EFFECT_KEYWORDS) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        let (input, effect) = state_effect(input)?;
+        Ok((
+            input,
+            crate::ast::StateActionUsage::Effect {
+                declaration: Some(Box::new(declaration)),
+                effect: Box::new(effect),
+            },
+        ))
+    })
+}
+
 /// State action alternatives share the complete perform declaration with `perform` members.
 fn state_behavior_action_target(
     input: Input<'_>,
@@ -117,20 +158,22 @@ fn state_behavior_action_target(
     if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
         return Ok((input, crate::ast::StateActionUsage::Empty));
     }
-    if starts_with_keyword(input.fragment(), b"send")
-        || starts_with_keyword(input.fragment(), b"accept")
-        || starts_with_keyword(input.fragment(), b"assign")
-    {
-        let (input, effect) = alt((
-            transition_effect_accept,
-            transition_effect_send,
-            transition_effect_assign,
-        ))
-        .parse(input)?;
+    if starts_with_any_keyword(input.fragment(), STATE_EFFECT_KEYWORDS) {
+        let (input, effect) = state_effect(input)?;
         return Ok((
             input,
-            crate::ast::StateActionUsage::Effect(Box::new(effect)),
+            crate::ast::StateActionUsage::Effect {
+                declaration: None,
+                effect: Box::new(effect),
+            },
         ));
+    }
+    // An `action` declaration is an accept/send/assign node only when that node keyword follows
+    // it; otherwise it is the perform alternative's `'action' UsageDeclaration`.
+    if starts_with_keyword(input.fragment(), b"action") {
+        if let Ok(result) = declared_state_effect(input) {
+            return Ok(result);
+        }
     }
     let (input, (target, value)) = crate::parser::perform::perform_action_declaration(input)?;
     Ok((

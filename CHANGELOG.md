@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Retain typed declarations and members across body grammars (#200).** Anonymous `entry/do/exit
   action :>> target;` and valued action declarations preserve their complete `UsageDeclaration`.
   State action alternatives use `StateActionUsage`; the shared perform grammar, emission,
-  traversal and semantic projection preserve the declared/reference distinction. Breaking AST
-  change: version 284. Action bodies also retain nested part/item/view/rendering/viewpoint
+  traversal and semantic projection preserve the declared/reference distinction. A referenced
+  action keeps its complete `FeatureSpecializationPart` (`entry ops : A;`, `do ops :> base;`,
+  `perform ops [1];`), and accept/send/assign state actions keep their `action` declaration
+  (`entry action accept S;`). Breaking AST change: version 284. Action bodies also retain nested part/item/view/rendering/viewpoint
   definitions and case-family usages; calculation bodies admit those usages. Case and state
   bodies retain typed variant membership. State subactions use the canonical action body.
   Item and related usage families retain every typing target, replacing scalar type fields

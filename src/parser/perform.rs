@@ -15,8 +15,31 @@ pub(crate) fn perform_action_declaration(
             (input, PerformActionTarget::Action(Box::new(declaration)))
         } else {
             let (input, action) = reference_path(input)?;
-            let (input, redefines) = crate::parser::usage::optional_redefinition(input)?;
-            (input, PerformActionTarget::Reference { action, redefines })
+            let (after, declaration) =
+                crate::parser::usage::usage_declaration_without_identification(input)?;
+            let authored = {
+                let d = &declaration.value;
+                d.typing.is_some()
+                    || d.multiplicity.is_some()
+                    || d.multiplicity_modifiers != Default::default()
+                    || d.subsets.is_some()
+                    || d.redefines.is_some()
+                    || d.references.is_some()
+                    || d.crosses.is_some()
+                    || d.intersects.is_some()
+            };
+            let (input, specialization) = if authored {
+                (after, Some(Box::new(declaration)))
+            } else {
+                (input, None)
+            };
+            (
+                input,
+                PerformActionTarget::Reference {
+                    action,
+                    specialization,
+                },
+            )
         };
         let (input, value) = nom::combinator::opt(nom::sequence::preceded(
             ws_and_comments,

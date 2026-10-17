@@ -799,10 +799,13 @@ fn emit_perform_target(
             w.push_str("action");
             emit_usage_declaration(w, path, &declaration.value)?;
         }
-        PerformActionTarget::Reference { action, redefines } => {
+        PerformActionTarget::Reference {
+            action,
+            specialization,
+        } => {
             w.push_qualified_reference(path, *action)?;
-            if let Some(redefines) = redefines {
-                emit_subsetting_clause(w, &redefines.value)?;
+            if let Some(specialization) = specialization {
+                emit_usage_declaration(w, path, &specialization.value)?;
             }
         }
     }
@@ -823,8 +826,15 @@ fn emit_state_action_usage(
                 emit_feature_value(w, value)?;
             }
         }
-        crate::ast::StateActionUsage::Effect(effect) => {
+        crate::ast::StateActionUsage::Effect {
+            declaration,
+            effect,
+        } => {
             w.push_char(' ');
+            if let Some(declaration) = declaration {
+                emit_action_node_usage_declaration(w, path, &declaration.value)?;
+                w.push_char(' ');
+            }
             emit_transition_effect(w, path, effect)?;
         }
     }

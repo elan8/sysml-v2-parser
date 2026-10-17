@@ -3509,10 +3509,10 @@ macro_rules! ast_traversal {
         pub fn walk_perform_action_target<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PerformActionTarget) {
             match node {
                 PerformActionTarget::Action(declaration) => visitor.visit_usage_declaration(declaration),
-                PerformActionTarget::Reference { action, redefines } => {
+                PerformActionTarget::Reference { action, specialization } => {
                     visitor.visit_qualified_reference(action);
-                    if let Some(redefines) = redefines {
-                        visitor.visit_subsetting_relationship(redefines);
+                    if let Some(specialization) = specialization {
+                        visitor.visit_usage_declaration(specialization);
                     }
                 }
             }
@@ -6233,7 +6233,12 @@ macro_rules! ast_traversal {
                     visitor.visit_perform_action_target(target);
                     if let Some(value) = value { visitor.visit_feature_value(value); }
                 },
-                StateActionUsage::Effect(effect) => visitor.visit_transition_effect(effect),
+                StateActionUsage::Effect { declaration, effect } => {
+                    if let Some(declaration) = declaration {
+                        visitor.visit_action_node_usage_declaration(declaration);
+                    }
+                    visitor.visit_transition_effect(effect);
+                },
             }
         }
 

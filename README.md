@@ -62,9 +62,13 @@ deserialization rejects diagnostic spans outside it or with invalid source coord
 
 `PARSE_AST_VERSION` 284 replaces the flattened state-action fields on `EntryAction`, `DoAction`
 and `ExitAction` with `action: StateActionUsage`. Match `Empty`, `Perform { target, value }`,
-or `Effect`; the perform target reuses `PerformActionTarget`. Its `Action` branch owns a full
-`UsageDeclaration`, including anonymous identification, all typing targets and specialization
-clauses. The `value` retains the authored assignment/default operator and expression. State
+or `Effect { declaration, effect }`; the perform target reuses `PerformActionTarget`. Its
+`Action` branch owns a full `UsageDeclaration`, including anonymous identification, all typing
+targets and specialization clauses. Its `Reference { action, specialization }` branch keeps the
+referenced action's complete `FeatureSpecializationPart` (`entry ops : A;`, `perform ops [1];`)
+as a `UsageDeclaration` without identification; the former `redefines` field is part of it.
+`Effect::declaration` is the optional `ActionNodeUsageDeclaration` of `entry action accept S;`,
+`do action sender send S() to p;` and `exit action a assign x := 1;`. The `value` retains the authored assignment/default operator and expression. State
 subaction `body` fields now use `ActionDefBody`, matching the `ActionBody` production; the
 obsolete state-body-only `FirstStmt` and `ThenAction` proxy variants are removed.
 

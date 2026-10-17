@@ -1199,7 +1199,12 @@ pub enum StateActionUsage {
         target: crate::ast::PerformActionTarget,
         value: Option<Box<Node<crate::ast::FeatureValue>>>,
     },
-    Effect(Box<TransitionEffect>),
+    /// `StateAcceptActionUsage`, `StateSendActionUsage` or `StateAssignmentActionUsage`: the
+    /// optional `ActionNodeUsageDeclaration` (`action name? :T?`) and the node's effect.
+    Effect {
+        declaration: Option<Box<Node<ActionNodeUsageDeclaration>>>,
+        effect: Box<TransitionEffect>,
+    },
 }
 
 /// A state `entry` member and its typed action usage.

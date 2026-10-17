@@ -1676,6 +1676,35 @@ fn action_node_usage_declaration(
     ))
 }
 
+/// [`action_node_usage_declaration`] for a node whose keyword follows the declaration
+/// (`AcceptNodeDeclaration = ActionNodeUsageDeclaration? 'accept' …`, and likewise `send` and
+/// `assign`): a bare `follow` keyword ends the declaration rather than becoming its name.
+pub(crate) fn action_node_usage_declaration_before<'a>(
+    input: Input<'a>,
+    follow: &[&[u8]],
+) -> IResult<Input<'a>, Node<ActionNodeUsageDeclaration>> {
+    let start = input;
+    let (input, (action_span, _)) = with_span(tag(&b"action"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, declaration) = if starts_with_any_keyword(input.fragment(), follow) {
+        (input, None)
+    } else {
+        let (input, declaration) = crate::parser::usage::usage_declaration_before(input, follow)?;
+        (input, Some(declaration))
+    };
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ActionNodeUsageDeclaration {
+                action_span,
+                declaration,
+            },
+        ),
+    ))
+}
+
 /// `ActionBodyParameter` owns the optional declaration immediately before its mandatory braced
 /// body. This is deliberately separate from `ActionNodePrefix`: `loop action charging { ... }`
 /// has an empty node prefix and a named body parameter.

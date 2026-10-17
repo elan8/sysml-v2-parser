@@ -1523,7 +1523,20 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 }
                 self.writer.write_char(')')?;
             }
-            super::StateActionUsage::Effect(effect) => self.write_transition_effect(effect)?,
+            super::StateActionUsage::Effect {
+                declaration: None,
+                effect,
+            } => self.write_transition_effect(effect)?,
+            super::StateActionUsage::Effect {
+                declaration: Some(declaration),
+                effect,
+            } => {
+                self.writer.write_str("(declared-effect ")?;
+                self.write_action_node_declaration(Some(declaration))?;
+                self.writer.write_char(' ')?;
+                self.write_transition_effect(effect)?;
+                self.writer.write_char(')')?;
+            }
         }
         self.writer.write_str(") ")?;
         self.write_action_body(body)?;
@@ -5729,12 +5742,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_usage_declaration(&declaration.value)?;
                 self.writer.write_char(')')?;
             }
-            super::PerformActionTarget::Reference { action, redefines } => {
+            super::PerformActionTarget::Reference {
+                action,
+                specialization,
+            } => {
                 self.writer.write_str("(reference (action ")?;
                 self.write_reference(*action)?;
-                self.writer.write_str(") ")?;
-                self.write_optional_subsetting("redefines", redefines.as_ref())?;
-                self.writer.write_char(')')?;
+                self.writer.write_str(") (specialization ")?;
+                match specialization {
+                    Some(declaration) => self.write_usage_declaration(&declaration.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")?;
             }
         }
         Ok(())

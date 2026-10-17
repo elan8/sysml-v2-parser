@@ -1035,11 +1035,13 @@ pub struct Perform {
 pub enum PerformActionTarget {
     /// `'action' UsageDeclaration?`, including the zero-width anonymous declaration.
     Action(Box<Node<crate::ast::UsageDeclaration>>),
-    /// `OwnedReferenceSubsetting FeatureSpecializationPart?` as currently supported: a
-    /// source-backed action reference with an optional `:>>` redefinition target.
+    /// `OwnedReferenceSubsetting FeatureSpecializationPart?`: the referenced action, then the
+    /// performing usage's own specialization part (`perform a : A [1] :>> b;`). The part is the
+    /// usage's `UsageDeclaration` with its `Identification` absent, as the production writes no
+    /// name; it is `None` when no specialization clause was authored.
     Reference {
         action: QualifiedReferenceId,
-        redefines: Option<Node<SubsettingRelationship>>,
+        specialization: Option<Box<Node<crate::ast::UsageDeclaration>>>,
     },
 }
 
