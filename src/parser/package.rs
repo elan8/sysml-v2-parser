@@ -1,8 +1,7 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, FilterMember, KermlFeatureDecl,
-    KermlSemanticDecl, LibraryPackage, NamespaceDecl, NamespaceName, Node, Package, PackageBody,
+    FilterMember, LibraryPackage, NamespaceDecl, NamespaceName, Node, Package, PackageBody,
     PackageBodyElement, QualifiedIdentification, RootElement, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
@@ -20,15 +19,13 @@ use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
 use crate::parser::expr::expression;
 use crate::parser::flow::{flow_def, flow_usage};
-use crate::parser::grammar_scope::{
-    package_body_starter, PackageProduction, PACKAGE_BODY_STARTERS,
-};
+use crate::parser::grammar_scope::PACKAGE_BODY_STARTERS;
 use crate::parser::import::import_;
 use crate::parser::individual::individual_def;
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
-    name, qualified_declaration_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
+    name, qualified_declaration_name, recover_body_element, starts_with_any_keyword,
+    starts_with_keyword, ws1, ws_and_comments,
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
@@ -295,17 +292,13 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::VerificationCaseDef(_)
         | PackageBodyElement::VerificationCaseUsage(_)
         | PackageBodyElement::UseCaseUsage(_)
-        | PackageBodyElement::FeatureDecl(_)
-        | PackageBodyElement::ClassifierDecl(_)
-        | PackageBodyElement::KermlSemanticDecl(_)
-        | PackageBodyElement::KermlFeatureDecl(_)
         | PackageBodyElement::KermlClassifier(_)
         | PackageBodyElement::KermlConnector(_)
         | PackageBodyElement::KermlRelationship(_)
         | PackageBodyElement::KermlInvariant(_)
+        | PackageBodyElement::KermlSuccession(_)
         | PackageBodyElement::KermlFeature(_)
         | PackageBodyElement::KermlBareDeclaration(_)
-        | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
         | PackageBodyElement::ItemUsage(_)
         | PackageBodyElement::PortUsage(_)
@@ -336,11 +329,13 @@ pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> 
     alt((package_body_brace, crate::parser::body::semicolon_body)).parse(input)
 }
 
-fn package_body_element_fallback(input: Input<'_>) -> IResult<Input<'_>, Node<PackageBodyElement>> {
-    crate::parser::span::reference_transaction(input, package_body_element_fallback_inner)
+fn package_body_member_alternatives(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<PackageBodyElement>> {
+    crate::parser::span::reference_transaction(input, package_body_member_alternatives_inner)
 }
 
-fn package_body_element_fallback_inner(
+fn package_body_member_alternatives_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<PackageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
@@ -363,21 +358,6 @@ fn package_body_element_fallback_inner(
         input,
         nom::error::ErrorKind::Tag,
     )))
-}
-
-/// The retained declaration text between `start` and `end`, as a span trimmed of trivia.
-fn modeled_decl_text(start: Input<'_>, end: Input<'_>) -> crate::ast::OpaqueText {
-    let delta = end
-        .location_offset()
-        .saturating_sub(start.location_offset());
-    let bytes = start.fragment();
-    let take = delta.min(bytes.len());
-    let raw = &bytes[..take];
-    let leading = raw.len() - raw.trim_ascii_start().len();
-    let trimmed_len = raw.trim_ascii().len();
-    let text_start = crate::parser::advance(start, leading);
-    let text_end = crate::parser::advance(text_start, trimmed_len);
-    crate::ast::OpaqueText::new(crate::parser::span_from_to(text_start, text_end))
 }
 
 fn starts_with_visibility_prefix(fragment: &[u8]) -> Option<usize> {
@@ -512,169 +492,12 @@ fn binding_connector_usage_inner(
     ))
 }
 
-fn is_modeled_decl_start(fragment: &[u8], starters: &[&[u8]]) -> bool {
-    if fragment.starts_with(b"#") {
-        return false;
-    }
-    if starts_with_keyword(fragment, b"package")
-        || starts_with_keyword(fragment, b"library")
-        || starts_with_keyword(fragment, b"namespace")
-        || starts_with_keyword(fragment, b"import")
-        || starts_with_keyword(fragment, b"doc")
-        || starts_with_keyword(fragment, b"comment")
-        || starts_with_keyword(fragment, b"filter")
-    {
-        return false;
-    }
-    let frag = strip_common_decl_prefixes(fragment);
-    starts_with_any_keyword(frag, starters)
-}
-
-fn unsupported_package_element(
-    input: Input<'_>,
-    recovery_end: Input<'_>,
-) -> Option<Node<PackageBodyElement>> {
-    let (trimmed, _) = ws_and_comments(input).ok()?;
-    let stripped = strip_common_decl_prefixes(trimmed.fragment());
-    let starter = package_body_starter(stripped)?;
-    let unsupported_production = match starter.production {
-        PackageProduction::BindingConnectorAsUsage => {
-            crate::ast::UnsupportedProduction::BindingConnectorAsUsage
-        }
-        PackageProduction::PerformActionUsage => {
-            crate::ast::UnsupportedProduction::PerformActionUsage
-        }
-        PackageProduction::PrefixMetadataMember
-        | PackageProduction::DefinitionElement
-        | PackageProduction::Action
-        | PackageProduction::ActorUsage
-        | PackageProduction::AliasMember
-        | PackageProduction::Allocation
-        | PackageProduction::AnalysisCase
-        | PackageProduction::AssertConstraintUsage
-        | PackageProduction::Constraint
-        | PackageProduction::Attribute
-        | PackageProduction::Calculation
-        | PackageProduction::Case
-        | PackageProduction::Comment
-        | PackageProduction::Concern
-        | PackageProduction::Connection
-        | PackageProduction::Dependency
-        | PackageProduction::Documentation
-        | PackageProduction::Enumeration
-        | PackageProduction::Expose
-        | PackageProduction::ElementFilterMember
-        | PackageProduction::Flow
-        | PackageProduction::Message
-        | PackageProduction::Succession
-        | PackageProduction::ExhibitStateUsage
-        | PackageProduction::IncludeUseCaseUsage
-        | PackageProduction::RequirementBodyItem
-        | PackageProduction::Import
-        | PackageProduction::Individual
-        | PackageProduction::Interface
-        | PackageProduction::Item
-        | PackageProduction::LibraryPackage
-        | PackageProduction::Metadata
-        | PackageProduction::Namespace
-        | PackageProduction::Occurrence
-        | PackageProduction::Package
-        | PackageProduction::Part
-        | PackageProduction::Port
-        | PackageProduction::MemberPrefix
-        | PackageProduction::ViewRenderingUsage
-        | PackageProduction::Rendering
-        | PackageProduction::TextualRepresentation
-        | PackageProduction::Requirement
-        | PackageProduction::SatisfyRequirementUsage
-        | PackageProduction::UseCase
-        | PackageProduction::VerificationCase
-        | PackageProduction::View
-        | PackageProduction::Viewpoint
-        | PackageProduction::FeaturePrefix
-        | PackageProduction::UsagePrefix
-        | PackageProduction::OccurrenceUsagePrefix
-        | PackageProduction::Connector
-        | PackageProduction::TextualRepresentationLanguage
-        | PackageProduction::Feature
-        | PackageProduction::Class => return None,
-    };
-    let found = crate::parser::recovery::recovery_found_snippet_from_span(input, recovery_end);
-    let recovery = crate::ast::ParseErrorNode {
-        diagnostic_span: None,
-        message: format!(
-            "the spec-valid {} production is not implemented in package bodies",
-            starter.production.bnf_name()
-        ),
-        code: "unsupported_grammar_form".to_owned(),
-        expected: Some(format!(
-            "implemented package-body form for {}",
-            starter.production.bnf_name()
-        )),
-        found,
-        suggestion: Some(
-            "Keep this syntax; parser support is incomplete rather than the authored model being malformed."
-                .to_owned(),
-        ),
-        category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
-    };
-    Some(node_from_to(
-        input,
-        recovery_end,
-        PackageBodyElement::Unsupported(Node::new(
-            crate::ast::Span::dummy(),
-            crate::ast::UnsupportedGrammarNode {
-                production: unsupported_production,
-                diagnostic: recovery,
-            },
-        )),
-    ))
-}
-
-fn parse_modeled_decl<'a>(
-    input: Input<'a>,
-    starters: &'a [&'a [u8]],
-) -> IResult<Input<'a>, (crate::ast::Span, crate::ast::OpaqueText)> {
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    if !is_modeled_decl_start(input.fragment(), starters) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let raw_start = input;
-    let stripped = strip_common_decl_prefixes(input.fragment());
-    // `is_modeled_decl_start` accepted this text, so exactly this search succeeded there.
-    let keyword = starters
-        .iter()
-        .find(|kw| starts_with_keyword(stripped, kw))
-        .ok_or_else(|| {
-            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
-        })?;
-    let keyword_start = crate::parser::advance(input, input.fragment().len() - stripped.len());
-    let keyword_span = crate::parser::span_from_to(
-        keyword_start,
-        crate::parser::advance(keyword_start, keyword.len()),
-    );
-    let (input, _) = skip_statement_or_block(input)?;
-    Ok((input, (keyword_span, modeled_decl_text(raw_start, input))))
-}
-
 /// Structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
 /// Covers `datatype DeferredType;`, `multiplicity exactlyOne [1..1];`,
 /// `interaction DeferredInteraction;`, `predicate deferredPredicate;`, `classifier
-/// SpatialFrame;`, and the same shape for every other KerML classifier/feature keyword whose
-/// bare (bodyless) form uses it (`class` is handled by [`class_def`] itself, whose body accepts
-/// a bare `;` -- see `attribute_body`). Tried before the opaque
-/// [`kerml_semantic_decl`]/[`classifier_decl`] fallbacks so this common shape gets a structured
-/// node; a keyword followed by a `{` body or a `:>`/`specializes` clause (a different, larger
-/// production, e.g. [`class_def`]) falls through to those other productions unchanged.
+/// SpatialFrame;`, and the same bodyless shape for other KerML classifier/feature keywords.
+/// Bodied declarations and specialization headers use the structured classifier or feature
+/// productions; a failed production enters source-preserving error recovery.
 fn kerml_bare_declaration(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBareDeclaration>> {
@@ -710,12 +533,6 @@ fn kerml_bare_declaration(
     ))
 }
 
-/// Structured KerML classifier declaration: (visibility)? `abstract`? keyword `all`?
-/// Identification multiplicity? (`specializes`/`:>` targets)? type body (Kernel Function/
-/// Semantic/Data Type Libraries). Tried before the opaque
-/// [`classifier_decl`]/[`kerml_semantic_decl`] fallbacks so these get a typed node; bare
-/// `keyword Name;` forward declarations stay on [`kerml_bare_declaration`], which is tried
-/// first.
 /// KerML explicit relationship declaration (BNF §8.2.4): `specialization S? subtype a
 /// specializes b;`, `specialization? subclassifier a specializes b;`, `specialization? typing a
 /// typed by b;`, `specialization? subset a subsets b;`, `specialization? redefinition a
@@ -1233,7 +1050,7 @@ fn kerml_classifier_structured_inner(
 /// `SpecializationPart`'s comma-separated `OwnedSubclassification`s. Both spellings are accepted
 /// and which one was authored is recorded, because they are interchangeable in the grammar and
 /// only emission cares.
-fn kerml_conjugation_part(
+pub(crate) fn kerml_conjugation_part(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<Node<crate::ast::Conjugation>>> {
     let (peek, _) = ws_and_comments(input)?;
@@ -1269,151 +1086,6 @@ fn kerml_conjugation_part(
                 span,
             },
         )),
-    ))
-}
-
-fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanticDecl>> {
-    let start = input;
-    let starters: &[&[u8]] = &[
-        b"behavior",
-        b"bool",
-        b"function",
-        b"interaction",
-        b"datatype",
-        b"inv",
-        b"invariant",
-        b"multiplicity",
-        b"assoc",
-        b"association",
-        b"metaclass",
-        b"step",
-    ];
-    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
-    Ok((
-        input,
-        node_from_to(start, input, KermlSemanticDecl { keyword_span, text }),
-    ))
-}
-
-/// A failed SysML definition must not be relabelled as a spec-valid opaque fallback declaration
-/// when its header uses KerML-only disjoining: SysML's `DefinitionDeclaration` is
-/// `Identification SubclassificationPart?` (SysML 8.2.2), and `disjoint from` exists only in KerML
-/// (KerML 7.3.2.5). The definition header grammar is reused on the original input, so comments,
-/// quoted names and nested bodies cannot be mistaken for a header clause. Every fallback that
-/// claims a SysML definition keyword must call this before claiming the text.
-fn reject_sysml_definition_disjoining<'a>(
-    input: Input<'a>,
-    starters: &[&'static [u8]],
-) -> IResult<Input<'a>, ()> {
-    if input.extra.name_language() != crate::ast::NameLanguage::Sysml {
-        return Ok((input, ()));
-    }
-    use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-    for keyword in starters.iter().copied() {
-        let mut options = DefinitionPrefixOptions::new(keyword)
-            .def_required()
-            .individual_allowed()
-            .with_captured_visibility()
-            .with_extension_keywords();
-        // `use case def` is the only two-word definition keyword: analysis and verification
-        // case definitions are `analysis def` and `verification def` (SysML 8.2.2.21, 8.2.2.22).
-        if keyword == b"use" {
-            options = options.with_second_keyword(b"case");
-        }
-        // A lookahead: the fallback re-parses the same bytes, so the probe keeps no references.
-        let header_end = crate::parser::span::reference_probe(input, |probe| {
-            parse_definition_prefix(probe, options).map(|(rest, _)| rest)
-        });
-        if let Ok(header_end) = header_end {
-            let (clause, _) = ws_and_comments(header_end)?;
-            if starts_with_keyword(clause.fragment(), b"disjoint") {
-                return Err(nom::Err::Failure(nom::error::Error::new(
-                    clause,
-                    nom::error::ErrorKind::Verify,
-                )));
-            }
-        }
-    }
-    Ok((input, ()))
-}
-
-fn kerml_feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlFeatureDecl>> {
-    let start = input;
-    let starters: &[&[u8]] = &[b"occurrence", b"expr", b"predicate", b"succession"];
-    // `occurrence def` is a SysML definition this KerML fallback also claims.
-    reject_sysml_definition_disjoining(input, &[b"occurrence"])?;
-    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
-    Ok((
-        input,
-        node_from_to(start, input, KermlFeatureDecl { keyword_span, text }),
-    ))
-}
-
-fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
-    let start = input;
-    let starters: &[&[u8]] = &[b"feature"];
-    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
-    Ok((
-        input,
-        node_from_to(start, input, FeatureDecl { keyword_span, text }),
-    ))
-}
-
-fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
-    let start = input;
-    let starters: &[&[u8]] = &[
-        b"class",
-        b"classifier",
-        b"struct",
-        b"structure",
-        b"subclassifier",
-    ];
-    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
-    Ok((
-        input,
-        node_from_to(start, input, ClassifierDecl { keyword_span, text }),
-    ))
-}
-
-// The bare-`feature` package member (`feature x : Integer;`, `feature f { expr s { ... } }`)
-// now parses through `kerml_feature` -- one typed representation for every
-// `feature`-keyword-led member across package and type-body scopes (spec42 gap 14). The
-// previous `DefaultReferenceUsage`-shaped `feature_usage_member` production and its expression
-// body machinery were removed with it; `expr s { ... }`
-// members now parse as feature members of kind `expr` inside the shared type-body grammar.
-fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLibraryDecl>> {
-    let start = input;
-    let starters: &[&[u8]] = &[
-        b"action",
-        b"allocation",
-        b"analysis",
-        b"attribute",
-        b"case",
-        b"calc",
-        b"connection",
-        b"constraint",
-        b"flow",
-        b"interface",
-        b"item",
-        b"metadata",
-        b"requirement",
-        b"state",
-        b"use",
-        b"verification",
-        b"view",
-        b"viewpoint",
-        b"rendering",
-        b"enum",
-        b"message",
-        b"concern",
-        b"part",
-        b"port",
-    ];
-    reject_sysml_definition_disjoining(input, starters)?;
-    let (input, (keyword_span, text)) = parse_modeled_decl(input, starters)?;
-    Ok((
-        input,
-        node_from_to(start, input, ExtendedLibraryDecl { keyword_span, text }),
     ))
 }
 
@@ -1473,7 +1145,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 // Same probe as the primary attempt above: this retry re-parses at the same
                 // stack depth and can recurse into an equally expensive nested construct.
                 if let Ok((next, element)) = crate::parser::stack::with_nested_body_stack(|| {
-                    package_body_element_fallback(input)
+                    package_body_member_alternatives(input)
                 }) {
                     if next.location_offset() == input.location_offset() {
                         return Err(nom::Err::Failure(nom::error::Error::new(
@@ -1492,11 +1164,6 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                         nom::error::ErrorKind::Many0,
                     )));
                 }
-                if let Some(unsupported) = unsupported_package_element(input, next) {
-                    elements.push(unsupported);
-                    input = next;
-                    continue;
-                }
                 let recovery = build_recovery_error_node_from_span(
                     input,
                     next,
@@ -1504,44 +1171,6 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                     "package body",
                     "recovered_package_body_element",
                 );
-                if matches!(
-                    recovery.code.as_str(),
-                    "invalid_identifier"
-                        | "invalid_typing_operator"
-                        | "missing_body_or_semicolon"
-                        | "missing_expression_after_operator"
-                        | "unexpected_keyword_in_scope"
-                        | "unrecognized_declaration_in_scope"
-                        | "unsupported_annotation_syntax"
-                        | "malformed_annotation_head"
-                ) {
-                    elements.push(node_from_to(
-                        input,
-                        next,
-                        PackageBodyElement::Error(node_from_to(input, next, recovery)),
-                    ));
-                    input = next;
-                    continue;
-                }
-                // If we couldn't parse a dedicated node but the line still looks like a modeled
-                // library declaration (including `abstract`/visibility prefixes), preserve it as
-                // an `ExtendedLibraryDecl` instead of aborting the entire package.
-                if let Ok((next, ext)) = map(
-                    extended_library_decl,
-                    PackageBodyElement::ExtendedLibraryDecl,
-                )
-                .parse(input)
-                {
-                    if next.location_offset() == input.location_offset() {
-                        return Err(nom::Err::Failure(nom::error::Error::new(
-                            input,
-                            nom::error::ErrorKind::Many0,
-                        )));
-                    }
-                    elements.push(node_from_to(input, next, ext));
-                    input = next;
-                    continue;
-                }
                 elements.push(node_from_to(
                     input,
                     next,
@@ -1553,7 +1182,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 // Same probe as the primary attempt above: this retry re-parses at the same
                 // stack depth and can recurse into an equally expensive nested construct.
                 if let Ok((next, element)) = crate::parser::stack::with_nested_body_stack(|| {
-                    package_body_element_fallback(input)
+                    package_body_member_alternatives(input)
                 }) {
                     if next.location_offset() > input.location_offset() {
                         elements.push(element);
@@ -1567,11 +1196,6 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                         input,
                         nom::error::ErrorKind::Many0,
                     )));
-                }
-                if let Some(unsupported) = unsupported_package_element(input, next) {
-                    elements.push(unsupported);
-                    input = next;
-                    continue;
                 }
                 let recovery = build_recovery_error_node_from_span(
                     input,
@@ -2298,14 +1922,12 @@ fn try_package_body_view<'a>(
         expose_member,
         PackageBodyElement::Expose
     );
-    // Bare `classifier`/`class` forward declarations (e.g. `classifier SpatialFrame;`, `class
-    // B;`) are tried before the opaque `classifier_decl` fallback so this common shape gets a
-    // structured node -- see `kerml_bare_declaration`'s doc comment.
+    // Parse relationship declarations through their complete typed grammar.
     try_package_body_dispatch!(input, start, kerml_relationship_decl, |n| {
         PackageBodyElement::KermlRelationship(Box::new(n))
     });
     // Classifier declarations (incl. bare `classifier X;`-style forward declarations, which get
-    // the same typed node with a `;` body) before the bare-declaration fallback, so every
+    // the same typed node with a `;` body) before the bodyless-declaration alternative, so every
     // keyword the structured production covers becomes a resolvable named declaration
     // (spec42 gap 13).
     try_package_body_dispatch!(input, start, kerml_classifier_structured, |n| {
@@ -2317,6 +1939,16 @@ fn try_package_body_view<'a>(
         crate::parser::constraint::kerml_feature,
         |n| { PackageBodyElement::KermlFeature(Box::new(n)) }
     );
+    // KerML `Succession`, whose `first` is optional (`succession [1] a then [*] b;`). SysML's
+    // `SuccessionAsUsage` requires `first` and was tried above.
+    if input.extra.name_language() == crate::ast::NameLanguage::Kerml {
+        try_package_body_dispatch!(
+            input,
+            start,
+            crate::parser::constraint::kerml_succession_member,
+            |n| { PackageBodyElement::KermlSuccession(Box::new(n)) }
+        );
+    }
     // Bare forward declarations for the keywords the structured productions above do not
     // cover (`inv x;`, `occurrence o;`, `succession s;`, ...).
     try_package_body_dispatch!(
@@ -2325,7 +1957,6 @@ fn try_package_body_view<'a>(
         kerml_bare_declaration,
         PackageBodyElement::KermlBareDeclaration
     );
-    try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
     try_package_body_dispatch!(
         input,
         start,
@@ -2337,18 +1968,6 @@ fn try_package_body_view<'a>(
         start,
         crate::parser::constraint::kerml_invariant_member,
         |n| { PackageBodyElement::KermlInvariant(Box::new(n)) }
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
-        classifier_decl,
-        PackageBodyElement::ClassifierDecl
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
-        kerml_semantic_decl,
-        PackageBodyElement::KermlSemanticDecl
     );
     // Keyword-less implicit-feature shorthand, last so every keyword-led production keeps
     // priority: bare `x;`, `y = expr;`, `z : Type;` package members (spec42 gap 23).
@@ -2614,11 +2233,6 @@ pub(crate) fn package_body_element(
     }) {
         return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
-    if let Ok((input, elem)) =
-        map(kerml_feature_decl, PackageBodyElement::KermlFeatureDecl).parse(input)
-    {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
-    }
     if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {
         if next.location_offset() != input.location_offset() {
             let recovery = build_recovery_error_node_from_span(
@@ -2630,8 +2244,7 @@ pub(crate) fn package_body_element(
             );
             if recovery.code == "invalid_identifier" {
                 // Keep the targeted diagnostic on the member. Returning `Err` here drops it, and
-                // the root/package fallback then reports a generic expected-keyword error while
-                // `extended_library_decl` can swallow the declaration with no diagnostic at all.
+                // the root/package recovery would otherwise lose the targeted member diagnostic.
                 return Ok((
                     next,
                     Box::new(node_from_to(
@@ -2657,12 +2270,10 @@ pub(crate) fn package_body_element(
             }
         }
     }
-    let (input, elem) = map(
-        extended_library_decl,
-        PackageBodyElement::ExtendedLibraryDecl,
-    )
-    .parse(input)?;
-    Ok((input, Box::new(node_from_to(start, input, elem))))
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
 }
 
 #[cfg(test)]

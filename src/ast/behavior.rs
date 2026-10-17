@@ -1061,6 +1061,9 @@ pub struct AllocationUsage {
     /// `Expression` nodes with the authored end name discarded.
     pub source: Option<Node<crate::ast::KermlConnectorEnd>>,
     pub target: Option<Node<crate::ast::KermlConnectorEnd>>,
+    /// The ends of the n-ary `allocate ( e1, e2, ... )` form (`NaryConnectorPart`); empty for
+    /// the binary form, whose ends are `source` and `target`.
+    pub nary_ends: Vec<Node<crate::ast::KermlConnectorEnd>>,
     pub body: DefinitionBody,
     pub membership: Membership,
 }
@@ -1274,6 +1277,8 @@ pub struct StateUsage {
     pub is_derived: bool,
     /// Leading `abstract` keyword.
     pub is_abstract: bool,
+    /// `variation` (`RefPrefix`'s alternative to `abstract`).
+    pub is_variation: bool,
     /// Leading `ref` keyword — reference feature usage (`ref state …`).
     pub is_reference: bool,
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).

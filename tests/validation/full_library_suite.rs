@@ -8,8 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use sysml_v2_parser::ast::NameLanguage;
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
-use sysml_v2_parser::{parse_for_editor_with_name_language, ParseError, ParsedDocument};
+use sysml_v2_parser::{parse_for_editor_with_name_language, ParseError};
 
 /// Root of the SysML v2 Release tree (from env or the local sysml-v2-release directory).
 fn sysml_v2_release_root() -> PathBuf {
@@ -126,165 +125,6 @@ fn classify_error(err: &ParseError) -> String {
         .take(3)
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn collect_bnf_decl_counts(
-    doc: &ParsedDocument,
-    root: &RootNamespace,
-    counts: &mut BTreeMap<String, usize>,
-) {
-    for element in &root.elements {
-        match &element.value {
-            RootElement::Package(p) => collect_bnf_decl_counts_in_body(doc, &p.value.body, counts),
-            RootElement::LibraryPackage(p) => {
-                collect_bnf_decl_counts_in_body(doc, &p.value.body, counts)
-            }
-            RootElement::Namespace(n) => {
-                collect_bnf_decl_counts_in_body(doc, &n.value.body, counts)
-            }
-            RootElement::Import(_) => {}
-            RootElement::Member(_) => {}
-        }
-    }
-}
-
-fn collect_bnf_decl_counts_in_body(
-    doc: &ParsedDocument,
-    body: &PackageBody,
-    counts: &mut BTreeMap<String, usize>,
-) {
-    let PackageBody::Brace { elements, .. } = body else {
-        return;
-    };
-    for element in elements {
-        match &element.value {
-            PackageBodyElement::FeatureDecl(n) => {
-                *counts
-                    .entry(format!(
-                        "dedicated:{}",
-                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
-                    ))
-                    .or_insert(0) += 1;
-            }
-            PackageBodyElement::ClassifierDecl(n) => {
-                *counts
-                    .entry(format!(
-                        "dedicated:{}",
-                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
-                    ))
-                    .or_insert(0) += 1;
-            }
-            PackageBodyElement::KermlSemanticDecl(n) => {
-                *counts
-                    .entry(format!(
-                        "bnf:{}",
-                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
-                    ))
-                    .or_insert(0) += 1;
-            }
-            PackageBodyElement::KermlFeatureDecl(n) => {
-                *counts
-                    .entry(format!(
-                        "bnf:{}",
-                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
-                    ))
-                    .or_insert(0) += 1;
-            }
-            PackageBodyElement::ExtendedLibraryDecl(n) => {
-                *counts
-                    .entry(format!(
-                        "bnf:{}",
-                        doc.source.slice(&n.value.keyword_span).unwrap_or("?")
-                    ))
-                    .or_insert(0) += 1;
-            }
-            PackageBodyElement::Package(n) => {
-                collect_bnf_decl_counts_in_body(doc, &n.value.body, counts)
-            }
-            PackageBodyElement::LibraryPackage(n) => {
-                collect_bnf_decl_counts_in_body(doc, &n.value.body, counts)
-            }
-            _ => {}
-        }
-    }
-}
-
-fn collect_package_body_type_counts(root: &RootNamespace, counts: &mut BTreeMap<String, usize>) {
-    for element in &root.elements {
-        match &element.value {
-            RootElement::Package(p) => collect_body_type_counts(&p.value.body, counts),
-            RootElement::LibraryPackage(p) => collect_body_type_counts(&p.value.body, counts),
-            RootElement::Namespace(n) => collect_body_type_counts(&n.value.body, counts),
-            RootElement::Import(_) => {}
-            RootElement::Member(_) => {}
-        }
-    }
-}
-
-fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
-    let PackageBody::Brace { elements, .. } = body else {
-        return;
-    };
-    for element in elements {
-        let key = match &element.value {
-            PackageBodyElement::ExtendedLibraryDecl(_) => "ExtendedLibraryDecl",
-            PackageBodyElement::KermlSemanticDecl(_) => "KermlSemanticDecl",
-            PackageBodyElement::KermlFeatureDecl(_) => "KermlFeatureDecl",
-            PackageBodyElement::FeatureDecl(_) => "FeatureDecl",
-            PackageBodyElement::ClassifierDecl(_) => "ClassifierDecl",
-            PackageBodyElement::ActionDef(_) => "ActionDef",
-            PackageBodyElement::AttributeDef(_) => "AttributeDef",
-            PackageBodyElement::CalcDef(_) => "CalcDef",
-            PackageBodyElement::CaseDef(_) => "CaseDef",
-            PackageBodyElement::ConnectionDef(_) => "ConnectionDef",
-            PackageBodyElement::ConstraintDef(_) => "ConstraintDef",
-            PackageBodyElement::FlowDef(_) => "FlowDef",
-            PackageBodyElement::InterfaceDef(_) => "InterfaceDef",
-            PackageBodyElement::ItemDef(_) => "ItemDef",
-            PackageBodyElement::MetadataDef(_) => "MetadataDef",
-            PackageBodyElement::PartDef(_) => "PartDef",
-            PackageBodyElement::PortDef(_) => "PortDef",
-            PackageBodyElement::RequirementDef(_) => "RequirementDef",
-            PackageBodyElement::StateDef(_) => "StateDef",
-            PackageBodyElement::ViewDef(_) => "ViewDef",
-            PackageBodyElement::ViewpointDef(_) => "ViewpointDef",
-            PackageBodyElement::RenderingDef(_) => "RenderingDef",
-            PackageBodyElement::Package(n) => {
-                collect_body_type_counts(&n.value.body, counts);
-                "Package"
-            }
-            PackageBodyElement::LibraryPackage(n) => {
-                collect_body_type_counts(&n.value.body, counts);
-                "LibraryPackage"
-            }
-            _ => "Other",
-        };
-        *counts.entry(key.to_string()).or_insert(0) += 1;
-    }
-}
-
-fn env_threshold(name: &str) -> Option<usize> {
-    std::env::var(name)
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-}
-
-fn collect_extended_texts(doc: &ParsedDocument, body: &PackageBody, out: &mut Vec<String>) {
-    let PackageBody::Brace { elements, .. } = body else {
-        return;
-    };
-    for element in elements {
-        match &element.value {
-            PackageBodyElement::ExtendedLibraryDecl(n) => {
-                out.push(doc.opaque_text(n.value.text).unwrap_or_default().to_owned())
-            }
-            PackageBodyElement::Package(n) => collect_extended_texts(doc, &n.value.body, out),
-            PackageBodyElement::LibraryPackage(n) => {
-                collect_extended_texts(doc, &n.value.body, out)
-            }
-            _ => {}
-        }
-    }
 }
 
 /// Full library suite: parse all SysML/KerML library sources from SysML-v2-Release.
@@ -416,7 +256,6 @@ fn test_systems_library_strict_no_diagnostics() {
     );
 
     let mut failures = Vec::new();
-    let mut bnf_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut pattern_counts: BTreeMap<String, usize> = BTreeMap::new();
     for file in &files {
         let relative_path = file
@@ -427,7 +266,6 @@ fn test_systems_library_strict_no_diagnostics() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
         let result = parse_library_source(file, &content);
-        collect_bnf_decl_counts(&result.document, &result.document.root, &mut bnf_counts);
         if !result.errors.is_empty() {
             for err in &result.errors {
                 *pattern_counts.entry(classify_error(err)).or_insert(0) += 1;
@@ -443,12 +281,6 @@ fn test_systems_library_strict_no_diagnostics() {
     }
 
     if !failures.is_empty() {
-        let mut top_bnf = bnf_counts.into_iter().collect::<Vec<_>>();
-        top_bnf.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-        eprintln!("Top modeled BNF declarations:");
-        for (pattern, count) in top_bnf.into_iter().take(10) {
-            eprintln!("  - {}: {}", pattern, count);
-        }
         let mut top_patterns = pattern_counts.into_iter().collect::<Vec<_>>();
         top_patterns.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         eprintln!("Top diagnostic patterns:");
@@ -496,7 +328,6 @@ fn test_full_library_strict_no_diagnostics() {
 
     let mut failures = Vec::new();
     let mut pattern_counts: BTreeMap<String, usize> = BTreeMap::new();
-    let mut bnf_counts: BTreeMap<String, usize> = BTreeMap::new();
 
     for file in &files {
         let relative_path = file
@@ -507,7 +338,6 @@ fn test_full_library_strict_no_diagnostics() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
         let result = parse_library_source(file, &content);
-        collect_bnf_decl_counts(&result.document, &result.document.root, &mut bnf_counts);
         if result.errors.is_empty() {
             eprintln!("✓ {}", relative_path);
             continue;
@@ -523,12 +353,6 @@ fn test_full_library_strict_no_diagnostics() {
     }
 
     if !failures.is_empty() {
-        let mut top_bnf = bnf_counts.into_iter().collect::<Vec<_>>();
-        top_bnf.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-        eprintln!("Top modeled BNF declarations:");
-        for (pattern, count) in top_bnf.into_iter().take(15) {
-            eprintln!("  - {}: {}", pattern, count);
-        }
         let mut top_patterns = pattern_counts.into_iter().collect::<Vec<_>>();
         top_patterns.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         eprintln!("Top diagnostic patterns:");
@@ -542,224 +366,6 @@ fn test_full_library_strict_no_diagnostics() {
             "Full library strict suite failed: {} of {} files produced diagnostics.",
             failures.len(),
             files.len()
-        );
-    }
-}
-
-/// Node-shape quality gate for SysML standard library.
-/// This test intentionally fails when `ExtendedLibraryDecl` is still used there.
-///
-/// Run with:
-/// `cargo test --test validation test_systems_library_node_types_no_extended -- --include-ignored --nocapture`
-#[test]
-#[ignore = "quality gate: ensure systems library maps to dedicated node types"]
-fn test_systems_library_node_types_no_extended() {
-    super::init_log();
-
-    let systems_path = library_dir().join("Systems Library");
-    if !systems_path.exists() {
-        log::debug!("Systems Library directory not found: {:?}", systems_path);
-        return;
-    }
-
-    let mut files =
-        find_library_files(&systems_path).expect("Failed to find Systems Library files");
-    files.sort();
-    assert!(!files.is_empty(), "No systems library files found");
-
-    let mut type_counts: BTreeMap<String, usize> = BTreeMap::new();
-    let mut extended_by_file = Vec::new();
-    let mut sample_texts = Vec::new();
-
-    for file in &files {
-        let relative = file
-            .strip_prefix(&systems_path)
-            .unwrap_or(file)
-            .to_string_lossy()
-            .to_string();
-        let content = fs::read_to_string(file)
-            .unwrap_or_else(|e| panic!("failed to read {}: {}", relative, e));
-        let result = parse_library_source(file, &content);
-        collect_package_body_type_counts(&result.document.root, &mut type_counts);
-
-        let mut file_counts = BTreeMap::new();
-        collect_package_body_type_counts(&result.document.root, &mut file_counts);
-        let n_extended = *file_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
-        if n_extended > 0 {
-            let mut snippets = Vec::new();
-            for root in &result.document.root.elements {
-                match &root.value {
-                    RootElement::Package(n) => {
-                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
-                    }
-                    RootElement::LibraryPackage(n) => {
-                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
-                    }
-                    RootElement::Namespace(n) => {
-                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
-                    }
-                    RootElement::Import(_) => {}
-                    RootElement::Member(_) => {}
-                }
-            }
-            for s in snippets.into_iter().take(2) {
-                sample_texts.push((relative.clone(), s));
-            }
-            extended_by_file.push((relative, n_extended));
-        }
-    }
-
-    let n_extended_total = *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
-    let n_semantic_total = *type_counts.get("KermlSemanticDecl").unwrap_or(&0);
-    let n_feature_total = *type_counts.get("KermlFeatureDecl").unwrap_or(&0);
-    eprintln!("Systems Library node-type counts:");
-    let mut sorted_counts = type_counts.into_iter().collect::<Vec<_>>();
-    sorted_counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    for (k, v) in sorted_counts {
-        eprintln!("  - {}: {}", k, v);
-    }
-
-    if n_extended_total > 0 {
-        extended_by_file.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-        eprintln!("Files still mapped as ExtendedLibraryDecl:");
-        for (path, n) in extended_by_file.iter().take(10) {
-            eprintln!("  - {}: {}", path, n);
-        }
-    }
-
-    assert_eq!(
-        n_extended_total, 0,
-        "Systems Library still contains ExtendedLibraryDecl nodes ({} total)",
-        n_extended_total
-    );
-    if let Some(threshold) = env_threshold("SYSTEMS_LIBRARY_KERML_SEMANTIC_MAX") {
-        assert!(
-            n_semantic_total <= threshold,
-            "Systems Library still contains KermlSemanticDecl nodes ({} total, threshold {})",
-            n_semantic_total,
-            threshold
-        );
-    }
-    if let Some(threshold) = env_threshold("SYSTEMS_LIBRARY_KERML_FEATURE_MAX") {
-        assert!(
-            n_feature_total <= threshold,
-            "Systems Library still contains KermlFeatureDecl nodes ({} total, threshold {})",
-            n_feature_total,
-            threshold
-        );
-    }
-}
-
-/// Node-shape quality gate for the full SysML standard library.
-///
-/// Run with:
-/// `cargo test --test validation test_full_library_node_types_no_extended -- --include-ignored --nocapture`
-#[test]
-#[ignore = "quality gate: ensure full std library maps to dedicated node types"]
-fn test_full_library_node_types_no_extended() {
-    super::init_log();
-
-    let full_path = library_dir();
-    if !full_path.exists() {
-        log::debug!("Library directory not found: {:?}", full_path);
-        return;
-    }
-
-    let mut files = find_library_files(&full_path).expect("Failed to find full library files");
-    files.sort();
-    assert!(!files.is_empty(), "No full library files found");
-
-    let mut type_counts: BTreeMap<String, usize> = BTreeMap::new();
-    let mut extended_by_file = Vec::new();
-    let mut sample_texts = Vec::new();
-
-    for file in &files {
-        let relative = file
-            .strip_prefix(&full_path)
-            .unwrap_or(file)
-            .to_string_lossy()
-            .to_string();
-        let content = fs::read_to_string(file)
-            .unwrap_or_else(|e| panic!("failed to read {}: {}", relative, e));
-        let result = parse_library_source(file, &content);
-        collect_package_body_type_counts(&result.document.root, &mut type_counts);
-
-        let mut file_counts = BTreeMap::new();
-        collect_package_body_type_counts(&result.document.root, &mut file_counts);
-        let n_extended = *file_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
-        if n_extended > 0 {
-            let mut snippets = Vec::new();
-            for root in &result.document.root.elements {
-                match &root.value {
-                    RootElement::Package(n) => {
-                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
-                    }
-                    RootElement::LibraryPackage(n) => {
-                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
-                    }
-                    RootElement::Namespace(n) => {
-                        collect_extended_texts(&result.document, &n.value.body, &mut snippets)
-                    }
-                    RootElement::Import(_) => {}
-                    RootElement::Member(_) => {}
-                }
-            }
-            for s in snippets.into_iter().take(2) {
-                sample_texts.push((relative.clone(), s));
-            }
-            extended_by_file.push((relative, n_extended));
-        }
-    }
-
-    let n_extended_total = *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
-    let n_semantic_total = *type_counts.get("KermlSemanticDecl").unwrap_or(&0);
-    let n_feature_total = *type_counts.get("KermlFeatureDecl").unwrap_or(&0);
-    // Staged burn-down support:
-    // - historical checkpoints: 1206 -> <=900 -> <=600 -> <=300 -> 0
-    // - default is strict hard-0 once migration is complete.
-    let threshold = std::env::var("FULL_LIBRARY_EXTENDED_MAX")
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(0);
-    eprintln!("Full library node-type counts:");
-    let mut sorted_counts = type_counts.into_iter().collect::<Vec<_>>();
-    sorted_counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    for (k, v) in sorted_counts {
-        eprintln!("  - {}: {}", k, v);
-    }
-
-    if n_extended_total > 0 {
-        extended_by_file.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-        eprintln!("Files still mapped as ExtendedLibraryDecl:");
-        for (path, n) in extended_by_file.iter().take(20) {
-            eprintln!("  - {}: {}", path, n);
-        }
-        eprintln!("ExtendedLibraryDecl samples:");
-        for (path, sample) in sample_texts.iter().take(20) {
-            eprintln!("  - {} => {}", path, sample.replace('\n', " "));
-        }
-    }
-
-    assert!(
-        n_extended_total <= threshold,
-        "Full std library still contains ExtendedLibraryDecl nodes ({} total, threshold {})",
-        n_extended_total,
-        threshold
-    );
-    if let Some(threshold) = env_threshold("FULL_LIBRARY_KERML_SEMANTIC_MAX") {
-        assert!(
-            n_semantic_total <= threshold,
-            "Full std library still contains KermlSemanticDecl nodes ({} total, threshold {})",
-            n_semantic_total,
-            threshold
-        );
-    }
-    if let Some(threshold) = env_threshold("FULL_LIBRARY_KERML_FEATURE_MAX") {
-        assert!(
-            n_feature_total <= threshold,
-            "Full std library still contains KermlFeatureDecl nodes ({} total, threshold {})",
-            n_feature_total,
-            threshold
         );
     }
 }

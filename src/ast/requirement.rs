@@ -516,6 +516,8 @@ pub struct EnumerationUsage {
     pub short_name: Option<DeclarationName>,
     pub type_name: Option<QualifiedReferenceId>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ValuePart`: `enum size : SizeChoice = SizeChoice::small;` (`Usage` admits it).
+    pub value: Option<Node<crate::ast::FeatureValue>>,
     pub body: AttributeBody,
     /// `end` keyword from `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`), reached through
     /// the same `UsagePrefix` production `AttributeUsage.is_end` uses (`UsagePrefix 'enum'
@@ -712,6 +714,8 @@ pub struct VerificationCaseUsage {
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract verification ...`.
     pub is_abstract: bool,
+    /// `variation` (`RefPrefix`'s alternative to `abstract`).
+    pub is_variation: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; `verification_case_usage` captures real visibility,
     /// `kind` always [`crate::ast::MembershipKind::FeatureMembership`].
@@ -730,6 +734,8 @@ pub struct UseCaseUsage {
     pub type_name: Option<QualifiedReferenceId>,
     /// True for `abstract use case ...`.
     pub is_abstract: bool,
+    /// `variation` (`RefPrefix`'s alternative to `abstract`).
+    pub is_variation: bool,
     /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
     /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). Previously the
     /// declaration's tail was skipped wholesale, so this and `subsets` were dropped.

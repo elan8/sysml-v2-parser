@@ -1,4 +1,4 @@
-//! Collect `ParseError` diagnostics from recovery and fallback nodes embedded in the AST.
+//! Collect `ParseError` diagnostics from recovery nodes embedded in the AST.
 //!
 //! Recovery diagnostics are a property of the node kind, not of the scope that happens to own
 //! it: a malformed member reports the same way inside a package body, a part definition body, or
@@ -11,7 +11,7 @@
 
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::visit::recovery::{scan_recovery_content, RecoveryContent};
-use crate::ast::{ExtendedLibraryDecl, Node, RootNamespace, Span, TextualRepresentation};
+use crate::ast::{RootNamespace, Span, TextualRepresentation};
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 fn textual_rep_language_diagnostic(
@@ -45,17 +45,6 @@ fn textual_rep_language_diagnostic(
         );
     }
     None
-}
-
-fn unsupported_fallback_diagnostic(span: &Span, production: &str) -> ParseError {
-    ParseError::new(format!(
-        "the spec-valid {production} production is retained but not structurally implemented"
-    ))
-    .with_location(span.offset, span.line, span.column)
-    .with_length(span.len.max(1))
-    .with_code("unsupported_grammar_form")
-    .with_severity(DiagnosticSeverity::Warning)
-    .with_category(DiagnosticCategory::UnsupportedGrammarForm)
 }
 
 pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec<ParseError> {
@@ -95,49 +84,6 @@ pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec
                 &node.value,
             ));
         }
-        RecoveryContent::ExtendedLibraryDecl(node) => {
-            errors.push(extended_library_decl_diagnostic(source, node));
-        }
-        RecoveryContent::FeatureDecl(node) => errors.push(unsupported_fallback_diagnostic(
-            &node.span,
-            "KerML feature declaration",
-        )),
-        RecoveryContent::ClassifierDecl(node) => errors.push(unsupported_fallback_diagnostic(
-            &node.span,
-            "KerML classifier declaration",
-        )),
-        RecoveryContent::KermlSemanticDecl(node) => errors.push(unsupported_fallback_diagnostic(
-            &node.span,
-            "KerML semantic declaration",
-        )),
-        RecoveryContent::KermlFeatureDecl(node) => errors.push(unsupported_fallback_diagnostic(
-            &node.span,
-            "KerML feature form",
-        )),
     });
     errors
-}
-
-/// An extended-library fallback keeps the declaration the grammar could not model. Some of those
-/// declarations are recognizable dialect forms with specific guidance to offer, so classify the
-/// node's own text here: the alternative -- searching the whole document for the dialect's
-/// spelling -- cannot tell a declaration from the same words inside a comment or a string literal.
-fn extended_library_decl_diagnostic(source: &str, node: &Node<ExtendedLibraryDecl>) -> ParseError {
-    let text = node.value.text.span();
-    match source
-        .get(text.offset..text.offset + text.len)
-        .and_then(|text| {
-            crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
-                text.as_bytes(),
-            )
-        }) {
-        Some((code, message, expected, suggestion)) => ParseError::new(message)
-            .with_location(node.span.offset, node.span.line, node.span.column)
-            .with_length(node.span.len)
-            .with_code(code)
-            .with_expected(expected)
-            .with_suggestion(suggestion)
-            .with_category(DiagnosticCategory::ParseError),
-        None => unsupported_fallback_diagnostic(&node.span, "extended-library declaration"),
-    }
 }

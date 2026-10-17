@@ -62,13 +62,43 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
 
     let (input, header) = feature_usage_header(input)?;
     let type_name = header.type_reference;
+    // `ConnectorPart = BinaryConnectorPart | NaryConnectorPart`: `allocate ( logical ::> l,
+    // physical ::> p )` names two or more ends in parentheses (SysML 8.2.2.14).
+    let (input, nary_ends) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if crate::parser::lex::starts_with_keyword(peek.fragment(), b"allocate") {
+            let (after, _) = tag(&b"allocate"[..]).parse(peek)?;
+            let (open, _) = ws_and_comments(after)?;
+            if open.fragment().starts_with(b"(") {
+                let (rest, _) = tag(&b"("[..]).parse(open)?;
+                let (rest, first) = preceded(ws_and_comments, allocation_end_expr).parse(rest)?;
+                let (rest, more) = nom::multi::many1(preceded(
+                    preceded(ws_and_comments, tag(&b","[..])),
+                    preceded(ws_and_comments, allocation_end_expr),
+                ))
+                .parse(rest)?;
+                let (rest, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(rest)?;
+                let mut ends = vec![first];
+                ends.extend(more);
+                (rest, ends)
+            } else {
+                (input, Vec::new())
+            }
+        } else {
+            (input, Vec::new())
+        }
+    };
     // `#73`: `allocate logical ::> torqueGenerator to physical ::> powerTrain` — optional
     // end-name + `::>` before each allocate expression (same shape as connect ends).
-    let (input, source) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"allocate"[..])),
-        preceded(ws1, allocation_end_expr),
-    ))
-    .parse(input)?;
+    let (input, source) = if nary_ends.is_empty() {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b"allocate"[..])),
+            preceded(ws1, allocation_end_expr),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, target) = match source {
         Some(_) => {
             let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
@@ -93,6 +123,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
                 redefines: header.redefines,
                 source,
                 target,
+                nary_ends,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -124,6 +155,7 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
                 redefines: None,
                 source: Some(source),
                 target: Some(target),
+                nary_ends: Vec::new(),
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

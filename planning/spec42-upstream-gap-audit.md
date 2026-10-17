@@ -624,12 +624,6 @@ Found during the audit, out of scope for these commits, recorded so it is not re
   over-accepts against the enclosing production rather than this one, and nothing is dropped, so it
   is not the silent-drop class the cardinality slice closed. It belongs to
   `FeatureSpecializationPart`.
-- In a *package* body, a malformed member whose first keyword is in `extended_library_decl`'s
-  starter list is classified `unsupported_grammar_form` at severity **warning**, with the message
-  "the spec-valid extended-library declaration production is retained but not structurally
-  implemented" -- which is false for an ordinary malformed `attribute`/`part` member. The text and
-  the siblings are preserved, so nothing is lost, but the classification misattributes the cause.
-  Pre-existing and independent of any gap here; it is a body-dispatch question.
 - `EndFeaturePrefix = ( isConstant ?= 'const' )? isEnd ?= 'end'` (KerML BNF 578) spells no other
   slot, and the `FeaturePrefix` merge closed most of the over-acceptance: `derived end feature x;`
   now reaches recovery with an exact span and a surviving sibling. `abstract end feature x;` did

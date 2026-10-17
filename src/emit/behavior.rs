@@ -828,6 +828,9 @@ pub(crate) fn emit_state_usage(
     if usage.is_abstract {
         w.push_str("abstract ");
     }
+    if usage.is_variation {
+        w.push_str("variation ");
+    }
     if usage.is_reference {
         w.push_str("ref ");
     }
@@ -1140,7 +1143,7 @@ pub(crate) fn emit_allocation_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     // Bare `allocate src to dst` (package-level `allocate_usage`) must not be rewritten as
-    // `allocation allocate …` — that form reparses as ExtendedLibraryDecl (validation `12b`).
+    // `allocation allocate …` — that spelling is malformed (validation `12b`).
     let shorthand = usage.name.is_none()
         && usage.short_name.is_none()
         && usage.type_name.is_none()
@@ -1177,6 +1180,16 @@ pub(crate) fn emit_allocation_usage(
         super::view::emit_kerml_connector_end(w, path, &source.value)?;
         w.push_str(" to ");
         super::view::emit_kerml_connector_end(w, path, &target.value)?;
+    }
+    if !usage.nary_ends.is_empty() {
+        w.push_str(" allocate (");
+        for (index, end) in usage.nary_ends.iter().enumerate() {
+            if index > 0 {
+                w.push_str(", ");
+            }
+            super::view::emit_kerml_connector_end(w, path, &end.value)?;
+        }
+        w.push_char(')');
     }
     emit_definition_body(w, path, &usage.body)
 }

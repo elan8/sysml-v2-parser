@@ -264,8 +264,6 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     ))
 }
 
-const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
-
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
@@ -358,16 +356,6 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(
             crate::parser::connector::ref_decl,
             PortDefBodyElement::RefDecl,
-        ),
-        map(
-            |i| {
-                crate::parser::recovery::unsupported_member(
-                    i,
-                    PORT_DEF_OPAQUE_STARTERS,
-                    "port definition body",
-                )
-            },
-            PortDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;

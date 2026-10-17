@@ -46,15 +46,15 @@ The coverage gate treats `implemented` as the stronger claim. Productions marked
 - `test_systems_library_strict_no_diagnostics`: required green
 - `test_full_library_strict_no_diagnostics`: required green
 - `test_full_library_suite`: broad integration visibility
-- `test_systems_library_node_types_no_extended`: required green (**hard 0 `ExtendedLibraryDecl` for Systems Library**)
-- `test_full_library_node_types_no_extended`: required green (**hard 0 `ExtendedLibraryDecl` for full std library**)
-  - supports staged migration threshold via env var `FULL_LIBRARY_EXTENDED_MAX`
-  - default threshold is `0` (strict)
+- `CONFORMANCE_SCORECARD_L2=1 cargo test --test conformance_scorecard`: required green;
+  the shared opacity scan requires zero unstructured nodes in the Systems Library and
+  full standard library, alongside the diagnostic gate. Opaque declaration variants have
+  been removed from the AST.
 
 ## Current quality baseline (2026-06-03)
 
 - `cargo test` is green, including `bnf_compliance` (640/640 productions classified as `implemented`).
 - `cargo test --test validation -- --include-ignored` is green, including the full validation suite and full SysML library gates.
-- Systems Library and full std-library node-shape validation pass with `ExtendedLibraryDecl = 0`.
+- Systems Library and full standard-library validation require zero unstructured nodes.
 - Map status `implemented` means the production is covered by dedicated parser paths and tests; it does not claim full semantic conformance.
 - Remaining depth work: richer AST for every body member, unified KerML definition/usage layer in code, and language-server recovery polish.

@@ -250,6 +250,11 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by `redefines` members in constraint usage bodies: `attribute redefines tp;`-style
     // members no longer fall to recovery, so the dynamics constraints reparse to the same AST.
     "v1 Spec Examples/D.4.7.8 Dynamics/HSUVDynamics.sysml",
+    // Promoted by retiring the permissive fallbacks: n-ary `allocate ( ... )`, an enumeration
+    // usage's value, and `variation verification` now have typed parsers.
+    "Simple Tests/AllocationTest.sysml",
+    "Simple Tests/EnumerationTest.sysml",
+    "Simple Tests/VariabilityTest.sysml",
 ];
 
 fn release_root() -> PathBuf {

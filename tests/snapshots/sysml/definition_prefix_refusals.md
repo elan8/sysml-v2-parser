@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "The two definition productions that do not reach BasicDefinitionPrefix refuse what they do not spell, and the refusal is a recovery node with an exact span and a surviving valid sibling rather than a silently dropped keyword. MetadataDefinition (SysML BNF 1652) inlines `isAbstract ?= 'abstract'` with no `variation` alternative; EnumerationDefinition (BNF 518) spells no prefix slot at all. Note the diagnostic message is misattributed: a package-body member whose first keyword is in the extended-library starter list is reported as that unimplemented production whatever the real cause. The span, the retained text and the siblings are correct; only the classification is wrong. Recorded as deferred debt in planning/spec42-upstream-gap-audit.md."))
+(snapshot (type semantic) (description "MetadataDefinition refuses variation and EnumerationDefinition refuses abstract/variation prefixes, preserving each malformed member with an error and retaining the valid siblings (SysML BNF 1652 and 518)."))
 ~~~
 # SOURCE
 ~~~sysml
@@ -18,9 +18,8 @@ package DefinitionPrefixRefusals {
 (fixture-diagnostics
   (document "definition_prefix_refusals.md"
     (diagnostics
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 39) (line 2) (column 5) (len 49)) (message "the spec-valid extended-library declaration production is retained but not structurally implemented"))
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 128) (line 4) (column 5) (len 39)) (message "the spec-valid extended-library declaration production is retained but not structurally implemented"))
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 212) (line 6) (column 5) (len 41)) (message "the spec-valid extended-library declaration production is retained but not structurally implemented"))
+      (diagnostic (code "recovered_package_body_element") (severity error) (category parseerror) (span (offset 39) (line 2) (column 5) (len 49)) (message "unexpected token in package body"))
+      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 39) (line 2) (column 5) (len 49)) (message "suppressed 2 cascading recovered diagnostics after earlier recovery errors"))
     )
   )
 )
@@ -35,6 +34,6 @@ package DefinitionPrefixRefusals {
   (name-language sysml)
   (references
   )
-  (root (package (name "DefinitionPrefixRefusals") (body brace (extended-library-declaration) (metadata-def (name "AcceptedMetadata") (abstract false) (specializes none) (body semicolon)) (extended-library-declaration) (enum-def (name "AcceptedEnumAfterAbstract") (body semicolon)) (extended-library-declaration) (enum-def (name "AcceptedEnumAfterVariation") (body semicolon)))))
+  (root (package (name "DefinitionPrefixRefusals") (body brace (malformed (code "recovered_package_body_element") (found "variation metadata def RejectedVariationMetadata;") (span (offset 39) (line 2) (column 5) (len 49))) (metadata-def (name "AcceptedMetadata") (abstract false) (specializes none) (body semicolon)) (malformed (code "recovered_package_body_element") (found "abstract enum def RejectedAbstractEnum;") (span (offset 128) (line 4) (column 5) (len 39))) (enum-def (name "AcceptedEnumAfterAbstract") (body semicolon)) (malformed (code "recovered_package_body_element") (found "variation enum def RejectedVariationEnum;") (span (offset 212) (line 6) (column 5) (len 41))) (enum-def (name "AcceptedEnumAfterVariation") (body semicolon)))))
 )
 ~~~

@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type recovery) (description "A `**` exponent operator is not two LiteralInfinity literals: a feature value spelled `**` has no operand and is not accepted as a LiteralInfinity value (it falls to the opaque KerML feature fallback), while the following valid `*` value still parses.") (name-language kerml))
+(snapshot (type recovery) (description "A malformed ** exponent with no operand produces an error recovery node; the following valid LiteralInfinity value remains typed.") (name-language kerml))
 ~~~
 # SOURCE
 ~~~sysml
@@ -14,7 +14,7 @@ package LiteralInfinityRecovery {
 (fixture-diagnostics
   (document "literal_infinity_expression_recovery.md"
     (diagnostics
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 38) (line 2) (column 5) (len 20)) (message "the spec-valid KerML feature declaration production is retained but not structurally implemented"))
+      (diagnostic (code "recovered_package_body_element") (severity error) (category parseerror) (span (offset 38) (line 2) (column 5) (len 20)) (message "unexpected token in package body"))
     )
   )
 )
@@ -29,6 +29,6 @@ package LiteralInfinityRecovery {
   (name-language kerml)
   (references
   )
-  (root (package (name "LiteralInfinityRecovery") (body brace (feature-declaration) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "infinite") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 82) (line 3) (column 24) (len 1)) (infinity))))) (body semicolon)))))
+  (root (package (name "LiteralInfinityRecovery") (body brace (malformed (code "recovered_package_body_element") (found "feature broken = **;") (span (offset 38) (line 2) (column 5) (len 20))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "infinite") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 82) (line 3) (column 24) (len 1)) (infinity))))) (body semicolon)))))
 )
 ~~~

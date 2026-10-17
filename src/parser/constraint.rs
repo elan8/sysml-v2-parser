@@ -1501,10 +1501,12 @@ fn kerml_feature_type_relationship_part(
             nom::error::ErrorKind::Tag,
         )));
     };
-    let (input, first) = qualified_reference(input)?;
+    // A feature's OwnedUnioning, OwnedIntersecting, OwnedDifferencing and OwnedDisjoining each
+    // name a QualifiedName or an OwnedFeatureChain (KerML 8.2.4.3.1, `b.f`).
+    let (input, first) = crate::parser::lex::reference_path(input)?;
     let (input, more) = nom::multi::many0(preceded(
         preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_comments, crate::parser::lex::reference_path),
     ))
     .parse(input)?;
     let mut targets = vec![first];
@@ -1693,6 +1695,18 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     // The name itself is also optional when a specialization/typing/multiplicity/body follows
     // directly: `step :> monitor.startObservation { ... }`, `private composite step : add
     // { ... }` (`Observation.kerml`, `SequenceFunctions.kerml`).
+    // `FeatureIdentification = '<' declaredShortName = NAME '>' ( declaredName = NAME )? |
+    // declaredName = NAME` (KerML 8.2.4.3.1).
+    let (input, short_name) = if leading_redefines.is_some() {
+        (input, None)
+    } else {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b"<") {
+            crate::parser::lex::short_name_prefix(peek)?
+        } else {
+            (input, None)
+        }
+    };
     let (input, name_str) = if leading_redefines.is_some() {
         (input, None)
     } else {
@@ -1700,6 +1714,10 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         if peek.fragment().starts_with(b":")
             || peek.fragment().starts_with(b"[")
             || peek.fragment().starts_with(b"{")
+            || (short_name.is_some()
+                && (peek.fragment().starts_with(b";")
+                    || peek.fragment().starts_with(b"=")
+                    || peek.fragment().starts_with(b"~")))
         {
             (input, None)
         } else {
@@ -1716,6 +1734,12 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         ));
     }
     specializations.extend(part.specializations);
+    // `FeatureDeclaration` takes a `ConjugationPart` instead of a `FeatureSpecializationPart`.
+    let (input, conjugates) = if specializations.is_empty() && part.multiplicity.is_none() {
+        crate::parser::package::kerml_conjugation_part(input)?
+    } else {
+        (input, None)
+    };
     let (input, relationship_parts) = kerml_feature_relationship_parts(input, None)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     // `expr` and `bool` features own an `ExpressionBody` (KerML BNF 863/895); the others a
@@ -1737,10 +1761,12 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 prefix,
                 kind,
                 is_all: is_all.is_some(),
+                short_name,
                 name: name_str,
                 specializations,
                 multiplicity: part.multiplicity,
                 multiplicity_modifiers: part.multiplicity_modifiers,
+                conjugates,
                 relationship_parts,
                 value,
                 body,
@@ -1837,11 +1863,41 @@ fn kerml_invariant_member_inner(
         )));
     }
     let (input, _) = tag(&b"inv"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1)).parse(input)?;
-    let (input, name_str) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    // `Invariant = FeaturePrefix 'inv' ( 'true' | isNegated ?= 'false' )? FeatureDeclaration
+    // ValuePart? FunctionBody` (KerML 8.2.5.8.1).
     let (peek, _) = ws_and_comments(input)?;
-    if !peek.fragment().starts_with(b"{") {
+    let (input, is_true, is_negated) = if starts_with_keyword(peek.fragment(), b"true") {
+        (tag(&b"true"[..]).parse(peek)?.0, true, false)
+    } else if starts_with_keyword(peek.fragment(), b"false")
+        || starts_with_keyword(peek.fragment(), b"not")
+    {
+        let keyword: &[u8] = if starts_with_keyword(peek.fragment(), b"false") {
+            b"false"
+        } else {
+            b"not"
+        };
+        (tag(keyword).parse(peek)?.0, false, true)
+    } else {
+        (input, false, false)
+    };
+    let (input, name_str) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":")
+            || peek.fragment().starts_with(b"[")
+            || peek.fragment().starts_with(b"{")
+            || peek.fragment().starts_with(b";")
+            || peek.fragment().starts_with(b"=")
+        {
+            (input, None)
+        } else {
+            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            (input, Some(n))
+        }
+    };
+    let (input, part) = kerml_feature_specialization_part(input)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    if !peek.fragment().starts_with(b"{") && !peek.fragment().starts_with(b";") {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -1854,8 +1910,12 @@ fn kerml_invariant_member_inner(
             start,
             input,
             crate::ast::KermlInvariantMember {
-                is_negated: is_negated.is_some(),
+                is_negated,
+                is_true,
                 name: name_str,
+                specializations: part.specializations,
+                multiplicity: part.multiplicity,
+                value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

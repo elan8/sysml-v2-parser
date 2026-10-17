@@ -1734,6 +1734,7 @@ pub(crate) fn exhibit_state_as_state_usage(
         direction: exhibit.value.direction,
         is_derived: exhibit.value.is_derived,
         is_abstract: exhibit.value.is_abstract,
+        is_variation: false,
         is_reference: exhibit.value.is_reference,
         is_individual: exhibit.value.is_individual,
         name: exhibit.value.name,

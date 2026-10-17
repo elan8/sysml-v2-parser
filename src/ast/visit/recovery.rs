@@ -9,13 +9,10 @@
 //! fails to compile until both decide what it means.
 
 use super::{
-    walk_classifier_decl, walk_extended_library_decl, walk_feature_decl, walk_kerml_feature_decl,
-    walk_kerml_semantic_decl, walk_parse_error_node, walk_textual_representation,
-    walk_unsupported_grammar_node, Visitor,
+    walk_parse_error_node, walk_textual_representation, walk_unsupported_grammar_node, Visitor,
 };
 use crate::ast::{
-    ClassifierDecl, DeclarationName, DeclarationNameState, ExtendedLibraryDecl, FeatureDecl,
-    KermlFeatureDecl, KermlSemanticDecl, Node, ParseErrorNode, RootNamespace,
+    DeclarationName, DeclarationNameState, Node, ParseErrorNode, RootNamespace,
     TextualRepresentation, UnsupportedGrammarNode,
 };
 
@@ -27,12 +24,6 @@ pub(crate) enum RecoveryContent<'a> {
     ParseError(&'a Node<ParseErrorNode>),
     /// A spec production that parses but has no structural representation yet.
     UnsupportedGrammar(&'a Node<UnsupportedGrammarNode>),
-    /// Fallback nodes that retain a declaration the typed grammar does not model.
-    ExtendedLibraryDecl(&'a Node<ExtendedLibraryDecl>),
-    FeatureDecl(&'a Node<FeatureDecl>),
-    ClassifierDecl(&'a Node<ClassifierDecl>),
-    KermlSemanticDecl(&'a Node<KermlSemanticDecl>),
-    KermlFeatureDecl(&'a Node<KermlFeatureDecl>),
     /// A `rep` body. It is recognized syntax, but its `language` clause may be missing or empty,
     /// which parsing diagnoses; it is reported here so that check shares this traversal.
     TextualRepresentation(&'a Node<TextualRepresentation>),
@@ -70,30 +61,5 @@ impl<F: FnMut(RecoveryContent<'_>)> Visitor for Scan<F> {
     fn visit_textual_representation(&mut self, node: &Node<TextualRepresentation>) {
         (self.0)(RecoveryContent::TextualRepresentation(node));
         walk_textual_representation(self, node);
-    }
-
-    fn visit_extended_library_decl(&mut self, node: &Node<ExtendedLibraryDecl>) {
-        (self.0)(RecoveryContent::ExtendedLibraryDecl(node));
-        walk_extended_library_decl(self, node);
-    }
-
-    fn visit_feature_decl(&mut self, node: &Node<FeatureDecl>) {
-        (self.0)(RecoveryContent::FeatureDecl(node));
-        walk_feature_decl(self, node);
-    }
-
-    fn visit_classifier_decl(&mut self, node: &Node<ClassifierDecl>) {
-        (self.0)(RecoveryContent::ClassifierDecl(node));
-        walk_classifier_decl(self, node);
-    }
-
-    fn visit_kerml_semantic_decl(&mut self, node: &Node<KermlSemanticDecl>) {
-        (self.0)(RecoveryContent::KermlSemanticDecl(node));
-        walk_kerml_semantic_decl(self, node);
-    }
-
-    fn visit_kerml_feature_decl(&mut self, node: &Node<KermlFeatureDecl>) {
-        (self.0)(RecoveryContent::KermlFeatureDecl(node));
-        walk_kerml_feature_decl(self, node);
     }
 }

@@ -226,12 +226,6 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
         vp.value.specializes.as_ref().map(|n| n.value.target.len()),
         Some(1)
     );
-    assert!(
-        !elements
-            .iter()
-            .any(|e| matches!(e.value, PackageBodyElement::ExtendedLibraryDecl(_))),
-        "sample should not fall back to ExtendedLibraryDecl"
-    );
 }
 
 #[test]

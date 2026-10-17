@@ -16,7 +16,7 @@ package Live::Valid;
 (fixture-diagnostics
   (document "qualified_declarations.md"
     (diagnostics
-      (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 103) (line 5) (column 1) (len 33)) (message "expected a specific keyword or punctuation token"))
+      (diagnostic (code "expected_alt") (severity error) (category parseerror) (span (offset 103) (line 5) (column 1) (len 33)) (message "expected a package member (e.g. part, port, attribute, action, requirement, import)"))
     )
   )
 )
@@ -43,6 +43,6 @@ package Live::Valid;
     (reference r2 (scope relative) (span (offset 87) (line 3) (column 26) (len 13)) (segments (segment 0 (token "Kernel") (name "Kernel") (separator none) (span (offset 87) (line 3) (column 26) (len 6))) (segment 1 (token "Types") (name "Types") (separator colon-colon) (span (offset 95) (line 3) (column 34) (len 5)))))
     (reference r3 (scope relative) (span (offset 145) (line 6) (column 9) (len 11)) (segments (segment 0 (token "Live") (name "Live") (separator none) (span (offset 145) (line 6) (column 9) (len 4))) (segment 1 (token "Valid") (name "Valid") (separator colon-colon) (span (offset 151) (line 6) (column 15) (len 5)))))
   )
-  (root (package (name (qualified-declaration (ref r0))) (body semicolon)) (namespace (name (qualified-declaration (ref r1))) (body semicolon)) (library-package (name (qualified-declaration (ref r2))) (standard true) (body semicolon)) (malformed (code "expected_keyword") (found "package Ghost::Broken unexpected;") (span (offset 103) (line 5) (column 1) (len 33))) (package (name (qualified-declaration (ref r3))) (body semicolon)))
+  (root (package (name (qualified-declaration (ref r0))) (body semicolon)) (namespace (name (qualified-declaration (ref r1))) (body semicolon)) (library-package (name (qualified-declaration (ref r2))) (standard true) (body semicolon)) (malformed (code "expected_alt") (found "package Ghost::Broken unexpected;") (span (offset 103) (line 5) (column 1) (len 33))) (package (name (qualified-declaration (ref r3))) (body semicolon)))
 )
 ~~~

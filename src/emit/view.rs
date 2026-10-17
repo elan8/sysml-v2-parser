@@ -412,8 +412,17 @@ pub(crate) fn emit_kerml_feature(
         head.push("all");
     }
     w.push_str(&head.join(" "));
-    if let Some(name) = feature.name {
+    if feature.short_name.is_some() {
         if !head.is_empty() {
+            w.push_char(' ');
+        }
+        w.push_short_name_prefix(&format!("{path}/short_name"), feature.short_name)?;
+        if feature.name.is_none() {
+            w.trim_trailing_space();
+        }
+    }
+    if let Some(name) = feature.name {
+        if !head.is_empty() && feature.short_name.is_none() {
             w.push_char(' ');
         }
         w.push_declaration_name(&format!("{path}/name"), name)?;
@@ -423,6 +432,13 @@ pub(crate) fn emit_kerml_feature(
         emit_multiplicity(w, &multiplicity.value)?;
     }
     emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
+    if let Some(conjugation) = &feature.conjugates {
+        w.push_str(match conjugation.value.spelling {
+            crate::ast::ConjugationSpelling::Keyword => " conjugates ",
+            crate::ast::ConjugationSpelling::Operator => " ~ ",
+        });
+        w.push_qualified_reference(&format!("{path}/conjugates"), conjugation.value.target)?;
+    }
     for (index, part) in feature.relationship_parts.iter().enumerate() {
         emit_feature_relationship_part(w, &format!("{path}/relationship[{index}]"), &part.value)?;
     }
@@ -508,11 +524,20 @@ pub(crate) fn emit_kerml_invariant_member(
     emit_visibility(w, invariant.membership.visibility);
     w.push_str("inv");
     if invariant.is_negated {
-        w.push_str(" not");
+        w.push_str(" false");
+    } else if invariant.is_true {
+        w.push_str(" true");
     }
     if let Some(name) = invariant.name {
         w.push_char(' ');
         w.push_declaration_name(&format!("{path}/name"), name)?;
+    }
+    emit_feature_specializations(w, &invariant.specializations)?;
+    if let Some(multiplicity) = &invariant.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if let Some(value) = &invariant.value {
+        emit_feature_value(w, value)?;
     }
     emit_calc_body(w, path, &invariant.body)
 }
