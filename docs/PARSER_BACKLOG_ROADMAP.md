@@ -1,8 +1,15 @@
 # Parser backlog & roadmap
 
-**Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
+**v0.58.0 status (2026-10-17):** AST schema 284; permissive declaration fallbacks are
+removed. Current release/API and corpus evidence live in [MIGRATION_0_58.md](MIGRATION_0_58.md),
+[SYSML_V2_COMPLIANCE_GAP.md](SYSML_V2_COMPLIANCE_GAP.md) and [CONFORMANCE.md](CONFORMANCE.md).
+The dated audits and completion notes below are historical design context. Check
+[GitHub issues](https://github.com/elan8/sysml-v2-parser/issues) for live work before treating
+an old checkbox or fallback description as current.
 
-**Last updated:** 2026-07-30 (GH-10 — `ref part` parsed as `PartUsage` with `is_reference` and full
+Historical roadmap for `sysml-v2-parser` and the Spec42 diagnostics integration. Use the live issue tracker and current status documents linked above for release planning.
+
+**Historical audit update:** 2026-07-30 (GH-10 — `ref part` parsed as `PartUsage` with `is_reference` and full
 `FeatureSpecializationPart`; `PARSE_AST_VERSION` 52 → 53.)
 
 **Previously:** 2026-07-30 (§6 fully closed — rebased [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3)

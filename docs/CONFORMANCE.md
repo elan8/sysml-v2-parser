@@ -1,6 +1,6 @@
 # Textual-notation conformance
 
-This crate claims **SysML/KerML textual notation** conformance against a pinned
+This crate targets **SysML/KerML textual notation** conformance against a pinned
 OMG [SysML-v2-Release](https://github.com/Systems-Modeling/SysML-v2-Release) tag.
 It does **not** claim semantic conformance (name resolution, typing, well-formedness).
 
@@ -39,32 +39,43 @@ crate docs and `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
 
 | Layer | Claim | Evidence |
 | ----- | ----- | -------- |
-| **L1 — Syntax acceptance** | Every textual BNF production in the pinned release is classified `implemented` in [`bnf_coverage.map`](./bnf_coverage.map) | `cargo test --test bnf_compliance`; scorecard `layers.L1` |
-| **L2 — Structured AST** | Systems Library and full `sysml.library` parse with zero diagnostics and zero `ExtendedLibraryDecl` | ignored validation gates; scorecard `layers.L2` |
+| **L1 — Syntax acceptance** | Every textual BNF production in the pinned release is classified `implemented` in [`bnf_coverage.map`](./bnf_coverage.map) | `cargo test --test bnf_compliance`; scorecard `layers.L1_syntax_acceptance` |
+| **L2 — Structured AST** | Systems Library and full `sysml.library` parse with zero diagnostics and zero unstructured nodes | ignored validation gates; scorecard `layers.L2_structured_ast` |
 | **L2.5 — Emit fidelity** | Selected release validation fixtures roundtrip: parse → opacity-clean → emit canonical SysML → reparse → AST-eq | `cargo test --test roundtrip_validation -- --include-ignored` |
-| **L3 — Semantics** | Not claimed (Spec42 / other tools) | scorecard `layers.L3.status = not_claimed` |
+| **L3 — Semantics** | Not claimed (Spec42 / other tools) | scorecard `layers.L3_semantics.status = not_claimed` |
 
-L2.5 does **not** claim semantic correctness. It claims that the AST for listed fixtures is structured enough to reprint as SysML and reparse to an equivalent tree. Opaque / recovery nodes (`Other`, `OpaqueMember`, KerML fallbacks, `ParseError`, …) fail the gate rather than fake-passing by reprinting raw text.
+L2.5 does **not** claim semantic correctness. Strict parsing, a clean opacity scan, canonical
+emission and reparsing must preserve the normalized AST. Recovery and unsupported nodes fail
+this gate; raw source replay is not accepted as proof of a structured round trip.
 
-**Iteration 2:** known-gap scan covers the full pinned `sysml/src/validation/` tree. Required-pass fixtures currently include all of `01-Parts Tree/` and `02-Parts Interconnection/`, all `3a` plus `3c-1`/`3c-3`, `05-1a`, `4a`, `13b`, plus incidental passers in `14`/`15` (`14b`, `15_01`, `15_02`, `15_03`, `15_06`, `15_07`). Remaining fixtures must still fail until promoted into `ROUNDTRIP_PASS`.
+The pinned `2026-04` validation tree contains **56 required-pass fixtures and no known gaps**.
+`ROUNDTRIP_PASS` in `tests/roundtrip_validation.rs` records the exact inventory. The complementary
+known-gap scan catches both regressions and a changed inventory; a newly passing fixture must be
+promoted deliberately. Run:
 
-Emitter coverage for the validation set is largely in place; remaining known gaps are dominated by **parser opacity** (`Other`, `ExtendedLibraryDecl`, KerML fallbacks), **AST-eq / reparse fidelity**, and a few structured constructs that still need parser work (not missing emit arms). Run `ROUNDTRIP_DIAG=1 cargo test --test roundtrip_validation roundtrip_known_gaps_must_still_fail -- --include-ignored --nocapture` for a per-fixture classification.
+```sh
+cargo test --test roundtrip_validation -- --include-ignored
+```
 
-Debug AST snapshots under `tests/validation/snapshots/` remain **regression canaries** only (they detect that parser output changed). They are not a correctness oracle: regenerating them locks in whatever the parser currently produces. New validation coverage should prefer roundtrip over growing Debug snapshots.
+The semantic Markdown snapshots under `tests/snapshots/` are the primary end-to-end parser
+contract. They record diagnostics, formatting and typed semantic projections, including recovery
+spans. Three legacy Debug snapshots and their unwired fixture modules remain as historical artifacts;
+they are not executed by the current validation target. New behavior coverage belongs in the
+semantic snapshots, not private Rust field assertions.
 
 ## Robustness tracker (`examples/`, not a conformance gate)
 
-The pinned `sysml/src/validation/` tree above is a curated conformance target, not a general
-robustness benchmark -- passing 100% of it proves conformance to that specific corpus, not that
-the parser handles arbitrary valid SysML v2 source. The release also ships `sysml/src/examples/`
-(95 files across 22 folders): a much wider, less curated sample of real-world models. GH-83 tracks
-this with the same roundtrip pipeline via `EXAMPLES_ROUNDTRIP_PASS` / `examples_roundtrip_scan`
-in `tests/roundtrip_validation.rs` -- currently 22/95 roundtrip. Unlike the `validation/` gate,
-this one does **not** require 100%: it only fails on a regression (something in
-`EXAMPLES_ROUNDTRIP_PASS` stops roundtripping) or an unpromoted pass (something outside the list
-starts roundtripping and should be added). Run `ROUNDTRIP_DIAG=1 cargo test --test
-roundtrip_validation examples_roundtrip_scan -- --include-ignored --nocapture` for the per-file
-gap list.
+The pinned `sysml/src/examples/` corpus contains **95 files**, with **85 tracked round trips**
+in `EXAMPLES_ROUNDTRIP_PASS`. The remaining files are known gaps, not an acceptance claim. The
+regression scan rejects a lost tracked pass or an unrecorded new pass. Use:
+
+```sh
+ROUNDTRIP_DIAG=1 cargo test --test roundtrip_validation examples_roundtrip_scan -- --include-ignored --nocapture
+```
+
+These counts describe this pinned corpus, not arbitrary SysML programs. The independent
+[parser oracle](PARSER-ORACLE.md) supplies additional differential evidence; a disagreement
+must be checked against the grammar rather than treating either parser as authoritative.
 
 ## Scorecard (CI artifact)
 

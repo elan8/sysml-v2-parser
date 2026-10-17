@@ -2,6 +2,11 @@
 
 This document describes the current recovery architecture after the language-server-oriented recovery improvements.
 
+Current for v0.58.0, AST schema 284. State entry/do/exit subactions own `ActionDefBody`;
+malformed members there produce action-body diagnostics while the enclosing state and later
+packages remain intact. Declaration-name and missing-token diagnostics can highlight a narrower
+`diagnostic_span` without changing the source slice used for recovered emission.
+
 ## Current Model
 
 The parser now uses a **hybrid recovery strategy**:
@@ -43,16 +48,16 @@ These parsers now:
 
 Relevant files:
 
-- [`src/parser/package.rs`](C:\Git\sysml-v2-parser\src\parser\package.rs)
-- [`src/parser/part.rs`](C:\Git\sysml-v2-parser\src\parser\part.rs)
-- [`src/parser/requirement.rs`](C:\Git\sysml-v2-parser\src\parser\requirement.rs)
-- [`src/parser/action.rs`](C:\Git\sysml-v2-parser\src\parser\action.rs)
-- [`src/parser/state.rs`](C:\Git\sysml-v2-parser\src\parser\state.rs)
-- [`src/parser/usecase.rs`](C:\Git\sysml-v2-parser\src\parser\usecase.rs)
+- [`src/parser/package.rs`](../src/parser/package.rs)
+- [`src/parser/part/mod.rs`](../src/parser/part/mod.rs)
+- [`src/parser/requirement.rs`](../src/parser/requirement.rs)
+- [`src/parser/action.rs`](../src/parser/action.rs)
+- [`src/parser/state.rs`](../src/parser/state.rs)
+- [`src/parser/usecase.rs`](../src/parser/usecase.rs)
 
 ### 2. Shared sync-point helpers
 
-Recovery now relies on shared helpers in [`src/parser/lex.rs`](C:\Git\sysml-v2-parser\src\parser\lex.rs):
+Recovery now relies on shared helpers in [`src/parser/lex.rs`](../src/parser/lex.rs):
 
 - `skip_statement_or_block()`
 - `skip_to_next_body_element_or_end()`
@@ -69,7 +74,7 @@ This makes recovery behavior more consistent across grammar scopes.
 
 ### 3. AST error nodes
 
-Recovered regions are represented with `ParseErrorNode` in [`src/ast.rs`](C:\Git\sysml-v2-parser\src\ast.rs).
+Recovered regions are represented with `ParseErrorNode` in [`src/ast/common.rs`](../src/ast/common.rs).
 
 Error-node variants currently exist in:
 
@@ -84,15 +89,17 @@ Error-node variants currently exist in:
 
 Each `ParseErrorNode` currently stores:
 
+- `diagnostic_span` (optional token highlight inside the retained recovery span)
 - `message`
 - `code`
 - `expected`
 - `found`
 - `suggestion`
+- `category`
 
 ### 4. Diagnostics from the AST
 
-`parse_with_diagnostics()` in [`src/parser/mod.rs`](C:\Git\sysml-v2-parser\src\parser\mod.rs) now does two things:
+`parse_with_diagnostics()` in [`src/parser/parse.rs`](../src/parser/parse.rs) now does two things:
 
 1. collects top-level parse failures using the outer recovery loop
 2. traverses the resulting AST and turns recovery nodes into `ParseError` diagnostics
@@ -141,7 +148,10 @@ Recovery-node diagnostics now have more specific codes than before, but many par
 
 ### 4. Recovery still depends on starter tables
 
-Starter tables are much better than snippet heuristics, but they are still manually curated. They must evolve with grammar coverage.
+Build-time validation pins the BNF contents and generated reserved-keyword inventory. Scope
+starter tables in `lex.rs` remain manually maintained alongside their parser dispatch. They
+need grammar review and recovery coverage when a production changes; production-map gates do
+not prove that every legal combination has the right synchronization boundary.
 
 ### 5. Engine limits vs language rules
 
@@ -168,8 +178,8 @@ The parser should preserve these recovery invariants:
 
 Recovery behavior is currently exercised by:
 
-- surveillance invalid-fixture tests in [`tests/validation/surveillance_drone.rs`](C:\Git\sysml-v2-parser\tests\validation\surveillance_drone.rs)
-- parser recovery tests in [`tests/parser_tests.rs`](C:\Git\sysml-v2-parser\tests\parser_tests.rs)
+- surveillance invalid-fixture tests in [`tests/validation/surveillance_drone.rs`](../tests/validation/surveillance_drone.rs)
+- parser recovery tests in [`tests/parser_tests.rs`](../tests/parser_tests.rs)
 - the full validation suite
 
 The newer parser tests explicitly verify:
@@ -181,8 +191,8 @@ The newer parser tests explicitly verify:
 
 Enforcement points:
 
-- compile-time lint policy in [`src/lib.rs`](C:\Git\sysml-v2-parser\src\lib.rs) denies `unwrap`, `expect`, and `panic!` in non-test code paths
-- panic-safety integration tests in [`tests/parser_panic_safety.rs`](C:\Git\sysml-v2-parser\tests\parser_panic_safety.rs)
+- compile-time lint policy in [`src/lib.rs`](../src/lib.rs) denies `unwrap`, `expect`, and `panic!` in non-test code paths
+- panic-safety integration tests in [`tests/parser_panic_safety.rs`](../tests/parser_panic_safety.rs)
 
 ## Recommended Next Steps
 

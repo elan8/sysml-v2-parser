@@ -1,5 +1,12 @@
 # Parser technical debt overview
 
+**v0.58.0 status (2026-10-17):** AST schema 284; permissive declaration fallbacks are
+removed. Current release/API and corpus evidence live in [MIGRATION_0_58.md](MIGRATION_0_58.md),
+[SYSML_V2_COMPLIANCE_GAP.md](SYSML_V2_COMPLIANCE_GAP.md) and [CONFORMANCE.md](CONFORMANCE.md).
+The dated audits and completion notes below are historical design context. Check
+[GitHub issues](https://github.com/elan8/sysml-v2-parser/issues) for live work before treating
+an old checkbox or fallback description as current.
+
 This document describes structural duplication and architectural gaps in `sysml-v2-parser`. It complements:
 
 - **[`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md)** — **single backlog** for all open grammar-coverage work (start here for priorities)
@@ -10,7 +17,7 @@ This document describes structural duplication and architectural gaps in `sysml-
 
 **Current, actively tracked tech-debt work lives in GitHub issues labeled [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt).** Open/closed issue state is self-accurate in a way prose never is. If you fix or find a duplication/architecture issue, file or close an issue — don't just edit a table in this file.
 
-The parser currently passes `cargo test`, the full validation suite (`cargo test -- --include-ignored`), and strict library node-shape gates (`ExtendedLibraryDecl = 0`). Technical debt here is about **maintainability and grammar depth**, not about missing CI green.
+The parser currently passes `cargo test`, the full validation suite (`cargo test -- --include-ignored`), and strict library node-shape gates (zero unstructured nodes). Technical debt here is about **maintainability and grammar depth**, not about missing CI green.
 
 ## Current architecture (summary)
 
@@ -103,20 +110,20 @@ From [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md):
    across construct-specific parsers instead of precise shared components composed by distinct
    family ASTs (largest architectural gap). This is a destination reached by audited vertical
    slices, not a request for a universal usage node or repository-wide rewrite.
-2. **Permissive bodies** — `skip_until_brace_end` still appears in alias, import, connect-body fallbacks, and deep behavioral body parsers.
+2. **Body fidelity** — preserve every admitted member and recover malformed input explicitly; generic declaration/body acceptance fallbacks have been removed.
 3. **Expression subset** — `expr.rs` is precedence-aware but not full `OwnedExpression`.
 4. **Recovery / LSP** — solid baseline; more specific diagnostics and coverage still wanted (see the [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt) and general issue trackers for concrete open items).
 
-Duplication in code and "partial grammar" in the spec sense overlap: the same missing shared header/body grammar shows up as copy-pasted parsers *and* as `ExtendedLibraryDecl` or opaque bodies when a shortcut fails.
+Duplication in code and "partial grammar" in the spec sense overlap: the same missing shared header/body grammar shows up as copy-pasted parsers *and* as dropped fields, misclassified members or recovery when a shortcut fails.
 
 ## What to avoid
 
-- **Monolithic "parser framework" rewrite** while validation and library gates are green — high risk of re-breaking `ExtendedLibraryDecl` and strict diagnostics tests.
+- **Monolithic "parser framework" rewrite** while validation and library gates are green — high risk of regressing typed declarations and strict diagnostics tests.
 - **Universal definition/usage structs** with discriminator tags or mostly irrelevant optional
   fields — they make illegal cross-family combinations representable and move grammar enforcement
   from exhaustive types into runtime validation.
 - **Dedup-only refactors** without grammar tests — merging code paths without fixture coverage tends to hide regressions until the full library suite runs.
-- **Removing fallback nodes prematurely** — keep `ExtendedLibraryDecl` at zero via dedicated parsers, not by deleting the fallback.
+- **Restoring permissive fallback nodes** — repair the owning typed production and its recovery instead of accepting a declaration by its opening keyword.
 
 ## Recommended workflow for refactors
 
