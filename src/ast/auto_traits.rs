@@ -228,6 +228,7 @@ payloads!(
     SequenceExpressionList,
     StakeholderMember,
     StateBodyModifier,
+    StateActionUsage,
     StateDef,
     StateDefBodyElement,
     StateUsage,

@@ -260,6 +260,27 @@ enum MetadataBindingPrefix {
 pub(crate) fn attribute_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                AttributeBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                AttributeBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -1175,6 +1196,27 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
 }
 
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                AttributeBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                AttributeBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.

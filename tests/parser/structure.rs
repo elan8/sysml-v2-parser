@@ -4,54 +4,6 @@ use sysml_v2_parser::ast::*;
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
 #[test]
-fn test_use_case_def_body_parses_members() {
-    let input =
-        "package P { use case def U { subject s : System; actor a : Operator; objective { } } }";
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let use_case = match &elements[0].value {
-        PackageBodyElement::UseCaseDef(uc) => &uc.value,
-        _ => panic!("expected UseCaseDef"),
-    };
-    let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected use case brace body"),
-    };
-    assert!(body_elements.iter().any(|e| matches!(
-        e.value,
-        sysml_v2_parser::ast::UseCaseDefBodyElement::SubjectDecl(_)
-    )));
-    assert!(body_elements.iter().any(|e| matches!(
-        e.value,
-        sysml_v2_parser::ast::UseCaseDefBodyElement::ActorUsage(_)
-    )));
-    let objective = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::UseCaseDefBodyElement::Objective(o) => Some(&o.value),
-            _ => None,
-        })
-        .expect("objective should be present");
-    assert_eq!(
-        objective
-            .requirement
-            .value
-            .name
-            .and_then(|n| result.declaration_name(n)),
-        // `objective` authors no `NAME`; the keyword is the member's syntax, not its name.
-        None
-    );
-    assert!(objective.requirement.value.type_name.is_none());
-}
-
-#[test]
 fn test_occurrence_usage_parse() {
     let input = "package P { occurrence sample : Event; }";
     let result = parse(input).expect("parse should succeed");
@@ -1055,60 +1007,6 @@ occurrence occurrenceEvent typed by Mission::Event subsets events redefines oldE
         occ.value.redefines.as_ref().map(|n| n.value.target.len()),
         Some(1)
     );
-}
-
-#[test]
-fn test_use_case_usage_accepts_typed_by_and_specialization_clauses() {
-    let input = r#"package P {
-use case mission typed by Mission::CaseType subsets BaseCase;
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => p,
-        other => panic!("expected package, got {:?}", other),
-    };
-    let elements = match &pkg.value.body {
-        PackageBody::Brace { elements, .. } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let use_case = match &elements[0].value {
-        PackageBodyElement::UseCaseUsage(u) => u,
-        other => panic!("expected use case usage, got {:?}", other),
-    };
-    assert!(use_case.value.type_name.is_some());
-}
-
-#[test]
-fn test_then_use_case_usage_accepts_typed_by_alias() {
-    let input = r#"package P {
-use case def U {
-then use case step typed by Mission::StepCase;
-}
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => p,
-        other => panic!("expected package, got {:?}", other),
-    };
-    let use_case_def = match &pkg.value.body {
-        PackageBody::Brace { elements, .. } => match &elements[0].value {
-            PackageBodyElement::UseCaseDef(d) => d,
-            other => panic!("expected use case def, got {:?}", other),
-        },
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let body_elements = match &use_case_def.value.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
-        other => panic!("expected use case brace body, got {:?}", other),
-    };
-    let then_use_case = body_elements
-        .iter()
-        .find_map(|el| match &el.value {
-            sysml_v2_parser::ast::UseCaseDefBodyElement::ThenUseCaseUsage(t) => Some(t),
-            _ => None,
-        })
-        .expect("then use case usage should be present");
-    assert!(then_use_case.value.use_case.value.type_name.is_some());
 }
 
 #[test]

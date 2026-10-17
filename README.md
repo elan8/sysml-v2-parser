@@ -60,6 +60,36 @@ assignment or default value; formatting and semantic snapshots consume these typ
 malformed source slice. The enclosing node span remains the authority for recovery emission;
 deserialization rejects diagnostic spans outside it or with invalid source coordinates.
 
+`PARSE_AST_VERSION` 284 replaces the flattened state-action fields on `EntryAction`, `DoAction`
+and `ExitAction` with `action: StateActionUsage`. Match `Empty`, `Perform { target, value }`,
+or `Effect { declaration, effect }`; the perform target reuses `PerformActionTarget`. Its
+`Action` branch owns a full `UsageDeclaration`, including anonymous identification, all typing
+targets and specialization clauses. Its `Reference { action, specialization }` branch keeps the
+referenced action's complete `FeatureSpecializationPart` (`entry ops : A;`, `perform ops [1];`)
+as a `UsageDeclaration` without identification; the former `redefines` field is part of it.
+`Effect::declaration` is the optional `ActionNodeUsageDeclaration` of `entry action accept S;`,
+`do action sender send S() to p;` and `exit action a assign x := 1;`. The `value` retains the authored assignment/default operator and expression. State
+subaction `body` fields now use `ActionDefBody`, matching the `ActionBody` production; the
+obsolete state-body-only `FirstStmt` and `ThenAction` proxy variants are removed.
+
+Action bodies expose typed part, item, view, rendering and viewpoint definitions and the case
+usage families. Calculation bodies delegate those members through `ActionMember`.
+`UseCaseDefBodyElement` and `StateDefBodyElement` retain `VariantUsage` members; the typed
+variant alternatives include case families, state, calculation and constraint usages.
+
+Usage families that previously exposed a scalar `type_name` now expose
+`typing: Option<Node<TypingRelationship>>`: item, enumeration, requirement, concern, framed
+concern, case, analysis, verification, use case, viewpoint, view rendering and allocation.
+Read `typing.value.type_name` for all targets in authored order; its operator and conjugation
+remain part of that same relationship. Allocation's mirrored `type_is_conjugated` field is
+removed. No scalar first-type compatibility field is retained.
+
+Body-owner enums now expose `ExtendedDefinition` and, where their pinned grammar admits
+`ExtendedUsage`, `ExtendedUsage` members. Both delegate to the existing typed extension nodes.
+`ExtendedDefinition::membership` retains member visibility. Interface and metadata usage
+bodies admit extended definitions, while rejecting direct extended usages as scope errors.
+Enumeration definition bodies retain their restricted grammar.
+
 `PARSE_AST_VERSION` 283 removes the opaque declaration variants `ExtendedLibraryDecl`,
 `FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with
 `OpaqueText` and `ParsedDocument::opaque_text`. Consumers should handle typed declarations

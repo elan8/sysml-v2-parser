@@ -20,6 +20,17 @@ use nom::Parser;
 fn interface_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                InterfaceDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
@@ -40,6 +51,27 @@ fn interface_def_body_element(
         let elem = InterfaceDefBodyElement::PartUsage(Box::new(usage));
         return Ok((next, node_from_to(start, next, elem)));
     }
+    // Interface ends own this overlapping spelling before the restricted-usage guard.
+    if let Some((next, member)) = (!crate::parser::body::starts_bare_comment(input))
+        .then(|| crate::parser::span::reference_transaction(input, end_decl))
+        .and_then(Result::ok)
+    {
+        return Ok((
+            next,
+            node_from_to(start, next, InterfaceDefBodyElement::EndDecl(member)),
+        ));
+    }
+    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
+    // transactionally before a metadata-prefix arm can split it into unrelated members.
+    if crate::parser::span::reference_probe(input, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -58,10 +90,6 @@ fn interface_def_body_element(
                 InterfaceDefBodyElement::MetadataKeywordUsage,
             ),
         )),
-        // GH-33: interfaces don't allow the `#name` derived-end-name form connections do (no
-        // matching real-usage evidence found for interfaces) -- see `connector::end_decl`'s doc
-        // comment.
-        map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
         // A nested interface usage; `interface_usage` refuses by lookahead unless `interface`
@@ -99,13 +127,25 @@ fn interface_def_body_element(
 }
 
 fn interface_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<InterfaceDefBodyElement> {
-    let recovery = build_recovery_error_node_from_span(
+    let mut recovery = build_recovery_error_node_from_span(
         start,
         end,
         INTERFACE_DEF_BODY_STARTERS,
         "interface definition body",
         "recovered_interface_def_body_element",
     );
+    if crate::parser::span::reference_probe(start, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        recovery.code = "unexpected_keyword_in_scope".to_string();
+        recovery.message =
+            "extended usage is not permitted in interface definition body".to_string();
+        recovery.expected = Some("valid interface definition body member".to_string());
+        recovery.suggestion =
+            Some("Move this extended usage to a body that admits UsageElement.".to_string());
+        recovery.category = Some(crate::DiagnosticCategory::ParseError);
+    }
+
     node_from_to(
         start,
         end,

@@ -8,7 +8,7 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_reference, reference_path, starts_with_keyword, take_until_terminator,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
     visibility_prefix, ws1, ws_and_comments, STATE_BODY_STARTERS,
 };
 
@@ -84,60 +84,6 @@ pub(crate) fn state_def_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBod
     alt((crate::parser::body::semicolon_body, state_def_body_brace)).parse(input)
 }
 
-/// Body of an `entry`/`do`/`exit` action. Structurally a `StateDefBody`, but per SysML these are
-/// `ActionBody`s (`PerformActionUsage ... ActionBody`), so the action-flow statements `first
-/// <node>;` and `then <target>;` are legal here in addition to every `state` body member. The
-/// Apollo 11 model's `do action prepareForMissionPhaseOperations { first start; then action
-/// loadConsumablesAndPropellants : ...; then done; }` is the real-usage case.
-pub(crate) fn state_action_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    alt((crate::parser::body::semicolon_body, state_action_body_brace)).parse(input)
-}
-
-fn state_action_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    let (input, members) = parse_structured_brace_members(
-        input,
-        STATE_BODY_STARTERS,
-        "state body",
-        "recovered_state_body_element",
-        state_action_body_element,
-        |start, end| {
-            let recovery = build_recovery_error_node_from_span(
-                start,
-                end,
-                STATE_BODY_STARTERS,
-                "state body",
-                "recovered_state_body_element",
-            );
-            node_from_to(
-                start,
-                end,
-                StateDefBodyElement::Error(node_from_to(start, end, recovery)),
-            )
-        },
-    )?;
-    Ok((input, members.into_body()))
-}
-
-/// `state_def_body_element` plus the two action-flow statements an `entry`/`do`/`exit` body also
-/// admits. `first`/`then` are tried first: `then_stmt` (the state `then <state>;` marker) would
-/// otherwise claim `then done;` as an initial-state reference.
-fn state_action_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
-    let start = input;
-    if let Ok((next, node)) = crate::parser::action::first_stmt(start) {
-        return Ok((
-            next,
-            node_from_to(start, next, StateDefBodyElement::FirstStmt(node)),
-        ));
-    }
-    if let Ok((next, node)) = crate::parser::action::then_action(start) {
-        return Ok((
-            next,
-            node_from_to(start, next, StateDefBodyElement::ThenAction(node)),
-        ));
-    }
-    state_def_body_element(input)
-}
-
 fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     let (input, members) = parse_structured_brace_members(
         input,
@@ -163,128 +109,78 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     Ok((input, members.into_body()))
 }
 
-/// Shared `entry`/`do`/`exit` header: optional `action` keyword plus an optional source-backed
-/// action target.
-/// Everything an `entry`/`do`/`exit` keyword may introduce (spec42 Gap 43): nothing (a plain
-/// body), an `assign`/`send`/`accept` effect, a new named/typed/redefining nested action
-/// declaration, or a reference to an existing action.
-struct StateActionHead {
-    has_action_keyword: bool,
-    action_reference: Option<crate::ast::QualifiedReferenceId>,
-    declared_name: Option<DeclarationName>,
-    type_name: Option<crate::ast::QualifiedReferenceId>,
-    redefines: Option<Node<crate::ast::SubsettingRelationship>>,
-    effect: Option<crate::ast::TransitionEffect>,
+/// The node keywords of `StateAcceptActionUsage`, `StateSendActionUsage` and
+/// `StateAssignmentActionUsage`.
+const STATE_EFFECT_KEYWORDS: &[&[u8]] = &[b"accept", b"send", b"assign"];
+
+/// The effect parsers themselves, not `transition_effect`: its trailing-`;` leniency would
+/// starve the caller's own body terminator.
+fn state_effect(input: Input<'_>) -> IResult<Input<'_>, crate::ast::TransitionEffect> {
+    alt((
+        transition_effect_accept,
+        transition_effect_send,
+        transition_effect_assign,
+    ))
+    .parse(input)
 }
 
-impl StateActionHead {
-    fn empty(has_action_keyword: bool) -> Self {
-        StateActionHead {
-            has_action_keyword,
-            action_reference: None,
-            declared_name: None,
-            type_name: None,
-            redefines: None,
-            effect: None,
-        }
-    }
-}
-
-fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, StateActionHead> {
-    // `entry assign counter.count := 0;` / `do send Sig() to port;` -- an effect written
-    // directly under the keyword rather than inside a transition's effect clause (spec42
-    // `assignment_test`, `25_change_and_time_triggers`; Gap 43).
-    {
-        let (peek, _) = ws_and_comments(input)?;
-        if starts_with_keyword(peek.fragment(), b"send")
-            || starts_with_keyword(peek.fragment(), b"accept")
-            || starts_with_keyword(peek.fragment(), b"assign")
-        {
-            // The individual effect parsers, not `transition_effect`: its trailing-`;` leniency
-            // would starve the caller's own body terminator.
-            let (input, effect) = alt((
-                transition_effect_accept,
-                transition_effect_send,
-                transition_effect_assign,
-            ))
-            .parse(peek)?;
-            return Ok((
-                input,
-                StateActionHead {
-                    effect: Some(effect),
-                    ..StateActionHead::empty(false)
-                },
-            ));
-        }
-    }
-    let (input, action_keyword) =
-        crate::parser::occurrence_prefix::optional_keyword_token(input, b"action")?;
-    let has_action_keyword = action_keyword.is_some();
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
-        return Ok((input, StateActionHead::empty(has_action_keyword)));
-    }
-    // New nested action declaration: `entry action entryAction :>> 'entry';`, `do action
-    // doAction : Action :>> 'do';` (Systems Library `States.sysml`; spec42 Gap 43), and
-    // `do action prepareForMissionPhaseOperations { first start; … }` (Apollo 11; spec42#100
-    // form 4). The leading token declares a name here, so it must not be interned as a reference.
-    let declaration_attempt = (|| -> IResult<Input<'_>, StateActionHead> {
-        let (i, declared_name) = preceded(ws_and_comments, name).parse(input)?;
-        let (i, type_name) = {
-            let (peek, _) = ws_and_comments(i)?;
-            if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-                let (i, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(i)?;
-                let (i, ty) = preceded(ws_and_comments, qualified_reference).parse(i)?;
-                (i, Some(ty))
-            } else {
-                (i, None)
-            }
-        };
-        let (i, redefines) = opt(preceded(
-            ws_and_comments,
-            crate::parser::usage::redefinition,
-        ))
-        .parse(i)?;
-        let (peek, _) = ws_and_comments(i)?;
-        let next_is_body = peek.fragment().starts_with(b"{");
-        let next_is_semicolon = peek.fragment().starts_with(b";");
-        // The name introduces a declaration when a `: Type` / `:>>` clause follows it, or -- with
-        // no such clause -- whenever the `action` keyword was written
-        // (`do action ops;` or `do action ops { first start; }`). Bare `do ops;` /
-        // `do ops { ... }` stays a referenced action usage (a nameless body was handled above).
-        let is_declaration = type_name.is_some() || redefines.is_some() || has_action_keyword;
-        // Whichever form, the head must be terminated by `;` or an owned `{ ... }` body.
-        if !is_declaration || !(next_is_semicolon || next_is_body) {
+/// `ActionNodeUsageDeclaration` followed by the node keyword it declares:
+/// `entry action accept S;`, `do action sender send S() to p;`, `exit action a assign x := 1;`.
+fn declared_state_effect(input: Input<'_>) -> IResult<Input<'_>, crate::ast::StateActionUsage> {
+    crate::parser::span::reference_transaction(input, |input| {
+        let (input, declaration) = crate::parser::action::action_node_usage_declaration_before(
+            input,
+            STATE_EFFECT_KEYWORDS,
+        )?;
+        let (input, _) = ws_and_comments(input)?;
+        if !starts_with_any_keyword(input.fragment(), STATE_EFFECT_KEYWORDS) {
             return Err(nom::Err::Error(nom::error::Error::new(
-                i,
+                input,
                 nom::error::ErrorKind::Tag,
             )));
         }
+        let (input, effect) = state_effect(input)?;
         Ok((
-            i,
-            StateActionHead {
-                declared_name: Some(declared_name),
-                type_name,
-                redefines,
-                ..StateActionHead::empty(has_action_keyword)
+            input,
+            crate::ast::StateActionUsage::Effect {
+                declaration: Some(Box::new(declaration)),
+                effect: Box::new(effect),
             },
         ))
-    })();
-    // `action` selects UsageDeclaration, not OwnedReferenceSubsetting (SysML 8.2.2.17.2).
-    // A failed declaration must not reinterpret `action P::a` as a reference.
-    if has_action_keyword {
-        return declaration_attempt;
+    })
+}
+
+/// State action alternatives share the complete perform declaration with `perform` members.
+fn state_behavior_action_target(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::StateActionUsage> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
+        return Ok((input, crate::ast::StateActionUsage::Empty));
     }
-    if let Ok(result) = declaration_attempt {
-        return Ok(result);
+    if starts_with_any_keyword(input.fragment(), STATE_EFFECT_KEYWORDS) {
+        let (input, effect) = state_effect(input)?;
+        return Ok((
+            input,
+            crate::ast::StateActionUsage::Effect {
+                declaration: None,
+                effect: Box::new(effect),
+            },
+        ));
     }
-    // Bare referenced action usage: `do 'sense temperature' { … }` / `entry initial;`.
-    let (input, action_reference) = reference_path(input)?;
+    // An `action` declaration is an accept/send/assign node only when that node keyword follows
+    // it; otherwise it is the perform alternative's `'action' UsageDeclaration`.
+    if starts_with_keyword(input.fragment(), b"action") {
+        if let Ok(result) = declared_state_effect(input) {
+            return Ok(result);
+        }
+    }
+    let (input, (target, value)) = crate::parser::perform::perform_action_declaration(input)?;
     Ok((
         input,
-        StateActionHead {
-            action_reference: Some(action_reference),
-            ..StateActionHead::empty(has_action_keyword)
+        crate::ast::StateActionUsage::Perform {
+            target,
+            value: value.map(Box::new),
         },
     ))
 }
@@ -310,22 +206,10 @@ fn entry_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>>
     let (input, _) = tag(&b"entry"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = state_action_body(input)?;
+    let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            EntryAction {
-                action_reference: head.action_reference,
-                has_action_keyword: head.has_action_keyword,
-                declared_name: head.declared_name,
-                type_name: head.type_name,
-                redefines: head.redefines,
-                effect: head.effect,
-                body,
-            },
-        ),
+        node_from_to(start, input, EntryAction { action: head, body }),
     ))
 }
 
@@ -350,22 +234,10 @@ fn do_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     let (input, _) = tag(&b"do"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = state_action_body(input)?;
+    let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            DoAction {
-                action_reference: head.action_reference,
-                has_action_keyword: head.has_action_keyword,
-                declared_name: head.declared_name,
-                type_name: head.type_name,
-                redefines: head.redefines,
-                effect: head.effect,
-                body,
-            },
-        ),
+        node_from_to(start, input, DoAction { action: head, body }),
     ))
 }
 
@@ -390,22 +262,10 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     let (input, _) = tag(&b"exit"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = state_action_body(input)?;
+    let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            ExitAction {
-                action_reference: head.action_reference,
-                has_action_keyword: head.has_action_keyword,
-                declared_name: head.declared_name,
-                type_name: head.type_name,
-                redefines: head.redefines,
-                effect: head.effect,
-                body,
-            },
-        ),
+        node_from_to(start, input, ExitAction { action: head, body }),
     ))
 }
 
@@ -580,7 +440,36 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
 }
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                StateDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                StateDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
+    if !crate::parser::body::starts_bare_comment(start) {
+        if let Ok((next, usage)) = crate::parser::part::variant_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, StateDefBodyElement::VariantUsage(usage)),
+            ));
+        }
+    }
     // `ref action` and `ref state` are typed ActionUsage/StateUsage forms in this shared
     // ActionBodyItem scope. They must precede the generic RefDecl parser; rejected attempts are
     // transactional, preserving bare `ref name` for that generic fallback.
@@ -1034,59 +923,6 @@ fn transition_tail<'a>(
 }
 
 #[cfg(test)]
-mod state_behavior_action_tests {
-    use super::*;
-
-    fn input(text: &str) -> Input<'_> {
-        crate::parser::span::test_input(text)
-    }
-
-    /// Spec42 Gap 43: `assign`/`send`/`accept` effects directly under `entry`/`do`/`exit`.
-    #[test]
-    fn entry_accepts_a_direct_assign_effect() {
-        let (rest, node) =
-            entry_action(input("entry assign counter.count := 0;")).expect("entry assign");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(matches!(
-            node.value.effect,
-            Some(crate::ast::TransitionEffect::Assign { .. })
-        ));
-        assert!(node.value.action_reference.is_none());
-    }
-
-    /// Spec42 Gap 43: named/typed/redefining nested action declarations.
-    #[test]
-    fn do_accepts_a_named_redefining_action_declaration() {
-        let src = input("do action doAction : Action :>> 'do';");
-        let (rest, node) = do_action(src).expect("do action declaration");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .declared_name
-                .map(|n| crate::parser::lex::name_bytes(src, n)),
-            Some(&b"doAction"[..])
-        );
-        assert!(node.value.type_name.is_some());
-        assert!(node.value.redefines.is_some());
-        assert!(node.value.action_reference.is_none());
-    }
-
-    #[test]
-    fn entry_accepts_a_bare_redefining_action_declaration() {
-        let src = input("entry action entryAction :>> 'entry';");
-        let (rest, node) = entry_action(src).expect("entry decl");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .declared_name
-                .map(|n| crate::parser::lex::name_bytes(src, n)),
-            Some(&b"entryAction"[..])
-        );
-        assert!(node.value.redefines.is_some());
-    }
-}
-
-#[cfg(test)]
 mod membership_tests {
     use super::*;
 
@@ -1153,30 +989,6 @@ mod membership_tests {
             crate::parser::usage::reference_text(source, node.value.state_reference).as_deref(),
             Some("Modes::ready")
         );
-    }
-
-    #[test]
-    fn do_action_keeps_bare_name_and_out_param() {
-        let source = input("do 'sense temperature' { out temp; }");
-        let (rest, node) = super::do_action(source).expect("do with bare name and out");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .action_reference
-                .and_then(|id| crate::parser::usage::reference_text(source, id))
-                .as_deref(),
-            Some("'sense temperature'")
-        );
-        assert!(!node.value.has_action_keyword);
-        match &node.value.body {
-            crate::ast::StateDefBody::Brace { elements, .. } => {
-                assert!(matches!(
-                    elements[0].value,
-                    crate::ast::StateDefBodyElement::InOutDecl(_)
-                ));
-            }
-            other => panic!("expected brace body, got {other:?}"),
-        }
     }
 
     #[test]

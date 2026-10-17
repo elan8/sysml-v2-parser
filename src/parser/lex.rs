@@ -264,6 +264,7 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
+    b"variant",
     b"@",
     b"abstract",
     b"action",
@@ -338,6 +339,14 @@ pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
 /// ActionBodyItem | ReturnParameterMember`, used to route a member to the action dispatcher
 /// before the keyword-less-binding fallback can read the keyword itself as a feature name.
 pub(crate) const CALCULATION_ACTION_STARTERS: &[&[u8]] = &[
+    b"case",
+    b"analysis",
+    b"verification",
+    b"use",
+    b"part",
+    b"view",
+    b"viewpoint",
+    b"rendering",
     b"first",
     b"merge",
     b"decide",

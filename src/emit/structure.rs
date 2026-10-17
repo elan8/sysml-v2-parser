@@ -248,6 +248,9 @@ pub(crate) fn emit_metadata_body(
             for (index, element) in elements.iter().enumerate() {
                 let member_path = format!("{path}/metadata-body[{index}]");
                 match &element.value {
+                    MetadataBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
                     MetadataBodyElement::Error(error) => {
                         w.push_recovery_span(&member_path, &error.span)?
                     }
@@ -333,6 +336,12 @@ fn emit_part_def_body_element(
     el: &PartDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        PartDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        PartDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         PartDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PartDefBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
@@ -511,6 +520,9 @@ fn emit_part_usage_body_element(
     el: &PartUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        PartUsageBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
         PartUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PartUsageBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
@@ -652,6 +664,12 @@ fn emit_attribute_body_element(
     el: &AttributeBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        AttributeBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        AttributeBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         AttributeBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         AttributeBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
@@ -816,6 +834,12 @@ fn emit_port_def_body_element(
     el: &PortDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        PortDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        PortDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         PortDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PortDefBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
@@ -874,6 +898,12 @@ fn emit_port_body_element(
     el: &PortBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        PortBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        PortBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         PortBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PortBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
@@ -977,6 +1007,9 @@ fn emit_interface_def_body_element(
     el: &InterfaceDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        InterfaceDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
         InterfaceDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         InterfaceDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
@@ -1309,6 +1342,9 @@ fn emit_interface_usage_body_element(
     el: &InterfaceUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        InterfaceUsageBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
         InterfaceUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         InterfaceUsageBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
@@ -2170,6 +2206,27 @@ pub(crate) fn emit_variant_usage(
                 }
             }
         }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::CaseUsage(member)) => {
+            super::requirement::emit_case_usage(w, path, &member.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::AnalysisCaseUsage(
+            member,
+        )) => super::requirement::emit_analysis_case_usage(w, path, &member.value),
+        crate::ast::VariantUsageForm::Typed(
+            crate::ast::VariantTypedUsage::VerificationCaseUsage(member),
+        ) => super::requirement::emit_verification_case_usage(w, path, &member.value),
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::UseCaseUsage(
+            member,
+        )) => super::requirement::emit_use_case_usage(w, path, &member.value),
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::State(member)) => {
+            super::behavior::emit_state_usage(w, path, &member.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Calculation(member)) => {
+            super::view::emit_calc_usage(w, path, &member.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Constraint(member)) => {
+            super::view::emit_constraint_usage(w, path, &member.value)
+        }
         crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Part(p)) => {
             emit_part_usage(w, path, &p.value)
         }
@@ -2362,6 +2419,12 @@ fn emit_connection_def_body_element(
     el: &crate::ast::ConnectionDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        crate::ast::ConnectionDefBodyElement::ExtendedDefinition(member) => {
+            super::root::emit_extended_definition(w, path, &member.value)
+        }
+        crate::ast::ConnectionDefBodyElement::ExtendedUsage(member) => {
+            super::structure::emit_extended_usage(w, path, &member.value)
+        }
         crate::ast::ConnectionDefBodyElement::Error(error) => {
             w.push_recovery_span(path, &error.span)
         }

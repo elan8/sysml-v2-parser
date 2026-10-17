@@ -276,6 +276,13 @@ fn extended_definition_prefix_tag(
 pub(crate) fn extended_definition(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
+    let (member_start, _) = crate::parser::lex::ws_and_notes(input)?;
+    if crate::parser::body::starts_bare_comment(member_start) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // A `#` extension run must follow the optional definition prefix; refuse before the
     // arena transaction otherwise.
     if !crate::parser::occurrence_prefix::hash_extension_follows(input) {
@@ -290,6 +297,7 @@ pub(crate) fn extended_definition(
 fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, definition_prefix) =
         crate::parser::definition_prefix::parse_basic_definition_prefix(
             input,
@@ -314,6 +322,7 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
                 identification: ident,
                 specializes,
                 body,
+                membership: crate::ast::Membership::owning(visibility, visibility_span),
             },
         ),
     ))
@@ -331,6 +340,13 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
 pub(crate) fn extended_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ExtendedUsage>> {
+    let (member_start, _) = crate::parser::lex::ws_and_notes(input)?;
+    if crate::parser::body::starts_bare_comment(member_start) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // Refuse unless a `#` extension follows the member's optional prefixes.
     if !crate::parser::occurrence_prefix::hash_extension_follows(input) {
         return Err(nom::Err::Error(nom::error::Error::new(

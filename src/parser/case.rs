@@ -126,7 +126,7 @@ fn analysis_case_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Analys
                 prefix,
                 name: usage.name,
                 short_name: usage.short_name,
-                type_name: usage.type_name,
+                typing: usage.typing,
                 subsets: usage.subsets,
                 redefines: usage.redefines,
                 body: usage.body,
@@ -195,7 +195,7 @@ pub(crate) fn verification_case_usage(
             VerificationCaseUsage {
                 name: usage.name,
                 short_name: usage.short_name,
-                type_name: usage.type_name,
+                typing: usage.typing,
                 multiplicity: usage.multiplicity,
                 subsets: usage.subsets,
                 redefines: usage.redefines,
@@ -226,7 +226,7 @@ fn case_like_usage_body(
         CaseUsage {
             name,
             short_name,
-            type_name: header.type_reference,
+            typing: header.typing,
             multiplicity: header.multiplicity,
             subsets: header.subsets,
             redefines: header.redefines,

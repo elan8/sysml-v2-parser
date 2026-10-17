@@ -242,11 +242,6 @@ fn consume_part_usage_structured_brace(
     )
 }
 
-/// Arena-backed action path for `perform`, preserving both qualification and dotted segments.
-fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, crate::ast::QualifiedReferenceId> {
-    crate::parser::lex::reference_path(input)
-}
-
 /// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     crate::parser::span::reference_transaction(input, perform_in_out_binding_inner)
@@ -351,11 +346,6 @@ fn perform_usage_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<Definitio
     .parse(input)
 }
 
-/// Trailing `= expr` binding on a perform member, e.g. `perform action :>> doXorY = doX;`.
-fn perform_value(input: Input<'_>) -> IResult<Input<'_>, Option<Node<crate::ast::FeatureValue>>> {
-    opt(preceded(ws_and_comments, usage_value_part)).parse(input)
-}
-
 fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     preceded(
         ws_and_comments,
@@ -384,12 +374,7 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, action_reference) = perform_action_path(input)?;
-    // `:>>` or its keyword spelling (`perform ActionTree::providePower redefines providePower;`,
-    // SysML v2 Spec Annex A SimpleVehicleModel.sysml). `optional_redefinition` records which
-    // one was authored.
-    let (input, redefines) = crate::parser::usage::optional_redefinition(input)?;
-    let (input, value) = perform_value(input)?;
+    let (input, (target, value)) = crate::parser::perform::perform_action_declaration(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
         input,
@@ -398,10 +383,7 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
             input,
             Perform {
                 usage_prefix,
-                target: PerformActionTarget::Reference {
-                    action: action_reference,
-                    redefines,
-                },
+                target,
                 value,
                 body,
             },
@@ -443,29 +425,7 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
 }
 
 fn perform_action_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, usage_prefix) = perform_usage_prefix(input)?;
-    let (input, _) = tag(&b"perform"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, declaration) = crate::parser::usage::usage_declaration(input)?;
-    let (input, value) = perform_value(input)?;
-    let (input, body) = perform_body_or_semicolon(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            Perform {
-                usage_prefix,
-                target: PerformActionTarget::Action(Box::new(declaration)),
-                value,
-                body,
-            },
-        ),
-    ))
+    perform_usage_inner(input)
 }
 
 /// Allocate: `allocate` source `to` target body.
@@ -667,6 +627,17 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 fn interface_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                InterfaceUsageBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+
     alt((
         interface_usage_ref_redef,
         // An `end`-led kind-keyworded usage is that family's node with an `end` head; give it
@@ -703,6 +674,17 @@ fn interface_usage_body_element(
 fn interface_usage_other_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
+    // transactionally before a metadata-prefix arm can split it into unrelated members.
+    if crate::parser::span::reference_probe(input, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     // `perform action ...` has the common `perform` prefix with the supported reference form,
     // so the declaration alternative must own it before `perform <qualified-reference>`.
     alt((
@@ -824,13 +806,24 @@ fn interface_usage_body_recovery(
     start: Input<'_>,
     end: Input<'_>,
 ) -> Node<InterfaceUsageBodyElement> {
-    let recovery = build_recovery_error_node_from_span(
+    let mut recovery = build_recovery_error_node_from_span(
         start,
         end,
         INTERFACE_USAGE_BODY_STARTERS,
         "interface usage body",
         "recovered_interface_usage_body_element",
     );
+    if crate::parser::span::reference_probe(start, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        recovery.code = "unexpected_keyword_in_scope".to_string();
+        recovery.message = "extended usage is not permitted in interface usage body".to_string();
+        recovery.expected = Some("valid interface usage body member".to_string());
+        recovery.suggestion =
+            Some("Move this extended usage to a body that admits UsageElement.".to_string());
+        recovery.category = Some(crate::DiagnosticCategory::ParseError);
+    }
+
     node_from_to(
         start,
         end,
@@ -1415,6 +1408,117 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
         ));
     }
 
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::case::case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::CaseUsage(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::case::analysis_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::AnalysisCaseUsage(Box::new(
+                        usage,
+                    ))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = crate::parser::span::reference_transaction(
+        input,
+        crate::parser::case::verification_case_usage,
+    ) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::VerificationCaseUsage(
+                        Box::new(usage),
+                    )),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::usecase::use_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::UseCaseUsage(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::state::state_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::State(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::constraint::calc_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Calculation(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = crate::parser::span::reference_transaction(
+        input,
+        crate::parser::constraint::constraint_usage,
+    ) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Constraint(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
     // Untyped reference form: `variant name;` or `variant name { ... }` / `variant 'quoted' {
     // ... }`, referencing an already-declared feature by name rather than declaring a fresh typed
     // usage. Real usage: `Simple Tests/VariabilityTest.sysml:16` (`variant q { attribute b : B
@@ -1440,6 +1544,27 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
 }
 
 fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsageBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PartUsageBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PartUsageBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
@@ -1530,10 +1655,6 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 map(
                     crate::parser::connector::end_decl,
                     PartUsageBodyElement::EndDecl,
-                ),
-                map(
-                    crate::parser::metadata_annotation::extended_usage,
-                    |usage| PartUsageBodyElement::ExtendedUsage(Box::new(usage)),
                 ),
                 map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,

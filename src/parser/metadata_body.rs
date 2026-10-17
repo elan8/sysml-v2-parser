@@ -78,6 +78,28 @@ fn metadata_body_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
 }
 
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                MetadataBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+
+    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
+    // transactionally before a metadata-prefix arm can split it into unrelated members.
+    if crate::parser::span::reference_probe(input, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     let start = input;
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     if crate::parser::body::starts_bare_comment(input) {
@@ -110,13 +132,24 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataBo
 }
 
 fn metadata_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<MetadataBodyElement> {
-    let recovery = build_recovery_error_node_from_span(
+    let mut recovery = build_recovery_error_node_from_span(
         start,
         end,
         METADATA_BODY_STARTERS,
         "metadata body",
         "recovered_metadata_body_element",
     );
+    if crate::parser::span::reference_probe(start, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        recovery.code = "unexpected_keyword_in_scope".to_string();
+        recovery.message = "extended usage is not permitted in metadata body".to_string();
+        recovery.expected = Some("valid metadata body member".to_string());
+        recovery.suggestion =
+            Some("Move this extended usage to a body that admits UsageElement.".to_string());
+        recovery.category = Some(crate::DiagnosticCategory::ParseError);
+    }
+
     node_from_to(
         start,
         end,

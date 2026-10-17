@@ -23,6 +23,17 @@ use nom::Parser;
 fn connection_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConnectionDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ConnectionDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
@@ -48,8 +59,28 @@ fn connection_def_body_element(
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
+    // Preserve the scope-owned connector end when its prefix also matches ExtendedUsage.
+    if let Some((next, member)) = (!crate::parser::body::starts_bare_comment(input))
+        .then(|| crate::parser::span::reference_transaction(input, end_decl))
+        .and_then(Result::ok)
+    {
+        return Ok((
+            next,
+            node_from_to(start, next, ConnectionDefBodyElement::EndDecl(member)),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ConnectionDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let (input, elem) = alt((
-        map(end_decl, ConnectionDefBodyElement::EndDecl),
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
         map(connect_stmt, ConnectionDefBodyElement::ConnectStmt),
         map(

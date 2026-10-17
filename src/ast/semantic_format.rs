@@ -248,8 +248,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
-        match usage.type_name {
-            Some(reference) => self.write_reference(reference)?,
+        match &usage.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (multiplicity ")?;
@@ -903,6 +903,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        RequirementDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        RequirementDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         RequirementDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -950,11 +958,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         RequirementDefBodyElement::RequirementUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_named_multiplicity(
-                                "requirement-usage",
-                                usage.value.name,
-                                usage.value.multiplicity.as_ref(),
-                            )?;
+                            self.write_requirement_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::Stakeholder(stakeholder) => {
                             self.write_item_prefix(&mut first)?;
@@ -1017,8 +1021,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.writer.write_str(") (short-name ")?;
                             self.write_optional_name(frame.value.short_name)?;
                             self.writer.write_str(") (type ")?;
-                            if let Some(type_name) = frame.value.type_name {
-                                self.write_reference(type_name)?;
+                            if let Some(typing) = &frame.value.typing {
+                                self.write_typing(&typing.value)?;
                             } else {
                                 self.writer.write_str("none")?;
                             }
@@ -1034,12 +1038,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         RequirementDefBodyElement::AllocationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "allocation-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_allocation_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::ConcernUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1105,6 +1105,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        ViewBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        ViewBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         ViewBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1162,6 +1170,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        UseCaseDefBodyElement::VariantUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&member.value)?;
+                        }
+                        UseCaseDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        UseCaseDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         UseCaseDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1238,36 +1258,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         UseCaseDefBodyElement::UseCaseUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_case_like_usage(
-                                "use-case-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                                usage.value.is_abstract,
-                                usage.value.type_name,
-                                usage.value.subsets.as_ref(),
-                            )?;
+                            self.write_use_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::CaseUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_case_like_usage(
-                                "case-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                                usage.value.is_abstract,
-                                usage.value.type_name,
-                                usage.value.subsets.as_ref(),
-                            )?;
+                            self.write_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::VerificationCaseUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_case_like_usage(
-                                "verification-case-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                                usage.value.is_abstract,
-                                usage.value.type_name,
-                                usage.value.subsets.as_ref(),
-                            )?;
+                            self.write_verification_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::IncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
@@ -1321,6 +1320,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                                 self.write_expression(expression)?;
                                                 self.writer.write_char(')')?;
                                             }
+                                            super::ReturnRefBodyElement::ExtendedDefinition(
+                                                member,
+                                            ) => {
+                                                self.write_extended_definition(&member.value)?;
+                                            }
+                                            super::ReturnRefBodyElement::ExtendedUsage(member) => {
+                                                self.write_extended_usage(&member.value)?;
+                                            }
                                             super::ReturnRefBodyElement::Error(error) => {
                                                 self.write_malformed(&error.value, &element.span)?;
                                             }
@@ -1361,7 +1368,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "attribute-usage")?;
                         }
                         UseCaseDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_usage.value)?;
                         }
                         UseCaseDefBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
@@ -1392,6 +1400,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        StateDefBodyElement::VariantUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&member.value)?;
+                        }
+                        StateDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        StateDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         StateDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1411,12 +1431,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_state_behavior_action(
                                 "entry",
-                                entry.value.has_action_keyword,
-                                entry.value.action_reference,
-                                entry.value.declared_name,
-                                entry.value.type_name,
-                                entry.value.redefines.as_ref().map(|n| &n.value),
-                                entry.value.effect.is_some(),
+                                &entry.value.action,
                                 &entry.value.body,
                             )?;
                         }
@@ -1424,12 +1439,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_state_behavior_action(
                                 "do",
-                                action.value.has_action_keyword,
-                                action.value.action_reference,
-                                action.value.declared_name,
-                                action.value.type_name,
-                                action.value.redefines.as_ref().map(|n| &n.value),
-                                action.value.effect.is_some(),
+                                &action.value.action,
                                 &action.value.body,
                             )?;
                         }
@@ -1437,12 +1447,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_state_behavior_action(
                                 "exit",
-                                exit.value.has_action_keyword,
-                                exit.value.action_reference,
-                                exit.value.declared_name,
-                                exit.value.type_name,
-                                exit.value.redefines.as_ref().map(|n| &n.value),
-                                exit.value.effect.is_some(),
+                                &exit.value.action,
                                 &exit.value.body,
                             )?;
                         }
@@ -1452,14 +1457,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_reference(then.value.state_reference)?;
                             self.writer.write_str("))")?;
                         }
-                        StateDefBodyElement::FirstStmt(first_stmt) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_first_statement(&first_stmt.value)?;
-                        }
-                        StateDefBodyElement::ThenAction(action) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_then_action(&action.value)?;
-                        }
+
                         StateDefBodyElement::FinalState(_state) => {
                             self.write_marker(&mut first, "final-state")?;
                         }
@@ -1468,7 +1466,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_ref_declaration(&declaration.value)?;
                         }
                         StateDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_usage.value)?;
                         }
                         StateDefBodyElement::StateUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1506,41 +1505,41 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn write_state_behavior_action(
         &mut self,
         kind: &str,
-        has_action_keyword: bool,
-        action_reference: Option<QualifiedReferenceId>,
-        declared_name: Option<DeclarationName>,
-        type_name: Option<QualifiedReferenceId>,
-        redefines: Option<&SubsettingRelationship>,
-        has_effect: bool,
-        body: &StateDefBody,
+        action: &super::StateActionUsage,
+        body: &super::ActionDefBody,
     ) -> io::Result<()> {
-        write!(
-            self.writer,
-            "({kind} (action-keyword {has_action_keyword}) (target "
-        )?;
-        if let Some(reference) = action_reference {
-            self.write_reference(reference)?;
-        } else {
-            self.writer.write_str("none")?;
+        write!(self.writer, "({kind} (action ")?;
+        match action {
+            super::StateActionUsage::Empty => self.writer.write_str("empty")?,
+            super::StateActionUsage::Perform { target, value } => {
+                self.write_perform_target(target)?;
+                self.writer.write_str(" (value ")?;
+                match value {
+                    Some(value) => self.write_feature_value(&value.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_char(')')?;
+            }
+            super::StateActionUsage::Effect {
+                declaration: None,
+                effect,
+            } => self.write_transition_effect(effect)?,
+            super::StateActionUsage::Effect {
+                declaration: Some(declaration),
+                effect,
+            } => {
+                self.writer.write_str("(declared-effect ")?;
+                self.write_action_node_declaration(Some(declaration))?;
+                self.writer.write_char(' ')?;
+                self.write_transition_effect(effect)?;
+                self.writer.write_char(')')?;
+            }
         }
-        self.writer.write_str(") (declared-name ")?;
-        self.write_optional_name(declared_name)?;
-        self.writer.write_str(") (type ")?;
-        match type_name {
-            Some(reference) => self.write_reference(reference)?,
-            None => self.writer.write_str("none")?,
-        }
-        self.writer.write_str(") (redefines ")?;
-        match redefines {
-            Some(redefines) => self.write_subsetting(redefines)?,
-            None => self.writer.write_str("none")?,
-        }
-        write!(self.writer, ") (effect {has_effect}) ")?;
-        self.write_state_body(body)?;
+        self.writer.write_str(") ")?;
+        self.write_action_body(body)?;
         self.writer.write_char(')')
     }
 
@@ -1743,6 +1742,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        PartDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        PartDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         PartDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1784,7 +1791,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_default_reference_usage(&usage.value)?;
                         }
                         PartDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_usage.value)?;
                         }
                         PartDefBodyElement::ItemDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1888,12 +1896,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "state-usage")?;
                         }
                         PartDefBodyElement::EnumerationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "enumeration-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_enumeration_usage(&usage.value)?;
                         }
                         PartDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -1947,12 +1951,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "allocation-def")?;
                         }
                         PartDefBodyElement::AllocationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "allocation-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_allocation_usage(&usage.value)?;
                         }
                         PartDefBodyElement::ViewDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1970,12 +1970,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                         }
                         PartDefBodyElement::ViewpointUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "viewpoint-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_usage(&usage.value)?;
                         }
                         PartDefBodyElement::RenderingDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -2560,7 +2556,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (name ")?;
         self.write_optional_name(definition.identification.name)?;
-        self.writer.write_str(") (specializes ")?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(definition.identification.short_name)?;
+        write!(
+            self.writer,
+            ") (visibility {}) (specializes ",
+            visibility_name(definition.membership.visibility)
+        )?;
         if let Some(specializes) = &definition.specializes {
             self.write_typing(&specializes.value)?;
         } else {
@@ -3250,6 +3252,27 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         span: &Span,
     ) -> io::Result<()> {
         match member {
+            ActionDefBodyElement::PartDef(member) => self.write_part_definition(&member.value),
+            ActionDefBodyElement::ItemDef(member) => self.write_item_definition(&member.value),
+            ActionDefBodyElement::ViewDef(member) => self.write_view_definition(&member.value),
+            ActionDefBodyElement::RenderingDef(member) => {
+                self.write_rendering_definition(&member.value)
+            }
+            ActionDefBodyElement::ViewpointDef(member) => {
+                self.write_viewpoint_definition(&member.value)
+            }
+            ActionDefBodyElement::CaseUsage(member) => self.write_case_usage(&member.value),
+            ActionDefBodyElement::AnalysisCaseUsage(member) => {
+                self.write_analysis_case_usage(&member.value)
+            }
+            ActionDefBodyElement::VerificationCaseUsage(member) => {
+                self.write_verification_case_usage(&member.value)
+            }
+            ActionDefBodyElement::UseCaseUsage(member) => self.write_use_case_usage(&member.value),
+            ActionDefBodyElement::ExtendedDefinition(member) => {
+                self.write_extended_definition(&member.value)
+            }
+            ActionDefBodyElement::ExtendedUsage(member) => self.write_extended_usage(&member.value),
             ActionDefBodyElement::Error(error) => self.write_malformed(&error.value, span),
             ActionDefBodyElement::Import(import) => {
                 self.writer.write_str("(import ")?;
@@ -3717,7 +3740,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             definition.definition_prefix.as_ref(),
             definition.is_individual,
         )?;
-        self.writer.write_str("))")
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&definition.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_allocation_definition(&mut self, definition: &super::AllocationDef) -> io::Result<()> {
@@ -3727,7 +3752,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             definition.definition_prefix.as_ref(),
             definition.is_individual,
         )?;
-        self.writer.write_str("))")
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&definition.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_interface_body(&mut self, body: &InterfaceDefBody) -> io::Result<()> {
@@ -3756,6 +3783,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::ConnectStmt(connect) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_connect_statement(&connect.value)?;
+                        }
+                        InterfaceDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
                         }
                         InterfaceDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -3836,6 +3867,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::MetadataKeywordUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
+                        }
+                        ConnectionDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        ConnectionDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
                         }
                         ConnectionDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -4129,6 +4168,50 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::ActionUsageBodyElement::PartDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_part_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ItemDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_item_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ViewDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::RenderingDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ViewpointDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::CaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::AnalysisCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_analysis_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::VerificationCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_verification_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::UseCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_use_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::ActionUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -4327,6 +4410,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::PartUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
                         super::PartUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -4351,12 +4438,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_default_reference_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::EnumerationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "enumeration-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_enumeration_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::PartUsage(member) => {
                             self.write_part_usage_member(&mut first, &member.value)?;
@@ -4472,7 +4555,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "import")?;
                         }
                         super::PartUsageBodyElement::RequirementUsage(_member) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_member.value)?;
                         }
                         super::PartUsageBodyElement::ItemDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -4541,12 +4625,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                         }
                         super::PartUsageBodyElement::ViewpointUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "viewpoint-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::RenderingDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -4705,6 +4785,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         element: &Node<super::AttributeBodyElement>,
     ) -> io::Result<()> {
         match &element.value {
+            super::AttributeBodyElement::ExtendedDefinition(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_definition(&member.value)?;
+            }
+            super::AttributeBodyElement::ExtendedUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_usage(&member.value)?;
+            }
             super::AttributeBodyElement::Error(error) => {
                 self.write_item_prefix(first)?;
                 self.write_malformed(&error.value, &element.span)?;
@@ -4865,6 +4953,27 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (usage ")?;
         match &usage.form {
             super::VariantUsageForm::Reference { .. } => self.writer.write_str("none")?,
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::CaseUsage(member)) => {
+                self.write_case_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::AnalysisCaseUsage(member)) => {
+                self.write_analysis_case_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::VerificationCaseUsage(
+                member,
+            )) => self.write_verification_case_usage(&member.value)?,
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::UseCaseUsage(member)) => {
+                self.write_use_case_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::State(member)) => {
+                self.write_state_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Calculation(member)) => {
+                self.write_calculation_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Constraint(member)) => {
+                self.write_constraint_usage(&member.value)?
+            }
             super::VariantUsageForm::Typed(super::VariantTypedUsage::Part(usage)) => {
                 self.write_part_usage(&usage.value)?
             }
@@ -4956,6 +5065,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::MetadataBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
                         super::MetadataBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -5247,7 +5360,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         name: Option<DeclarationName>,
         short_name: Option<DeclarationName>,
         is_abstract: bool,
-        type_name: Option<QualifiedReferenceId>,
+        typing: Option<&Node<TypingRelationship>>,
         subsets: Option<&Node<SubsettingRelationship>>,
     ) -> io::Result<()> {
         self.writer.write_str("(")?;
@@ -5260,8 +5373,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer
             .write_str(if is_abstract { "true" } else { "false" })?;
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5286,8 +5399,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = usage.type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5295,6 +5408,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_use_case_body(&usage.body)?;
         self.writer.write_char(')')
     }
 
@@ -5556,6 +5671,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::InterfaceUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
                         super::InterfaceUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -5616,22 +5735,33 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
-    fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
-        self.writer.write_str("(perform (target ")?;
-        match &perform.target {
+    fn write_perform_target(&mut self, target: &super::PerformActionTarget) -> io::Result<()> {
+        match target {
             super::PerformActionTarget::Action(declaration) => {
                 self.writer.write_str("(action ")?;
                 self.write_usage_declaration(&declaration.value)?;
                 self.writer.write_char(')')?;
             }
-            super::PerformActionTarget::Reference { action, redefines } => {
+            super::PerformActionTarget::Reference {
+                action,
+                specialization,
+            } => {
                 self.writer.write_str("(reference (action ")?;
                 self.write_reference(*action)?;
-                self.writer.write_str(") ")?;
-                self.write_optional_subsetting("redefines", redefines.as_ref())?;
-                self.writer.write_char(')')?;
+                self.writer.write_str(") (specialization ")?;
+                match specialization {
+                    Some(declaration) => self.write_usage_declaration(&declaration.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")?;
             }
         }
+        Ok(())
+    }
+
+    fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
+        self.writer.write_str("(perform (target ")?;
+        self.write_perform_target(&perform.target)?;
         self.writer.write_str(") (value ")?;
         if let Some(value) = &perform.value {
             self.write_feature_value(&value.value)?;
@@ -5750,6 +5880,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         element: &Node<super::OccurrenceBodyElement>,
     ) -> io::Result<()> {
         match &element.value {
+            super::OccurrenceBodyElement::ExtendedDefinition(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_definition(&member.value)
+            }
+            super::OccurrenceBodyElement::ExtendedUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_usage(&member.value)
+            }
             super::OccurrenceBodyElement::Error(error) => {
                 self.write_item_prefix(first)?;
                 self.write_malformed(&error.value, &element.span)
@@ -5927,8 +6065,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.is_individual,
             usage.is_definition,
         )?;
-        if let Some(type_name) = usage.type_name {
-            self.write_reference(type_name)?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5951,6 +6089,158 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// a single member of the body -- a `view def` was the one definition family whose entire
     /// contents were invisible to the end-to-end contract, which is why a satisfy usage inside
     /// one could only be pinned through `FORMAT`.
+    fn write_typed_usage_head(
+        &mut self,
+        label: &str,
+        name: Option<DeclarationName>,
+        short_name: Option<DeclarationName>,
+        typing: Option<&Node<TypingRelationship>>,
+    ) -> io::Result<()> {
+        write!(self.writer, "({label} (name ")?;
+        self.write_optional_name(name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(short_name)?;
+        self.writer.write_str(") (typing ")?;
+        match typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")
+    }
+
+    fn write_requirement_usage(&mut self, usage: &super::RequirementUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "requirement-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        write!(
+            self.writer,
+            "(abstract {}) (variation {}) ",
+            usage.is_abstract, usage.is_variation
+        )?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_requirement_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_enumeration_usage(&mut self, usage: &super::EnumerationUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "enumeration-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        self.write_attribute_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_viewpoint_usage(&mut self, usage: &super::ViewpointUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "viewpoint-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        self.write_requirement_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_allocation_usage(&mut self, usage: &super::AllocationUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "allocation-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        self.writer.write_str("(ends")?;
+        for end in usage
+            .source
+            .iter()
+            .chain(usage.target.iter())
+            .chain(usage.nary_ends.iter())
+        {
+            self.writer.write_char(' ')?;
+            self.write_kerml_connector_end(&end.value)?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_viewpoint_definition(&mut self, definition: &super::ViewpointDef) -> io::Result<()> {
+        self.writer.write_str("(viewpoint-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(definition.identification.short_name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") (specializes ")?;
+        match &definition.specializes {
+            Some(specializes) => self.write_typing(&specializes.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_requirement_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_case_usage(&mut self, usage: &super::CaseUsage) -> io::Result<()> {
+        self.writer.write_str("(case-usage ")?;
+        self.write_case_like_usage(
+            "declaration",
+            usage.name,
+            usage.short_name,
+            usage.is_abstract,
+            usage.typing.as_ref(),
+            usage.subsets.as_ref(),
+        )?;
+        self.writer.write_char(' ')?;
+        self.write_use_case_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_use_case_usage(&mut self, usage: &super::UseCaseUsage) -> io::Result<()> {
+        self.writer.write_str("(use-case-usage ")?;
+        self.write_case_like_usage(
+            "declaration",
+            usage.name,
+            usage.short_name,
+            usage.is_abstract,
+            usage.typing.as_ref(),
+            usage.subsets.as_ref(),
+        )?;
+        write!(self.writer, " (variation {}) ", usage.is_variation)?;
+        self.write_use_case_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_verification_case_usage(
+        &mut self,
+        usage: &super::VerificationCaseUsage,
+    ) -> io::Result<()> {
+        self.writer.write_str("(verification-case-usage ")?;
+        self.write_case_like_usage(
+            "declaration",
+            usage.name,
+            usage.short_name,
+            usage.is_abstract,
+            usage.typing.as_ref(),
+            usage.subsets.as_ref(),
+        )?;
+        self.writer.write_char(' ')?;
+        self.write_use_case_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_view_definition(&mut self, definition: &super::ViewDef) -> io::Result<()> {
         self.writer.write_str("(view-def (name ")?;
         self.write_optional_name(definition.identification.name)?;
@@ -6019,6 +6309,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::RenderingDefBodyElement::Unsupported(node) => {
                             self.write_unsupported(&node.value, &element.span)?
                         }
+                        super::RenderingDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_extended_definition(&member.value)?
+                        }
+                        super::RenderingDefBodyElement::ExtendedUsage(member) => {
+                            self.write_extended_usage(&member.value)?
+                        }
                         super::RenderingDefBodyElement::Error(error) => {
                             self.write_malformed(&error.value, &element.span)?
                         }
@@ -6052,6 +6348,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_unsupported(&node.value, &element.span)?;
                         }
+                        super::ViewDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::ViewDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::ViewDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -6084,12 +6388,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_ref_declaration(&declaration.value)?;
                         }
                         super::ViewDefBodyElement::ViewpointUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "viewpoint-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_usage(&usage.value)?;
                         }
                         super::ViewDefBodyElement::ViewUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -6191,8 +6491,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
         }
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = usage.type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -6219,8 +6519,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (name ")?;
         self.write_optional_name(objective.requirement.value.name)?;
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = objective.requirement.value.type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = &objective.requirement.value.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -6242,8 +6542,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_str("(name ")?;
             self.write_optional_name(requirement.value.name)?;
             self.writer.write_str(") (type ")?;
-            if let Some(reference) = requirement.value.type_name {
-                self.write_reference(reference)?;
+            if let Some(typing) = &requirement.value.typing {
+                self.write_typing(&typing.value)?;
             } else {
                 self.writer.write_str("none")?;
             }
@@ -6276,6 +6576,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::RenderingUsageBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::RenderingUsageBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::RenderingUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -6297,6 +6605,33 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
         }
+    }
+
+    fn write_case_definition(&mut self, definition: &super::CaseDef) -> io::Result<()> {
+        self.writer.write_str("(case-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") ")?;
+        self.write_use_case_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_analysis_case_definition(
+        &mut self,
+        definition: &super::AnalysisCaseDef,
+    ) -> io::Result<()> {
+        self.writer.write_str("(analysis-case-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") ")?;
+        self.write_use_case_body(&definition.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_use_case_definition(&mut self, definition: &super::UseCaseDef) -> io::Result<()> {
@@ -6843,6 +7178,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::PortBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        super::PortBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         super::PortBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -6919,6 +7262,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
+                        PortDefBodyElement::ExtendedDefinition(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_definition(&member.value)?;
+                        }
+                        PortDefBodyElement::ExtendedUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_extended_usage(&member.value)?;
+                        }
                         PortDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -6942,12 +7293,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         PortDefBodyElement::EnumerationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "enumeration-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_enumeration_usage(&usage.value)?;
                         }
                         PortDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
@@ -7094,11 +7441,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::RequirementUsage(usage) => {
                 self.write_item_prefix(first)?;
-                self.write_named_multiplicity(
-                    "requirement-usage",
-                    usage.value.name,
-                    usage.value.multiplicity.as_ref(),
-                )
+                self.write_requirement_usage(&usage.value)
             }
             PackageBodyElement::Satisfy(usage) => {
                 self.write_item_prefix(first)?;
@@ -7146,11 +7489,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_view_definition(&definition.value)
             }
-            PackageBodyElement::ViewpointDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "viewpoint-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::ViewpointDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_viewpoint_definition(&definition.value)
+            }
             PackageBodyElement::RenderingDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_rendering_definition(&definition.value)
@@ -7159,14 +7501,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_view_usage(&usage.value)
             }
-            PackageBodyElement::ViewpointUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "viewpoint-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
-            PackageBodyElement::RenderingUsage(_usage) => {
-                self.write_marker(first, "rendering-usage")
+            PackageBodyElement::ViewpointUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_viewpoint_usage(&usage.value)
+            }
+            PackageBodyElement::RenderingUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_rendering_usage(&usage.value)
             }
             PackageBodyElement::Expose(expose) => {
                 self.write_item_prefix(first)?;
@@ -7208,12 +7549,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_allocation_definition(&definition.value)
             }
-            PackageBodyElement::AllocationUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "allocation-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
+            PackageBodyElement::AllocationUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_allocation_usage(&usage.value)
+            }
             PackageBodyElement::FlowDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_flow_definition(&definition.value)
@@ -7226,22 +7565,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_concern_usage(&usage.value)
             }
-            PackageBodyElement::CaseDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "case-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
-            PackageBodyElement::CaseUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "case-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
-            PackageBodyElement::AnalysisCaseDef(definition) => self.write_definition_prefix_marker(
-                first,
-                "analysis-case-def",
-                definition.value.definition_prefix.as_ref(),
-            ),
+            PackageBodyElement::CaseDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_case_definition(&definition.value)
+            }
+            PackageBodyElement::CaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_case_usage(&usage.value)
+            }
+            PackageBodyElement::AnalysisCaseDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_analysis_case_definition(&definition.value)
+            }
             PackageBodyElement::AnalysisCaseUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_analysis_case_usage(&usage.value)
@@ -7255,13 +7590,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_use_case_body(&definition.value.body)?;
                 self.writer.write_char(')')
             }
-            PackageBodyElement::VerificationCaseUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "verification-case-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
-            PackageBodyElement::UseCaseUsage(_usage) => self.write_marker(first, "use-case-usage"),
+            PackageBodyElement::VerificationCaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_verification_case_usage(&usage.value)
+            }
+            PackageBodyElement::UseCaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_use_case_usage(&usage.value)
+            }
             PackageBodyElement::KermlConnector(connector) => {
                 self.write_item_prefix(first)?;
                 self.write_kerml_connector(&connector.value)
@@ -7330,12 +7666,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_ref_declaration(&declaration.value)
             }
-            PackageBodyElement::EnumerationUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "enumeration-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
+            PackageBodyElement::EnumerationUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_enumeration_usage(&usage.value)
+            }
             PackageBodyElement::MetadataKeywordUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_metadata_keyword_usage(&usage.value)

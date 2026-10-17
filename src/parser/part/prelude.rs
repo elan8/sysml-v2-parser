@@ -5,8 +5,8 @@ pub(crate) use crate::ast::{
     InterfaceEnd, InterfaceEndMember, InterfaceEndReferenceOperator, InterfaceEndTarget,
     InterfacePart, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node, PartDef,
     PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform,
-    PerformActionTarget, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefDecl,
-    VariantTypedUsage, VariantUsage, VariantUsageForm,
+    PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefDecl, VariantTypedUsage,
+    VariantUsage, VariantUsageForm,
 };
 pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};

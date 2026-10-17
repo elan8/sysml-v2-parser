@@ -52,6 +52,9 @@ pub type RequirementDefBody = Body<RequirementDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RequirementDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -434,7 +437,8 @@ pub struct RequirementUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (e.g. `requirement <'1.1'> vehicleMass1 : …`).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Reference subsetting after `::>` / `references` (validation `08`:
@@ -480,7 +484,8 @@ pub struct ItemUsage {
     /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
     /// `PartUsage::name`'s existing convention.
     pub name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// Redefines target, e.g. `shape` in `item :>> shape : Cylinder { ... }`. `None` for the
     /// ordinary named form. Confirmed real usage in the OMG Geometry domain library's
     /// `VehicleGeometryAndCoordinateFrames.sysml` example (`item :>> shape = new Box(...);` and
@@ -514,7 +519,8 @@ pub struct EnumerationUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `ValuePart`: `enum size : SizeChoice = SizeChoice::small;` (`Usage` admits it).
     pub value: Option<Node<crate::ast::FeatureValue>>,
@@ -547,7 +553,8 @@ pub struct FrameMember {
     pub has_concern_keyword: bool,
     pub name: Option<DeclarationName>,
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -570,7 +577,8 @@ pub struct ConcernUsage {
     /// `OccurrenceDefinitionPrefix` (SysML BNF 541) admits `individual` on `concern def`; the
     /// usage keeps it through `OccurrenceUsagePrefix` (SysML BNF 564).
     pub is_individual: bool,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// Multiplicity after the name, e.g. `[0..*]` in `abstract concern concerns[0..*]`. Also
     /// previously parsed and discarded.
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -615,7 +623,8 @@ pub struct CaseUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
     /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). The declaration's tail
     /// used to be skipped wholesale, so this was dropped without a diagnostic.
@@ -664,7 +673,8 @@ pub struct AnalysisCaseUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: UseCaseDefBody,
@@ -700,7 +710,8 @@ pub struct VerificationCaseUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// Multiplicity after the type, e.g. `[0..*]` in `abstract verification
     /// subVerificationCases : VerificationCase[0..*] :> verificationCases, subcases { ... }`
     /// (Systems Library `VerificationCases.sysml:42`). See [`CaseUsage::multiplicity`].
@@ -731,7 +742,8 @@ pub struct UseCaseUsage {
     /// See [`RequirementUsage::short_name`]; `UseCaseUsage` previously had no field for it at all,
     /// so the grammar accepted `<'S-01'>` on a `requirement` but not on a `use case`.
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// True for `abstract use case ...`.
     pub is_abstract: bool,
     /// `variation` (`RefPrefix`'s alternative to `abstract`).
@@ -910,6 +922,9 @@ pub type ReturnRefBody = Body<ReturnRefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum ReturnRefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     Result(Node<Expression>),
@@ -922,6 +937,11 @@ pub enum ReturnRefBodyElement {
 // Boxing it only in use cases would make the public AST depend on the containing body kind.
 #[allow(clippy::large_enum_variant)]
 pub enum UseCaseDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
+    VariantUsage(Node<crate::ast::VariantUsage>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),

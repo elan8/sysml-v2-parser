@@ -1066,6 +1066,10 @@ macro_rules! ast_traversal {
             }
 
             /// Visits [`EntryAction`]; the default implementation walks its children.
+            fn visit_state_action_usage(&mut self, action: &$($mutability)? StateActionUsage) {
+                walk_state_action_usage(self, action)
+            }
+
             fn visit_entry_action(&mut self, node: &$($mutability)? Node<EntryAction>) {
                 walk_entry_action(self, node)
             }
@@ -2564,7 +2568,7 @@ macro_rules! ast_traversal {
         pub fn walk_extended_definition<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExtendedDefinition>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExtendedDefinition { prefix_keywords, definition_prefix, identification, specializes, body } = &$($mutability)? node.value;
+            let ExtendedDefinition { prefix_keywords, definition_prefix, identification, specializes, body, membership } = &$($mutability)? node.value;
             for inner in prefix_keywords {
                 visitor.visit_metadata_keyword_usage(inner);
             }
@@ -2576,6 +2580,7 @@ macro_rules! ast_traversal {
                 visitor.visit_typing_relationship(inner);
             }
             visitor.visit_package_body(body);
+            visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -2614,6 +2619,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                PartDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                PartDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 PartDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -2982,6 +2989,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                AttributeBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                AttributeBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 AttributeBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3196,6 +3205,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                MetadataBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 MetadataBodyElement::Error(error) => visitor.visit_parse_error_node(error),
                 MetadataBodyElement::Annotating(member) => visitor.visit_annotating_member(member),
                 MetadataBodyElement::Usage(usage) => visitor.visit_metadata_body_usage(usage),
@@ -3252,6 +3262,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                PartUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 PartUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3449,6 +3460,13 @@ macro_rules! ast_traversal {
 
         pub fn walk_variant_typed_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? VariantTypedUsage) {
             match node {
+                VariantTypedUsage::CaseUsage(member) => visitor.visit_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::AnalysisCaseUsage(member) => visitor.visit_analysis_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::VerificationCaseUsage(member) => visitor.visit_verification_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::UseCaseUsage(member) => visitor.visit_use_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::State(member) => visitor.visit_state_usage(&$($mutability)? **member),
+                VariantTypedUsage::Calculation(member) => visitor.visit_calc_usage(&$($mutability)? **member),
+                VariantTypedUsage::Constraint(member) => visitor.visit_constraint_usage(&$($mutability)? **member),
                 VariantTypedUsage::Part(field_0) => {
                     visitor.visit_part_usage(&$($mutability)? **field_0);
                 }
@@ -3491,10 +3509,10 @@ macro_rules! ast_traversal {
         pub fn walk_perform_action_target<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PerformActionTarget) {
             match node {
                 PerformActionTarget::Action(declaration) => visitor.visit_usage_declaration(declaration),
-                PerformActionTarget::Reference { action, redefines } => {
+                PerformActionTarget::Reference { action, specialization } => {
                     visitor.visit_qualified_reference(action);
-                    if let Some(redefines) = redefines {
-                        visitor.visit_subsetting_relationship(redefines);
+                    if let Some(specialization) = specialization {
+                        visitor.visit_usage_declaration(specialization);
                     }
                 }
             }
@@ -3702,6 +3720,8 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                PortDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                PortDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 PortDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3811,6 +3831,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                PortBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                PortBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 PortBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -3920,6 +3942,7 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::ConnectStmt(field_0) => {
                     visitor.visit_connect_stmt(field_0);
                 }
+                InterfaceDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 InterfaceDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4169,6 +4192,8 @@ macro_rules! ast_traversal {
                 ConnectionDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                ConnectionDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ConnectionDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ConnectionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4674,6 +4699,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                OccurrenceBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                OccurrenceBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 OccurrenceBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4946,6 +4973,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                InterfaceUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
                 InterfaceUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -5098,6 +5126,35 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ActionDefBodyElement::PartDef(member) => {
+                    visitor.visit_part_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ItemDef(member) => {
+                    visitor.visit_item_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ViewDef(member) => {
+                    visitor.visit_view_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::RenderingDef(member) => {
+                    visitor.visit_rendering_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ViewpointDef(member) => {
+                    visitor.visit_viewpoint_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::CaseUsage(member) => {
+                    visitor.visit_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::AnalysisCaseUsage(member) => {
+                    visitor.visit_analysis_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::VerificationCaseUsage(member) => {
+                    visitor.visit_verification_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::UseCaseUsage(member) => {
+                    visitor.visit_use_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ActionDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ActionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -5546,6 +5603,35 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ActionUsageBodyElement::PartDef(member) => {
+                    visitor.visit_part_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ItemDef(member) => {
+                    visitor.visit_item_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ViewDef(member) => {
+                    visitor.visit_view_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::RenderingDef(member) => {
+                    visitor.visit_rendering_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ViewpointDef(member) => {
+                    visitor.visit_viewpoint_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::CaseUsage(member) => {
+                    visitor.visit_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::AnalysisCaseUsage(member) => {
+                    visitor.visit_analysis_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::VerificationCaseUsage(member) => {
+                    visitor.visit_verification_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::UseCaseUsage(member) => {
+                    visitor.visit_use_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ActionUsageBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6001,17 +6087,16 @@ macro_rules! ast_traversal {
         pub fn walk_allocation_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AllocationUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AllocationUsage { name, short_name, type_name, type_is_conjugated, subsets, redefines, source, target, nary_ends, body, membership } = &$($mutability)? node.value;
+            let AllocationUsage { name, short_name, typing, subsets, redefines, source, target, nary_ends, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
-            let _ = type_is_conjugated;
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -6075,6 +6160,9 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                StateDefBodyElement::VariantUsage(member) => visitor.visit_variant_usage(member),
+                StateDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                StateDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 StateDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6099,12 +6187,8 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Then(field_0) => {
                     visitor.visit_then_stmt(field_0);
                 }
-                StateDefBodyElement::FirstStmt(field_0) => {
-                    visitor.visit_first_stmt(field_0);
-                }
-                StateDefBodyElement::ThenAction(field_0) => {
-                    visitor.visit_then_action(field_0);
-                }
+
+
                 StateDefBodyElement::FinalState(field_0) => {
                     visitor.visit_final_state(field_0);
                 }
@@ -6142,75 +6226,46 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_state_action_usage<V: $Visitor>(visitor: &mut V, action: &$($mutability)? StateActionUsage) {
+            match action {
+                StateActionUsage::Empty => {},
+                StateActionUsage::Perform { target, value } => {
+                    visitor.visit_perform_action_target(target);
+                    if let Some(value) = value { visitor.visit_feature_value(value); }
+                },
+                StateActionUsage::Effect { declaration, effect } => {
+                    if let Some(declaration) = declaration {
+                        visitor.visit_action_node_usage_declaration(declaration);
+                    }
+                    visitor.visit_transition_effect(effect);
+                },
+            }
+        }
+
         pub fn walk_entry_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EntryAction>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EntryAction { action_reference, has_action_keyword, declared_name, type_name, redefines, effect, body } = &$($mutability)? node.value;
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = has_action_keyword;
-            if let Some(inner) = declared_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = effect {
-                visitor.visit_transition_effect(inner);
-            }
-            visitor.visit_state_def_body(body);
+            let EntryAction { action, body } = &$($mutability)? node.value;
+            visitor.visit_state_action_usage(action);
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_do_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DoAction>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DoAction { action_reference, has_action_keyword, declared_name, type_name, redefines, effect, body } = &$($mutability)? node.value;
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = has_action_keyword;
-            if let Some(inner) = declared_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = effect {
-                visitor.visit_transition_effect(inner);
-            }
-            visitor.visit_state_def_body(body);
+            let DoAction { action, body } = &$($mutability)? node.value;
+            visitor.visit_state_action_usage(action);
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_exit_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExitAction>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExitAction { action_reference, has_action_keyword, declared_name, type_name, redefines, effect, body } = &$($mutability)? node.value;
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = has_action_keyword;
-            if let Some(inner) = declared_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = effect {
-                visitor.visit_transition_effect(inner);
-            }
-            visitor.visit_state_def_body(body);
+            let ExitAction { action, body } = &$($mutability)? node.value;
+            visitor.visit_state_action_usage(action);
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6346,6 +6401,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                RequirementDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                RequirementDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 RequirementDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6670,15 +6727,15 @@ macro_rules! ast_traversal {
         pub fn walk_requirement_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequirementUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequirementUsage { name, short_name, type_name, multiplicity, subsets, references, is_abstract, is_variation, value, direction, body, membership } = &$($mutability)? node.value;
+            let RequirementUsage { name, short_name, typing, multiplicity, subsets, references, is_abstract, is_variation, value, direction, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -6705,13 +6762,13 @@ macro_rules! ast_traversal {
         pub fn walk_item_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ItemUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ItemUsage { prefix, name, type_name, redefines, subsets, short_name, multiplicity, multiplicity_modifiers, value, body, membership } = &$($mutability)? node.value;
+            let ItemUsage { prefix, name, typing, redefines, subsets, short_name, multiplicity, multiplicity_modifiers, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
@@ -6737,15 +6794,15 @@ macro_rules! ast_traversal {
         pub fn walk_enumeration_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumerationUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumerationUsage { name, short_name, type_name, multiplicity, value, body, is_end, membership } = &$($mutability)? node.value;
+            let EnumerationUsage { name, short_name, typing, multiplicity, value, body, is_end, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -6813,7 +6870,7 @@ macro_rules! ast_traversal {
         pub fn walk_frame_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FrameMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let FrameMember { has_concern_keyword, name, short_name, type_name, multiplicity, subsets, redefines, value, body } = &$($mutability)? node.value;
+            let FrameMember { has_concern_keyword, name, short_name, typing, multiplicity, subsets, redefines, value, body } = &$($mutability)? node.value;
             let _ = has_concern_keyword;
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
@@ -6821,8 +6878,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -6843,7 +6900,7 @@ macro_rules! ast_traversal {
         pub fn walk_concern_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConcernUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConcernUsage { name, short_name, is_abstract, is_individual, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
+            let ConcernUsage { name, short_name, is_abstract, is_individual, typing, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6855,8 +6912,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
@@ -6890,7 +6947,7 @@ macro_rules! ast_traversal {
         pub fn walk_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CaseUsage { name, short_name, type_name, multiplicity, subsets, redefines, is_abstract, body, membership } = &$($mutability)? node.value;
+            let CaseUsage { name, short_name, typing, multiplicity, subsets, redefines, is_abstract, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6900,8 +6957,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
@@ -6935,7 +6992,7 @@ macro_rules! ast_traversal {
         pub fn walk_analysis_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AnalysisCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AnalysisCaseUsage { prefix, name, short_name, type_name, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let AnalysisCaseUsage { prefix, name, short_name, typing, subsets, redefines, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -6943,8 +7000,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
@@ -6977,7 +7034,7 @@ macro_rules! ast_traversal {
         pub fn walk_verification_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerificationCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VerificationCaseUsage { name, short_name, type_name, multiplicity, subsets, redefines, is_abstract, is_variation, body, membership } = &$($mutability)? node.value;
+            let VerificationCaseUsage { name, short_name, typing, multiplicity, subsets, redefines, is_abstract, is_variation, body, membership } = &$($mutability)? node.value;
             let _ = is_variation;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
@@ -6994,8 +7051,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             let _ = is_abstract;
             visitor.visit_use_case_def_body_value(body);
@@ -7006,7 +7063,7 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseUsage { name, short_name, type_name, is_abstract, is_variation, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let UseCaseUsage { name, short_name, typing, is_abstract, is_variation, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
             let _ = is_variation;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
@@ -7023,8 +7080,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             let _ = is_abstract;
             visitor.visit_use_case_def_body_value(body);
@@ -7219,6 +7276,8 @@ macro_rules! ast_traversal {
                 ReturnRefBodyElement::Result(field_0) => {
                     visitor.visit_expression(field_0);
                 }
+                ReturnRefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ReturnRefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ReturnRefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7230,6 +7289,9 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                UseCaseDefBodyElement::VariantUsage(member) => visitor.visit_variant_usage(member),
+                UseCaseDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                UseCaseDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 UseCaseDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7700,6 +7762,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ViewDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ViewDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ViewDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7743,13 +7807,13 @@ macro_rules! ast_traversal {
         pub fn walk_view_rendering_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewRenderingUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewRenderingUsage { form, type_name, multiplicity, multiplicity_modifiers, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let ViewRenderingUsage { form, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body, membership } = &$($mutability)? node.value;
             match form {
                 ViewRenderingForm::Reference(target) => visitor.visit_qualified_reference(target),
                 ViewRenderingForm::Inline(name) => visitor.visit_declaration_name(name),
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -7787,6 +7851,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                RenderingUsageBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                RenderingUsageBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 RenderingUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7858,6 +7924,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                RenderingDefBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                RenderingDefBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 RenderingDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7937,6 +8005,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ViewBodyElement::ExtendedDefinition(member) => visitor.visit_extended_definition(&$($mutability)? **member),
+                ViewBodyElement::ExtendedUsage(member) => visitor.visit_extended_usage(&$($mutability)? **member),
                 ViewBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -7984,15 +8054,15 @@ macro_rules! ast_traversal {
         pub fn walk_viewpoint_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewpointUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewpointUsage { name, short_name, type_name, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let ViewpointUsage { name, short_name, typing, subsets, redefines, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
             }
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);

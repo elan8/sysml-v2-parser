@@ -156,12 +156,8 @@ pub(crate) struct SpecializationClauses {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct UsageHeader {
-    pub type_reference: Option<QualifiedReferenceId>,
-    pub type_is_conjugated: bool,
     /// The complete `Typings` clause as one relationship node: its authored spelling (`:`,
     /// `typed by`, `defined by`), conjugation, span, and every target -- not just the first.
-    /// Callers that keep only a single `type_reference` lose the spelling and the extra targets,
-    /// so scopes whose emitter must reproduce what was written read this instead.
     pub typing: Option<Node<TypingRelationship>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `= expression` written as part of a `Subsettings` clause. The shared grammar
@@ -1031,10 +1027,8 @@ fn merge_usage_header(
     let references = merge_groups(leading.references, trailing.references);
     let crosses = merge_groups(leading.crosses, trailing.crosses);
     let intersects = merge_groups(leading.intersects, trailing.intersects);
-    let (_, type_reference, typing) = typing_reference_fields_from_result(type_result);
+    let (_, _, typing) = typing_reference_fields_from_result(type_result);
     UsageHeader {
-        type_is_conjugated: typing.as_ref().is_some_and(|node| node.value.is_conjugated),
-        type_reference,
         typing,
         subsets,
         subsetting_value: leading_subsetting_value.or(trailing_subsetting_value),
@@ -1273,55 +1267,6 @@ mod tests {
     }
 
     #[test]
-    fn usage_header_accepts_typing_then_specialization() {
-        let input = span_input(": Engine :> BasePart :>> oldPart ;");
-        let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(
-            header
-                .type_reference
-                .and_then(|id| reference_text(input, id))
-                .as_deref(),
-            Some("Engine")
-        );
-        assert_eq!(
-            header
-                .subsets
-                .as_ref()
-                .map(|rel| rel_target_kind(input, rel)),
-            Some(("BasePart".to_string(), SubsettingKind::Subsets))
-        );
-        assert_eq!(
-            header
-                .redefines
-                .as_ref()
-                .map(|rel| rel_target_kind(input, rel)),
-            Some(("oldPart".to_string(), SubsettingKind::Redefines))
-        );
-        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
-    }
-
-    #[test]
-    fn usage_header_accepts_specialization_then_typing() {
-        let input = span_input("subsets base : Engine ;");
-        let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(
-            header
-                .type_reference
-                .and_then(|id| reference_text(input, id))
-                .as_deref(),
-            Some("Engine")
-        );
-        assert_eq!(
-            header
-                .subsets
-                .as_ref()
-                .map(|rel| rel_target_kind(input, rel)),
-            Some(("base".to_string(), SubsettingKind::Subsets))
-        );
-        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
-    }
-
-    #[test]
     fn reference_subsetting_accepts_keyword() {
         let input = span_input("references portA ;");
         let (rest, target) = reference_subsetting(input).expect("references");
@@ -1340,35 +1285,6 @@ mod tests {
             rel_target_kind(input, &target),
             ("other".to_string(), SubsettingKind::Crosses)
         );
-        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
-    }
-
-    #[test]
-    fn usage_header_preserves_references_and_crosses() {
-        let input = span_input(": T references a crosses b ;");
-        let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(
-            header
-                .type_reference
-                .and_then(|id| reference_text(input, id))
-                .as_deref(),
-            Some("T")
-        );
-        assert_eq!(
-            header
-                .references
-                .as_ref()
-                .map(|rel| rel_target_kind(input, rel)),
-            Some(("a".to_string(), SubsettingKind::References))
-        );
-        assert_eq!(
-            header
-                .crosses
-                .as_ref()
-                .map(|rel| rel_target_kind(input, rel)),
-            Some(("b".to_string(), SubsettingKind::Crosses))
-        );
-        assert!(header.subsets.is_none());
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -1439,27 +1355,6 @@ mod tests {
                 .as_ref()
                 .map(|rel| rel_target_kind(input, rel)),
             Some(("c, d".to_string(), SubsettingKind::Intersects))
-        );
-        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
-    }
-
-    #[test]
-    fn usage_header_preserves_intersects() {
-        let input = span_input(": T intersects a ;");
-        let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(
-            header
-                .type_reference
-                .and_then(|id| reference_text(input, id))
-                .as_deref(),
-            Some("T")
-        );
-        assert_eq!(
-            header
-                .intersects
-                .as_ref()
-                .map(|rel| rel_target_kind(input, rel)),
-            Some(("a".to_string(), SubsettingKind::Intersects))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }

@@ -194,7 +194,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
             EnumerationUsage {
                 name,
                 short_name,
-                type_name: header.type_reference,
+                typing: header.typing,
                 multiplicity,
                 value,
                 body,

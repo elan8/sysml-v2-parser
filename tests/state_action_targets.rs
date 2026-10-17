@@ -24,7 +24,17 @@ fn failed_state_action_production_does_not_publish_its_target() {
                 PackageBodyElement::StateDef(state) => match &state.value.body {
                     StateDefBody::Brace { elements, .. } => elements.iter().find_map(|element| {
                         if let StateDefBodyElement::Do(action) = &element.value {
-                            action.value.action_reference
+                            match &action.value.action {
+                                sysml_v2_parser::ast::StateActionUsage::Perform {
+                                    target:
+                                        sysml_v2_parser::ast::PerformActionTarget::Reference {
+                                            action,
+                                            ..
+                                        },
+                                    ..
+                                } => Some(*action),
+                                _ => None,
+                            }
                         } else {
                             None
                         }

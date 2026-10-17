@@ -30,7 +30,8 @@ package AnalysisCaseUsagePrefixRecovery {
   (name-language sysml)
   (references
     (reference r0 (scope relative) (span (offset 92) (line 3) (column 30) (len 1)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 92) (line 3) (column 30) (len 1)))))
+    (reference r1 (scope relative) (span (offset 116) (line 4) (column 22) (len 1)) (segments (segment 0 (token "C") (name "C") (separator none) (span (offset 116) (line 4) (column 22) (len 1)))))
   )
-  (root (package (name "AnalysisCaseUsagePrefixRecovery") (body brace (malformed (code "missing_type_reference") (found "ref analysis : ;") (span (offset 46) (line 2) (column 5) (len 16))) (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual false) (portion none) (extensions)) (name "recovered") (short-name none) (type (ref r0)) (subsets none) (redefines none)) (case-usage (name "following") (short-name none)))))
+  (root (package (name "AnalysisCaseUsagePrefixRecovery") (body brace (malformed (code "missing_type_reference") (found "ref analysis : ;") (span (offset 46) (line 2) (column 5) (len 16))) (analysis-case-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual false) (portion none) (extensions)) (name "recovered") (short-name none) (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (subsets none) (redefines none) (body semicolon)) (case-usage (declaration (name "following") (short-name none) (abstract false) (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (subsets none)) (body semicolon)))))
 )
 ~~~

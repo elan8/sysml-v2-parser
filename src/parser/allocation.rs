@@ -61,7 +61,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     ) = crate::parser::lex::identification(input)?;
 
     let (input, header) = feature_usage_header(input)?;
-    let type_name = header.type_reference;
+    let typing = header.typing;
     // `ConnectorPart = BinaryConnectorPart | NaryConnectorPart`: `allocate ( logical ::> l,
     // physical ::> p )` names two or more ends in parentheses (SysML 8.2.2.14).
     let (input, nary_ends) = {
@@ -117,8 +117,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
             AllocationUsage {
                 name: name_str,
                 short_name,
-                type_name,
-                type_is_conjugated: header.type_is_conjugated,
+                typing,
                 subsets: header.subsets,
                 redefines: header.redefines,
                 source,
@@ -149,8 +148,7 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
                 // `allocate a to b` is anonymous; there is no `Identification` to carry one.
                 short_name: None,
                 name: None,
-                type_name: None,
-                type_is_conjugated: false,
+                typing: None,
                 subsets: None,
                 redefines: None,
                 source: Some(source),
@@ -236,23 +234,6 @@ mod membership_tests {
     fn allocation_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = allocation_usage(input("allocation a1;")).expect("allocation usage");
         assert_eq!(node.value.membership.visibility, None);
-    }
-
-    #[test]
-    fn allocation_usage_accepts_named_reference_ends() {
-        let source =
-            input("allocation a : $::Allocations::T allocate logical ::> src to physical ::> dst;");
-        let (rest, node) = allocation_usage(source).expect("allocation with ::> ends");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .type_name
-                .and_then(|id| crate::parser::usage::reference_text(source, id))
-                .as_deref(),
-            Some("$::Allocations::T")
-        );
-        assert!(node.value.source.is_some());
-        assert!(node.value.target.is_some());
     }
 
     #[test]

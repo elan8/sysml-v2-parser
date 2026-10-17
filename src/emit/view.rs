@@ -772,6 +772,12 @@ pub(crate) fn emit_view_def(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::ViewDefBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::ViewDefBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::ViewDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
@@ -876,6 +882,12 @@ pub(crate) fn emit_view_usage(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::ViewBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::ViewBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::ViewBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
@@ -945,9 +957,8 @@ pub(crate) fn emit_view_rendering(
             w.push_declaration_name(&format!("{path}/name"), name)?;
         }
     }
-    if let Some(ty) = &r.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
+    if let Some(typing) = &r.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &r.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
@@ -974,6 +985,12 @@ pub(crate) fn emit_view_rendering(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::RenderingUsageBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/render[{i}]"), &error.span)?
                     }
@@ -1038,9 +1055,8 @@ pub(crate) fn emit_viewpoint_usage(
             name: usage.name,
         },
     )?;
-    if let Some(type_name) = usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), type_name)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(redefines) = &usage.redefines {
         super::structure::emit_subsetting_clause(w, &redefines.value)?;
@@ -1077,6 +1093,12 @@ pub(crate) fn emit_rendering_def(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::RenderingDefBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::RenderingDefBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::RenderingDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
@@ -1150,6 +1172,12 @@ pub(crate) fn emit_rendering_usage(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
+                    crate::ast::RenderingUsageBodyElement::ExtendedDefinition(member) => {
+                        super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::ExtendedUsage(member) => {
+                        super::structure::emit_extended_usage(w, path, &member.value)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }

@@ -35,6 +35,27 @@ fn port_body(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
 }
 
 fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PortBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PortBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -265,6 +286,27 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
 }
 
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PortDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                PortDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.

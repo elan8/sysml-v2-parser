@@ -61,11 +61,12 @@ pub(crate) fn emit_library_package(
     emit_package_body(w, path, &pkg.body)
 }
 
-fn emit_extended_definition(
+pub(crate) fn emit_extended_definition(
     w: &mut EmitWriter<'_>,
     path: &str,
     def: &crate::ast::ExtendedDefinition,
 ) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
     if let Some(prefix) = &def.definition_prefix {
         structure::emit_definition_prefix(w, Some(prefix));
     }

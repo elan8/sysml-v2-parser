@@ -168,7 +168,7 @@ fn use_case_usage_tail(
         UseCaseUsage {
             name: ident,
             short_name,
-            type_name: header.type_reference,
+            typing: header.typing,
             is_abstract,
             is_variation: false,
             multiplicity: header.multiplicity,
@@ -355,6 +355,27 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
 }
 
 fn return_ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ReturnRefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ReturnRefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -613,10 +634,39 @@ fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBod
 pub(crate) fn use_case_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<UseCaseDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                UseCaseDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                UseCaseDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    if !crate::parser::body::starts_bare_comment(start) {
+        if let Ok((next, usage)) = crate::parser::part::variant_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, UseCaseDefBodyElement::VariantUsage(usage)),
+            ));
+        }
+    }
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a

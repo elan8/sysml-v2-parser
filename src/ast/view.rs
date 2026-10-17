@@ -426,6 +426,9 @@ pub type ViewDefBody = Body<ViewDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     /// A spec-valid member of this body that the parser does not model yet, retained with
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
@@ -467,7 +470,8 @@ pub enum ViewDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewRenderingUsage {
     pub form: ViewRenderingForm,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     pub subsets: Option<Node<SubsettingRelationship>>,
@@ -499,6 +503,9 @@ pub type RenderingUsageBody = Body<RenderingUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum RenderingUsageBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -558,6 +565,9 @@ pub type RenderingDefBody = Body<RenderingDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     /// A spec-valid member of this body that the parser does not model yet, retained with
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
@@ -622,6 +632,9 @@ pub type ViewBody = Body<ViewBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -669,7 +682,8 @@ pub struct ViewpointUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// `:>` subsets clause (spec42 gap 25), mirroring [`ViewUsage::subsets`]. Previously parsed
     /// by the shared usage header and discarded.
     pub subsets: Option<Node<SubsettingRelationship>>,

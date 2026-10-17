@@ -23,6 +23,27 @@ use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ViewDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ViewDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -100,6 +121,27 @@ fn view_filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterMember>
 fn rendering_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingUsageBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                RenderingUsageBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                RenderingUsageBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -192,7 +234,7 @@ pub(crate) fn view_rendering_usage(
             input,
             ViewRenderingUsage {
                 form,
-                type_name: header.type_reference,
+                typing: header.typing,
                 multiplicity: header.multiplicity,
                 multiplicity_modifiers: header.multiplicity_modifiers,
                 subsets: header.subsets,
@@ -296,6 +338,27 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
 fn rendering_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                RenderingDefBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                RenderingDefBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -382,6 +445,27 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
 }
 
 fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElement>> {
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ViewBodyElement::ExtendedDefinition(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::metadata_annotation::extended_usage(input) {
+        return Ok((
+            next,
+            crate::parser::node_from_to(
+                input,
+                next,
+                ViewBodyElement::ExtendedUsage(Box::new(member)),
+            ),
+        ));
+    }
+
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
@@ -620,7 +704,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
             ViewpointUsage {
                 name: name_str,
                 short_name,
-                type_name: header.type_reference,
+                typing: header.typing,
                 subsets: header.subsets,
                 redefines: header.redefines,
                 body,

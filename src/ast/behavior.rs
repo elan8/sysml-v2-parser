@@ -46,6 +46,19 @@ pub type ActionDefBody = Body<ActionDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
+    PartDef(Box<Node<crate::ast::PartDef>>),
+    ItemDef(Box<Node<crate::ast::ItemDef>>),
+    ViewDef(Box<Node<crate::ast::ViewDef>>),
+    RenderingDef(Box<Node<crate::ast::RenderingDef>>),
+    ViewpointDef(Box<Node<crate::ast::ViewpointDef>>),
+    CaseUsage(Box<Node<crate::ast::CaseUsage>>),
+    AnalysisCaseUsage(Box<Node<crate::ast::AnalysisCaseUsage>>),
+    VerificationCaseUsage(Box<Node<crate::ast::VerificationCaseUsage>>),
+    UseCaseUsage(Box<Node<crate::ast::UseCaseUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// An import owned directly by this action body.
     ///
@@ -510,6 +523,19 @@ pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
+    PartDef(Box<Node<crate::ast::PartDef>>),
+    ItemDef(Box<Node<crate::ast::ItemDef>>),
+    ViewDef(Box<Node<crate::ast::ViewDef>>),
+    RenderingDef(Box<Node<crate::ast::RenderingDef>>),
+    ViewpointDef(Box<Node<crate::ast::ViewpointDef>>),
+    CaseUsage(Box<Node<crate::ast::CaseUsage>>),
+    AnalysisCaseUsage(Box<Node<crate::ast::AnalysisCaseUsage>>),
+    VerificationCaseUsage(Box<Node<crate::ast::VerificationCaseUsage>>),
+    UseCaseUsage(Box<Node<crate::ast::UseCaseUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// An import owned directly by this action body; see [`ActionDefBodyElement::Import`].
     Import(Node<crate::ast::Import>),
@@ -1048,8 +1074,8 @@ pub struct AllocationUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
-    pub type_is_conjugated: bool,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// `:>` subsets clause (spec42 gap 27), previously parsed by the shared usage header and
     /// discarded.
     pub subsets: Option<Node<SubsettingRelationship>>,
@@ -1114,6 +1140,11 @@ pub type StateDefBody = Body<StateDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StateDefBodyElement {
+    ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
+    ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
+
+    VariantUsage(Node<crate::ast::VariantUsage>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -1129,13 +1160,6 @@ pub enum StateDefBodyElement {
     Exit(Node<ExitAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
-    /// `first <node>;` initial-node marker inside an `entry`/`do`/`exit` action body (SysML
-    /// `ActionBody`), e.g. `do action ops { first start; then done; }` (Apollo 11). Only produced
-    /// for the entry/do/exit action bodies, never a plain `state` body.
-    FirstStmt(Node<FirstStmt>),
-    /// `then <target>;` action succession inside an `entry`/`do`/`exit` action body -- the
-    /// action-flow `then`, distinct from [`Self::Then`]'s `then <state>;` initial-state marker.
-    ThenAction(Node<ThenAction>),
     /// `final` / `final state` name `;` - explicit final state.
     FinalState(Node<FinalState>),
     /// `ref` name `:` type body – reference binding in state.
@@ -1165,76 +1189,46 @@ pub enum StateDefBodyElement {
     ConstraintUsage(Box<Node<crate::ast::ConstraintUsage>>),
 }
 
-/// Entry action: `entry` (`;` or body).
+/// The alternatives of SysML `StateActionUsage` (8.2.2.18).
+/// A declaration retains the same `PerformActionUsageDeclaration` as a perform member.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum StateActionUsage {
+    Empty,
+    Perform {
+        target: crate::ast::PerformActionTarget,
+        value: Option<Box<Node<crate::ast::FeatureValue>>>,
+    },
+    /// `StateAcceptActionUsage`, `StateSendActionUsage` or `StateAssignmentActionUsage`: the
+    /// optional `ActionNodeUsageDeclaration` (`action name? :T?`) and the node's effect.
+    Effect {
+        declaration: Option<Box<Node<ActionNodeUsageDeclaration>>>,
+        effect: Box<TransitionEffect>,
+    },
+}
+
+/// A state `entry` member and its typed action usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntryAction {
-    /// Referenced action for `entry action path body` / `entry path body`; absent for a plain
-    /// `entry` body. This is a semantic target, not a declaration label.
-    pub action_reference: Option<QualifiedReferenceId>,
-    /// True when the `action` keyword was written (`entry action path` vs `entry path`).
-    pub has_action_keyword: bool,
-    /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
-    /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
-    /// `action_reference`, which the reference form keeps.
-    pub declared_name: Option<DeclarationName>,
-    /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
-    pub type_name: Option<QualifiedReferenceId>,
-    /// `:>> target` redefinition on the declaration form.
-    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `assign`/`send`/`accept` effect written directly under the keyword (`entry assign
-    /// counter.count := 0;`, spec42 `assignment_test`), mirroring [`Transition::effect`]
-    /// (spec42 Gap 43).
-    pub effect: Option<TransitionEffect>,
-    pub body: StateDefBody,
+    pub action: StateActionUsage,
+    pub body: ActionDefBody,
 }
 
-/// Do action: `do` (`;` or body).
+/// A state `do` member and its typed action usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DoAction {
-    /// Referenced action for `do action path body` / `do path body`; absent for a plain `do` body.
-    /// This is a semantic target, not a declaration label.
-    pub action_reference: Option<QualifiedReferenceId>,
-    /// True when the `action` keyword was written (`do action path` vs `do path`).
-    pub has_action_keyword: bool,
-    /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
-    /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
-    /// `action_reference`, which the reference form keeps.
-    pub declared_name: Option<DeclarationName>,
-    /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
-    pub type_name: Option<QualifiedReferenceId>,
-    /// `:>> target` redefinition on the declaration form.
-    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `assign`/`send`/`accept` effect written directly under the keyword (`entry assign
-    /// counter.count := 0;`, spec42 `assignment_test`), mirroring [`Transition::effect`]
-    /// (spec42 Gap 43).
-    pub effect: Option<TransitionEffect>,
-    pub body: StateDefBody,
+    pub action: StateActionUsage,
+    pub body: ActionDefBody,
 }
 
-/// Exit action: `exit` (`;` or body).
+/// A state `exit` member and its typed action usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExitAction {
-    /// Referenced action for `exit action path body` / `exit path body`; absent for a plain `exit`
-    /// body. This is a semantic target, not a declaration label.
-    pub action_reference: Option<QualifiedReferenceId>,
-    /// True when the `action` keyword was written (`exit action path` vs `exit path`).
-    pub has_action_keyword: bool,
-    /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
-    /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
-    /// `action_reference`, which the reference form keeps.
-    pub declared_name: Option<DeclarationName>,
-    /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
-    pub type_name: Option<QualifiedReferenceId>,
-    /// `:>> target` redefinition on the declaration form.
-    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
-    /// `assign`/`send`/`accept` effect written directly under the keyword (`entry assign
-    /// counter.count := 0;`, spec42 `assignment_test`), mirroring [`Transition::effect`]
-    /// (spec42 Gap 43).
-    pub effect: Option<TransitionEffect>,
-    pub body: StateDefBody,
+    pub action: StateActionUsage,
+    pub body: ActionDefBody,
 }
 
 /// Then (initial state): `then` state-path `;`.
