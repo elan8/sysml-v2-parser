@@ -435,6 +435,31 @@ pub(crate) fn emit_action_def_body_element(
     el: &ActionDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        ActionDefBodyElement::PartDef(member) => {
+            super::structure::emit_part_def(w, path, &member.value)
+        }
+        ActionDefBodyElement::ItemDef(member) => {
+            super::structure::emit_item_def(w, path, &member.value)
+        }
+        ActionDefBodyElement::ViewDef(member) => super::view::emit_view_def(w, path, &member.value),
+        ActionDefBodyElement::RenderingDef(member) => {
+            super::view::emit_rendering_def(w, path, &member.value)
+        }
+        ActionDefBodyElement::ViewpointDef(member) => {
+            super::view::emit_viewpoint_def(w, path, &member.value)
+        }
+        ActionDefBodyElement::CaseUsage(member) => {
+            super::requirement::emit_case_usage(w, path, &member.value)
+        }
+        ActionDefBodyElement::AnalysisCaseUsage(member) => {
+            super::requirement::emit_analysis_case_usage(w, path, &member.value)
+        }
+        ActionDefBodyElement::VerificationCaseUsage(member) => {
+            super::requirement::emit_verification_case_usage(w, path, &member.value)
+        }
+        ActionDefBodyElement::UseCaseUsage(member) => {
+            super::requirement::emit_use_case_usage(w, path, &member.value)
+        }
         ActionDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ActionDefBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionDefBodyElement::AttributeUsage(a) => {
@@ -542,6 +567,33 @@ pub(crate) fn emit_action_usage_body_element(
     el: &ActionUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        ActionUsageBodyElement::PartDef(member) => {
+            super::structure::emit_part_def(w, path, &member.value)
+        }
+        ActionUsageBodyElement::ItemDef(member) => {
+            super::structure::emit_item_def(w, path, &member.value)
+        }
+        ActionUsageBodyElement::ViewDef(member) => {
+            super::view::emit_view_def(w, path, &member.value)
+        }
+        ActionUsageBodyElement::RenderingDef(member) => {
+            super::view::emit_rendering_def(w, path, &member.value)
+        }
+        ActionUsageBodyElement::ViewpointDef(member) => {
+            super::view::emit_viewpoint_def(w, path, &member.value)
+        }
+        ActionUsageBodyElement::CaseUsage(member) => {
+            super::requirement::emit_case_usage(w, path, &member.value)
+        }
+        ActionUsageBodyElement::AnalysisCaseUsage(member) => {
+            super::requirement::emit_analysis_case_usage(w, path, &member.value)
+        }
+        ActionUsageBodyElement::VerificationCaseUsage(member) => {
+            super::requirement::emit_verification_case_usage(w, path, &member.value)
+        }
+        ActionUsageBodyElement::UseCaseUsage(member) => {
+            super::requirement::emit_use_case_usage(w, path, &member.value)
+        }
         ActionUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ActionUsageBodyElement::Import(import) => super::root::emit_import(w, &import.value),
         ActionUsageBodyElement::AttributeUsage(a) => {
@@ -979,6 +1031,9 @@ fn emit_state_def_body_element(
     el: &StateDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        StateDefBodyElement::VariantUsage(member) => {
+            super::structure::emit_variant_usage(w, path, &member.value)
+        }
         StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         StateDefBodyElement::Annotating(member) => {
@@ -987,17 +1042,17 @@ fn emit_state_def_body_element(
         StateDefBodyElement::Entry(action) => {
             w.push_str("entry");
             emit_state_action_usage(w, path, &action.value.action)?;
-            emit_state_def_body(w, path, &action.value.body)
+            emit_action_def_body(w, path, &action.value.body)
         }
         StateDefBodyElement::Do(action) => {
             w.push_str("do");
             emit_state_action_usage(w, path, &action.value.action)?;
-            emit_state_def_body(w, path, &action.value.body)
+            emit_action_def_body(w, path, &action.value.body)
         }
         StateDefBodyElement::Exit(action) => {
             w.push_str("exit");
             emit_state_action_usage(w, path, &action.value.action)?;
-            emit_state_def_body(w, path, &action.value.body)
+            emit_action_def_body(w, path, &action.value.body)
         }
         StateDefBodyElement::Then(t) => {
             w.push_str("then ");
@@ -1005,8 +1060,6 @@ fn emit_state_def_body_element(
             w.push_char(';');
             Ok(())
         }
-        StateDefBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
-        StateDefBodyElement::ThenAction(t) => emit_then_action(w, path, &t.value),
         StateDefBodyElement::FinalState(f) => {
             w.push_str("final ");
             w.push_declaration_name(&format!("{path}/final-name"), f.value.state_name)?;

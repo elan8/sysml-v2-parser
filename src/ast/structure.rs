@@ -978,6 +978,14 @@ pub enum VariantUsageForm {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VariantTypedUsage {
+    CaseUsage(Box<Node<crate::ast::CaseUsage>>),
+    AnalysisCaseUsage(Box<Node<crate::ast::AnalysisCaseUsage>>),
+    VerificationCaseUsage(Box<Node<crate::ast::VerificationCaseUsage>>),
+    UseCaseUsage(Box<Node<crate::ast::UseCaseUsage>>),
+    State(Box<Node<crate::ast::StateUsage>>),
+    Calculation(Box<Node<crate::ast::CalcUsage>>),
+    Constraint(Box<Node<crate::ast::ConstraintUsage>>),
+
     Part(Box<Node<PartUsage>>),
     Attribute(Box<Node<AttributeUsage>>),
     Item(Box<Node<ItemUsage>>),

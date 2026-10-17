@@ -1162,6 +1162,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        UseCaseDefBodyElement::VariantUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&member.value)?;
+                        }
                         UseCaseDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1238,36 +1242,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         UseCaseDefBodyElement::UseCaseUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_case_like_usage(
-                                "use-case-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                                usage.value.is_abstract,
-                                usage.value.type_name,
-                                usage.value.subsets.as_ref(),
-                            )?;
+                            self.write_use_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::CaseUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_case_like_usage(
-                                "case-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                                usage.value.is_abstract,
-                                usage.value.type_name,
-                                usage.value.subsets.as_ref(),
-                            )?;
+                            self.write_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::VerificationCaseUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_case_like_usage(
-                                "verification-case-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                                usage.value.is_abstract,
-                                usage.value.type_name,
-                                usage.value.subsets.as_ref(),
-                            )?;
+                            self.write_verification_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::IncludeUseCase(include) => {
                             self.write_item_prefix(&mut first)?;
@@ -1392,6 +1375,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        StateDefBodyElement::VariantUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_variant_usage(&member.value)?;
+                        }
                         StateDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -1437,14 +1424,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_reference(then.value.state_reference)?;
                             self.writer.write_str("))")?;
                         }
-                        StateDefBodyElement::FirstStmt(first_stmt) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_first_statement(&first_stmt.value)?;
-                        }
-                        StateDefBodyElement::ThenAction(action) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_then_action(&action.value)?;
-                        }
+
                         StateDefBodyElement::FinalState(_state) => {
                             self.write_marker(&mut first, "final-state")?;
                         }
@@ -1495,7 +1475,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         &mut self,
         kind: &str,
         action: &super::StateActionUsage,
-        body: &StateDefBody,
+        body: &super::ActionDefBody,
     ) -> io::Result<()> {
         write!(self.writer, "({kind} (action ")?;
         match action {
@@ -1512,7 +1492,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::StateActionUsage::Effect(effect) => self.write_transition_effect(effect)?,
         }
         self.writer.write_str(") ")?;
-        self.write_state_body(body)?;
+        self.write_action_body(body)?;
         self.writer.write_char(')')
     }
 
@@ -3222,6 +3202,23 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         span: &Span,
     ) -> io::Result<()> {
         match member {
+            ActionDefBodyElement::PartDef(member) => self.write_part_definition(&member.value),
+            ActionDefBodyElement::ItemDef(member) => self.write_item_definition(&member.value),
+            ActionDefBodyElement::ViewDef(member) => self.write_view_definition(&member.value),
+            ActionDefBodyElement::RenderingDef(member) => {
+                self.write_rendering_definition(&member.value)
+            }
+            ActionDefBodyElement::ViewpointDef(member) => {
+                self.write_viewpoint_definition(&member.value)
+            }
+            ActionDefBodyElement::CaseUsage(member) => self.write_case_usage(&member.value),
+            ActionDefBodyElement::AnalysisCaseUsage(member) => {
+                self.write_analysis_case_usage(&member.value)
+            }
+            ActionDefBodyElement::VerificationCaseUsage(member) => {
+                self.write_verification_case_usage(&member.value)
+            }
+            ActionDefBodyElement::UseCaseUsage(member) => self.write_use_case_usage(&member.value),
             ActionDefBodyElement::Error(error) => self.write_malformed(&error.value, span),
             ActionDefBodyElement::Import(import) => {
                 self.writer.write_str("(import ")?;
@@ -4101,6 +4098,42 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
+                        super::ActionUsageBodyElement::PartDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_part_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ItemDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_item_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ViewDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::RenderingDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::ViewpointDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_definition(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::CaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::AnalysisCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_analysis_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::VerificationCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_verification_case_usage(&member.value)?;
+                        }
+                        super::ActionUsageBodyElement::UseCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_use_case_usage(&member.value)?;
+                        }
                         super::ActionUsageBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
@@ -4837,6 +4870,27 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (usage ")?;
         match &usage.form {
             super::VariantUsageForm::Reference { .. } => self.writer.write_str("none")?,
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::CaseUsage(member)) => {
+                self.write_case_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::AnalysisCaseUsage(member)) => {
+                self.write_analysis_case_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::VerificationCaseUsage(
+                member,
+            )) => self.write_verification_case_usage(&member.value)?,
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::UseCaseUsage(member)) => {
+                self.write_use_case_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::State(member)) => {
+                self.write_state_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Calculation(member)) => {
+                self.write_calculation_usage(&member.value)?
+            }
+            super::VariantUsageForm::Typed(super::VariantTypedUsage::Constraint(member)) => {
+                self.write_constraint_usage(&member.value)?
+            }
             super::VariantUsageForm::Typed(super::VariantTypedUsage::Part(usage)) => {
                 self.write_part_usage(&usage.value)?
             }
@@ -5267,6 +5321,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_use_case_body(&usage.body)?;
         self.writer.write_char(')')
     }
 
@@ -5928,6 +5984,73 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// a single member of the body -- a `view def` was the one definition family whose entire
     /// contents were invisible to the end-to-end contract, which is why a satisfy usage inside
     /// one could only be pinned through `FORMAT`.
+    fn write_viewpoint_definition(&mut self, definition: &super::ViewpointDef) -> io::Result<()> {
+        self.writer.write_str("(viewpoint-def (name ")?;
+        self.write_optional_name(definition.identification.name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(definition.identification.short_name)?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str(") (specializes ")?;
+        match &definition.specializes {
+            Some(specializes) => self.write_typing(&specializes.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_requirement_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_case_usage(&mut self, usage: &super::CaseUsage) -> io::Result<()> {
+        self.writer.write_str("(case-usage ")?;
+        self.write_case_like_usage(
+            "declaration",
+            usage.name,
+            usage.short_name,
+            usage.is_abstract,
+            usage.type_name,
+            usage.subsets.as_ref(),
+        )?;
+        self.writer.write_char(' ')?;
+        self.write_use_case_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_use_case_usage(&mut self, usage: &super::UseCaseUsage) -> io::Result<()> {
+        self.writer.write_str("(use-case-usage ")?;
+        self.write_case_like_usage(
+            "declaration",
+            usage.name,
+            usage.short_name,
+            usage.is_abstract,
+            usage.type_name,
+            usage.subsets.as_ref(),
+        )?;
+        write!(self.writer, " (variation {}) ", usage.is_variation)?;
+        self.write_use_case_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_verification_case_usage(
+        &mut self,
+        usage: &super::VerificationCaseUsage,
+    ) -> io::Result<()> {
+        self.writer.write_str("(verification-case-usage ")?;
+        self.write_case_like_usage(
+            "declaration",
+            usage.name,
+            usage.short_name,
+            usage.is_abstract,
+            usage.type_name,
+            usage.subsets.as_ref(),
+        )?;
+        self.writer.write_char(' ')?;
+        self.write_use_case_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_view_definition(&mut self, definition: &super::ViewDef) -> io::Result<()> {
         self.writer.write_str("(view-def (name ")?;
         self.write_optional_name(definition.identification.name)?;
@@ -7208,12 +7331,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 "case-def",
                 definition.value.definition_prefix.as_ref(),
             ),
-            PackageBodyElement::CaseUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "case-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
+            PackageBodyElement::CaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_case_usage(&usage.value)
+            }
             PackageBodyElement::AnalysisCaseDef(definition) => self.write_definition_prefix_marker(
                 first,
                 "analysis-case-def",
@@ -7232,13 +7353,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_use_case_body(&definition.value.body)?;
                 self.writer.write_char(')')
             }
-            PackageBodyElement::VerificationCaseUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "verification-case-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
-            PackageBodyElement::UseCaseUsage(_usage) => self.write_marker(first, "use-case-usage"),
+            PackageBodyElement::VerificationCaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_verification_case_usage(&usage.value)
+            }
+            PackageBodyElement::UseCaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_use_case_usage(&usage.value)
+            }
             PackageBodyElement::KermlConnector(connector) => {
                 self.write_item_prefix(first)?;
                 self.write_kerml_connector(&connector.value)

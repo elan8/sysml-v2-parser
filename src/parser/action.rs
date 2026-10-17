@@ -36,6 +36,12 @@ use nom::IResult;
 use nom::Parser;
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
+    b"case",
+    b"analysis",
+    b"verification",
+    b"use",
+    b"viewpoint",
+    b"rendering",
     b"view",
     b"import",
     b"public",
@@ -310,6 +316,15 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::Transition(_)
         | ActionDefBodyElement::StateUsage(_)
         | ActionDefBodyElement::ActionUsage(_)
+        | ActionDefBodyElement::PartDef(_)
+        | ActionDefBodyElement::ItemDef(_)
+        | ActionDefBodyElement::ViewDef(_)
+        | ActionDefBodyElement::RenderingDef(_)
+        | ActionDefBodyElement::ViewpointDef(_)
+        | ActionDefBodyElement::CaseUsage(_)
+        | ActionDefBodyElement::AnalysisCaseUsage(_)
+        | ActionDefBodyElement::VerificationCaseUsage(_)
+        | ActionDefBodyElement::UseCaseUsage(_)
         | ActionDefBodyElement::ViewUsage(_)
         | ActionDefBodyElement::PartUsage(_)
         | ActionDefBodyElement::ItemUsage(_)
@@ -834,6 +849,103 @@ pub(crate) fn action_def_body_element(
         let (next, member) = annotating_member_stmt(start)?;
         let elem = ActionDefBodyElement::Annotating(member);
         return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::part::part_def)
+    {
+        return Ok((
+            next,
+            node_from_to(start, next, ActionDefBodyElement::PartDef(Box::new(member))),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::item::item_def_required)
+    {
+        return Ok((
+            next,
+            node_from_to(start, next, ActionDefBodyElement::ItemDef(Box::new(member))),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::view::view_def)
+    {
+        return Ok((
+            next,
+            node_from_to(start, next, ActionDefBodyElement::ViewDef(Box::new(member))),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::view::rendering_def)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::RenderingDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::view::viewpoint_def)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::ViewpointDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::case::case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::CaseUsage(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::case::analysis_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::AnalysisCaseUsage(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::span::reference_transaction(
+        start,
+        crate::parser::case::verification_case_usage,
+    ) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::VerificationCaseUsage(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::usecase::use_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionDefBodyElement::UseCaseUsage(Box::new(member)),
+            ),
+        ));
     }
     if let Ok((next, usage)) = crate::parser::view::view_usage(start) {
         return Ok((
@@ -1824,6 +1936,115 @@ pub(crate) fn action_usage_body_element(
         let (next, member) = annotating_member_stmt(start)?;
         let elem = ActionUsageBodyElement::Annotating(member);
         return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::part::part_def)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::PartDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::item::item_def_required)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::ItemDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::view::view_def)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::ViewDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::view::rendering_def)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::RenderingDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::view::viewpoint_def)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::ViewpointDef(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::case::case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::CaseUsage(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::case::analysis_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::AnalysisCaseUsage(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) = crate::parser::span::reference_transaction(
+        start,
+        crate::parser::case::verification_case_usage,
+    ) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::VerificationCaseUsage(Box::new(member)),
+            ),
+        ));
+    }
+    if let Ok((next, member)) =
+        crate::parser::span::reference_transaction(start, crate::parser::usecase::use_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                ActionUsageBodyElement::UseCaseUsage(Box::new(member)),
+            ),
+        ));
     }
     if let Ok((next, usage)) = crate::parser::view::view_usage(start) {
         return Ok((

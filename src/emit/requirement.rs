@@ -802,6 +802,9 @@ fn emit_use_case_body_element(
     el: &UseCaseDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
+        UseCaseDefBodyElement::VariantUsage(member) => {
+            super::structure::emit_variant_usage(w, path, &member.value)
+        }
         UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         UseCaseDefBodyElement::Import(i) => emit_import(w, &i.value),
         UseCaseDefBodyElement::Annotating(member) => {

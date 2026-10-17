@@ -84,60 +84,6 @@ pub(crate) fn state_def_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBod
     alt((crate::parser::body::semicolon_body, state_def_body_brace)).parse(input)
 }
 
-/// Body of an `entry`/`do`/`exit` action. Structurally a `StateDefBody`, but per SysML these are
-/// `ActionBody`s (`PerformActionUsage ... ActionBody`), so the action-flow statements `first
-/// <node>;` and `then <target>;` are legal here in addition to every `state` body member. The
-/// Apollo 11 model's `do action prepareForMissionPhaseOperations { first start; then action
-/// loadConsumablesAndPropellants : ...; then done; }` is the real-usage case.
-pub(crate) fn state_action_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    alt((crate::parser::body::semicolon_body, state_action_body_brace)).parse(input)
-}
-
-fn state_action_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    let (input, members) = parse_structured_brace_members(
-        input,
-        STATE_BODY_STARTERS,
-        "state body",
-        "recovered_state_body_element",
-        state_action_body_element,
-        |start, end| {
-            let recovery = build_recovery_error_node_from_span(
-                start,
-                end,
-                STATE_BODY_STARTERS,
-                "state body",
-                "recovered_state_body_element",
-            );
-            node_from_to(
-                start,
-                end,
-                StateDefBodyElement::Error(node_from_to(start, end, recovery)),
-            )
-        },
-    )?;
-    Ok((input, members.into_body()))
-}
-
-/// `state_def_body_element` plus the two action-flow statements an `entry`/`do`/`exit` body also
-/// admits. `first`/`then` are tried first: `then_stmt` (the state `then <state>;` marker) would
-/// otherwise claim `then done;` as an initial-state reference.
-fn state_action_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
-    let start = input;
-    if let Ok((next, node)) = crate::parser::action::first_stmt(start) {
-        return Ok((
-            next,
-            node_from_to(start, next, StateDefBodyElement::FirstStmt(node)),
-        ));
-    }
-    if let Ok((next, node)) = crate::parser::action::then_action(start) {
-        return Ok((
-            next,
-            node_from_to(start, next, StateDefBodyElement::ThenAction(node)),
-        ));
-    }
-    state_def_body_element(input)
-}
-
 fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     let (input, members) = parse_structured_brace_members(
         input,
@@ -211,7 +157,7 @@ fn entry_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>>
     let (input, _) = tag(&b"entry"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = state_action_body(input)?;
+    let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
         node_from_to(start, input, EntryAction { action: head, body }),
@@ -239,7 +185,7 @@ fn do_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     let (input, _) = tag(&b"do"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = state_action_body(input)?;
+    let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
         node_from_to(start, input, DoAction { action: head, body }),
@@ -267,7 +213,7 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     let (input, _) = tag(&b"exit"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = state_action_body(input)?;
+    let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
         node_from_to(start, input, ExitAction { action: head, body }),
@@ -446,6 +392,14 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
     let start = input;
+    if !crate::parser::body::starts_bare_comment(start) {
+        if let Ok((next, usage)) = crate::parser::part::variant_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, StateDefBodyElement::VariantUsage(usage)),
+            ));
+        }
+    }
     // `ref action` and `ref state` are typed ActionUsage/StateUsage forms in this shared
     // ActionBodyItem scope. They must precede the generic RefDecl parser; rejected attempts are
     // transactional, preserving bare `ref name` for that generic fallback.

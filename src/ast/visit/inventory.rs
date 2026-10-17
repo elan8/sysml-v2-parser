@@ -3453,6 +3453,13 @@ macro_rules! ast_traversal {
 
         pub fn walk_variant_typed_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? VariantTypedUsage) {
             match node {
+                VariantTypedUsage::CaseUsage(member) => visitor.visit_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::AnalysisCaseUsage(member) => visitor.visit_analysis_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::VerificationCaseUsage(member) => visitor.visit_verification_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::UseCaseUsage(member) => visitor.visit_use_case_usage(&$($mutability)? **member),
+                VariantTypedUsage::State(member) => visitor.visit_state_usage(&$($mutability)? **member),
+                VariantTypedUsage::Calculation(member) => visitor.visit_calc_usage(&$($mutability)? **member),
+                VariantTypedUsage::Constraint(member) => visitor.visit_constraint_usage(&$($mutability)? **member),
                 VariantTypedUsage::Part(field_0) => {
                     visitor.visit_part_usage(&$($mutability)? **field_0);
                 }
@@ -5102,6 +5109,33 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ActionDefBodyElement::PartDef(member) => {
+                    visitor.visit_part_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ItemDef(member) => {
+                    visitor.visit_item_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ViewDef(member) => {
+                    visitor.visit_view_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::RenderingDef(member) => {
+                    visitor.visit_rendering_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::ViewpointDef(member) => {
+                    visitor.visit_viewpoint_def(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::CaseUsage(member) => {
+                    visitor.visit_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::AnalysisCaseUsage(member) => {
+                    visitor.visit_analysis_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::VerificationCaseUsage(member) => {
+                    visitor.visit_verification_case_usage(&$($mutability)? **member);
+                }
+                ActionDefBodyElement::UseCaseUsage(member) => {
+                    visitor.visit_use_case_usage(&$($mutability)? **member);
+                }
                 ActionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -5550,6 +5584,33 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                ActionUsageBodyElement::PartDef(member) => {
+                    visitor.visit_part_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ItemDef(member) => {
+                    visitor.visit_item_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ViewDef(member) => {
+                    visitor.visit_view_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::RenderingDef(member) => {
+                    visitor.visit_rendering_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::ViewpointDef(member) => {
+                    visitor.visit_viewpoint_def(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::CaseUsage(member) => {
+                    visitor.visit_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::AnalysisCaseUsage(member) => {
+                    visitor.visit_analysis_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::VerificationCaseUsage(member) => {
+                    visitor.visit_verification_case_usage(&$($mutability)? **member);
+                }
+                ActionUsageBodyElement::UseCaseUsage(member) => {
+                    visitor.visit_use_case_usage(&$($mutability)? **member);
+                }
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6079,6 +6140,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                StateDefBodyElement::VariantUsage(member) => visitor.visit_variant_usage(member),
                 StateDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -6103,12 +6165,8 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Then(field_0) => {
                     visitor.visit_then_stmt(field_0);
                 }
-                StateDefBodyElement::FirstStmt(field_0) => {
-                    visitor.visit_first_stmt(field_0);
-                }
-                StateDefBodyElement::ThenAction(field_0) => {
-                    visitor.visit_then_action(field_0);
-                }
+
+
                 StateDefBodyElement::FinalState(field_0) => {
                     visitor.visit_final_state(field_0);
                 }
@@ -6162,7 +6220,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let EntryAction { action, body } = &$($mutability)? node.value;
             visitor.visit_state_action_usage(action);
-            visitor.visit_state_def_body(body);
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6171,7 +6229,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let DoAction { action, body } = &$($mutability)? node.value;
             visitor.visit_state_action_usage(action);
-            visitor.visit_state_def_body(body);
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6180,7 +6238,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let ExitAction { action, body } = &$($mutability)? node.value;
             visitor.visit_state_action_usage(action);
-            visitor.visit_state_def_body(body);
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -7200,6 +7258,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
+                UseCaseDefBodyElement::VariantUsage(member) => visitor.visit_variant_usage(member),
                 UseCaseDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }

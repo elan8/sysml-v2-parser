@@ -46,6 +46,16 @@ pub type ActionDefBody = Body<ActionDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
+    PartDef(Box<Node<crate::ast::PartDef>>),
+    ItemDef(Box<Node<crate::ast::ItemDef>>),
+    ViewDef(Box<Node<crate::ast::ViewDef>>),
+    RenderingDef(Box<Node<crate::ast::RenderingDef>>),
+    ViewpointDef(Box<Node<crate::ast::ViewpointDef>>),
+    CaseUsage(Box<Node<crate::ast::CaseUsage>>),
+    AnalysisCaseUsage(Box<Node<crate::ast::AnalysisCaseUsage>>),
+    VerificationCaseUsage(Box<Node<crate::ast::VerificationCaseUsage>>),
+    UseCaseUsage(Box<Node<crate::ast::UseCaseUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// An import owned directly by this action body.
     ///
@@ -510,6 +520,16 @@ pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
+    PartDef(Box<Node<crate::ast::PartDef>>),
+    ItemDef(Box<Node<crate::ast::ItemDef>>),
+    ViewDef(Box<Node<crate::ast::ViewDef>>),
+    RenderingDef(Box<Node<crate::ast::RenderingDef>>),
+    ViewpointDef(Box<Node<crate::ast::ViewpointDef>>),
+    CaseUsage(Box<Node<crate::ast::CaseUsage>>),
+    AnalysisCaseUsage(Box<Node<crate::ast::AnalysisCaseUsage>>),
+    VerificationCaseUsage(Box<Node<crate::ast::VerificationCaseUsage>>),
+    UseCaseUsage(Box<Node<crate::ast::UseCaseUsage>>),
+
     Error(Node<ParseErrorNode>),
     /// An import owned directly by this action body; see [`ActionDefBodyElement::Import`].
     Import(Node<crate::ast::Import>),
@@ -1114,6 +1134,8 @@ pub type StateDefBody = Body<StateDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StateDefBodyElement {
+    VariantUsage(Node<crate::ast::VariantUsage>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -1129,13 +1151,6 @@ pub enum StateDefBodyElement {
     Exit(Node<ExitAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
-    /// `first <node>;` initial-node marker inside an `entry`/`do`/`exit` action body (SysML
-    /// `ActionBody`), e.g. `do action ops { first start; then done; }` (Apollo 11). Only produced
-    /// for the entry/do/exit action bodies, never a plain `state` body.
-    FirstStmt(Node<FirstStmt>),
-    /// `then <target>;` action succession inside an `entry`/`do`/`exit` action body -- the
-    /// action-flow `then`, distinct from [`Self::Then`]'s `then <state>;` initial-state marker.
-    ThenAction(Node<ThenAction>),
     /// `final` / `final state` name `;` - explicit final state.
     FinalState(Node<FinalState>),
     /// `ref` name `:` type body – reference binding in state.
@@ -1183,7 +1198,7 @@ pub enum StateActionUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntryAction {
     pub action: StateActionUsage,
-    pub body: StateDefBody,
+    pub body: ActionDefBody,
 }
 
 /// A state `do` member and its typed action usage.
@@ -1191,7 +1206,7 @@ pub struct EntryAction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DoAction {
     pub action: StateActionUsage,
-    pub body: StateDefBody,
+    pub body: ActionDefBody,
 }
 
 /// A state `exit` member and its typed action usage.
@@ -1199,7 +1214,7 @@ pub struct DoAction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExitAction {
     pub action: StateActionUsage,
-    pub body: StateDefBody,
+    pub body: ActionDefBody,
 }
 
 /// Then (initial state): `then` state-path `;`.

@@ -1375,6 +1375,117 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
         ));
     }
 
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::case::case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::CaseUsage(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::case::analysis_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::AnalysisCaseUsage(Box::new(
+                        usage,
+                    ))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = crate::parser::span::reference_transaction(
+        input,
+        crate::parser::case::verification_case_usage,
+    ) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::VerificationCaseUsage(
+                        Box::new(usage),
+                    )),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::usecase::use_case_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::UseCaseUsage(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::state::state_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::State(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) =
+        crate::parser::span::reference_transaction(input, crate::parser::constraint::calc_usage)
+    {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Calculation(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = crate::parser::span::reference_transaction(
+        input,
+        crate::parser::constraint::constraint_usage,
+    ) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    form: VariantUsageForm::Typed(VariantTypedUsage::Constraint(Box::new(usage))),
+                    membership,
+                },
+            ),
+        ));
+    }
     // Untyped reference form: `variant name;` or `variant name { ... }` / `variant 'quoted' {
     // ... }`, referencing an already-declared feature by name rather than declaring a fresh typed
     // usage. Real usage: `Simple Tests/VariabilityTest.sysml:16` (`variant q { attribute b : B

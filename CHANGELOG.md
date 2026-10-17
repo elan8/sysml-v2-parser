@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   action :>> target;` and valued action declarations preserve their complete `UsageDeclaration`.
   State action alternatives use `StateActionUsage`; the shared perform grammar, emission,
   traversal and semantic projection preserve the declared/reference distinction. Breaking AST
-  change: version 284.
+  change: version 284. Action bodies also retain nested part/item/view/rendering/viewpoint
+  definitions and case-family usages; calculation bodies admit those usages. Case and state
+  bodies retain typed variant membership. State subactions use the canonical action body.
 
 - **Remove permissive declaration and body-member fallbacks (breaking AST change).**
   Failed grammar now produces source-preserving error recovery. Remove the five opaque

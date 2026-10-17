@@ -64,7 +64,14 @@ deserialization rejects diagnostic spans outside it or with invalid source coord
 and `ExitAction` with `action: StateActionUsage`. Match `Empty`, `Perform { target, value }`,
 or `Effect`; the perform target reuses `PerformActionTarget`. Its `Action` branch owns a full
 `UsageDeclaration`, including anonymous identification, all typing targets and specialization
-clauses. The `value` retains the authored assignment/default operator and expression.
+clauses. The `value` retains the authored assignment/default operator and expression. State
+subaction `body` fields now use `ActionDefBody`, matching the `ActionBody` production; the
+obsolete state-body-only `FirstStmt` and `ThenAction` proxy variants are removed.
+
+Action bodies expose typed part, item, view, rendering and viewpoint definitions and the case
+usage families. Calculation bodies delegate those members through `ActionMember`.
+`UseCaseDefBodyElement` and `StateDefBodyElement` retain `VariantUsage` members; the typed
+variant alternatives include case families, state, calculation and constraint usages.
 
 `PARSE_AST_VERSION` 283 removes the opaque declaration variants `ExtendedLibraryDecl`,
 `FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with

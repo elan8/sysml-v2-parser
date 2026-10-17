@@ -617,6 +617,14 @@ pub(crate) fn use_case_def_body_element(
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
+    if !crate::parser::body::starts_bare_comment(start) {
+        if let Ok((next, usage)) = crate::parser::part::variant_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, UseCaseDefBodyElement::VariantUsage(usage)),
+            ));
+        }
+    }
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a

@@ -2170,6 +2170,27 @@ pub(crate) fn emit_variant_usage(
                 }
             }
         }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::CaseUsage(member)) => {
+            super::requirement::emit_case_usage(w, path, &member.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::AnalysisCaseUsage(
+            member,
+        )) => super::requirement::emit_analysis_case_usage(w, path, &member.value),
+        crate::ast::VariantUsageForm::Typed(
+            crate::ast::VariantTypedUsage::VerificationCaseUsage(member),
+        ) => super::requirement::emit_verification_case_usage(w, path, &member.value),
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::UseCaseUsage(
+            member,
+        )) => super::requirement::emit_use_case_usage(w, path, &member.value),
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::State(member)) => {
+            super::behavior::emit_state_usage(w, path, &member.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Calculation(member)) => {
+            super::view::emit_calc_usage(w, path, &member.value)
+        }
+        crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Constraint(member)) => {
+            super::view::emit_constraint_usage(w, path, &member.value)
+        }
         crate::ast::VariantUsageForm::Typed(crate::ast::VariantTypedUsage::Part(p)) => {
             emit_part_usage(w, path, &p.value)
         }

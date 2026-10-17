@@ -922,6 +922,8 @@ pub enum ReturnRefBodyElement {
 // Boxing it only in use cases would make the public AST depend on the containing body kind.
 #[allow(clippy::large_enum_variant)]
 pub enum UseCaseDefBodyElement {
+    VariantUsage(Node<crate::ast::VariantUsage>),
+
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
