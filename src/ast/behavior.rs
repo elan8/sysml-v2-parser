@@ -1068,8 +1068,8 @@ pub struct AllocationUsage {
     pub name: Option<DeclarationName>,
     /// Short name from `< ... >` when present (`Identification`, BNF §8.2.2.2).
     pub short_name: Option<DeclarationName>,
-    pub type_name: Option<QualifiedReferenceId>,
-    pub type_is_conjugated: bool,
+    /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
+    pub typing: Option<Node<crate::ast::TypingRelationship>>,
     /// `:>` subsets clause (spec42 gap 27), previously parsed by the shared usage header and
     /// discarded.
     pub subsets: Option<Node<SubsettingRelationship>>,

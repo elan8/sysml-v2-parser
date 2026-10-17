@@ -53,9 +53,8 @@ pub(crate) fn emit_requirement_usage(
     if let Some(name) = usage.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
@@ -238,9 +237,8 @@ fn emit_requirement_body_element(
             if let Some(name) = f.value.name {
                 w.push_declaration_name(&format!("{path}/frame/name"), name)?;
             }
-            if let Some(type_name) = f.value.type_name {
-                w.push_str(" : ");
-                w.push_qualified_reference(&format!("{path}/frame/type"), type_name)?;
+            if let Some(typing) = &f.value.typing {
+                super::structure::emit_typing_clause(w, &typing.value)?;
             }
             if let Some(multiplicity) = &f.value.multiplicity {
                 emit_multiplicity(w, &multiplicity.value)?;
@@ -310,9 +308,8 @@ pub(crate) fn emit_verify_requirement(
             if let Some(name) = usage.name {
                 w.push_declaration_name(&format!("{path}/requirement/name"), name)?;
             }
-            if let Some(ty) = &usage.type_name {
-                w.push_str(" : ");
-                w.push_qualified_reference(&format!("{path}/requirement/type"), *ty)?;
+            if let Some(typing) = &usage.typing {
+                super::structure::emit_typing_clause(w, &typing.value)?;
             }
             if let Some(subsets) = &usage.subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
@@ -482,9 +479,8 @@ pub(crate) fn emit_item_usage(
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -525,9 +521,8 @@ pub(crate) fn emit_concern_usage(
     if let Some(mult) = &concern.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if let Some(ty) = &concern.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &concern.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(subsets) = &concern.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -573,9 +568,8 @@ pub(crate) fn emit_use_case_usage(
     if let Some(name) = usage.name {
         w.push_declaration_name(&format!("{path}/name"), name)?;
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -622,9 +616,8 @@ pub(crate) fn emit_analysis_case_usage(
             name: usage.name,
         },
     )?;
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -673,9 +666,8 @@ pub(crate) fn emit_verification_case_usage(
             name: usage.name,
         },
     )?;
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -724,9 +716,8 @@ pub(crate) fn emit_case_usage(
             name: usage.name,
         },
     )?;
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -869,10 +860,8 @@ fn emit_use_case_body_element(
                 w.push_declaration_name(&format!("{path}/objective/name"), name)?;
                 w.push_char(' ');
             }
-            if let Some(ty) = &req.type_name {
-                w.push_str(": ");
-                w.push_qualified_reference(&format!("{path}/objective/type"), *ty)?;
-                w.push_char(' ');
+            if let Some(typing) = &req.typing {
+                super::structure::emit_typing_clause(w, &typing.value)?;
             }
             if let Some(subsets) = &req.subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
@@ -1042,9 +1031,8 @@ pub(crate) fn emit_enumeration_usage(
             name: usage.name,
         },
     )?;
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;

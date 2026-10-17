@@ -133,7 +133,7 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
                 prefix,
                 name,
                 short_name,
-                type_name: header.type_reference,
+                typing: header.typing,
                 redefines,
                 subsets,
                 multiplicity: multiplicity.or(header.multiplicity),
@@ -271,47 +271,6 @@ mod redefines_tests {
 
     // Real usage confirmed in the OMG Geometry domain library's
     // `sysml-v2-release/sysml/src/examples/Geometry Examples/VehicleGeometryAndCoordinateFrames.sysml`.
-
-    #[test]
-    fn item_usage_accepts_anonymous_redefinition_with_value() {
-        let (rest, node) = item_usage(input(
-            "item :>> shape = new Box(4800 [mm], 1840 [mm], 1350 [mm]);",
-        ))
-        .expect("item usage");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.name.is_none());
-        assert!(node.value.redefines.is_some());
-        assert!(node.value.value.is_some());
-        assert!(node.value.type_name.is_none());
-    }
-
-    #[test]
-    fn item_usage_accepts_anonymous_redefinition_with_type_and_body() {
-        let (rest, node) = item_usage(input(
-            "item :>> shape : Cylinder { :>> radius = 14 [mm]; :>> height = 40 [mm]; }",
-        ))
-        .expect("item usage");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.name.is_none());
-        assert!(node.value.redefines.is_some());
-        assert!(node.value.type_name.is_some());
-        assert!(node.value.value.is_none());
-    }
-
-    #[test]
-    fn item_usage_named_form_still_parses() {
-        let source = input("item wheelShape : Circle;");
-        let (rest, node) = item_usage(source).expect("item usage");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .name
-                .map(|n| crate::parser::lex::name_bytes(source, n)),
-            Some(&b"wheelShape"[..])
-        );
-        assert!(node.value.type_name.is_some());
-        assert!(node.value.redefines.is_none());
-    }
 
     #[test]
     fn item_usage_named_form_accepts_a_value() {

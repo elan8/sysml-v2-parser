@@ -248,8 +248,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
-        match usage.type_name {
-            Some(reference) => self.write_reference(reference)?,
+        match &usage.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") (multiplicity ")?;
@@ -950,11 +950,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         RequirementDefBodyElement::RequirementUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_named_multiplicity(
-                                "requirement-usage",
-                                usage.value.name,
-                                usage.value.multiplicity.as_ref(),
-                            )?;
+                            self.write_requirement_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::Stakeholder(stakeholder) => {
                             self.write_item_prefix(&mut first)?;
@@ -1017,8 +1013,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.writer.write_str(") (short-name ")?;
                             self.write_optional_name(frame.value.short_name)?;
                             self.writer.write_str(") (type ")?;
-                            if let Some(type_name) = frame.value.type_name {
-                                self.write_reference(type_name)?;
+                            if let Some(typing) = &frame.value.typing {
+                                self.write_typing(&typing.value)?;
                             } else {
                                 self.writer.write_str("none")?;
                             }
@@ -1034,12 +1030,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         RequirementDefBodyElement::AllocationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "allocation-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_allocation_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::ConcernUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1344,7 +1336,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "attribute-usage")?;
                         }
                         UseCaseDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_usage.value)?;
                         }
                         UseCaseDefBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
@@ -1433,7 +1426,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_ref_declaration(&declaration.value)?;
                         }
                         StateDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_usage.value)?;
                         }
                         StateDefBodyElement::StateUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1736,7 +1730,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_default_reference_usage(&usage.value)?;
                         }
                         PartDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_usage.value)?;
                         }
                         PartDefBodyElement::ItemDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1840,12 +1835,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "state-usage")?;
                         }
                         PartDefBodyElement::EnumerationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "enumeration-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_enumeration_usage(&usage.value)?;
                         }
                         PartDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -1899,12 +1890,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "allocation-def")?;
                         }
                         PartDefBodyElement::AllocationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "allocation-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_allocation_usage(&usage.value)?;
                         }
                         PartDefBodyElement::ViewDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1922,12 +1909,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                         }
                         PartDefBodyElement::ViewpointUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "viewpoint-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_usage(&usage.value)?;
                         }
                         PartDefBodyElement::RenderingDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -4356,12 +4339,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_default_reference_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::EnumerationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "enumeration-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_enumeration_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::PartUsage(member) => {
                             self.write_part_usage_member(&mut first, &member.value)?;
@@ -4477,7 +4456,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "import")?;
                         }
                         super::PartUsageBodyElement::RequirementUsage(_member) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_usage(&_member.value)?;
                         }
                         super::PartUsageBodyElement::ItemDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -4546,12 +4526,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                         }
                         super::PartUsageBodyElement::ViewpointUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "viewpoint-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::RenderingDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -5273,7 +5249,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         name: Option<DeclarationName>,
         short_name: Option<DeclarationName>,
         is_abstract: bool,
-        type_name: Option<QualifiedReferenceId>,
+        typing: Option<&Node<TypingRelationship>>,
         subsets: Option<&Node<SubsettingRelationship>>,
     ) -> io::Result<()> {
         self.writer.write_str("(")?;
@@ -5286,8 +5262,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer
             .write_str(if is_abstract { "true" } else { "false" })?;
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5312,8 +5288,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (short-name ")?;
         self.write_optional_name(usage.short_name)?;
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = usage.type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5960,8 +5936,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.is_individual,
             usage.is_definition,
         )?;
-        if let Some(type_name) = usage.type_name {
-            self.write_reference(type_name)?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -5984,6 +5960,91 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// a single member of the body -- a `view def` was the one definition family whose entire
     /// contents were invisible to the end-to-end contract, which is why a satisfy usage inside
     /// one could only be pinned through `FORMAT`.
+    fn write_typed_usage_head(
+        &mut self,
+        label: &str,
+        name: Option<DeclarationName>,
+        short_name: Option<DeclarationName>,
+        typing: Option<&Node<TypingRelationship>>,
+    ) -> io::Result<()> {
+        write!(self.writer, "({label} (name ")?;
+        self.write_optional_name(name)?;
+        self.writer.write_str(") (short-name ")?;
+        self.write_optional_name(short_name)?;
+        self.writer.write_str(") (typing ")?;
+        match typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")
+    }
+
+    fn write_requirement_usage(&mut self, usage: &super::RequirementUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "requirement-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        write!(
+            self.writer,
+            "(abstract {}) (variation {}) ",
+            usage.is_abstract, usage.is_variation
+        )?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_requirement_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_enumeration_usage(&mut self, usage: &super::EnumerationUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "enumeration-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        self.write_attribute_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_viewpoint_usage(&mut self, usage: &super::ViewpointUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "viewpoint-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        self.write_requirement_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_allocation_usage(&mut self, usage: &super::AllocationUsage) -> io::Result<()> {
+        self.write_typed_usage_head(
+            "allocation-usage",
+            usage.name,
+            usage.short_name,
+            usage.typing.as_ref(),
+        )?;
+        self.writer.write_str("(ends")?;
+        for end in usage
+            .source
+            .iter()
+            .chain(usage.target.iter())
+            .chain(usage.nary_ends.iter())
+        {
+            self.writer.write_char(' ')?;
+            self.write_kerml_connector_end(&end.value)?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_viewpoint_definition(&mut self, definition: &super::ViewpointDef) -> io::Result<()> {
         self.writer.write_str("(viewpoint-def (name ")?;
         self.write_optional_name(definition.identification.name)?;
@@ -6010,7 +6071,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.name,
             usage.short_name,
             usage.is_abstract,
-            usage.type_name,
+            usage.typing.as_ref(),
             usage.subsets.as_ref(),
         )?;
         self.writer.write_char(' ')?;
@@ -6025,7 +6086,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.name,
             usage.short_name,
             usage.is_abstract,
-            usage.type_name,
+            usage.typing.as_ref(),
             usage.subsets.as_ref(),
         )?;
         write!(self.writer, " (variation {}) ", usage.is_variation)?;
@@ -6043,7 +6104,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.name,
             usage.short_name,
             usage.is_abstract,
-            usage.type_name,
+            usage.typing.as_ref(),
             usage.subsets.as_ref(),
         )?;
         self.writer.write_char(' ')?;
@@ -6184,12 +6245,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_ref_declaration(&declaration.value)?;
                         }
                         super::ViewDefBodyElement::ViewpointUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "viewpoint-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_viewpoint_usage(&usage.value)?;
                         }
                         super::ViewDefBodyElement::ViewUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -6291,8 +6348,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
         }
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = usage.type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -6319,8 +6376,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (name ")?;
         self.write_optional_name(objective.requirement.value.name)?;
         self.writer.write_str(") (type ")?;
-        if let Some(reference) = objective.requirement.value.type_name {
-            self.write_reference(reference)?;
+        if let Some(typing) = &objective.requirement.value.typing {
+            self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
@@ -6342,8 +6399,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_str("(name ")?;
             self.write_optional_name(requirement.value.name)?;
             self.writer.write_str(") (type ")?;
-            if let Some(reference) = requirement.value.type_name {
-                self.write_reference(reference)?;
+            if let Some(typing) = &requirement.value.typing {
+                self.write_typing(&typing.value)?;
             } else {
                 self.writer.write_str("none")?;
             }
@@ -7042,12 +7099,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         PortDefBodyElement::EnumerationUsage(usage) => {
-                            self.write_identified_usage_marker(
-                                &mut first,
-                                "enumeration-usage",
-                                usage.value.name,
-                                usage.value.short_name,
-                            )?;
+                            self.write_item_prefix(&mut first)?;
+                            self.write_enumeration_usage(&usage.value)?;
                         }
                         PortDefBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
@@ -7194,11 +7247,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::RequirementUsage(usage) => {
                 self.write_item_prefix(first)?;
-                self.write_named_multiplicity(
-                    "requirement-usage",
-                    usage.value.name,
-                    usage.value.multiplicity.as_ref(),
-                )
+                self.write_requirement_usage(&usage.value)
             }
             PackageBodyElement::Satisfy(usage) => {
                 self.write_item_prefix(first)?;
@@ -7259,12 +7308,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_view_usage(&usage.value)
             }
-            PackageBodyElement::ViewpointUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "viewpoint-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
+            PackageBodyElement::ViewpointUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_viewpoint_usage(&usage.value)
+            }
             PackageBodyElement::RenderingUsage(_usage) => {
                 self.write_marker(first, "rendering-usage")
             }
@@ -7308,12 +7355,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_allocation_definition(&definition.value)
             }
-            PackageBodyElement::AllocationUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "allocation-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
+            PackageBodyElement::AllocationUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_allocation_usage(&usage.value)
+            }
             PackageBodyElement::FlowDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_flow_definition(&definition.value)
@@ -7429,12 +7474,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_ref_declaration(&declaration.value)
             }
-            PackageBodyElement::EnumerationUsage(usage) => self.write_identified_usage_marker(
-                first,
-                "enumeration-usage",
-                usage.value.name,
-                usage.value.short_name,
-            ),
+            PackageBodyElement::EnumerationUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_enumeration_usage(&usage.value)
+            }
             PackageBodyElement::MetadataKeywordUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_metadata_keyword_usage(&usage.value)

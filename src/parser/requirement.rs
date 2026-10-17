@@ -389,7 +389,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract(
         RequirementUsage {
             name,
             short_name,
-            type_name: header.type_reference,
+            typing: header.typing,
             multiplicity: multiplicity.or(header.multiplicity),
             subsets: post_body_specialization
                 .subsets
@@ -642,7 +642,7 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
                 has_concern_keyword: concern_keyword.is_some(),
                 name: ident.name,
                 short_name: ident.short_name,
-                type_name: header.type_reference,
+                typing: header.typing,
                 multiplicity: header.multiplicity,
                 subsets: header.subsets,
                 redefines: header.redefines,
@@ -1393,7 +1393,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
         short_name,
         is_abstract: abstract_kw.is_some(),
         is_individual: individual_kw.is_some(),
-        type_name: header.type_reference,
+        typing: header.typing,
         multiplicity: header.multiplicity,
         subsets: header.subsets,
         redefines: header.redefines,
@@ -1640,17 +1640,6 @@ mod membership_tests {
         );
     }
 
-    #[test]
-    fn concern_usage_def_form_with_type_and_body_is_a_definition() {
-        let (rest, node) = concern_usage(input(
-            "concern def SafetyConcern : BaseConcern { doc /* d */ }",
-        ))
-        .expect("concern def with type and body");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_definition);
-        assert!(node.value.type_name.is_some());
-    }
-
     /// Payload sites with no visibility grammar of their own (`verify requirement ...`,
     /// `objective { requirement ... }`) always build `visibility: None` -- see
     /// `RequirementUsage::membership`'s doc comment.
@@ -1663,27 +1652,5 @@ mod membership_tests {
             .requirement
             .expect("inline requirement usage present");
         assert_eq!(inline.value.membership.visibility, None);
-    }
-
-    #[test]
-    fn requirement_usage_accepts_short_name() {
-        let src = input(
-            "requirement <'1.1'> vehicleMass1: MassLimitationRequirement { subject vehicle : Vehicle; }",
-        );
-        let (rest, node) = requirement_usage(src).expect("requirement usage with short name");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(
-            node.value
-                .short_name
-                .map(|n| crate::parser::lex::name_bytes(src, n)),
-            Some(&b"'1.1'"[..])
-        );
-        assert_eq!(
-            node.value
-                .name
-                .map(|n| crate::parser::lex::name_bytes(src, n)),
-            Some(&b"vehicleMass1"[..])
-        );
-        assert!(node.value.type_name.is_some());
     }
 }

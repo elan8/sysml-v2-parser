@@ -73,6 +73,13 @@ usage families. Calculation bodies delegate those members through `ActionMember`
 `UseCaseDefBodyElement` and `StateDefBodyElement` retain `VariantUsage` members; the typed
 variant alternatives include case families, state, calculation and constraint usages.
 
+Usage families that previously exposed a scalar `type_name` now expose
+`typing: Option<Node<TypingRelationship>>`: item, enumeration, requirement, concern, framed
+concern, case, analysis, verification, use case, viewpoint, view rendering and allocation.
+Read `typing.value.type_name` for all targets in authored order; its operator and conjugation
+remain part of that same relationship. Allocation's mirrored `type_is_conjugated` field is
+removed. No scalar first-type compatibility field is retained.
+
 `PARSE_AST_VERSION` 283 removes the opaque declaration variants `ExtendedLibraryDecl`,
 `FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with
 `OpaqueText` and `ParsedDocument::opaque_text`. Consumers should handle typed declarations

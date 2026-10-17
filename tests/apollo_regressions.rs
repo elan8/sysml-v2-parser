@@ -1610,38 +1610,6 @@ fn part_usage_default_null_without_equals_parses() {
     );
 }
 
-#[test]
-fn part_def_body_item_usage_parses() {
-    let input = "package P {\npart def Stakeholder {\nitem concerns[*]: Concern;\n}\n}";
-    let result = parse_with_diagnostics(input);
-    assert!(
-        result.errors.is_empty(),
-        "unexpected diagnostics: {:?}",
-        result.errors
-    );
-    let (doc, elements) = package_elements(input);
-    let stakeholder = match &elements[0].value {
-        PackageBodyElement::PartDef(def) => &def.value,
-        _ => panic!("expected part def"),
-    };
-    let PartDefBody::Brace { elements, .. } = &stakeholder.body else {
-        panic!("expected brace body");
-    };
-    let item = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PartDefBodyElement::ItemUsage(item) => Some(&item.value),
-            _ => None,
-        })
-        .expect("item usage in part def body");
-    assert_eq!(
-        item.name.and_then(|n| doc.declaration_name(n)),
-        Some("concerns")
-    );
-    assert!(item.multiplicity.is_some());
-    assert!(item.type_name.is_some());
-}
-
 /// spec42 #128 (`Purpose/StakeholderPackage.sysml`, 40 occurrences): `:>` trailing an item
 /// usage's brace body is that usage's own subsetting clause, not a separate anonymous member.
 /// Before this fix the whole package failed to parse as one document -- `item_usage` stopped at

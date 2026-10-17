@@ -168,7 +168,7 @@ fn use_case_usage_tail(
         UseCaseUsage {
             name: ident,
             short_name,
-            type_name: header.type_reference,
+            typing: header.typing,
             is_abstract,
             is_variation: false,
             multiplicity: header.multiplicity,

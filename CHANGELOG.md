@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change: version 284. Action bodies also retain nested part/item/view/rendering/viewpoint
   definitions and case-family usages; calculation bodies admit those usages. Case and state
   bodies retain typed variant membership. State subactions use the canonical action body.
+  Item and related usage families retain every typing target, replacing scalar type fields
+  with the full `TypingRelationship`; formatting preserves typing operators and conjugation.
 
 - **Remove permissive declaration and body-member fallbacks (breaking AST change).**
   Failed grammar now produces source-preserving error recovery. Remove the five opaque

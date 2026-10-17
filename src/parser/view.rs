@@ -192,7 +192,7 @@ pub(crate) fn view_rendering_usage(
             input,
             ViewRenderingUsage {
                 form,
-                type_name: header.type_reference,
+                typing: header.typing,
                 multiplicity: header.multiplicity,
                 multiplicity_modifiers: header.multiplicity_modifiers,
                 subsets: header.subsets,
@@ -620,7 +620,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
             ViewpointUsage {
                 name: name_str,
                 short_name,
-                type_name: header.type_reference,
+                typing: header.typing,
                 subsets: header.subsets,
                 redefines: header.redefines,
                 body,

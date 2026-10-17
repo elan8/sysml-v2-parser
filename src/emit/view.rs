@@ -945,9 +945,8 @@ pub(crate) fn emit_view_rendering(
             w.push_declaration_name(&format!("{path}/name"), name)?;
         }
     }
-    if let Some(ty) = &r.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
+    if let Some(typing) = &r.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &r.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
@@ -1038,9 +1037,8 @@ pub(crate) fn emit_viewpoint_usage(
             name: usage.name,
         },
     )?;
-    if let Some(type_name) = usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), type_name)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let Some(redefines) = &usage.redefines {
         super::structure::emit_subsetting_clause(w, &redefines.value)?;

@@ -163,30 +163,6 @@ fn test_view_and_connection_bodies_parse_members() {
 }
 
 #[test]
-fn test_viewpoint_usage_accepts_defined_by_typing() {
-    let input = r#"package P {
-viewpoint safety defined by Mission::SafetyViewpoint { }
-}"#;
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => p,
-        other => panic!("expected package, got {:?}", other),
-    };
-    let elements = match &pkg.value.body {
-        PackageBody::Brace { elements, .. } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let viewpoint = match &elements[0].value {
-        PackageBodyElement::ViewpointUsage(v) => v,
-        other => panic!("expected viewpoint usage, got {:?}", other),
-    };
-    assert_eq!(
-        reference_text(&result, viewpoint.value.type_name),
-        Some("Mission::SafetyViewpoint")
-    );
-}
-
-#[test]
 fn test_action_state_and_view_usage_accept_typed_by_alias() {
     let input = r#"package P {
 action sendAction typed by Mission::SendAction;

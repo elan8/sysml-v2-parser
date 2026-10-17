@@ -1152,7 +1152,7 @@ pub(crate) fn emit_allocation_usage(
     // `allocation allocate …` — that spelling is malformed (validation `12b`).
     let shorthand = usage.name.is_none()
         && usage.short_name.is_none()
-        && usage.type_name.is_none()
+        && usage.typing.is_none()
         && usage.subsets.is_none()
         && usage.redefines.is_none()
         && (usage.source.is_some() || usage.target.is_some());
@@ -1174,12 +1174,8 @@ pub(crate) fn emit_allocation_usage(
             name: usage.name,
         },
     )?;
-    if let Some(ty) = usage.type_name {
-        w.push_str(" : ");
-        if usage.type_is_conjugated {
-            w.push_char('~');
-        }
-        w.push_qualified_reference(path, ty)?;
+    if let Some(typing) = &usage.typing {
+        super::structure::emit_typing_clause(w, &typing.value)?;
     }
     if let (Some(source), Some(target)) = (&usage.source, &usage.target) {
         w.push_str(" allocate ");

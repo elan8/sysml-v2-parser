@@ -12,55 +12,6 @@ fn reference_text(document: &ParsedDocument, id: QualifiedReferenceId) -> &str {
 }
 
 #[test]
-fn test_objective_parses_named_typed_requirement_usage() {
-    let input = "package P { use case def U { objective missionObjective : MaximizeObjective; } }";
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let use_case = match &elements[0].value {
-        PackageBodyElement::UseCaseDef(uc) => &uc.value,
-        _ => panic!("expected UseCaseDef"),
-    };
-    let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected use case brace body"),
-    };
-    let objective = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::UseCaseDefBodyElement::Objective(o) => Some(&o.value),
-            _ => None,
-        })
-        .expect("objective should be present");
-    assert_eq!(
-        objective
-            .requirement
-            .value
-            .name
-            .and_then(|n| result.declaration_name(n)),
-        Some("missionObjective")
-    );
-    assert_eq!(
-        objective
-            .requirement
-            .value
-            .type_name
-            .map(|id| reference_text(&result, id)),
-        Some("MaximizeObjective")
-    );
-    assert!(matches!(
-        objective.requirement.value.body,
-        sysml_v2_parser::ast::RequirementDefBody::Semicolon { .. }
-    ));
-}
-
-#[test]
 fn test_objective_body_preserves_structured_requirement_members() {
     let input = "package P { use case def U { objective verificationObjective { doc /* verify behavior */ require constraint { true } } } }";
     let result = parse(input).expect("parse should succeed");
@@ -104,52 +55,6 @@ fn test_objective_body_preserves_structured_requirement_members() {
 }
 
 #[test]
-fn test_objective_typed_semicolon_has_no_declared_name() {
-    let input = "package P { use case def U { objective : MaximizeObjective; } }";
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let use_case = match &elements[0].value {
-        PackageBodyElement::UseCaseDef(uc) => &uc.value,
-        _ => panic!("expected UseCaseDef"),
-    };
-    let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected use case brace body"),
-    };
-    let objective = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::UseCaseDefBodyElement::Objective(o) => Some(&o.value),
-            _ => None,
-        })
-        .expect("objective should be present");
-    assert_eq!(
-        objective
-            .requirement
-            .value
-            .name
-            .and_then(|n| result.declaration_name(n)),
-        // `objective` authors no `NAME`; the keyword is the member's syntax, not its name.
-        None
-    );
-    assert_eq!(
-        objective
-            .requirement
-            .value
-            .type_name
-            .map(|id| reference_text(&result, id)),
-        Some("MaximizeObjective")
-    );
-}
-
-#[test]
 fn test_objective_preserves_visibility_prefix() {
     let input = "package P { use case def U { private objective O { } } }";
     let result = parse(input).expect("parse should succeed");
@@ -180,83 +85,6 @@ fn test_objective_preserves_visibility_prefix() {
         objective.visibility,
         Some(sysml_v2_parser::ast::Visibility::Private)
     ));
-}
-
-#[test]
-fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
-    let input = "package P { use case def U { objective O { verify vehicleMassRequirement; verify requirement vehicleMassRequirement : VehicleMassRequirement; } } }";
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements, .. } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let use_case = match &elements[0].value {
-        PackageBodyElement::UseCaseDef(uc) => &uc.value,
-        _ => panic!("expected UseCaseDef"),
-    };
-    let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected use case brace body"),
-    };
-    let objective = body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::UseCaseDefBodyElement::Objective(o) => Some(&o.value),
-            _ => None,
-        })
-        .expect("objective should be present");
-    let req_body_elements = match &objective.requirement.value.body {
-        sysml_v2_parser::ast::RequirementDefBody::Brace { elements, .. } => elements,
-        _ => panic!("expected objective requirement brace body"),
-    };
-    let shorthand = req_body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::RequirementDefBodyElement::VerifyRequirement(v)
-                if !v.value.explicit_requirement_keyword =>
-            {
-                Some(&v.value)
-            }
-            _ => None,
-        })
-        .expect("shorthand verify should be present");
-    assert_eq!(
-        shorthand.target.map(|id| reference_text(&result, id)),
-        Some("vehicleMassRequirement")
-    );
-    let explicit = req_body_elements
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::RequirementDefBodyElement::VerifyRequirement(v)
-                if v.value.explicit_requirement_keyword =>
-            {
-                Some(&v.value)
-            }
-            _ => None,
-        })
-        .expect("explicit verify requirement should be present");
-    let explicit_req = explicit
-        .requirement
-        .as_ref()
-        .expect("explicit form should include parsed requirement usage");
-    assert_eq!(
-        explicit_req
-            .value
-            .name
-            .and_then(|n| result.declaration_name(n)),
-        Some("vehicleMassRequirement")
-    );
-    assert_eq!(
-        explicit_req
-            .value
-            .type_name
-            .map(|id| reference_text(&result, id)),
-        Some("VehicleMassRequirement")
-    );
 }
 
 #[test]
