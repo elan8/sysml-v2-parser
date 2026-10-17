@@ -1,10 +1,10 @@
 # Preparing and cutting a parser release
 
 The next prepared release is **v0.58.0**, with **AST schema 284** and **Rust 1.88** as the MSRV.
-The release-preparation PR depends on the issue #200 implementation in
-[PR #202](https://github.com/elan8/sysml-v2-parser/pull/202). Merge that implementation first,
-then land the release-preparation changes on `main`. Preparing the PR does not publish a crate
-or create a tag.
+The release includes the issue #200 implementation merged in
+[PR #202](https://github.com/elan8/sysml-v2-parser/pull/202). Land the release-preparation
+changes on `main` before cutting the tag. Preparing the PR does not publish a crate or create
+a tag.
 
 ## Preparation
 
