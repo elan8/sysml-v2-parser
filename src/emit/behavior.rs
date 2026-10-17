@@ -718,7 +718,19 @@ pub(crate) fn emit_perform(
 ) -> Result<(), EmitError> {
     emit_definition_prefix_value(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
-    match &perform.target {
+    emit_perform_target(w, path, &perform.target)?;
+    if let Some(value) = &perform.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_perform_body(w, path, &perform.body)
+}
+
+fn emit_perform_target(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    target: &PerformActionTarget,
+) -> Result<(), EmitError> {
+    match target {
         PerformActionTarget::Action(declaration) => {
             w.push_str("action");
             emit_usage_declaration(w, path, &declaration.value)?;
@@ -730,10 +742,29 @@ pub(crate) fn emit_perform(
             }
         }
     }
-    if let Some(value) = &perform.value {
-        emit_feature_value(w, value)?;
+    Ok(())
+}
+
+fn emit_state_action_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    action: &crate::ast::StateActionUsage,
+) -> Result<(), EmitError> {
+    match action {
+        crate::ast::StateActionUsage::Empty => {}
+        crate::ast::StateActionUsage::Perform { target, value } => {
+            w.push_char(' ');
+            emit_perform_target(w, path, target)?;
+            if let Some(value) = value {
+                emit_feature_value(w, value)?;
+            }
+        }
+        crate::ast::StateActionUsage::Effect(effect) => {
+            w.push_char(' ');
+            emit_transition_effect(w, path, effect)?;
+        }
     }
-    emit_perform_body(w, path, &perform.body)
+    Ok(())
 }
 
 fn emit_perform_body(
@@ -953,98 +984,20 @@ fn emit_state_def_body_element(
         StateDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
-        StateDefBodyElement::Entry(e) => {
+        StateDefBodyElement::Entry(action) => {
             w.push_str("entry");
-            if let Some(effect) = &e.value.effect {
-                w.push_char(' ');
-                emit_transition_effect(w, path, effect)?;
-            }
-            if let Some(declared_name) = e.value.declared_name {
-                if e.value.has_action_keyword {
-                    w.push_str(" action ");
-                } else {
-                    w.push_char(' ');
-                }
-                w.push_declaration_name(&format!("{path}/name"), declared_name)?;
-                if let Some(type_name) = e.value.type_name {
-                    w.push_str(" : ");
-                    w.push_qualified_reference(&format!("{path}/entry/type"), type_name)?;
-                }
-                if let Some(redefines) = &e.value.redefines {
-                    emit_subsetting_clause(w, &redefines.value)?;
-                }
-            }
-            if let Some(reference) = e.value.action_reference {
-                if e.value.has_action_keyword {
-                    w.push_str(" action ");
-                } else {
-                    w.push_char(' ');
-                }
-                w.push_qualified_reference(&format!("{path}/entry/action"), reference)?;
-            }
-            emit_state_def_body(w, path, &e.value.body)
+            emit_state_action_usage(w, path, &action.value.action)?;
+            emit_state_def_body(w, path, &action.value.body)
         }
-        StateDefBodyElement::Do(d) => {
+        StateDefBodyElement::Do(action) => {
             w.push_str("do");
-            if let Some(effect) = &d.value.effect {
-                w.push_char(' ');
-                emit_transition_effect(w, path, effect)?;
-            }
-            if let Some(declared_name) = d.value.declared_name {
-                if d.value.has_action_keyword {
-                    w.push_str(" action ");
-                } else {
-                    w.push_char(' ');
-                }
-                w.push_declaration_name(&format!("{path}/name"), declared_name)?;
-                if let Some(type_name) = d.value.type_name {
-                    w.push_str(" : ");
-                    w.push_qualified_reference(&format!("{path}/do/type"), type_name)?;
-                }
-                if let Some(redefines) = &d.value.redefines {
-                    emit_subsetting_clause(w, &redefines.value)?;
-                }
-            }
-            if let Some(reference) = d.value.action_reference {
-                if d.value.has_action_keyword {
-                    w.push_str(" action ");
-                } else {
-                    w.push_char(' ');
-                }
-                w.push_qualified_reference(&format!("{path}/do/action"), reference)?;
-            }
-            emit_state_def_body(w, path, &d.value.body)
+            emit_state_action_usage(w, path, &action.value.action)?;
+            emit_state_def_body(w, path, &action.value.body)
         }
-        StateDefBodyElement::Exit(e) => {
+        StateDefBodyElement::Exit(action) => {
             w.push_str("exit");
-            if let Some(effect) = &e.value.effect {
-                w.push_char(' ');
-                emit_transition_effect(w, path, effect)?;
-            }
-            if let Some(declared_name) = e.value.declared_name {
-                if e.value.has_action_keyword {
-                    w.push_str(" action ");
-                } else {
-                    w.push_char(' ');
-                }
-                w.push_declaration_name(&format!("{path}/name"), declared_name)?;
-                if let Some(type_name) = e.value.type_name {
-                    w.push_str(" : ");
-                    w.push_qualified_reference(&format!("{path}/exit/type"), type_name)?;
-                }
-                if let Some(redefines) = &e.value.redefines {
-                    emit_subsetting_clause(w, &redefines.value)?;
-                }
-            }
-            if let Some(reference) = e.value.action_reference {
-                if e.value.has_action_keyword {
-                    w.push_str(" action ");
-                } else {
-                    w.push_char(' ');
-                }
-                w.push_qualified_reference(&format!("{path}/exit/action"), reference)?;
-            }
-            emit_state_def_body(w, path, &e.value.body)
+            emit_state_action_usage(w, path, &action.value.action)?;
+            emit_state_def_body(w, path, &action.value.body)
         }
         StateDefBodyElement::Then(t) => {
             w.push_str("then ");

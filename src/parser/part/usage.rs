@@ -242,11 +242,6 @@ fn consume_part_usage_structured_brace(
     )
 }
 
-/// Arena-backed action path for `perform`, preserving both qualification and dotted segments.
-fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, crate::ast::QualifiedReferenceId> {
-    crate::parser::lex::reference_path(input)
-}
-
 /// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     crate::parser::span::reference_transaction(input, perform_in_out_binding_inner)
@@ -351,11 +346,6 @@ fn perform_usage_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<Definitio
     .parse(input)
 }
 
-/// Trailing `= expr` binding on a perform member, e.g. `perform action :>> doXorY = doX;`.
-fn perform_value(input: Input<'_>) -> IResult<Input<'_>, Option<Node<crate::ast::FeatureValue>>> {
-    opt(preceded(ws_and_comments, usage_value_part)).parse(input)
-}
-
 fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     preceded(
         ws_and_comments,
@@ -384,12 +374,7 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, action_reference) = perform_action_path(input)?;
-    // `:>>` or its keyword spelling (`perform ActionTree::providePower redefines providePower;`,
-    // SysML v2 Spec Annex A SimpleVehicleModel.sysml). `optional_redefinition` records which
-    // one was authored.
-    let (input, redefines) = crate::parser::usage::optional_redefinition(input)?;
-    let (input, value) = perform_value(input)?;
+    let (input, (target, value)) = crate::parser::perform::perform_action_declaration(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
         input,
@@ -398,10 +383,7 @@ fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
             input,
             Perform {
                 usage_prefix,
-                target: PerformActionTarget::Reference {
-                    action: action_reference,
-                    redefines,
-                },
+                target,
                 value,
                 body,
             },
@@ -443,29 +425,7 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
 }
 
 fn perform_action_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, usage_prefix) = perform_usage_prefix(input)?;
-    let (input, _) = tag(&b"perform"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, declaration) = crate::parser::usage::usage_declaration(input)?;
-    let (input, value) = perform_value(input)?;
-    let (input, body) = perform_body_or_semicolon(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            Perform {
-                usage_prefix,
-                target: PerformActionTarget::Action(Box::new(declaration)),
-                value,
-                body,
-            },
-        ),
-    ))
+    perform_usage_inner(input)
 }
 
 /// Allocate: `allocate` source `to` target body.

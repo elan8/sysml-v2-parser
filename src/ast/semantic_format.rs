@@ -1411,12 +1411,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_state_behavior_action(
                                 "entry",
-                                entry.value.has_action_keyword,
-                                entry.value.action_reference,
-                                entry.value.declared_name,
-                                entry.value.type_name,
-                                entry.value.redefines.as_ref().map(|n| &n.value),
-                                entry.value.effect.is_some(),
+                                &entry.value.action,
                                 &entry.value.body,
                             )?;
                         }
@@ -1424,12 +1419,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_state_behavior_action(
                                 "do",
-                                action.value.has_action_keyword,
-                                action.value.action_reference,
-                                action.value.declared_name,
-                                action.value.type_name,
-                                action.value.redefines.as_ref().map(|n| &n.value),
-                                action.value.effect.is_some(),
+                                &action.value.action,
                                 &action.value.body,
                             )?;
                         }
@@ -1437,12 +1427,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_state_behavior_action(
                                 "exit",
-                                exit.value.has_action_keyword,
-                                exit.value.action_reference,
-                                exit.value.declared_name,
-                                exit.value.type_name,
-                                exit.value.redefines.as_ref().map(|n| &n.value),
-                                exit.value.effect.is_some(),
+                                &exit.value.action,
                                 &exit.value.body,
                             )?;
                         }
@@ -1506,40 +1491,27 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn write_state_behavior_action(
         &mut self,
         kind: &str,
-        has_action_keyword: bool,
-        action_reference: Option<QualifiedReferenceId>,
-        declared_name: Option<DeclarationName>,
-        type_name: Option<QualifiedReferenceId>,
-        redefines: Option<&SubsettingRelationship>,
-        has_effect: bool,
+        action: &super::StateActionUsage,
         body: &StateDefBody,
     ) -> io::Result<()> {
-        write!(
-            self.writer,
-            "({kind} (action-keyword {has_action_keyword}) (target "
-        )?;
-        if let Some(reference) = action_reference {
-            self.write_reference(reference)?;
-        } else {
-            self.writer.write_str("none")?;
+        write!(self.writer, "({kind} (action ")?;
+        match action {
+            super::StateActionUsage::Empty => self.writer.write_str("empty")?,
+            super::StateActionUsage::Perform { target, value } => {
+                self.write_perform_target(target)?;
+                self.writer.write_str(" (value ")?;
+                match value {
+                    Some(value) => self.write_feature_value(&value.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_char(')')?;
+            }
+            super::StateActionUsage::Effect(effect) => self.write_transition_effect(effect)?,
         }
-        self.writer.write_str(") (declared-name ")?;
-        self.write_optional_name(declared_name)?;
-        self.writer.write_str(") (type ")?;
-        match type_name {
-            Some(reference) => self.write_reference(reference)?,
-            None => self.writer.write_str("none")?,
-        }
-        self.writer.write_str(") (redefines ")?;
-        match redefines {
-            Some(redefines) => self.write_subsetting(redefines)?,
-            None => self.writer.write_str("none")?,
-        }
-        write!(self.writer, ") (effect {has_effect}) ")?;
+        self.writer.write_str(") ")?;
         self.write_state_body(body)?;
         self.writer.write_char(')')
     }
@@ -5616,9 +5588,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
-    fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
-        self.writer.write_str("(perform (target ")?;
-        match &perform.target {
+    fn write_perform_target(&mut self, target: &super::PerformActionTarget) -> io::Result<()> {
+        match target {
             super::PerformActionTarget::Action(declaration) => {
                 self.writer.write_str("(action ")?;
                 self.write_usage_declaration(&declaration.value)?;
@@ -5632,6 +5603,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')?;
             }
         }
+        Ok(())
+    }
+
+    fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
+        self.writer.write_str("(perform (target ")?;
+        self.write_perform_target(&perform.target)?;
         self.writer.write_str(") (value ")?;
         if let Some(value) = &perform.value {
             self.write_feature_value(&value.value)?;

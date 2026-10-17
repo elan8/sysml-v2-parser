@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **State actions retain full declarations and bound values (#200).** Anonymous `entry/do/exit
+  action :>> target;` and valued action declarations preserve their complete `UsageDeclaration`.
+  State action alternatives use `StateActionUsage`; the shared perform grammar, emission,
+  traversal and semantic projection preserve the declared/reference distinction. Breaking AST
+  change: version 284.
+
 - **Remove permissive declaration and body-member fallbacks (breaking AST change).**
   Failed grammar now produces source-preserving error recovery. Remove the five opaque
   declaration node kinds, `OpaqueText` and its document accessor; `PARSE_AST_VERSION` is 283.

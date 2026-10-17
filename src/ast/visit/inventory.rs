@@ -1066,6 +1066,10 @@ macro_rules! ast_traversal {
             }
 
             /// Visits [`EntryAction`]; the default implementation walks its children.
+            fn visit_state_action_usage(&mut self, action: &$($mutability)? StateActionUsage) {
+                walk_state_action_usage(self, action)
+            }
+
             fn visit_entry_action(&mut self, node: &$($mutability)? Node<EntryAction>) {
                 walk_entry_action(self, node)
             }
@@ -6142,26 +6146,22 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_state_action_usage<V: $Visitor>(visitor: &mut V, action: &$($mutability)? StateActionUsage) {
+            match action {
+                StateActionUsage::Empty => {},
+                StateActionUsage::Perform { target, value } => {
+                    visitor.visit_perform_action_target(target);
+                    if let Some(value) = value { visitor.visit_feature_value(value); }
+                },
+                StateActionUsage::Effect(effect) => visitor.visit_transition_effect(effect),
+            }
+        }
+
         pub fn walk_entry_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EntryAction>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EntryAction { action_reference, has_action_keyword, declared_name, type_name, redefines, effect, body } = &$($mutability)? node.value;
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = has_action_keyword;
-            if let Some(inner) = declared_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = effect {
-                visitor.visit_transition_effect(inner);
-            }
+            let EntryAction { action, body } = &$($mutability)? node.value;
+            visitor.visit_state_action_usage(action);
             visitor.visit_state_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -6169,23 +6169,8 @@ macro_rules! ast_traversal {
         pub fn walk_do_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DoAction>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DoAction { action_reference, has_action_keyword, declared_name, type_name, redefines, effect, body } = &$($mutability)? node.value;
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = has_action_keyword;
-            if let Some(inner) = declared_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = effect {
-                visitor.visit_transition_effect(inner);
-            }
+            let DoAction { action, body } = &$($mutability)? node.value;
+            visitor.visit_state_action_usage(action);
             visitor.visit_state_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -6193,23 +6178,8 @@ macro_rules! ast_traversal {
         pub fn walk_exit_action<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ExitAction>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ExitAction { action_reference, has_action_keyword, declared_name, type_name, redefines, effect, body } = &$($mutability)? node.value;
-            if let Some(inner) = action_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            let _ = has_action_keyword;
-            if let Some(inner) = declared_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = effect {
-                visitor.visit_transition_effect(inner);
-            }
+            let ExitAction { action, body } = &$($mutability)? node.value;
+            visitor.visit_state_action_usage(action);
             visitor.visit_state_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }

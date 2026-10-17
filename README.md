@@ -60,6 +60,12 @@ assignment or default value; formatting and semantic snapshots consume these typ
 malformed source slice. The enclosing node span remains the authority for recovery emission;
 deserialization rejects diagnostic spans outside it or with invalid source coordinates.
 
+`PARSE_AST_VERSION` 284 replaces the flattened state-action fields on `EntryAction`, `DoAction`
+and `ExitAction` with `action: StateActionUsage`. Match `Empty`, `Perform { target, value }`,
+or `Effect`; the perform target reuses `PerformActionTarget`. Its `Action` branch owns a full
+`UsageDeclaration`, including anonymous identification, all typing targets and specialization
+clauses. The `value` retains the authored assignment/default operator and expression.
+
 `PARSE_AST_VERSION` 283 removes the opaque declaration variants `ExtendedLibraryDecl`,
 `FeatureDecl`, `ClassifierDecl`, `KermlSemanticDecl` and `KermlFeatureDecl`, together with
 `OpaqueText` and `ParsedDocument::opaque_text`. Consumers should handle typed declarations

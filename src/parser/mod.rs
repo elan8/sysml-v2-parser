@@ -50,6 +50,7 @@ pub(crate) mod package;
 mod parse;
 mod part;
 mod payload;
+mod perform;
 mod port;
 mod recovery;
 mod requirement;
