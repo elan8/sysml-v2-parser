@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-10-17
+
+This release updates the serialized AST from version **260 to 284** and requires **Rust 1.88**.
+It removes permissive declaration fallbacks, retains more grammar-owned syntax, and adds a
+pinned differential parser oracle. See the [migration guide](docs/MIGRATION_0_58.md) before
+updating consumers or reusing cached documents.
+
+### Added
+
+- A pinned differential parser oracle against OpenMBEE sysml-toolkit, with baselines for the
+  release corpus and its OpenSysML invalid-model fixtures. Divergences are triaged against the
+  pinned grammar; neither parser acts as the normative authority.
+- A v0.57.0-to-v0.58.0 migration guide and release checklist. Current documentation now records
+  the 56 validation round trips, 85 tracked example round trips and removal of opaque declaration
+  fallbacks; historical plans are identified as historical rather than current support claims.
+
 ### Changed
 
 - **Retain typed declarations and members across body grammars (#200).** Anonymous `entry/do/exit
@@ -273,8 +289,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     not write is gone).
   - The `view_body_rendering_and_alias_recovery` fixture used `alias for AliasTarget;` as its
     malformed alias; that is a valid anonymous alias, so the fixture now uses `alias for ;`.
-
-### Changed
 
 - Regular names are optional independently of short names in case, analysis, verification,
   concern, viewpoint, enum, allocation, metadata, state and exhibit-state declarations.
@@ -6837,3 +6851,6 @@ See `docs/PARSER_BACKLOG_ROADMAP.md` § 5 for the full list of gaps this closes 
 **Local smoke (optional):** In a Spec42 checkout, add to `.cargo/config.toml` a `[patch."https://github.com/elan8/sysml-v2-parser"]` entry with `sysml-v2-parser = { path = "../sysml-v2-parser" }`, then run `cargo update -p sysml-v2-parser` and `cargo check -p kernel`. Remove the patch afterward unless you intend to keep developing against a local parser build.
 
 [0.9.0]: https://github.com/elan8/sysml-v2-parser/compare/v0.8.0...v0.9.0
+
+[Unreleased]: https://github.com/elan8/sysml-v2-parser/compare/v0.58.0...HEAD
+[0.58.0]: https://github.com/elan8/sysml-v2-parser/compare/v0.57.0...v0.58.0

@@ -1,60 +1,36 @@
-# BNF Compliance Matrix
+# BNF coverage and structured-AST baseline
 
-This is the primary compact coverage snapshot for the parser.
+Current for **v0.58.0**, AST schema **284**. The authority for production classification is
+[`bnf_coverage.map`](bnf_coverage.map), checked against both pinned BNF files identified by
+[`conformance-target`](conformance-target). This document does not maintain a second set of
+per-family status labels.
 
-Reference grammar (pinned release — see [`docs/conformance-target`](./conformance-target)):
+The map classifies all **350 SysML + 290 KerML = 640** textual productions as `implemented`.
+This is a tested coverage inventory, not a proof of every legal combination or a semantic
+conformance claim. See [the claim layers and corpus limits](CONFORMANCE.md).
 
-- `sysml-v2-release/bnf/SysML-textual-bnf.kebnf`
+## Structured declarations and bodies
 
-Machine-readable coverage gate:
+| Area | Current representation |
+| --- | --- |
+| SysML definitions and usages | Construct-specific typed nodes, structured body members, prefixes and relationships |
+| KerML classifiers, features, functions and connectors | Typed declaration/member nodes; the old opaque declaration fallback variants are removed |
+| Extensions | Typed extended definitions and usages in their permitted owning body enums; native connector/interface ends keep scope-owned precedence |
+| Actions and states | Typed case/definition/view members, variants, complete state subaction declarations and canonical action bodies |
+| Typing and specialization | Typed relationships retain all targets where modeled; migrated usage families no longer expose a scalar first type |
+| Malformed and unsupported input | Explicit source-backed recovery or unsupported nodes with diagnostics; a recognized keyword does not establish validity |
 
-- [`docs/bnf_coverage.map`](./bnf_coverage.map), validated by `cargo test --test bnf_compliance`
+## Gates
 
-Status labels:
+- `cargo test --test bnf_compliance` checks production counts, map coverage and forbidden opaque
+  body-helper patterns. Labels such as `partial`, `opaque` and `fallback` remain map-format
+  vocabulary but are not current classifications.
+- `CONFORMANCE_SCORECARD_L2=1 cargo test --test conformance_scorecard` verifies the 21 Systems
+  Library files and all 94 standard-library files have zero diagnostics and unstructured nodes.
+- `cargo test --test roundtrip_validation -- --include-ignored` checks all 56 pinned validation
+  fixtures and the tracked examples inventory.
+- `cargo snapshot check` verifies semantic/recovery/provenance fixtures and formatting stability.
 
-- `implemented`: dedicated AST + dedicated parser path, exercised by the current validation baseline
-- `partial`: dedicated parser exists and is validated for common forms, but coverage may still rely on permissive body parsing or subset-only grammar support
-- `modeled`: parsed into BNF-aligned modeled declaration nodes (`KermlSemanticDecl` / `KermlFeatureDecl` / `ExtendedLibraryDecl`) instead of a fully dedicated construct-specific AST
-
-Important distinction:
-
-- **Accepted grammar fragment** means strict parsing recognizes the BNF surface form and preserves the existing public AST shape where fields exist.
-- **Fully structured AST body** means brace body contents are parsed into construct-specific member nodes, not consumed by `skip_until_brace_end` or generic statement-only body parsing.
-
-The coverage gate treats `implemented` as the stronger claim. Productions marked `implemented` must not rely on `skip_until_brace_end`, `semicolon_or_statement_brace_body`, or `take_until_terminator(input, b";{")` in their parser module (see `tests/bnf_compliance.rs`).
-
-## Package-level declaration families
-
-- `package`, `library package`, `namespace`, `import`: `implemented`
-- `part definition`, `part usage`: `implemented`; definition and usage bodies already parse structured member nodes (attributes, nested parts/ports, doc, recovery errors)
-- `port definition`, `port usage`: `implemented`; `PortDefinition` requires `def`, `PortUsage = OccurrenceUsagePrefix 'port' Usage` carries the shared typed prefix, and `PortBody::Brace { elements }` holds nested ports, in/out, `ref` and `variant` members
-- `part*`, `port*` wildcards: `partial` (member-depth gaps remain in broader families)
-- `attribute definition`, `attribute usage`: `implemented`; brace bodies use structured member parsing (`AttributeBody::Brace { elements }`) with doc/nested attribute recovery
-- `occurrence definition`: `implemented`; definition brace bodies use structured `DefinitionBody::Brace { elements }` with occurrence member parsing
-- `flow definition`, `flow usage`, `allocation definition`, `allocation usage`, `metadata definition`: `implemented`; def and usage brace bodies use shared structured parsing (doc members plus statement recovery)
-- `action definition`, `state definition`, `requirement definition`: `implemented` at package level; definition bodies use structured member loops with `advance_to_closing_brace` / `skip_statement_or_block` recovery (no `skip_until_brace_end`)
-- `occurrence usage`: `partial`; `:` / `defined by` / `typed by`, `subsets`, and `redefines` are accepted on usages with current last-wins normalization
-- `requirement usage`, `case usage`, `analysis case usage`, `verification case usage`, `action usage`, `state usage`, `view usage`, `rendering usage`, `use case usage`, `viewpoint usage`: `implemented` (shared `usage_header` flow accepts `:` / `defined by` / `typed by` plus specialization clauses; requirement usages also accept optional multiplicity before typing)
-- `rendering definition`: `implemented`; structured `RenderingDefBody::Brace { elements }`
-- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `interface`, `view`, `viewpoint`, `metadata usage`, `enum`: `partial` for the broader families due to remaining body/member-depth gaps outside the promoted productions
-- KerML semantic families (`behavior`, `function`, `datatype`, `assoc`, `struct`, `metaclass`, `class`, `classifier`, `feature`, `step`): `modeled`
-- KerML feature logic families (`occurrence`, `expr`, `predicate`, `succession`): `modeled`
-- Extended declaration starters (`message`, `concern` and remaining library declarations): `modeled`
-
-## Validation gates
-
-- `test_systems_library_strict_no_diagnostics`: required green
-- `test_full_library_strict_no_diagnostics`: required green
-- `test_full_library_suite`: broad integration visibility
-- `CONFORMANCE_SCORECARD_L2=1 cargo test --test conformance_scorecard`: required green;
-  the shared opacity scan requires zero unstructured nodes in the Systems Library and
-  full standard library, alongside the diagnostic gate. Opaque declaration variants have
-  been removed from the AST.
-
-## Current quality baseline (2026-06-03)
-
-- `cargo test` is green, including `bnf_compliance` (640/640 productions classified as `implemented`).
-- `cargo test --test validation -- --include-ignored` is green, including the full validation suite and full SysML library gates.
-- Systems Library and full standard-library validation require zero unstructured nodes.
-- Map status `implemented` means the production is covered by dedicated parser paths and tests; it does not claim full semantic conformance.
-- Remaining depth work: richer AST for every body member, unified KerML definition/usage layer in code, and language-server recovery polish.
+Broader grammar combinations and consumer fidelity still need regression coverage as issues
+are found. Parser acceptance does not validate name resolution, types, or SysML/KerML semantic
+well-formedness; those belong to a host such as Spec42.

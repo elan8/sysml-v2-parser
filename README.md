@@ -4,7 +4,15 @@
 
 SysML v2 textual notation parser for Rust. Parses SysML v2 and KerML textual syntax into an AST, with a resilient editor mode that returns partial trees plus diagnostics.
 
-Release notes: [`CHANGELOG.md`](CHANGELOG.md).
+Release notes: [`CHANGELOG.md`](CHANGELOG.md). For v0.58.0, see the
+[migration guide](docs/MIGRATION_0_58.md): the document schema is `PARSE_AST_VERSION` 284
+and the minimum supported Rust version is 1.88.
+
+```toml
+[dependencies]
+sysml-v2-parser = "0.58"
+# Enable `features = ["serde"]` to serialize complete ParsedDocument envelopes.
+```
 
 ## Features
 
@@ -105,19 +113,24 @@ ranges, and dangling AST reference identities during deserialization.
 ## Development
 
 ```bash
-cargo test
-cargo clippy -- -W clippy::all
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
+cargo snapshot check
 ```
 
 **Full validation suite** (CI validation job — includes ignored slow/corpus tests):
 
 ```bash
 ./scripts/fetch-sysml-v2-release.sh   # or scripts/fetch-sysml-v2-release.ps1 (reads docs/conformance-target)
-cargo test -- --include-ignored
+cargo test --all-features -- --include-ignored
 ```
 
 Set `SYSML_V2_RELEASE_DIR` if fixtures are not in `./sysml-v2-release`.
 The pin lives in [`docs/conformance-target`](docs/conformance-target); see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
+Enable `CONFORMANCE_SCORECARD_L2=1` and `RUN_STRICT_LIBRARY_GATES=1` for the library scorecard
+and strict gates. Release preparation and the tag-triggered publishing workflow are documented in
+[`docs/RELEASING.md`](docs/RELEASING.md).
 
 **Optional MBSE vacuum corpus** (ignored integration tests; skips when unset):
 
@@ -211,6 +224,8 @@ until the profile contains enough steady-state samples for the question being in
 
 | Topic | Doc |
 |-------|-----|
+| v0.58.0 migration | [`docs/MIGRATION_0_58.md`](docs/MIGRATION_0_58.md) |
+| Release procedure | [`docs/RELEASING.md`](docs/RELEASING.md) |
 | Backlog & roadmap | [`docs/PARSER_BACKLOG_ROADMAP.md`](docs/PARSER_BACKLOG_ROADMAP.md) |
 | Spec42 diagnostics | [`docs/SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md`](docs/SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md) |
 | Error recovery | [`docs/ERROR_RECOVERY.md`](docs/ERROR_RECOVERY.md) |

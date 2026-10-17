@@ -39,74 +39,37 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | 18-Use Case | 1 | 0 |
 | **Totals** | **56** | **0** |
 
-### Remaining known-gap classes (after emitter expansion)
+### Failure classification
 
-With emit arms in place for ports, interfaces, actions, states, requirements, constraints, calcs, flows, views, metadata, analysis parameters/returns, etc., the pinned validation tree currently has **no known-gap fixtures**. New failures classify roughly as:
+The pinned validation tree currently has no known-gap fixtures. New failures distinguish parser
+recovery/unstructured nodes, unsupported emission, reparse errors and AST fidelity mismatches.
+The opaque declaration variants were removed in v0.58.0; do not restore a fallback to make a
+fixture pass. Source locations that do not affect meaning are normalized for AST comparison.
 
-| Class | Meaning | Typical next work |
-| ----- | ------- | ----------------- |
-| `opacity` / `emit opaque` (`Other`, `ExtendedLibraryDecl`, KerML decls) | Parser recovered opaquely | Parser structure recovery |
-| `AST-eq` | Emits and reparses, but AST differs | Emit fidelity or lost parse fields (e.g. assume vs require) |
-| `reparse` | Emitted text is not accepted | Emit quoting/shape bugs, or missing grammar in reparse path |
-
-### ExtendedLibraryDecl / KermlFeatureDecl (#73)
-
-Package-level fallbacks for SysML keywords that failed structured dispatch. Cleared for validation
-fixtures `08`, `09`, `12b-Allocation-1`, and `14c` by parsing requirement short names, allocation
-`::>` ends, and `nonunique` occurrence usages. `12b-Allocation-1` is in `ROUNDTRIP_PASS` (AllocationDef
-emit + structured body `end`). Remaining failures on `08`/`09`/`14c` are nested `Other` /
-unsupported emit (not those fallback kinds).
-
-### Intentional AST PartialEq normalization (#74 / #78)
-
-Roundtrip AST equality ignores source locations that do not affect semantics. `Membership` / `Node`
-already did this; #74 covered `PayloadClause` / `ActionUsage`; #78 extended the same convention to
-attribute/part/port/ref/metadata/import/state then-final and related `*_span` fields. Remaining
-`12b-Allocation` fails structurally (reparse → `ExtendedLibraryDecl`), not as a span phantom.
-
-Set `ROUNDTRIP_DIAG=1` when running the known-gap test to print the first failure reason per fixture.
-
-Debug AST snapshots below are **regression canaries only**. They store `Debug` dumps of the AST and fail when that dump changes. Regenerating with `UPDATE_VALIDATION_AST=1` locks in current parser output — including wrong classifications — so snapshots are not a correctness oracle. Prefer roundtrip for new coverage; do not grow the snapshot set.
+The primary parser contract is the semantic Markdown suite under `tests/snapshots`, managed by
+`cargo snapshot check` and `cargo snapshot update`. Its fixtures expose diagnostics, retained
+syntax, recovery, emission and parse/format/reparse stability. The three legacy Debug snapshots
+and their unwired Rust modules are historical artifacts, not current test gates. There is no
+active `UPDATE_VALIDATION_AST` regeneration path.
 
 ## Layout
 
-- **`tests/validation.rs`** – Shared helpers (`release_root`, `validation_fixture_path`, `assert_ast_eq`, `assert_ast_snapshot`) and module wiring.
-- **`tests/validation/<name>.rs`** – One module per validation fixture (parse / shape / snapshot).
-- **`tests/validation/snapshots/`** – Normalized AST Debug snapshots (frozen regression canaries).
-- **`tests/roundtrip_validation.rs`** – Emit-fidelity roundtrip suite (L2.5).
+- `tests/validation.rs` wires the active modules and owns release-path/logging helpers.
+- `tests/validation/full_validation_suite.rs` parses the entire pinned validation corpus.
+- `tests/validation/full_library_suite.rs` owns the strict library diagnostics/structure gates.
+- `tests/roundtrip_validation.rs` owns validation and broader-example round trips.
+- `tests/snapshots/` contains the primary semantic parser contract.
+- `tests/validation/snapshots/` retains three historical Debug dumps; no current test reads them.
 
-## Adding a new validation test
+## Adding coverage
 
-1. Prefer extending roundtrip coverage (promote a fixture into `ROUNDTRIP_PASS` once the emitter supports it).
-2. For targeted construct probes, add a `.rs` file in `tests/validation/` and wire it in `tests/validation.rs`.
-3. Use `assert_ast_eq` only for small hand-built expected trees; avoid new Debug snapshots.
+1. Promote a new fixture into `ROUNDTRIP_PASS` only after the strict round-trip pipeline passes.
+2. For targeted language behavior, add a semantic/provenance/recovery Markdown snapshot under
+   `tests/snapshots`; migrate a touched private-field assertion to that public projection.
+3. Reserve focused Rust tests for owning mechanics such as arena validation, rollback, resource
+   limits and failing output sinks. Avoid new Debug snapshots.
 
-## When to regenerate snapshots
-
-Refresh checked-in AST snapshots **in the same PR** whenever parser output changes for the three existing snapshot fixtures, for example:
-
-- new optional fields on existing AST structs
-- new enum variants on body-element types
-- a construct now parses into a different variant
-
-CI always runs `cargo test -- --include-ignored`; local `cargo test` alone does **not** run these ignored tests.
-
-## Regenerate
-
-All snapshot fixtures:
-
-```powershell
-$env:UPDATE_VALIDATION_AST = "1"
-cargo test --test validation -- --include-ignored
-Remove-Item Env:UPDATE_VALIDATION_AST
-```
-
-Or a subset (faster while iterating):
-
-```powershell
-$env:UPDATE_VALIDATION_AST = "1"
-cargo test --test validation test_parse_1a_parts_tree test_parse_3a_function_based_behavior -- --include-ignored
-Remove-Item Env:UPDATE_VALIDATION_AST
-```
-
-Unset `UPDATE_VALIDATION_AST` before committing. Review the `.txt` diff in `snapshots/` — only intentional AST changes should appear.
+After changing fixture source or an owning formatter, run `cargo snapshot update`, review the
+complete diff, then run `cargo snapshot check`. Generated sections must not be edited by hand.
+Run `cargo test --all-features -- --include-ignored` with the pinned fixtures for the broad gates;
+ordinary `cargo test` does not execute ignored corpus tests.
