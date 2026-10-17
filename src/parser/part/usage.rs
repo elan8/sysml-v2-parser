@@ -638,17 +638,6 @@ fn interface_usage_body_element(
         ));
     }
 
-    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
-    // transactionally before a metadata-prefix arm can split it into unrelated members.
-    if crate::parser::span::reference_probe(input, |input| {
-        crate::parser::metadata_annotation::extended_usage(input).is_ok()
-    }) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-
     alt((
         interface_usage_ref_redef,
         // An `end`-led kind-keyworded usage is that family's node with an `end` head; give it
@@ -685,6 +674,17 @@ fn interface_usage_body_element(
 fn interface_usage_other_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
+    // transactionally before a metadata-prefix arm can split it into unrelated members.
+    if crate::parser::span::reference_probe(input, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     // `perform action ...` has the common `perform` prefix with the supported reference form,
     // so the declaration alternative must own it before `perform <qualified-reference>`.
     alt((

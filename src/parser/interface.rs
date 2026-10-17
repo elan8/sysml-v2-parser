@@ -31,17 +31,6 @@ fn interface_def_body_element(
         ));
     }
 
-    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
-    // transactionally before a metadata-prefix arm can split it into unrelated members.
-    if crate::parser::span::reference_probe(input, |input| {
-        crate::parser::metadata_annotation::extended_usage(input).is_ok()
-    }) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
     // annotating member, which is the `Comment` production's keyword-less spelling.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
@@ -62,6 +51,27 @@ fn interface_def_body_element(
         let elem = InterfaceDefBodyElement::PartUsage(Box::new(usage));
         return Ok((next, node_from_to(start, next, elem)));
     }
+    // Interface ends own this overlapping spelling before the restricted-usage guard.
+    if let Some((next, member)) = (!crate::parser::body::starts_bare_comment(input))
+        .then(|| crate::parser::span::reference_transaction(input, end_decl))
+        .and_then(Result::ok)
+    {
+        return Ok((
+            next,
+            node_from_to(start, next, InterfaceDefBodyElement::EndDecl(member)),
+        ));
+    }
+    // This body's usage alternatives omit ExtendedUsage. Recognize a complete declaration
+    // transactionally before a metadata-prefix arm can split it into unrelated members.
+    if crate::parser::span::reference_probe(input, |input| {
+        crate::parser::metadata_annotation::extended_usage(input).is_ok()
+    }) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -80,10 +90,6 @@ fn interface_def_body_element(
                 InterfaceDefBodyElement::MetadataKeywordUsage,
             ),
         )),
-        // GH-33: interfaces don't allow the `#name` derived-end-name form connections do (no
-        // matching real-usage evidence found for interfaces) -- see `connector::end_decl`'s doc
-        // comment.
-        map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
         // A nested interface usage; `interface_usage` refuses by lookahead unless `interface`
