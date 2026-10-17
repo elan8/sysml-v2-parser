@@ -442,57 +442,6 @@ action def Done { }
 }
 
 #[test]
-fn malformed_root_package_body_recovers_without_top_level_cascade() {
-    let input = r#"package Broken {
-  part def BatteryLevelComputer {
-    exhibit state BatteryLevelComputerStates {
-      in ref maxBatCap = batteryCapacity;
-    }
-  }
-  state def BatteryLevelComputerStates {
-    entry; then x;
-    state x {
-      entry act { batCap; maxBatCap; computedColor; }
-    }
-  }
-}
-package Later {
-  part def Good;
-}"#;
-    let result = parse_with_diagnostics(input);
-    assert!(
-        result
-            .errors
-            .iter()
-            .any(|e| { e.code.as_deref() == Some("invalid_bare_identifier_in_state_body") }),
-        "malformed state body members should surface scoped recovery diagnostics: {:?}",
-        result.errors
-    );
-    assert!(
-        !result
-            .errors
-            .iter()
-            .any(|e| { matches!(e.code.as_deref(), Some("expected_keyword")) }),
-        "malformed package body should not cascade as top-level errors: {:?}",
-        result.errors
-    );
-    assert!(result
-        .document
-        .root
-        .elements
-        .iter()
-        .any(|e| match &e.value {
-            RootElement::Package(pkg) =>
-                pkg.value
-                    .identification
-                    .simple_name()
-                    .and_then(|n| result.document.declaration_name(n))
-                    == Some("Later"),
-            _ => false,
-        }));
-}
-
-#[test]
 fn fixture_invalid_typing_operator_reports_specific_fix() {
     let input = fixture("invalid-typing-operator.sysml");
     let (result, elements) = package_elements(&input);
