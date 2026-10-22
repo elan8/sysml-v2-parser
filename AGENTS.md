@@ -138,7 +138,8 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - Document-local IDs are an implementation of identity, not portable spelling. Wire formats either
   preserve and validate the whole owning envelope or deliberately remap identities at the boundary.
 - Breaking AST, arena, recovery, or serialized-shape changes update the authoritative version,
-  changelog, public documentation, snapshot format, and affected consumers together.
+  public documentation, snapshot format, and affected consumers together, and record the change in
+  a `Breaking:` commit trailer (see Changelog below).
 - Public constructors must preserve invariants. If naked IDs cannot form a valid tree, provide a
   document/builder API or require parsing; do not expose constructors that permit dangling syntax.
 
@@ -196,3 +197,16 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - Review parser changes adversarially for copied token text, hidden per-node allocations, detached IDs,
   string reparsing, non-exhaustive matches, swallowed input, imprecise spans, recovery that consumes
   valid siblings, nondeterministic output, and snapshots coupled to Rust layout.
+
+## Changelog
+
+- `CHANGELOG.md` is written only when preparing a release, from the commits since the previous
+  release tag. Feature and fix changes never edit it; this keeps parallel pull requests free of
+  changelog conflicts.
+- A commit with a user-visible effect ends with git trailers, in the final paragraph together with
+  any `Co-Authored-By:` line: `Changelog: <one user-facing sentence>` and, for a change a consumer
+  must act on (an AST, arena or serialized-shape version, a removed API), `Breaking: <what to
+  change>`.
+- Release preparation runs `scripts/changelog-draft.sh`, which lists the `Breaking:` and
+  `Changelog:` trailers and the subjects of the remaining commits since the last `v*` tag, and
+  edits the result into the release section of `CHANGELOG.md`.
