@@ -3,7 +3,8 @@
 //! `part def A { ... };` is grammatical: `DefaultReferenceUsage = RefPrefix Usage` (SysML
 //! 8.2.2.6.3) has every slot optional and `UsageBody` may be `;`, so the trailing `;` parses as a
 //! second, empty, anonymous member. It is almost always a statement terminator written by habit
-//! rather than an intended feature, so it is reported as an error with its exact `;` span.
+//! rather than an intended feature, so it is reported as a warning with its exact `;` span.
+//! The empty usage remains valid syntax and does not cause strict parsing to fail.
 //!
 //! The rule is stated over typed spans only. A brace body reports its `}` through
 //! [`Visitor::visit_body_braces`]; an empty member is a [`DefaultReferenceUsage`] with no authored
@@ -18,7 +19,7 @@ use crate::ast::{AttributeBody, DefaultReferenceUsage, Node, RootNamespace, Span
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use crate::parser::diagnostic_catalog;
 
-pub(crate) fn collect_redundant_semicolon_errors(root: &RootNamespace) -> Vec<ParseError> {
+pub(crate) fn collect_redundant_semicolon_warnings(root: &RootNamespace) -> Vec<ParseError> {
     let mut scan = Scan::default();
     scan.visit_root_namespace(root);
     scan.empty_members
@@ -30,14 +31,16 @@ pub(crate) fn collect_redundant_semicolon_errors(root: &RootNamespace) -> Vec<Pa
                 .is_some_and(|end| scan.close_brace_ends.contains(end))
         })
         .map(|semicolon| {
-            ParseError::new("unexpected ';' after a closing '}': a braced body needs no terminator")
-                .with_location(semicolon.offset, semicolon.line, semicolon.column)
-                .with_length(semicolon.len.max(1))
-                .with_code(diagnostic_catalog::REDUNDANT_SEMICOLON_AFTER_BODY)
-                .with_severity(DiagnosticSeverity::Error)
-                .with_category(DiagnosticCategory::ParseError)
-                .with_found(";")
-                .with_suggestion("Remove the ';'.")
+            ParseError::new(
+                "possible redundant ';' after a closing '}': parsed as an empty anonymous usage",
+            )
+            .with_location(semicolon.offset, semicolon.line, semicolon.column)
+            .with_length(semicolon.len.max(1))
+            .with_code(diagnostic_catalog::REDUNDANT_SEMICOLON_AFTER_BODY)
+            .with_severity(DiagnosticSeverity::Warning)
+            .with_category(DiagnosticCategory::ParseError)
+            .with_found(";")
+            .with_suggestion("Remove the ';' if the empty usage was unintended.")
         })
         .collect()
 }

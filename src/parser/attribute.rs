@@ -682,10 +682,13 @@ pub(crate) fn default_reference_value_binding(
     let (peek, _) = ws_and_comments(input)?;
     // `:`, `:>` and `:>>` only: `::>`, `::` and `:=` start no declaration this entry point owns.
     let fragment = peek.fragment();
+    // DefaultReferenceUsage is nullable up to its UsageBody. A bare semicolon is therefore an
+    // explicit empty anonymous usage, including in action and requirement bodies.
+    let empty_member = fragment.starts_with(b";");
     let specialization_led =
         fragment.starts_with(b":") && !fragment.starts_with(b"::") && !fragment.starts_with(b":=");
     let (input, usage) = default_reference_usage(input)?;
-    if usage.value.value.is_none() && !specialization_led {
+    if usage.value.value.is_none() && !specialization_led && !empty_member {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,

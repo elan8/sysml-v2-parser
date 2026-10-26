@@ -306,7 +306,7 @@ fn actual_snapshot(
     let mut diagnostics = Vec::new();
     write_diagnostics(&mut diagnostics, file_name, &editor.errors)
         .map_err(|error| format!("{}: diagnostics write failed: {error}", path.display()))?;
-    let strict = if editor.errors.is_empty() {
+    let strict = if editor.is_ok() {
         let strict = sysml_v2_parser::parse_with_name_language(&source, name_language)
             .map_err(|error| format!("{}: strict parse failed: {error}", path.display()))?;
         if strict.normalize_for_test_comparison()
@@ -319,9 +319,15 @@ fn actual_snapshot(
         }
         Some(strict)
     } else {
+        if sysml_v2_parser::parse_with_name_language(&source, name_language).is_ok() {
+            return Err(format!(
+                "{}: strict parse accepted input with editor errors",
+                path.display()
+            ));
+        }
         None
     };
-    let emitted = if editor.errors.is_empty() {
+    let emitted = if editor.is_ok() {
         emit_sysml(&editor.document)
     } else {
         emit_recovered_sysml(&editor.document)
