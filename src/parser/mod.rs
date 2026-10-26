@@ -53,6 +53,7 @@ mod payload;
 mod perform;
 mod port;
 mod recovery;
+mod redundant_semicolon;
 mod requirement;
 mod span;
 mod specialization;

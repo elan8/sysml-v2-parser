@@ -11,6 +11,7 @@ use super::diagnostics::{
 };
 use super::lex;
 use super::package;
+use super::redundant_semicolon::collect_redundant_semicolon_errors;
 use super::span::{node_from_to, ParseContext};
 use crate::ast::{
     PackageBodyElement, ParseErrorNode, ParsedDocument, RootElement, RootNamespace, SourceStorage,
@@ -370,6 +371,7 @@ fn parse_with_diagnostics_document(
 
     let root = RootNamespace { elements };
     errors.extend(collect_recovery_errors(source, &root));
+    errors.extend(collect_redundant_semicolon_errors(&root));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);

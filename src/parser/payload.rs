@@ -214,8 +214,6 @@ fn control_node_payload_stmt<'a>(
 
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = action_usage_body(input)?;
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((
         input,
         node_from_to(

@@ -158,7 +158,7 @@ mod tests {
         let source = r#"package P {
 action def A {
   badstmt {}
-  action good { };
+  action good { }
 }
 }"#;
         let parsed = crate::parse_for_editor(source);

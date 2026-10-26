@@ -2579,11 +2579,6 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     };
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = action_usage_body(input)?;
-    // Spec-wise, a braced body does not require a trailing semicolon. However, in practice some
-    // sources write `... { ... };` as a statement terminator. We accept an optional `;` here to
-    // avoid cascading recovery errors in action bodies.
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((
         input,
         node_from_to(

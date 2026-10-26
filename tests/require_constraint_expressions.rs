@@ -90,7 +90,7 @@ fn assert_no_other_in_constraint(src: &str) {
 
 #[test]
 fn require_constraint_single_line_multi_and_round_trip() {
-    let src = "package P {\nrequirement def R {\nrequire constraint { (a <= b) and (c <= d) and (e <= f) };\n}\n}";
+    let src = "package P {\nrequirement def R {\nrequire constraint { (a <= b) and (c <= d) and (e <= f) }\n}\n}";
     assert_no_other_in_constraint(src);
     let root = parse(src).expect("parse");
     let body = first_require_constraint_body(&root);
@@ -105,7 +105,7 @@ fn require_constraint_multi_line_multi_and() {
         "  (a <= b)\n",
         "  and (c <= d)\n",
         "  and (e <= f)\n",
-        "};\n}\n}",
+        "}\n}\n}",
     );
     assert_no_other_in_constraint(src);
     let root = parse(src).expect("parse");
@@ -116,7 +116,7 @@ fn require_constraint_multi_line_multi_and() {
 
 #[test]
 fn require_constraint_not_and_comparison() {
-    let src = "package P {\nrequirement def R {\nrequire constraint { not p and (x <= y) };\n}\n}";
+    let src = "package P {\nrequirement def R {\nrequire constraint { not p and (x <= y) }\n}\n}";
     assert_no_other_in_constraint(src);
     let root = parse(src).expect("parse");
     let body = first_require_constraint_body(&root);
@@ -143,7 +143,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
         "package P {\nrequirement def R {\n",
         "attribute n: Integer = 0;\n",
         "attribute v :> ISQ::speed = 0.9 [m/s];\n",
-        "require constraint { true };\n",
+        "require constraint { true }\n",
         "}\n}",
     );
     let r = parse_with_diagnostics(src);
