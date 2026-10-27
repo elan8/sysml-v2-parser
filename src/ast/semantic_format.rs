@@ -3427,7 +3427,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_occurrence_usage_prefix(&occurrence.value.prefix)?;
                 self.writer.write_char(')')
             }
-            ActionDefBodyElement::Assign(_assign) => self.writer.write_str("(assign)"),
+            ActionDefBodyElement::Assign(assign) => self.write_assign(&assign.value),
             ActionDefBodyElement::ForLoop(for_loop) => self.write_for_loop(&for_loop.value),
             ActionDefBodyElement::ThenAction(action) => self.write_then_action(&action.value),
             ActionDefBodyElement::AttributeUsage(_usage) => {
@@ -5029,9 +5029,23 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    /// The currently supported semicolon form of `TerminateNode` (SysML BNF 1116-1121).
+    /// `AssignmentNode` (SysML BNF 8.2.2.17.5): the `then`, the shared `ActionNodePrefix` and both
+    /// operand expressions.
+    fn write_assign(&mut self, assign: &super::AssignStmt) -> io::Result<()> {
+        write!(self.writer, "(assign (then {}) ", assign.is_then)?;
+        self.write_action_node_prefix(&assign.prefix)?;
+        self.writer.write_str(" (target ")?;
+        self.write_expression(&assign.lhs)?;
+        self.writer.write_str(") (value ")?;
+        self.write_expression(&assign.rhs)?;
+        self.writer.write_str("))")
+    }
+
+    /// The semicolon form of `TerminateNode` (SysML BNF 1116-1121).
     fn write_terminate_statement(&mut self, terminate: &super::TerminateStmt) -> io::Result<()> {
-        self.writer.write_str("(terminate (target ")?;
+        write!(self.writer, "(terminate (then {}) ", terminate.is_then)?;
+        self.write_action_node_prefix(&terminate.prefix)?;
+        self.writer.write_str(" (target ")?;
         match &terminate.target {
             Some(target) => self.write_expression(target)?,
             None => self.writer.write_str("none")?,
