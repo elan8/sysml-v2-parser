@@ -487,7 +487,7 @@ pub(crate) fn emit_action_def_body_element(
         ActionDefBodyElement::Perform(p) => emit_perform(w, path, &p.value),
         ActionDefBodyElement::Bind(b) => structure::emit_bind(w, path, &b.value),
         ActionDefBodyElement::RefDecl(r) => structure::emit_ref_decl(w, path, &r.value),
-        ActionDefBodyElement::Assign(a) => emit_assign(w, &a.value),
+        ActionDefBodyElement::Assign(a) => emit_assign(w, path, &a.value),
         ActionDefBodyElement::ThenAction(t) => emit_then_action(w, path, &t.value),
         ActionDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
@@ -538,7 +538,9 @@ pub(crate) fn emit_action_def_body_element(
         ActionDefBodyElement::Dependency(d) => {
             super::requirement::emit_dependency(w, path, &d.value)
         }
-        ActionDefBodyElement::TerminateStmt(terminate) => emit_terminate_stmt(w, &terminate.value),
+        ActionDefBodyElement::TerminateStmt(terminate) => {
+            emit_terminate_stmt(w, path, &terminate.value)
+        }
     }
 }
 
@@ -625,7 +627,7 @@ pub(crate) fn emit_action_usage_body_element(
         }
         ActionUsageBodyElement::Bind(b) => structure::emit_bind(w, path, &b.value),
         ActionUsageBodyElement::RefDecl(r) => structure::emit_ref_decl(w, path, &r.value),
-        ActionUsageBodyElement::Assign(a) => emit_assign(w, &a.value),
+        ActionUsageBodyElement::Assign(a) => emit_assign(w, path, &a.value),
         ActionUsageBodyElement::ThenAction(t) => emit_then_action(w, path, &t.value),
         ActionUsageBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
@@ -682,18 +684,24 @@ pub(crate) fn emit_action_usage_body_element(
             super::requirement::emit_dependency(w, path, &d.value)
         }
         ActionUsageBodyElement::TerminateStmt(terminate) => {
-            emit_terminate_stmt(w, &terminate.value)
+            emit_terminate_stmt(w, path, &terminate.value)
         }
         ActionUsageBodyElement::ForLoop(f) => emit_for_loop(w, path, &f.value),
     }
 }
 
-/// The currently supported semicolon form of `TerminateNode`: `terminate;` or
-/// `terminate target;`. The target remains a typed expression from parsing through emission.
+/// The semicolon form of `TerminateNode`: `then`, then the shared `ActionNodePrefix`, then
+/// `terminate;` or `terminate target;`. The target remains a typed expression from parsing
+/// through emission.
 fn emit_terminate_stmt(
     w: &mut EmitWriter<'_>,
+    path: &str,
     terminate: &crate::ast::TerminateStmt,
 ) -> Result<(), EmitError> {
+    if terminate.is_then {
+        w.push_str("then ");
+    }
+    emit_action_node_prefix(w, path, &terminate.prefix)?;
     w.push_str("terminate");
     if let Some(target) = &terminate.target {
         w.push_char(' ');
@@ -703,10 +711,16 @@ fn emit_terminate_stmt(
     Ok(())
 }
 
-fn emit_assign(w: &mut EmitWriter<'_>, assign: &AssignStmt) -> Result<(), EmitError> {
+/// `AssignmentNode`: `then`, then the shared `ActionNodePrefix`, then `assign lhs := rhs;`.
+pub(crate) fn emit_assign(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    assign: &AssignStmt,
+) -> Result<(), EmitError> {
     if assign.is_then {
         w.push_str("then ");
     }
+    emit_action_node_prefix(w, path, &assign.prefix)?;
     w.push_str("assign ");
     emit_expression(w, &assign.lhs.value)?;
     w.push_str(" := ");

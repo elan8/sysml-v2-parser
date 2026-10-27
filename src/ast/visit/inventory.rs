@@ -5273,8 +5273,9 @@ macro_rules! ast_traversal {
         pub fn walk_assign_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AssignStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AssignStmt { is_then, lhs, rhs } = &$($mutability)? node.value;
+            let AssignStmt { is_then, prefix, lhs, rhs } = &$($mutability)? node.value;
             let _ = is_then;
+            visitor.visit_action_node_prefix(prefix);
             visitor.visit_expression(lhs);
             visitor.visit_expression(rhs);
             visitor.leave_node(&$($mutability)? node.span);
@@ -5961,7 +5962,9 @@ macro_rules! ast_traversal {
         pub fn walk_terminate_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<TerminateStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let TerminateStmt { target } = &$($mutability)? node.value;
+            let TerminateStmt { is_then, prefix, target } = &$($mutability)? node.value;
+            let _ = is_then;
+            visitor.visit_action_node_prefix(prefix);
             if let Some(inner) = target {
                 visitor.visit_expression(inner);
             }

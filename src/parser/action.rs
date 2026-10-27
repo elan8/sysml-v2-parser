@@ -643,12 +643,30 @@ fn consume_action_structured_brace(
     )
 }
 
+/// `AssignmentNode = OccurrenceUsagePrefix ( ActionNodeUsageDeclaration )? 'assign' …`
+/// (SysML BNF 8.2.2.17.5), optionally after a `then`: `then action inc assign count := 1;`.
 pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStmt>> {
+    // Speculated at member starts it does not own; refuse by lookahead before entering an
+    // arena transaction, as `for_loop` does. An `action`-led member admits the parser, since
+    // the generic prefix scan cannot cross the declaration before `assign`.
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"assign")
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, assign_stmt_inner)
+}
+
+fn assign_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, is_then) = opt(map(preceded(tag(&b"then"[..]), ws1), |_| true)).parse(input)?;
     let is_then = is_then.unwrap_or(false);
-    let (input, _) = tag(&b"assign"[..]).parse(input)?;
+    let (input, prefix) = action_node_prefix_before(input, &[b"assign"])?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"assign"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
 
     // LHS: structured feature-chain target (SysML v2 `AssignmentTargetParameter`).
@@ -660,7 +678,16 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
 
     Ok((
         after_semi,
-        node_from_to(start, after_semi, AssignStmt { is_then, lhs, rhs }),
+        node_from_to(
+            start,
+            after_semi,
+            AssignStmt {
+                is_then,
+                prefix,
+                lhs,
+                rhs,
+            },
+        ),
     ))
 }
 
@@ -1081,6 +1108,9 @@ fn action_def_body_leading_element(input: Input<'_>) -> IResult<Input<'_>, Actio
         map(crate::parser::import::import_, ActionDefBodyElement::Import),
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
+        // Before `then_action`: `then terminate;` is a terminate node, not a target named
+        // `terminate`.
+        map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
         map(then_action, ActionDefBodyElement::ThenAction),
     ))
     .parse(input)
@@ -1168,7 +1198,6 @@ fn action_def_body_behavior_element(input: Input<'_>) -> IResult<Input<'_>, Acti
 
 fn action_def_body_control_element(input: Input<'_>) -> IResult<Input<'_>, ActionDefBodyElement> {
     alt((
-        map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
         map(while_or_loop_stmt, |node| match node {
             WhileOrLoop::While(stmt) => ActionDefBodyElement::WhileStmt(stmt),
             WhileOrLoop::Loop(stmt) => ActionDefBodyElement::LoopStmt(stmt),
@@ -1606,14 +1635,71 @@ fn fork_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     ))
 }
 
-/// Terminate control node: `terminate;` or `terminate target;`
-fn terminate_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
+/// `TerminateNode = OccurrenceUsagePrefix ActionNodeUsageDeclaration? 'terminate'
+/// NodeParameterMember? ActionBody` (SysML BNF 8.2.2.17.6), optionally after a `then`:
+/// `terminate;`, `terminate target;`, `then terminate self;`, `then action stop terminate;`.
+pub(crate) fn terminate_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
+    // `then terminate` must reach this node rather than `then_action`, which would read the
+    // reserved keyword as the name of a succession target. See `assign_stmt` for the lookahead.
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"terminate")
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"action")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    crate::parser::span::reference_transaction(input, terminate_stmt_inner)
+}
+
+fn terminate_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"terminate"[..]).parse(input)?;
+    let (input, is_then) = opt(map(preceded(tag(&b"then"[..]), ws1), |_| true)).parse(input)?;
+    let is_then = is_then.unwrap_or(false);
+    let (input, prefix) = action_node_prefix_before(input, &[b"terminate"])?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"terminate"[..])).parse(input)?;
     let (input, target) = opt(preceded(ws1, path_expression)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, TerminateStmt { target })))
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            TerminateStmt {
+                is_then,
+                prefix,
+                target,
+            },
+        ),
+    ))
+}
+
+/// [`action_node_prefix`] for a node whose keyword follows the declaration (`assign`,
+/// `terminate`): a bare `follow` keyword ends the declaration rather than becoming its name.
+fn action_node_prefix_before<'a>(
+    input: Input<'a>,
+    follow: &[&[u8]],
+) -> IResult<Input<'a>, ActionNodePrefix> {
+    let (input, occurrence_prefix) =
+        crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    if !starts_with_keyword(input.fragment(), b"action") {
+        return Ok((
+            input,
+            ActionNodePrefix {
+                occurrence_prefix,
+                action_declaration: None,
+            },
+        ));
+    }
+    let (input, action_declaration) = action_node_usage_declaration_before(input, follow)?;
+    Ok((
+        input,
+        ActionNodePrefix {
+            occurrence_prefix,
+            action_declaration: Some(action_declaration),
+        },
+    ))
 }
 
 /// `ActionNodePrefix = OccurrenceUsagePrefix ActionNodeUsageDeclaration?` (SysML textual BNF
@@ -2213,6 +2299,9 @@ fn action_usage_body_leading_element(
         ),
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
+        // Before `then_action`: `then terminate;` is a terminate node, not a target named
+        // `terminate`.
+        map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
         map(then_action, ActionUsageBodyElement::ThenAction),
     ))
     .parse(input)
@@ -2304,7 +2393,6 @@ fn action_usage_body_control_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, ActionUsageBodyElement> {
     alt((
-        map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
         map(while_or_loop_stmt, |node| match node {
             WhileOrLoop::While(stmt) => ActionUsageBodyElement::WhileStmt(stmt),
             WhileOrLoop::Loop(stmt) => ActionUsageBodyElement::LoopStmt(stmt),

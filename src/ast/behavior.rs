@@ -139,13 +139,20 @@ pub enum ActionDefBodyElement {
 
 /// Assignment statement (SysML v2 AssignmentNode/AssignmentActionUsage).
 ///
+/// `AssignmentNode = OccurrenceUsagePrefix AssignmentNodeDeclaration ActionBody` with
+/// `AssignmentNodeDeclaration = ActionNodeUsageDeclaration? 'assign' …` (SysML BNF 8.2.2.17.5).
+///
 /// Examples:
 /// - `assign x := y;`
 /// - `then assign position := dynamics.x_out;`
+/// - `action increment assign count := count + 1;`
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssignStmt {
+    /// Written after a `then` (`SourceSuccessionMember ActionNodeMember`).
     pub is_then: bool,
+    /// The occurrence prefix and optional `action` declaration before `assign`.
+    pub prefix: ActionNodePrefix,
     pub lhs: Node<Expression>,
     pub rhs: Node<Expression>,
 }
@@ -935,9 +942,16 @@ pub enum FirstMergeBodyElement {
 }
 
 /// Terminate control node: `terminate;` or `terminate target;`.
+///
+/// `TerminateNode = OccurrenceUsagePrefix ActionNodeUsageDeclaration? 'terminate'
+/// NodeParameterMember? ActionBody` (SysML BNF 8.2.2.17.6), e.g. `then action stop terminate;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TerminateStmt {
+    /// Written after a `then` (`SourceSuccessionMember ActionNodeMember`).
+    pub is_then: bool,
+    /// The occurrence prefix and optional `action` declaration before `terminate`.
+    pub prefix: ActionNodePrefix,
     /// Optional target being terminated; bare `terminate;` terminates the enclosing action.
     pub target: Option<Node<Expression>>,
 }

@@ -887,14 +887,7 @@ fn emit_use_case_body_element(
             emit_requirement_body(w, path, &req.body)
         }
         UseCaseDefBodyElement::AttributeDef(a) => structure::emit_attribute_def(w, path, &a.value),
-        UseCaseDefBodyElement::Assign(a) => {
-            w.push_str("assign ");
-            emit_expression(w, &a.value.lhs.value)?;
-            w.push_str(" := ");
-            emit_expression(w, &a.value.rhs.value)?;
-            w.push_char(';');
-            Ok(())
-        }
+        UseCaseDefBodyElement::Assign(a) => super::behavior::emit_assign(w, path, &a.value),
         UseCaseDefBodyElement::ThenAction(t) => {
             super::behavior::emit_then_action_pub(w, path, &t.value)
         }
