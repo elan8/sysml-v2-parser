@@ -11,6 +11,7 @@ use super::diagnostics::{
 };
 use super::lex;
 use super::package;
+use super::redundant_semicolon::collect_redundant_semicolon_warnings;
 use super::span::{node_from_to, ParseContext};
 use crate::ast::{
     PackageBodyElement, ParseErrorNode, ParsedDocument, RootElement, RootNamespace, SourceStorage,
@@ -51,14 +52,14 @@ fn nesting_limit_error(input: &[u8], delimiters: &DelimiterScan) -> Option<Parse
 pub struct ParseResult {
     /// Source, reference arena, and root AST. The AST is partial when errors occurred.
     pub document: ParsedDocument,
-    /// All parse errors encountered (multiple when recovery is used).
+    /// All parser diagnostics, including non-fatal warnings, in source order.
     pub errors: Vec<ParseError>,
 }
 
 impl ParseResult {
-    /// True if the document parsed fully with no errors.
+    /// True for a fully recognized document. Non-fatal warnings about recognized syntax do not reject it.
     pub fn is_ok(&self) -> bool {
-        self.errors.is_empty()
+        !self.errors.iter().any(ParseError::prevents_strict_parsing)
     }
 }
 /// Parse full input; must consume entire input. Strips UTF-8 BOM if present.
@@ -94,7 +95,7 @@ fn parse_root_source(
     // precede it: stop recovering there instead of collecting errors only to discard them.
     let ParseResult { document, errors } =
         parse_source_with_root_error_limit(source, name_language, 1);
-    match errors.into_iter().next() {
+    match errors.into_iter().find(ParseError::prevents_strict_parsing) {
         Some(error) => Err(error),
         None => Ok(document),
     }
@@ -370,6 +371,7 @@ fn parse_with_diagnostics_document(
 
     let root = RootNamespace { elements };
     errors.extend(collect_recovery_errors(source, &root));
+    errors.extend(collect_redundant_semicolon_warnings(&root));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);

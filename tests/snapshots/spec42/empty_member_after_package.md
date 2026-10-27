@@ -11,6 +11,7 @@ package MyPkg { }; in newX : Real;
 (fixture-diagnostics
   (document "empty_member_after_package.md"
     (diagnostics
+      (diagnostic (code "redundant_semicolon_after_body") (severity warning) (category parseerror) (span (offset 17) (line 1) (column 18) (len 1)) (message "possible redundant ';' after a closing '}': parsed as an empty anonymous usage"))
     )
   )
 )

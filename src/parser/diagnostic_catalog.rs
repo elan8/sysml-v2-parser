@@ -32,6 +32,9 @@ pub const MISSING_CLOSING_BRACE: &str = "missing_closing_brace";
 pub const UNEXPECTED_CLOSING_BRACE: &str = "unexpected_closing_brace";
 pub const MISSING_SEMICOLON: &str = "missing_semicolon";
 pub const MISSING_BODY_OR_SEMICOLON: &str = "missing_body_or_semicolon";
+/// A `;` written directly after a member's closing `}`, which parses as an empty anonymous
+/// member rather than as a terminator of the braced declaration.
+pub const REDUNDANT_SEMICOLON_AFTER_BODY: &str = "redundant_semicolon_after_body";
 pub const MISSING_REP_LANGUAGE: &str = "missing_rep_language";
 pub const INVALID_REP_LANGUAGE: &str = "invalid_rep_language";
 pub const NESTING_TOO_DEEP: &str = "nesting_too_deep";
@@ -64,6 +67,7 @@ pub const DOCUMENTED_CODES: &[&str] = &[
     UNEXPECTED_CLOSING_BRACE,
     MISSING_SEMICOLON,
     MISSING_BODY_OR_SEMICOLON,
+    REDUNDANT_SEMICOLON_AFTER_BODY,
     MISSING_REP_LANGUAGE,
     INVALID_REP_LANGUAGE,
     NESTING_TOO_DEEP,

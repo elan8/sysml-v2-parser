@@ -50,6 +50,20 @@ pub struct ParseError {
 }
 
 impl ParseError {
+    /// Whether this diagnostic rejects strict parsing. Unsupported or unresolved forms remain
+    /// incomplete even when reported at warning severity. Warnings about fully parsed syntax
+    /// do not reject it; unspecified severity retains the existing error default.
+    pub fn prevents_strict_parsing(&self) -> bool {
+        !matches!(self.severity, Some(DiagnosticSeverity::Warning))
+            || matches!(
+                self.category,
+                Some(
+                    DiagnosticCategory::UnsupportedGrammarForm
+                        | DiagnosticCategory::UnresolvedSymbol
+                )
+            )
+    }
+
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),

@@ -110,8 +110,8 @@ action def ExecutePatrol {
   out status : String;
   doc /* Execute patrol/overwatch mission along route. */
 
-  action validateRoute { out validationStatus : String; };
-  action startMission { out missionStarted : String; };
+  action validateRoute { out validationStatus : String; }
+  action startMission { out missionStarted : String; }
 
   first validateRoute then startMission;
   bind status = startMission::missionStarted;
@@ -141,7 +141,7 @@ fn test_action_usage_body_allows_untyped_out_pin_decl() {
     let input = r#"package P {
 action def CaptureVideo { out videoStream : String; }
 action def ExecutePatrol {
-  action capture : CaptureVideo { out videoStream; };
+  action capture : CaptureVideo { out videoStream; }
   first capture then capture;
 }
 }"#;
