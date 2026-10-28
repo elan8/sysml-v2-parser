@@ -172,6 +172,89 @@ pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::P
     })
 }
 
+/// `import A as B;` is not SysML: `Import = VisibilityIndicator 'import' 'all'? ImportDeclaration
+/// RelationshipBody` (SysML BNF 8.2.2.4) has no renaming clause. Recovery owns this diagnosis so
+/// the reader learns that an alias membership (`alias B for A;`) is the construct that names an
+/// element differently, rather than seeing a generic unexpected-token error. The span is the `as`
+/// clause itself.
+pub(crate) fn alias_clause_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
+    let (cursor, _) = ws_and_comments(input).ok()?;
+    let (cursor, _) = opt(crate::parser::lex::visibility_indicator)
+        .parse(cursor)
+        .ok()?;
+    let (cursor, _) = ws_and_comments(cursor).ok()?;
+    if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
+        return None;
+    }
+    let bytes = cursor.fragment();
+    let skip_space = |mut index: usize| {
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        index
+    };
+    // The import target: one token run, where a quoted name may hold spaces.
+    let mut index = skip_space(b"import".len());
+    if crate::parser::lex::starts_with_keyword(&bytes[index..], b"all") {
+        index = skip_space(index + b"all".len());
+    }
+    let target_start = index;
+    while let Some(&byte) = bytes.get(index) {
+        if byte == b'\'' {
+            index += 1 + bytes[index + 1..].iter().position(|b| *b == b'\'')?;
+        } else if byte.is_ascii_whitespace() || byte == b';' || byte == b'{' {
+            break;
+        }
+        index += 1;
+    }
+    if index == target_start {
+        return None;
+    }
+    let clause = skip_space(index);
+    if !crate::parser::lex::starts_with_keyword(&bytes[clause..], b"as") {
+        return None;
+    }
+    let mut end = skip_space(clause + b"as".len());
+    let name_start = end;
+    while let Some(&byte) = bytes.get(end) {
+        if byte == b'\'' && end == name_start {
+            end += 1 + bytes[end + 1..].iter().position(|b| *b == b'\'')?;
+        } else if byte.is_ascii_whitespace() || byte == b';' || byte == b'{' {
+            break;
+        }
+        end += 1;
+    }
+    let name = String::from_utf8_lossy(&bytes[name_start..end]).into_owned();
+    let target = String::from_utf8_lossy(&bytes[target_start..index]).into_owned();
+    let (clause_start, _) = nom::bytes::complete::take::<_, _, nom::error::Error<_>>(clause)
+        .parse(cursor)
+        .ok()?;
+    let (clause_end, _) = nom::bytes::complete::take::<_, _, nom::error::Error<_>>(end - clause)
+        .parse(clause_start)
+        .ok()?;
+    let suggestion = if name.is_empty() {
+        "Remove the 'as' clause, and declare an alias membership to name the element differently: \
+         'alias <name> for <target>;'."
+            .to_owned()
+    } else {
+        format!(
+            "Remove 'as {name}' and declare an alias membership instead: 'alias {name} for {target};' \
+             (with the import's visibility to re-export the name)."
+        )
+    };
+    Some(crate::ast::ParseErrorNode {
+        diagnostic_span: Some(span_from_to(clause_start, clause_end)),
+        message:
+            "a SysML import has no 'as' clause; an alias membership names an element differently"
+                .to_owned(),
+        code: crate::parser::diagnostic_catalog::IMPORT_ALIAS_CLAUSE.to_owned(),
+        expected: Some("';' or a relationship body after the import target".to_owned()),
+        found: Some("as".to_owned()),
+        suggestion: Some(suggestion),
+        category: Some(crate::error::DiagnosticCategory::ParseError),
+    })
+}
+
 /// The offset just past an import target's last authored token: its final suffix or filter member
 /// if it has one, otherwise the qualified reference itself.
 pub(crate) fn import_target_end(shape: &crate::ast::ImportShape, reference_end: usize) -> usize {

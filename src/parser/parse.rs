@@ -269,7 +269,8 @@ fn parse_with_diagnostics_document(
                         }
                     }
                 }
-                let grammar_diagnostic = super::import::missing_visibility_error(input);
+                let grammar_diagnostic = super::import::missing_visibility_error(input)
+                    .or_else(|| super::import::alias_clause_error(input));
                 let pe = grammar_diagnostic.as_ref().map(|error| {
                     super::recovery::parse_error_from_recovery_node(&crate::parser::span_from_to(input, input), error)
                 }).unwrap_or_else(|| missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
