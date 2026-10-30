@@ -89,7 +89,9 @@ fn emit_requirement_body(
             w.push_char(';');
             Ok(())
         }
-        RequirementDefBody::Brace { elements, .. } => {
+        RequirementDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -98,7 +100,7 @@ fn emit_requirement_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -417,7 +419,9 @@ pub(crate) fn emit_require_constraint(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ConstraintDefBody::Brace { elements, .. } => {
+        crate::ast::ConstraintDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -430,7 +434,7 @@ pub(crate) fn emit_require_constraint(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -778,7 +782,9 @@ pub(crate) fn emit_use_case_body(
             w.push_char(';');
             Ok(())
         }
-        UseCaseDefBody::Brace { elements, .. } => {
+        UseCaseDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -787,7 +793,7 @@ pub(crate) fn emit_use_case_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -946,7 +952,9 @@ fn emit_return_ref(
         ReturnRefBody::Semicolon { .. } => {
             w.push_char(';');
         }
-        ReturnRefBody::Brace { elements, .. } => {
+        ReturnRefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             if !elements.is_empty() {
                 w.newline();
@@ -976,7 +984,7 @@ fn emit_return_ref(
                 }
                 w.dedent();
             }
-            w.push_char('}');
+            w.push_body_close(close);
         }
     }
     Ok(())

@@ -1103,21 +1103,14 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
         // a member boundary is the `Comment` production, not trivia.
         let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (close_start, _) = ws_and_comments(input)?;
-            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+        if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
+            let (input, close) = crate::parser::body::close_or_end_of_input(input)?;
             return Ok((
                 input,
                 PackageBody::Brace {
                     open_span,
                     elements,
-                    close_span: crate::parser::span::span_from_to(close_start, input),
+                    close,
                 },
             ));
         }

@@ -79,6 +79,20 @@ impl<'a> EmitWriter<'a> {
         self.push_str(c.encode_utf8(&mut tmp));
     }
 
+    /// Close a brace body: its `}` when one was authored, nothing when it ran to end of input.
+    pub(crate) fn push_body_close(&mut self, close: &crate::ast::BodyClose) {
+        match close {
+            crate::ast::BodyClose::Authored { .. } => self.push_char('}'),
+            crate::ast::BodyClose::MissingAtEndOfInput { .. } => {}
+        }
+    }
+
+    /// An empty brace body on one line: ` {}`, or ` {` when it ran to end of input.
+    pub(crate) fn push_empty_brace_body(&mut self, close: &crate::ast::BodyClose) {
+        self.push_str(" {");
+        self.push_body_close(close);
+    }
+
     /// Re-emit the exact source captured by a resilient parser recovery node.
     pub(crate) fn push_recovery_span(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
         let text = self

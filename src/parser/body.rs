@@ -184,7 +184,7 @@ pub(crate) fn semicolon_body<E>(input: Input<'_>) -> IResult<Input<'_>, crate::a
 pub(crate) struct ParsedBraceMembers<E> {
     pub(crate) open_span: crate::ast::Span,
     pub(crate) elements: Vec<Node<E>>,
-    pub(crate) close_span: crate::ast::Span,
+    pub(crate) close: crate::ast::BodyClose,
 }
 
 impl<E> ParsedBraceMembers<E> {
@@ -193,8 +193,31 @@ impl<E> ParsedBraceMembers<E> {
         crate::ast::Body::Brace {
             open_span: self.open_span,
             elements: self.elements,
-            close_span: self.close_span,
+            close: self.close,
         }
+    }
+}
+
+/// Consume the `}` that closes a brace body at `input`, recording its exact token.
+pub(crate) fn body_close(input: Input<'_>) -> IResult<Input<'_>, crate::ast::BodyClose> {
+    let (close_start, _) = ws_and_comments(input)?;
+    let (rest, _) = tag(&b"}"[..]).parse(close_start)?;
+    Ok((
+        rest,
+        crate::ast::BodyClose::Authored {
+            span: crate::parser::span::span_from_to(close_start, rest),
+        },
+    ))
+}
+
+/// The close of a body still open at end of input: a zero-width span at `end`.
+///
+/// The body keeps the members read so far; the document-level brace balance reports the
+/// `missing_closing_brace` diagnostic at the same position.
+pub(crate) fn body_close_at_end_of_input(end: Input<'_>) -> crate::ast::BodyClose {
+    debug_assert!(end.fragment().is_empty());
+    crate::ast::BodyClose::MissingAtEndOfInput {
+        at: crate::parser::span::span_from_to(end, end),
     }
 }
 
@@ -273,24 +296,8 @@ where
         // so this widening cannot turn a previously-parsing document into a recovered one.
         let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (close_start, _) = ws_and_comments(input)?;
-            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-            let close_span = crate::parser::span::span_from_to(close_start, input);
-            return Ok((
-                input,
-                ParsedBraceMembers {
-                    open_span,
-                    elements,
-                    close_span,
-                },
-            ));
+        if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
+            return finish_brace_members(input, open_span, elements);
         }
         let reference_checkpoint = input.extra.reference_checkpoint();
         // Probe again before the member. Body entry already checked, but that check cannot see
@@ -327,39 +334,15 @@ where
                     input = after_ws;
                     continue;
                 }
-                let next = {
-                    let Ok((next, _)) = recover_body_element(input, starters) else {
-                        let (closing, _) = advance_to_closing_brace(input)?;
-                        elements.push(map_recovery(start_unknown, closing));
-                        let (close_start, _) = ws_and_comments(closing)?;
-                        let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-                        let close_span = crate::parser::span::span_from_to(close_start, input);
-                        return Ok((
-                            input,
-                            ParsedBraceMembers {
-                                open_span,
-                                elements,
-                                close_span,
-                            },
-                        ));
-                    };
-                    next
-                };
-                if next.location_offset() == start_unknown.location_offset() {
-                    let (closing, _) = advance_to_closing_brace(input)?;
+                let recovered = recover_body_element(input, starters)
+                    .ok()
+                    .map(|(next, _)| next)
+                    .filter(|next| next.location_offset() > start_unknown.location_offset());
+                let Some(next) = recovered else {
+                    let (closing, _) = advance_to_closing_brace_or_end(input)?;
                     elements.push(map_recovery(start_unknown, closing));
-                    let (close_start, _) = ws_and_comments(closing)?;
-                    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-                    let close_span = crate::parser::span::span_from_to(close_start, input);
-                    return Ok((
-                        input,
-                        ParsedBraceMembers {
-                            open_span,
-                            elements,
-                            close_span,
-                        },
-                    ));
-                }
+                    return finish_brace_members(closing, open_span, elements);
+                };
                 let (next, _) = ws_and_comments(next)?;
                 if next.fragment().starts_with(b"}") {
                     elements.push(map_recovery(start_unknown, next));
@@ -380,11 +363,39 @@ pub(crate) fn semicolon_or_structured_definition_body(
     occurrence_definition_body(input)
 }
 
-/// Advance through statements/blocks until the next token is `}`.
-pub(crate) fn advance_to_closing_brace(mut input: Input<'_>) -> IResult<Input<'_>, ()> {
+/// End a brace body at `input`: the `}` there, or end of input with the body still open.
+pub(crate) fn close_or_end_of_input(input: Input<'_>) -> IResult<Input<'_>, crate::ast::BodyClose> {
+    let (at, _) = ws_and_comments(input)?;
+    if at.fragment().is_empty() {
+        Ok((at, body_close_at_end_of_input(at)))
+    } else {
+        body_close(at)
+    }
+}
+
+fn finish_brace_members<'a, E>(
+    input: Input<'a>,
+    open_span: crate::ast::Span,
+    elements: Vec<Node<E>>,
+) -> IResult<Input<'a>, ParsedBraceMembers<E>> {
+    let (rest, close) = close_or_end_of_input(input)?;
+    Ok((
+        rest,
+        ParsedBraceMembers {
+            open_span,
+            elements,
+            close,
+        },
+    ))
+}
+
+/// Advance through statements/blocks until the next token is `}` or the input ends.
+///
+/// Used by recovery inside a body, which keeps the members it read when the body is unterminated.
+pub(crate) fn advance_to_closing_brace_or_end(mut input: Input<'_>) -> IResult<Input<'_>, ()> {
     loop {
         let (next, _) = ws_and_comments(input)?;
-        if next.fragment().starts_with(b"}") {
+        if next.fragment().is_empty() || next.fragment().starts_with(b"}") {
             return Ok((next, ()));
         }
         let (next, _) = skip_statement_or_block(next)?;
@@ -397,6 +408,7 @@ pub(crate) fn advance_to_closing_brace(mut input: Input<'_>) -> IResult<Input<'_
         input = next;
     }
 }
+
 /// none currently; keep for families that still need broad compatibility.
 #[allow(dead_code)]
 pub(crate) fn semicolon_or_opaque_brace_body(
@@ -410,14 +422,13 @@ pub(crate) fn semicolon_or_opaque_brace_body(
     let (input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let (input, _) = skip_until_brace_end(input)?;
-    let (close_start, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+    let (input, close) = body_close(input)?;
     Ok((
         input,
         DefinitionBody::Brace {
             open_span,
             elements: vec![],
-            close_span: crate::parser::span::span_from_to(close_start, input),
+            close,
         },
     ))
 }

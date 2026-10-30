@@ -92,7 +92,9 @@ pub(crate) fn emit_package_body(
             w.push_char(';');
             Ok(())
         }
-        PackageBody::Brace { elements, .. } => {
+        PackageBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -101,7 +103,7 @@ pub(crate) fn emit_package_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }

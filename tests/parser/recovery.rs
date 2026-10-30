@@ -672,10 +672,27 @@ fn test_parse_with_diagnostics_reports_missing_closing_brace_for_unterminated_pa
         .find(|e| e.code.as_deref() == Some("missing_closing_brace"))
         .expect("expected missing closing brace diagnostic");
     assert_eq!(err.expected.as_deref(), Some("'}'"));
+    let Some(RootElement::Package(package)) = result
+        .document
+        .root
+        .elements
+        .first()
+        .map(|node| &node.value)
+    else {
+        panic!("the unterminated package is kept as a package");
+    };
+    let PackageBody::Brace {
+        elements,
+        close: BodyClose::MissingAtEndOfInput { at },
+        ..
+    } = &package.value.body
+    else {
+        panic!("the package body records that it ran to end of input");
+    };
+    assert_eq!(at.offset, input.len());
     assert!(matches!(
-        result.document.root.elements.first().map(|node| &node.value),
-        Some(RootElement::Member(member))
-            if matches!(member.value, PackageBodyElement::Error(_))
+        elements.first().map(|node| &node.value),
+        Some(PackageBodyElement::PartDef(_))
     ));
 }
 

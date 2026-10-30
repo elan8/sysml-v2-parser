@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type malformed) (description "A prefixed occurrence usage whose brace body is never closed. There is deliberately no 'body with a missing close' state (see planning/shared-grammar.md), so the enclosing declaration's parse fails and the scope above keeps the text as one recovery node reporting missing_closing_brace. Its own fixture because a document-wide recovery span subsumes every other member, which is exactly the property being pinned: the prefix does not change it, and nothing is silently reinterpreted as a terminated usage."))
+(snapshot (type malformed) (description "A prefixed occurrence usage whose brace body is never closed. The bodies still open at end of input keep the members read before it and record a missing close rather than a } span (body brace (unterminated)), while missing_closing_brace reports end of input. Its own fixture because the prefix must not change that: the prefixed usage keeps its prefix and members, and the formatter writes no closing brace that was never authored."))
 ~~~
 # SOURCE
 ~~~sysml
@@ -24,8 +24,15 @@ package OccurrencePrefixUnterminated {
 )
 ~~~
 # FORMAT
-~~~sexpr
-(stable-idempotent)
+~~~sysml
+package OccurrencePrefixUnterminated {
+    part def UnmatchedBrace {
+        ref individual occurrence unterminated {
+        }
+        part def AfterUnmatchedBrace {
+            occurrence recovered;
+        }
+    }
 ~~~
 # AST
 ~~~sexpr
@@ -33,6 +40,6 @@ package OccurrencePrefixUnterminated {
   (name-language sysml)
   (references
   )
-  (root (malformed (code "missing_closing_brace") (found none) (span (offset 0) (line 1) (column 1) (len 196))))
+  (root (package (name "OccurrencePrefixUnterminated") (body brace (unterminated) (part-def (name "UnmatchedBrace") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual true) (portion none) (extensions)) (declaration "unterminated") (short-name none) (target none) (body brace)) (part-def (name "AfterUnmatchedBrace") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "recovered") (short-name none) (target none) (body semicolon)))))))))
 )
 ~~~

@@ -2933,7 +2933,7 @@ mod control_node_gap_tests {
                 let FirstMergeBody::Brace {
                     open_span,
                     elements,
-                    close_span,
+                    close: crate::ast::BodyClose::Authored { span: close_span },
                 } = f.value.body
                 else {
                     panic!("expected source-backed brace body");

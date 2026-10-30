@@ -13,7 +13,9 @@
 //! fixture by `serialized_provenance_corpus.rs`, which validates them during serialization; the
 //! test here states the invariant directly rather than as a side effect of that.
 
-use sysml_v2_parser::ast::{Body, PackageBody, PackageBodyElement, PartDefBody, RootElement, Span};
+use sysml_v2_parser::ast::{
+    Body, BodyClose, PackageBody, PackageBodyElement, PartDefBody, RootElement, Span,
+};
 
 /// Sharing the container does not share the member set: each scope still names its own element
 /// type, so a member cannot be moved to a scope whose grammar does not accept it. This is a
@@ -22,12 +24,16 @@ use sysml_v2_parser::ast::{Body, PackageBody, PackageBodyElement, PartDefBody, R
 fn scopes_keep_their_own_member_types() {
     let package: PackageBody = Body::Brace {
         open_span: Span::dummy(),
-        close_span: Span::dummy(),
+        close: BodyClose::Authored {
+            span: Span::dummy(),
+        },
         elements: Vec::new(),
     };
     let part_def: PartDefBody = Body::Brace {
         open_span: Span::dummy(),
-        close_span: Span::dummy(),
+        close: BodyClose::Authored {
+            span: Span::dummy(),
+        },
         elements: Vec::new(),
     };
     assert_eq!(package.braced_elements().map(<[_]>::len), Some(0));
@@ -54,7 +60,9 @@ fn the_serialized_body_shape_carries_its_delimiters() {
     let empty: PartDefBody = Body::Brace {
         open_span: Span::dummy(),
         elements: Vec::new(),
-        close_span: Span::dummy(),
+        close: BodyClose::Authored {
+            span: Span::dummy(),
+        },
     };
     assert_eq!(
         serde_json::to_value(&empty).expect("serialize"),
@@ -62,7 +70,7 @@ fn the_serialized_body_shape_carries_its_delimiters() {
             "Brace": {
                 "open_span": {"offset": 0, "line": 1, "column": 1, "len": 0},
                 "elements": [],
-                "close_span": {"offset": 0, "line": 1, "column": 1, "len": 0}
+                "close": {"Authored": {"span": {"offset": 0, "line": 1, "column": 1, "len": 0}}}
             }
         })
     );
@@ -85,7 +93,7 @@ fn the_delimiters_slice_to_the_tokens_they_came_from() {
     let PackageBody::Brace {
         open_span,
         elements,
-        close_span,
+        close: BodyClose::Authored { span: close_span },
     } = &package.value.body
     else {
         panic!("expected a brace package body");
@@ -105,7 +113,7 @@ fn the_delimiters_slice_to_the_tokens_they_came_from() {
     };
     let PartDefBody::Brace {
         open_span: inner_open,
-        close_span: inner_close,
+        close: BodyClose::Authored { span: inner_close },
         ..
     } = &part_def.value.body
     else {
@@ -153,7 +161,7 @@ fn a_delimiter_redirected_to_another_body_is_rejected() {
     let sibling =
         "/root/elements/0/value/Package/value/body/Brace/elements/1/value/PartDef/value/body/Brace";
     let mut tampered = encoded.clone();
-    for delimiter in ["open_span", "close_span"] {
+    for delimiter in ["open_span", "close/Authored/span"] {
         let replacement = tampered
             .pointer(&format!("{sibling}/{delimiter}"))
             .cloned()
@@ -168,5 +176,38 @@ fn a_delimiter_redirected_to_another_body_is_rejected() {
     assert!(
         message.contains("outside"),
         "expected a containment failure, got: {message}"
+    );
+}
+
+/// A body that ran to end of input has no `}` to point at, so its zero-width close is pinned to
+/// the end of the source. Moved anywhere else it would claim an unclosed body in the middle of a
+/// document, and deserialization rejects it.
+#[cfg(feature = "serde")]
+#[test]
+fn a_missing_close_away_from_end_of_input_is_rejected() {
+    let source = "package P {\n  part def A;\n";
+    let document = sysml_v2_parser::parse_for_editor(source).document;
+    let encoded = serde_json::to_value(&document).expect("the parsed document serializes");
+    let close = "/root/elements/0/value/Package/value/body/Brace/close/MissingAtEndOfInput/at";
+    assert_eq!(
+        encoded
+            .pointer(&format!("{close}/offset"))
+            .and_then(serde_json::Value::as_u64),
+        Some(source.len() as u64),
+        "the open package body records its missing close at end of input"
+    );
+    serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(encoded.clone())
+        .expect("the untampered document deserializes");
+
+    let mut tampered = encoded;
+    *tampered
+        .pointer_mut(&format!("{close}/offset"))
+        .expect("the missing close position") = serde_json::json!(10);
+    let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
+        .expect_err("a missing close must sit at end of input");
+    let message = error.to_string();
+    assert!(
+        message.contains("not the end of the source"),
+        "expected an end-of-input failure, got: {message}"
     );
 }

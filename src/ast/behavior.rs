@@ -856,11 +856,12 @@ pub(crate) fn validate_first_merge_body_provenance(
     let Body::Brace {
         open_span,
         elements,
-        close_span,
+        close,
     } = body
     else {
         return Ok(());
     };
+    let close_span = close.span();
 
     fn span_end(span: &Span, role: &str) -> Result<usize, String> {
         span.offset
@@ -885,7 +886,7 @@ pub(crate) fn validate_first_merge_body_provenance(
     if source.slice(open_span) != Some("{") {
         return Err("first/merge open brace span does not contain \"{\"".to_owned());
     }
-    if source.slice(close_span) != Some("}") {
+    if close.authored_span().is_some() && source.slice(close_span) != Some("}") {
         return Err("first/merge close brace span does not contain \"}\"".to_owned());
     }
 

@@ -148,7 +148,7 @@ No malformed satisfy spelling occurs in the pinned corpus.
 | malformed member inside the braced `RequirementBody` | recovery node inside the body; the valid members after it, and the valid siblings after the satisfy usage, survive |
 | `}` inside a comment or a quoted name | not a body terminator; the body closes at its real `}` |
 | nested braces inside the body | balanced and preserved |
-| unmatched opening brace | the enclosing declaration's parse fails and the scope above keeps the text — `missing_closing_brace`. There is deliberately no "body with a missing close" state (see `planning/shared-grammar.md`) |
+| unmatched opening brace | the body runs to end of input with `BodyClose::MissingAtEndOfInput` and keeps its members — `missing_closing_brace` (see `planning/shared-grammar.md`) |
 | malformed member before a **prefixed** satisfy usage | recovery stops at the prefix. `assert`, `not` and `satisfy` are all FIRST tokens of this production, so all three are recovery boundaries in every scope's starter table; before this seam only `satisfy` was listed (and `satisfy` itself was missing from `VIEW_DEF_BODY_STARTERS`), so a malformed member scanned past the prefix and swallowed the whole usage including its `;`. Checked for all 7 wired scopes × all 4 prefix combinations |
 
 Starter tables updated: `REQUIREMENT_BODY_STARTERS` (+`assert`, +`not`), `PART_BODY_STARTERS`

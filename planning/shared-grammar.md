@@ -197,12 +197,10 @@ against its production: `Satisfy`'s was `ConstraintDefBody` where `SatisfyRequir
 RequirementBody`, corrected -- along with the rest of that production -- by
 `planning/satisfy-requirement-usage-matrix.md`.
 
-There is deliberately no state for a missing closing brace. An unterminated body does not produce a
-body today: the enclosing declaration's parse fails and the scope above keeps the text as recovery.
-A typed close outcome (`Authored | Recovered | Missing`) belongs with the recovery change that
-makes such bodies representable, and adding it earlier would mean shipping unreachable variants.
-That recovery change is worth doing: an unterminated body currently loses every member it
-contained.
+A brace body records how it ended as `BodyClose::Authored { span }` or
+`BodyClose::MissingAtEndOfInput { at }`. A body still open at end of input keeps the members read
+before it, and the document's `missing_closing_brace` reports the same position; the formatter
+writes no `}` for it.
 
 ### Phase 3: Extract low-risk shared member families — done
 

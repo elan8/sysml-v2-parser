@@ -28,8 +28,9 @@ use super::core::{Node, Span};
 ///
 /// # Delimiter provenance
 ///
-/// Both brace tokens and the semicolon are retained exactly as authored, so a consumer never has
-/// to re-scan the source to find where a body began or ended.
+/// The `{`, the semicolon, and an authored `}` are retained exactly as written, so a consumer
+/// never has to re-scan the source to find where a body began or ended. A body still open at end
+/// of input records that as [`BodyClose::MissingAtEndOfInput`] rather than a `}` span.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Body<E> {
@@ -45,16 +46,41 @@ pub enum Body<E> {
         /// Members in authored order, including malformed and unsupported ones at the position
         /// they were written.
         elements: Vec<Node<E>>,
-        /// Exact `}` token closing the body.
-        ///
-        /// Every brace body the parser produces has one. An unterminated body does not become a
-        /// body with a missing close: the parse of the whole declaration fails and the enclosing
-        /// scope keeps the text as a recovery node, so there is no state here for "no close
-        /// token". Giving recovery the ability to retain the members it read up to end of input
-        /// is a parser change, and the typed close outcome it needs belongs with that change
-        /// rather than as an unreachable variant now.
-        close_span: Span,
+        /// How the body ended: the authored `}`, or end of input with the body still open.
+        close: BodyClose,
     },
+}
+
+/// How a brace body ended.
+///
+/// An unterminated body keeps the members read before end of input instead of discarding the
+/// declaration, so the document's `missing_closing_brace` diagnostic and its members describe the
+/// same text. The missing token is its own state, never a fabricated `}` span.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum BodyClose {
+    /// Exact `}` token closing the body.
+    Authored { span: Span },
+    /// End of input reached with the body open. `at` is the zero-width span at end of input.
+    MissingAtEndOfInput { at: Span },
+}
+
+impl BodyClose {
+    /// The authored `}` token, or `None` when the body ran to end of input.
+    pub const fn authored_span(&self) -> Option<&Span> {
+        match self {
+            Self::Authored { span } => Some(span),
+            Self::MissingAtEndOfInput { .. } => None,
+        }
+    }
+
+    /// Where the body ends: the `}` token, or the zero-width end-of-input position.
+    pub const fn span(&self) -> &Span {
+        match self {
+            Self::Authored { span } => span,
+            Self::MissingAtEndOfInput { at } => at,
+        }
+    }
 }
 
 impl<E> Body<E> {

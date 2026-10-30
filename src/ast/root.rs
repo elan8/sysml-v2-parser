@@ -639,14 +639,14 @@ mod serde_tests {
             .cloned()
             .expect("open brace span");
         let close = encoded
-            .pointer("/root/elements/0/value/Package/value/body/Brace/close_span")
+            .pointer("/root/elements/0/value/Package/value/body/Brace/close/Authored/span")
             .cloned()
             .expect("close brace span");
         *encoded
             .pointer_mut("/root/elements/0/value/Package/value/body/Brace/open_span")
             .expect("open brace span") = close;
         *encoded
-            .pointer_mut("/root/elements/0/value/Package/value/body/Brace/close_span")
+            .pointer_mut("/root/elements/0/value/Package/value/body/Brace/close/Authored/span")
             .expect("close brace span") = open;
         let error = serde_json::from_value::<ParsedDocument>(encoded)
             .expect_err("a body whose close precedes its open must be rejected");

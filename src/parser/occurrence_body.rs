@@ -375,21 +375,14 @@ fn occurrence_usage_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, Occ
         // for that dispatcher rather than consuming it as lexical trivia at the body boundary.
         let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (close_start, _) = ws_and_comments(input)?;
-            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+        if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
+            let (input, close) = crate::parser::body::close_or_end_of_input(input)?;
             return Ok((
                 input,
                 OccurrenceUsageBody::Brace {
                     open_span,
                     elements,
-                    close_span: crate::parser::span::span_from_to(close_start, input),
+                    close,
                 },
             ));
         }
@@ -414,7 +407,7 @@ fn occurrence_usage_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, Occ
                 let start_unknown = input;
                 let (next, _) = recover_body_element(input, OCCURRENCE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (closing, _) = crate::parser::body::advance_to_closing_brace(input)?;
+                    let (closing, _) = crate::parser::body::advance_to_closing_brace_or_end(input)?;
                     let recovery = build_recovery_error_node_from_span(
                         start_unknown,
                         closing,
@@ -428,14 +421,13 @@ fn occurrence_usage_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, Occ
                         closing,
                         OccurrenceBodyElement::Error(node),
                     ));
-                    let (close_start, _) = ws_and_comments(closing)?;
-                    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                    let (input, close) = crate::parser::body::close_or_end_of_input(closing)?;
                     return Ok((
                         input,
                         OccurrenceUsageBody::Brace {
                             open_span,
                             elements,
-                            close_span: crate::parser::span::span_from_to(close_start, input),
+                            close,
                         },
                     ));
                 }
