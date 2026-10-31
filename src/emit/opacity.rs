@@ -42,6 +42,8 @@ pub fn opacity_report(root: &RootNamespace) -> OpacityReport {
             RecoveryContent::ReservedDeclarationName(name) => {
                 (*name.span(), OpacityKind::ParseError)
             }
+            // Reprinting it would present an import the grammar rejects as valid source.
+            RecoveryContent::MissingImportVisibility(span) => (span, OpacityKind::ParseError),
             // Reprinting it without the `}` would present unbalanced text as formatted source.
             RecoveryContent::UnterminatedBody(at) => (at, OpacityKind::ParseError),
             RecoveryContent::ParseError(node) => (node.span, OpacityKind::ParseError),

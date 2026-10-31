@@ -1,10 +1,10 @@
 //! Import and relationship body parsing.
 
 use crate::ast::{
-    FilterPackageMember, Import, ImportShape, ImportSuffixSpans, ImportTarget, Membership,
-    MembershipKind, Node, RelationshipBodyElement,
+    FilterPackageMember, Import, ImportShape, ImportSuffixSpans, ImportTarget, ImportVisibility,
+    Node,
 };
-use crate::parser::body::relationship_body_annotations;
+use crate::parser::body::relationship_body;
 use crate::parser::expr::expression;
 use crate::parser::lex::{qualified_reference, ws1, ws_and_comments};
 use crate::parser::span::reference_transaction;
@@ -16,13 +16,6 @@ use nom::multi::many1;
 use nom::sequence::{preceded, terminated};
 use nom::IResult;
 use nom::Parser;
-
-/// RelationshipBody: `;` or `{` doc/comment/rep/metadata* `}`.
-pub(crate) fn relationship_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
-    relationship_body_annotations(input)
-}
 
 fn filter_package_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterPackageMember>> {
     let (input, _) = ws_and_comments(input)?;
@@ -135,8 +128,7 @@ pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> 
 /// Import: visibility 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
 pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     // Speculated at many member starts; refuse unless `import` follows the optional
-    // visibility keyword, before entering an arena transaction. This lookahead also routes
-    // a bare import to its owning grammar, which rejects the missing prefix.
+    // visibility keyword, before entering an arena transaction.
     {
         let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
         let (cursor, _) = opt(crate::parser::lex::visibility_indicator).parse(cursor)?;
@@ -151,8 +143,25 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     reference_transaction(input, import_inner)
 }
 
+/// `missing_import_visibility` on the `import` keyword.
+pub(crate) fn missing_visibility_node(
+    keyword_span: crate::ast::Span,
+) -> crate::ast::ParseErrorNode {
+    crate::ast::ParseErrorNode {
+        diagnostic_span: Some(keyword_span),
+        message: "an import requires an explicit visibility indicator".to_owned(),
+        code: "missing_import_visibility".to_owned(),
+        expected: Some("'public', 'private', or 'protected' before 'import'".to_owned()),
+        found: Some("import".to_owned()),
+        suggestion: Some("Specify the import visibility explicitly.".to_owned()),
+        category: Some(crate::error::DiagnosticCategory::ParseError),
+    }
+}
+
 /// The Import production requires VisibilityIndicator in both pinned grammars.
-/// Recovery owns this token diagnosis; it never publishes a successful import with a default.
+///
+/// Recovery owns this diagnosis for a bare import that could not be kept typed: its target is
+/// malformed, or the scope has no imports. A typed one reports through the recovery scan.
 pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
     let (keyword_start, _) = ws_and_comments(input).ok()?;
     if !crate::parser::lex::starts_with_keyword(keyword_start.fragment(), b"import") {
@@ -161,15 +170,7 @@ pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::P
     let (end, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
         .parse(keyword_start)
         .ok()?;
-    Some(crate::ast::ParseErrorNode {
-        diagnostic_span: Some(span_from_to(keyword_start, end)),
-        message: "an import requires an explicit visibility indicator".to_owned(),
-        code: "missing_import_visibility".to_owned(),
-        expected: Some("'public', 'private', or 'protected' before 'import'".to_owned()),
-        found: Some("import".to_owned()),
-        suggestion: Some("Specify the import visibility explicitly.".to_owned()),
-        category: Some(crate::error::DiagnosticCategory::ParseError),
-    })
+    Some(missing_visibility_node(span_from_to(keyword_start, end)))
 }
 
 /// `import A as B;` is not SysML: `Import = VisibilityIndicator 'import' 'all'? ImportDeclaration
@@ -298,9 +299,18 @@ pub(crate) fn import_target_end(shape: &crate::ast::ImportShape, reference_end: 
 fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_indicator(input)?;
+    let (input, authored_visibility) =
+        opt(crate::parser::lex::visibility_indicator).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"import"[..]).parse(input)?;
+    let (input, (import_keyword_span, _)) = with_span(tag(&b"import"[..]))(input)?;
+    // The grammar requires the prefix. Keeping the typed import lets its target resolve; the
+    // recovery scan reports the missing prefix on the keyword.
+    let visibility = match authored_visibility {
+        Some((span, visibility)) => ImportVisibility::Authored { visibility, span },
+        None => ImportVisibility::Missing {
+            import_keyword_span,
+        },
+    };
     let (input, _) = ws_and_comments(input)?;
     let target_start = input;
     let (input, all) = opt(terminated(with_span(tag(&b"all"[..])), ws1)).parse(input)?;
@@ -313,25 +323,21 @@ fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let mut target_span = span_from_to(target_start, input);
     target_span.len = import_target_end(&shape, after_reference.location_offset())
         .saturating_sub(target_span.offset);
-    let (input, body_elements) = relationship_body(input)?;
+    let (input, body) = relationship_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             Import {
-                membership: Membership::new(
-                    MembershipKind::Import,
-                    Some(visibility),
-                    visibility_span,
-                ),
+                visibility,
                 target: ImportTarget {
                     span: target_span,
                     all_span,
                     reference,
                     shape,
                 },
-                body_elements,
+                body,
             },
         ),
     ))
@@ -347,26 +353,40 @@ mod membership_tests {
         context.input(text.as_bytes())
     }
 
-    // --- parser work item 4b (continuation): `Import.visibility` replaced by `Import.membership` ---
-
     #[test]
-    fn import_visibility_prefix_is_captured_on_membership() {
+    fn import_visibility_prefix_is_captured_with_its_span() {
         let (_, node) = import_(input("public import SI::kg;")).expect("import");
-        assert_eq!(
-            node.value.membership.visibility,
-            Some(crate::ast::Visibility::Public)
-        );
-        assert_eq!(
-            node.value.membership.kind,
-            crate::ast::MembershipKind::Import
-        );
+        let ImportVisibility::Authored { visibility, span } = node.value.visibility else {
+            panic!(
+                "expected an authored visibility, got {:?}",
+                node.value.visibility
+            );
+        };
+        assert_eq!(visibility, crate::ast::Visibility::Public);
+        assert_eq!((span.offset, span.len), (0, "public".len()));
     }
 
     #[test]
-    fn import_without_visibility_is_rejected_without_publishing_references() {
+    fn import_without_visibility_keeps_its_typed_target() {
         let context = ParseContext::new();
-        assert!(import_(context.input(b"import SI::kg;")).is_err());
-        assert!(context.finish().is_empty());
+        let source = crate::ast::SourceStorage::from("  import SI::kg;");
+        let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
+        assert!(rest.fragment().is_empty());
+        let ImportVisibility::Missing {
+            import_keyword_span,
+        } = node.value.visibility
+        else {
+            panic!(
+                "expected a missing visibility, got {:?}",
+                node.value.visibility
+            );
+        };
+        assert_eq!(source.slice(&import_keyword_span), Some("import"));
+        let arena = context.finish();
+        let view = arena
+            .get(&source, node.value.target.reference)
+            .expect("reference");
+        assert_eq!(view.authored_text(), "SI::kg");
     }
 
     #[test]

@@ -5,8 +5,8 @@ use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
     CommentAnnotation, CommentBody, DocComment, FilterMember, Identification, Import, ImportShape,
-    ImportTarget, LibraryPackage, NamespaceName, Package, PackageBody, PackageBodyElement,
-    QualifiedIdentification, RootElement, RootNamespace, TextualRepresentation,
+    ImportTarget, ImportVisibility, LibraryPackage, NamespaceName, Package, PackageBody,
+    PackageBodyElement, QualifiedIdentification, RootElement, RootNamespace, TextualRepresentation,
 };
 
 pub(crate) fn emit_root(w: &mut EmitWriter<'_>, root: &RootNamespace) -> Result<(), EmitError> {
@@ -377,30 +377,17 @@ pub(crate) fn emit_package_body_element(
 }
 
 pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(), EmitError> {
-    emit_visibility(w, import.membership.visibility);
+    match import.visibility {
+        ImportVisibility::Authored { visibility, .. } => emit_visibility(w, Some(visibility)),
+        // Reprinted as authored; the opacity report already refuses this import.
+        ImportVisibility::Missing { .. } => {}
+    }
     w.push_str("import ");
     if import.target.all_span.is_some() {
         w.push_str("all ");
     }
     emit_import_target(w, "import/target", &import.target)?;
-    // Preserve RelationshipBody shape: `None` → `;`, `Some` → `{ ... }` even when empty
-    // (brace bodies with only trivia comments parse as `Some([])`).
-    match &import.body_elements {
-        None => w.push_char(';'),
-        Some(elements) if elements.is_empty() => w.push_str(" {}"),
-        Some(elements) => {
-            w.push_str(" {");
-            w.newline();
-            w.indent();
-            for (i, el) in elements.iter().enumerate() {
-                emit_relationship_body_element(w, &format!("import/body[{i}]"), &el.value)?;
-                w.newline();
-            }
-            w.dedent();
-            w.push_char('}');
-        }
-    }
-    Ok(())
+    super::structure::emit_relationship_body(w, "import", &import.body)
 }
 
 pub(crate) fn emit_import_target(
@@ -440,21 +427,6 @@ pub(crate) fn emit_import_target(
         }
     }
     Ok(())
-}
-
-fn emit_relationship_body_element(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &crate::ast::RelationshipBodyElement,
-) -> Result<(), EmitError> {
-    use crate::ast::RelationshipBodyElement;
-    match el {
-        RelationshipBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
-        RelationshipBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature(w, path, &n.value)
-        }
-        RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-    }
 }
 
 /// The annotating members are one grammar production, so they emit the same way wherever a scope

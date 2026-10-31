@@ -356,18 +356,22 @@ mod serde_tests {
         }
     }
 
-    struct RemoveImportVisibility;
+    struct MarkImportVisibilityMissing;
 
-    impl VisitorMut for RemoveImportVisibility {
+    impl VisitorMut for MarkImportVisibilityMissing {
         fn visit_import(&mut self, node: &mut Node<crate::ast::Import>) {
-            node.value.membership.visibility = None;
+            if let crate::ast::ImportVisibility::Authored { span, .. } = node.value.visibility {
+                node.value.visibility = crate::ast::ImportVisibility::Missing {
+                    import_keyword_span: span,
+                };
+            }
         }
     }
 
     #[test]
-    fn import_requires_visibility_in_the_serialized_document() {
+    fn missing_import_visibility_must_cover_the_import_keyword_in_the_serialized_document() {
         assert_typed_corruption_is_rejected("private import A::*;", |document| {
-            apply_visitor(&mut RemoveImportVisibility, document);
+            apply_visitor(&mut MarkImportVisibilityMissing, document);
         });
     }
 
