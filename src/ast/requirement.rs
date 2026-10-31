@@ -814,21 +814,17 @@ pub struct IncludeUseCase {
     /// shredded into a bare `Expression::FeatureRef` naming the keyword `include` plus a sibling
     /// use-case usage -- a keyword turned into a reference to a feature nobody declared.
     ///
-    /// `Some` selects the second alternative, in which [`Self::name`] *declares* a usage and
-    /// [`Self::target`] is `None`; `None` selects the first, in which `target` *references* an
+    /// `Some` selects the second alternative, in which [`Self::declaration`] *declares* a usage
+    /// and [`Self::target`] is `None`; `None` selects the first, in which `target` *references* an
     /// existing use case. Mirrors how [`crate::ast::RequireConstraint`] models the same shape of
     /// choice.
     pub use_case_keyword_span: Option<Span>,
-    /// Declared short name of the `use case` form. `None` for the reference form.
-    pub short_name: Option<DeclarationName>,
-    /// Declared name of the `use case` form. `None` for the reference form and for an anonymous
-    /// declaration.
-    pub name: Option<DeclarationName>,
-    /// Typing clause of the `use case` form's `UsageDeclaration`, e.g. `include use case v : V;`.
-    pub typing: Option<Node<crate::ast::TypingRelationship>>,
+    /// The `UsageDeclaration` of the `use case` form, e.g. `include use case v :> u [1..5];`.
+    /// `None` for the reference form.
+    pub declaration: Option<Node<crate::ast::UsageDeclaration>>,
     /// Referenced use case of the `OwnedReferenceSubsetting` form. `None` for the `use case` form.
     pub target: Option<QualifiedReferenceId>,
-    /// Optional multiplicity suffix like `[0..*]`, parsed into structured lower/upper bounds.
+    /// Multiplicity of the reference form. The `use case` form keeps its in `declaration`.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: UseCaseDefBody,
 }
@@ -977,6 +973,10 @@ pub enum UseCaseDefBodyElement {
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
+    /// An `ActionBodyItem` this scope has no arm of its own for: control nodes, `item` members
+    /// and structured action nodes (`CaseBodyItem : ActionBodyItem`). The same member
+    /// [`crate::ast::CalcDefBodyElement::ActionMember`] holds.
+    ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
     /// Nested `action` usage in analysis/verification case bodies (validation `09`).
     ActionUsage(Box<Node<crate::ast::ActionUsage>>),
     /// Nested `analysis` usage in analysis case bodies (validation `10a`).

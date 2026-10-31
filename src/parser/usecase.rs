@@ -108,18 +108,16 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
         Ok((rest, (span, ()))) => (rest, Some(span)),
         Err(_) => (input, None),
     };
-    let (input, short_name, name, target, typing) = if use_case_keyword_span.is_some() {
-        let (input, _) = ws1(input)?;
-        let (input, identity) = crate::parser::lex::identification_before(input, &[])?;
-        let (input, result) = crate::parser::usage::optional_typings(input)?;
-        let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(result);
-        (input, identity.short_name, identity.name, None, typing)
+    let (input, declaration, target, multiplicity) = if use_case_keyword_span.is_some() {
+        let (input, _) = ws_and_notes(input)?;
+        let (input, declaration) = crate::parser::usage::usage_declaration(input)?;
+        (input, Some(declaration), None, None)
     } else {
         // `OwnedReferenceSubsetting` is a qualified name or a feature chain.
         let (input, reference) = crate::parser::lex::reference_path(input)?;
-        (input, None, None, Some(reference), None)
+        let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
+        (input, None, Some(reference), multiplicity)
     };
-    let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_notes(input)?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
@@ -129,11 +127,9 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
             input,
             IncludeUseCase {
                 use_case_keyword_span,
-                short_name,
-                name,
-                typing,
+                declaration,
                 target,
-                multiplicity: mult,
+                multiplicity,
                 body,
             },
         ),
@@ -688,6 +684,19 @@ pub(crate) fn use_case_def_body_element(
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
+    // `CaseBodyItem : ActionBodyItem`. These have no arm below, and each keyword would otherwise
+    // fall through to the expression arm and become a stray feature reference. Transactional:
+    // when the action parser declines (`if a ? b else c` is a result expression), the references
+    // it allocated must not stay in the arena.
+    if starts_case_body_action_member(start) {
+        if let Ok((next, member)) = crate::parser::span::reference_transaction(
+            start,
+            crate::parser::action::action_def_body_element,
+        ) {
+            let elem = UseCaseDefBodyElement::ActionMember(Box::new(member));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         alt((
             map(
@@ -841,6 +850,28 @@ pub(crate) fn use_case_def_body_element(
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// Whether `input`, after its visibility, starts an `ActionBodyItem` the case body has no arm for.
+fn starts_case_body_action_member(input: Input<'_>) -> bool {
+    const STARTERS: &[&[u8]] = &[
+        b"accept",
+        b"decide",
+        b"exhibit",
+        b"fork",
+        b"if",
+        b"item",
+        b"join",
+        b"loop",
+        b"merge",
+        b"send",
+        b"state",
+        b"terminate",
+        b"while",
+    ];
+    STARTERS
+        .iter()
+        .any(|keyword| crate::parser::occurrence_prefix::kind_keyword_follows(input, keyword))
 }
 
 fn is_use_case_statement_keyword(frag: &[u8]) -> bool {

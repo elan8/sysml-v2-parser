@@ -1381,6 +1381,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_then_action(&action.value)?;
                         }
+                        UseCaseDefBodyElement::ActionMember(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_merge_member(&member.value, &member.span)?;
+                        }
                         UseCaseDefBodyElement::ActionUsage(_usage) => {
                             self.write_marker(&mut first, "action-usage")?;
                         }
@@ -6870,16 +6874,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         match include.target {
             Some(reference) => self.write_reference(reference),
             None => {
-                self.writer.write_str("(use-case (short-name ")?;
-                self.write_optional_name(include.short_name)?;
-                self.writer.write_str(") (name ")?;
-                self.write_optional_name(include.name)?;
-                self.writer.write_str(") (typing ")?;
-                match &include.typing {
-                    Some(typing) => self.write_typing(&typing.value)?,
-                    None => self.writer.write_str("none")?,
+                self.writer.write_str("(use-case ")?;
+                if let Some(declaration) = &include.declaration {
+                    self.write_usage_declaration(&declaration.value)?;
                 }
-                self.writer.write_str("))")
+                self.writer.write_char(')')
             }
         }
     }
