@@ -61,8 +61,10 @@ pub(crate) fn emit_inout_decl(
         emit_feature_value(w, value)?;
     }
     match &decl.body {
-        None => w.push_char(';'),
-        Some(elements) => {
+        crate::ast::ActionDefBody::Semicolon { .. } => w.push_char(';'),
+        crate::ast::ActionDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -71,7 +73,7 @@ pub(crate) fn emit_inout_decl(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
         }
     }
     Ok(())

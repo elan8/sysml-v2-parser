@@ -47,19 +47,6 @@ pub(crate) fn relationship_body(
     Ok((input, members.into_body()))
 }
 
-/// The same body, for the callers whose AST field is still an optional member list rather than a
-/// shared [`crate::ast::Body`].
-pub(crate) fn relationship_body_annotations(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
-    let (input, body) = relationship_body(input)?;
-    let elements = match body {
-        crate::ast::Body::Semicolon { .. } => None,
-        crate::ast::Body::Brace { elements, .. } => Some(elements),
-    };
-    Ok((input, elements))
-}
-
 /// A full `RelationshipBody` member: the shared annotation subset plus owned related elements
 /// (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s `ownedRelatedElement`,
 /// spec42 Gap 37). `relationship_body_element` stays annotation-only because ref bodies reuse it
