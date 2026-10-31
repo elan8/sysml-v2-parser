@@ -757,17 +757,8 @@ pub(crate) fn emit_include_use_case(
         Some(target) => w.push_qualified_reference(&format!("{path}/target"), target)?,
         None => {
             w.push_str("use case");
-            if let Some(short_name) = include.short_name {
-                w.push_str(" <");
-                w.push_declaration_name(&format!("{path}/include/short_name"), short_name)?;
-                w.push_char('>');
-            }
-            if let Some(name) = include.name {
-                w.push_char(' ');
-                w.push_declaration_name(&format!("{path}/include/name"), name)?;
-            }
-            if let Some(typing) = &include.typing {
-                super::structure::emit_typing_clause(w, &typing.value)?;
+            if let Some(declaration) = &include.declaration {
+                super::behavior::emit_usage_declaration(w, path, &declaration.value)?;
             }
         }
     }
@@ -901,6 +892,9 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::Assign(a) => super::behavior::emit_assign(w, path, &a.value),
         UseCaseDefBodyElement::ThenAction(t) => {
             super::behavior::emit_then_action_pub(w, path, &t.value)
+        }
+        UseCaseDefBodyElement::ActionMember(n) => {
+            super::behavior::emit_action_def_body_element(w, path, &n.value)
         }
         UseCaseDefBodyElement::ActionUsage(a) => {
             super::behavior::emit_action_usage(w, path, &a.value)

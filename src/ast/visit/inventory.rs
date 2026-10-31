@@ -7163,18 +7163,12 @@ macro_rules! ast_traversal {
         pub fn walk_include_use_case<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<IncludeUseCase>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let IncludeUseCase { use_case_keyword_span, short_name, name, typing, target, multiplicity, body } = &$($mutability)? node.value;
+            let IncludeUseCase { use_case_keyword_span, declaration, target, multiplicity, body } = &$($mutability)? node.value;
             if let Some(span) = use_case_keyword_span {
                 visitor.visit_span(span);
             }
-            if let Some(inner) = short_name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = name {
-                visitor.visit_declaration_name(inner);
-            }
-            if let Some(inner) = typing {
-                visitor.visit_typing_relationship(inner);
+            if let Some(inner) = declaration {
+                visitor.visit_usage_declaration(inner);
             }
             if let Some(inner) = target {
                 visitor.visit_qualified_reference(inner);
@@ -7391,6 +7385,9 @@ macro_rules! ast_traversal {
                 }
                 UseCaseDefBodyElement::ThenAction(field_0) => {
                     visitor.visit_then_action(field_0);
+                }
+                UseCaseDefBodyElement::ActionMember(field_0) => {
+                    visitor.visit_action_def_body_element(&$($mutability)? **field_0);
                 }
                 UseCaseDefBodyElement::ActionUsage(field_0) => {
                     visitor.visit_action_usage(&$($mutability)? **field_0);
