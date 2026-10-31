@@ -3,7 +3,7 @@ use crate::ast::{
     VerificationCaseUsage,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{ws1, ws_and_comments};
+use crate::parser::lex::{ws1, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -44,7 +44,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
 
 pub(crate) fn case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CaseUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
@@ -104,7 +104,7 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
 
 fn analysis_case_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     // `AnalysisCaseUsage = OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody`
     // (SysML textual BNF 1533-1535; pinned Pilot `SysML.xtext` 2236). The entire prefix is
@@ -172,7 +172,7 @@ pub(crate) fn verification_case_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<VerificationCaseUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, variation_kw) = if abstract_kw.is_none() {

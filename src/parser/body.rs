@@ -3,7 +3,7 @@
 use crate::ast::{AnnotatingMember, DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
 use crate::parser::lex::{
     recover_body_element, skip_statement_or_block, skip_until_brace_end, starts_with_keyword,
-    ws_and_comments, RELATIONSHIP_BODY_STARTERS,
+    ws_and_notes, RELATIONSHIP_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::metadata_annotation;
 use crate::parser::occurrence_body::occurrence_definition_body;
@@ -22,7 +22,7 @@ use nom::Parser;
 pub(crate) fn relationship_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, crate::ast::Body<RelationshipBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         return semicolon_body(input);
     }
@@ -54,7 +54,7 @@ pub(crate) fn relationship_body(
 fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's annotating
-    // member. This was `ws_and_comments`, which consumed it as trivia before either arm below
+    // member. This was `ws_and_notes`, which consumed it as trivia before either arm below
     // could claim it, so an authored comment in an `import` or `dependency` body was dropped
     // outright -- silently, since the surviving members still parse. Measured across the pinned
     // release, that lost 18 block comments in 15 files, `sysml.library`'s own `Occurrences.kerml`
@@ -84,7 +84,7 @@ fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<Relatio
 /// A scope must test this *before* its own member dispatch, whether that dispatch is a keyword
 /// lookup or an ordered `alt` over productions. `/*` selects no production keyword, so a keyword
 /// chain never reaches [`annotating_member`] at all; and every sibling production begins by
-/// skipping trivia with `ws_and_comments`, which swallows the comment and then reads the member
+/// skipping trivia with `ws_and_notes`, which swallows the comment and then reads the member
 /// written *after* it as its own. Either way the annotating member is lost and its successor is
 /// misparsed. The test is exact rather than merely early: no other member spelling in any scope
 /// can begin with `/*`.
@@ -97,7 +97,7 @@ pub(crate) fn starts_bare_comment(input: Input<'_>) -> bool {
 /// A scope accepts the whole production or none of it, so every scope that owns annotating
 /// members dispatches through here rather than repeating the four alternatives.
 pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, AnnotatingMember> {
-    // `ws_and_notes`, not `ws_and_comments`: a bare `/* ... */` is this production's shortest
+    // `ws_and_notes`, not `ws_and_notes`: a bare `/* ... */` is this production's shortest
     // legal spelling, so skipping it as trivia here would delete the member before it could be
     // recognized. `//` and `//*` notes stay trivia, as the pinned lexical rules make them.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
@@ -154,7 +154,7 @@ pub(crate) fn relationship_body_element(
 /// Every scope spells this the same way, so no scope needs its own copy of "consume `;` and
 /// remember where it was".
 pub(crate) fn semicolon_body<E>(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Body<E>> {
-    let (start, _) = ws_and_comments(input)?;
+    let (start, _) = ws_and_notes(input)?;
     let (rest, _) = tag(&b";"[..]).parse(start)?;
     Ok((
         rest,
@@ -187,7 +187,7 @@ impl<E> ParsedBraceMembers<E> {
 
 /// Consume the `}` that closes a brace body at `input`, recording its exact token.
 pub(crate) fn body_close(input: Input<'_>) -> IResult<Input<'_>, crate::ast::BodyClose> {
-    let (close_start, _) = ws_and_comments(input)?;
+    let (close_start, _) = ws_and_notes(input)?;
     let (rest, _) = tag(&b"}"[..]).parse(close_start)?;
     Ok((
         rest,
@@ -271,7 +271,7 @@ where
     F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<E>>,
     G: FnMut(Input<'a>, Input<'a>) -> Node<E>,
 {
-    let (open_start, _) = ws_and_comments(input)?;
+    let (open_start, _) = ws_and_notes(input)?;
     let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
@@ -309,14 +309,14 @@ where
                 // trivia. Reported nowhere, because there is nothing wrong with the document --
                 // only with how much of it this scope can yet describe.
                 if input.fragment().starts_with(b"/*") {
-                    let (after_comment, _) = ws_and_comments(input)?;
+                    let (after_comment, _) = ws_and_notes(input)?;
                     if after_comment.location_offset() > input.location_offset() {
                         input = after_comment;
                         continue;
                     }
                 }
                 let start_unknown = input;
-                let (after_ws, _) = ws_and_comments(input)?;
+                let (after_ws, _) = ws_and_notes(input)?;
                 if after_ws.fragment().starts_with(b"}") {
                     input = after_ws;
                     continue;
@@ -330,7 +330,7 @@ where
                     elements.push(map_recovery(start_unknown, closing));
                     return finish_brace_members(closing, open_span, elements);
                 };
-                let (next, _) = ws_and_comments(next)?;
+                let (next, _) = ws_and_notes(next)?;
                 if next.fragment().starts_with(b"}") {
                     elements.push(map_recovery(start_unknown, next));
                     input = next;
@@ -352,7 +352,7 @@ pub(crate) fn semicolon_or_structured_definition_body(
 
 /// End a brace body at `input`: the `}` there, or end of input with the body still open.
 pub(crate) fn close_or_end_of_input(input: Input<'_>) -> IResult<Input<'_>, crate::ast::BodyClose> {
-    let (at, _) = ws_and_comments(input)?;
+    let (at, _) = ws_and_notes(input)?;
     if at.fragment().is_empty() {
         Ok((at, body_close_at_end_of_input(at)))
     } else {
@@ -381,7 +381,7 @@ fn finish_brace_members<'a, E>(
 /// Used by recovery inside a body, which keeps the members it read when the body is unterminated.
 pub(crate) fn advance_to_closing_brace_or_end(mut input: Input<'_>) -> IResult<Input<'_>, ()> {
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        let (next, _) = ws_and_notes(input)?;
         if next.fragment().is_empty() || next.fragment().starts_with(b"}") {
             return Ok((next, ()));
         }
@@ -401,7 +401,7 @@ pub(crate) fn advance_to_closing_brace_or_end(mut input: Input<'_>) -> IResult<I
 pub(crate) fn semicolon_or_opaque_brace_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, DefinitionBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         return semicolon_body(input);
     }

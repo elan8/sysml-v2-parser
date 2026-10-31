@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, qualified_reference, reference_path, starts_with_keyword, typed_by_operator,
-    ws1, ws_and_comments,
+    ws1, ws_and_notes,
 };
 use crate::parser::{node_from_to, span_from_to, Input};
 use nom::bytes::complete::tag;
@@ -225,7 +225,7 @@ fn find_top_level_range_dots(frag: &[u8], limit: usize) -> Option<usize> {
 fn parse_multiplicity_bound_text(
     slice: Input<'_>,
 ) -> Result<Box<Node<Expression>>, nom::Err<nom::error::Error<Input<'_>>>> {
-    let (rest, _) = ws_and_comments(slice)?;
+    let (rest, _) = ws_and_notes(slice)?;
     let (_, expr) = expression(rest)?;
     Ok(Box::new(expr))
 }
@@ -238,7 +238,7 @@ fn parse_multiplicity_bound_text(
 /// if the right-hand side (`*`) fails to parse as a primary expression (PAR-004/PAR-003 item 5).
 pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Multiplicity>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"["[..]).parse(input)?;
     let frag = input.fragment();
     let close_rel = find_multiplicity_close(frag).ok_or_else(|| {
@@ -309,12 +309,12 @@ pub(crate) fn reference_list_text(input: Input<'_>, ids: &[QualifiedReferenceId]
 /// per target.
 pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, TypingsResult> {
     let before = input;
-    let (input, spelling) = preceded(ws_and_comments, typed_by_operator).parse(input)?;
+    let (input, spelling) = preceded(ws_and_notes, typed_by_operator).parse(input)?;
     let (input, (first_conjugated, first)) =
-        preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
+        preceded(ws_and_notes, conjugated_qualified_name).parse(input)?;
     let (input, rest) = many0(preceded(
-        preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, conjugated_qualified_name),
+        preceded(ws_and_notes, tag(&b","[..])),
+        preceded(ws_and_notes, conjugated_qualified_name),
     ))
     .parse(input)?;
     let mut targets = vec![first];
@@ -334,7 +334,7 @@ pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, TypingsResult> {
 
 /// Optional typings that remain strict once a typing starter is present.
 pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<TypingsResult>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let fragment = peek.fragment();
     if (fragment.starts_with(b":")
         && !fragment.starts_with(b":>")
@@ -390,8 +390,8 @@ pub(crate) fn specialization_targets(
 ) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
     let (input, first) = specialization_target(input)?;
     let (input, rest) = many0(preceded(
-        preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, specialization_target),
+        preceded(ws_and_notes, tag(&b","[..])),
+        preceded(ws_and_notes, specialization_target),
     ))
     .parse(input)?;
     let mut targets = vec![first];
@@ -477,7 +477,7 @@ pub(crate) fn post_body_specialization(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<(SubsettingKind, Node<SubsettingRelationship>)>> {
     let before = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `:>>` must be tried before `:>`: `tag(":>")` on `:>>concerns` would match its first two
     // bytes and strand a leading `>` in front of the target reference.
     let (input, redefines_tag) = opt(tag(&b":>>"[..])).parse(input)?;
@@ -490,7 +490,7 @@ pub(crate) fn post_body_specialization(
     let Some(kind) = kind else {
         return Ok((before, None));
     };
-    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
     let span = span_from_to(before, input);
     Ok((
         input,
@@ -562,12 +562,12 @@ fn subsetting_clause(
 ) -> IResult<Input<'_>, (Node<SubsettingRelationship>, Option<Node<Expression>>)> {
     let before = input;
     let (input, spelling) =
-        preceded(ws_and_comments, crate::parser::lex::spelled_subset_operator).parse(input)?;
-    let (input, target) = preceded(ws_and_comments, specialization_targets).parse(input)?;
+        preceded(ws_and_notes, crate::parser::lex::spelled_subset_operator).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, specialization_targets).parse(input)?;
     let (input, value) = if takes_value {
         opt(preceded(
-            preceded(ws_and_comments, tag(&b"="[..])),
-            preceded(ws_and_comments, expression),
+            preceded(ws_and_notes, tag(&b"="[..])),
+            preceded(ws_and_notes, expression),
         ))
         .parse(input)?
     } else {
@@ -583,11 +583,8 @@ fn subsetting_clause(
 pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
     let before = input;
     let (input, (spelling, target)) = (
-        preceded(
-            ws_and_comments,
-            crate::parser::lex::spelled_redefine_operator,
-        ),
-        preceded(ws_and_comments, specialization_targets),
+        preceded(ws_and_notes, crate::parser::lex::spelled_redefine_operator),
+        preceded(ws_and_notes, specialization_targets),
     )
         .parse(input)?;
     let span = span_from_to(before, input);
@@ -606,7 +603,7 @@ pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<Subsetti
 pub(crate) fn optional_redefinition(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<Node<SubsettingRelationship>>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if peek.fragment().starts_with(b":>>") || starts_with_keyword(peek.fragment(), b"redefines") {
         let (input, relationship) = redefinition(input)?;
         Ok((input, Some(relationship)))
@@ -631,10 +628,10 @@ pub(crate) fn reference_subsetting(
     let before = input;
     let (input, (spelling, target)) = (
         preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::lex::spelled_references_operator,
         ),
-        preceded(ws_and_comments, specialization_targets),
+        preceded(ws_and_notes, specialization_targets),
     )
         .parse(input)?;
     let span = span_from_to(before, input);
@@ -650,11 +647,8 @@ pub(crate) fn cross_subsetting(
 ) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
     let before = input;
     let (input, (spelling, target)) = (
-        preceded(
-            ws_and_comments,
-            crate::parser::lex::spelled_crosses_operator,
-        ),
-        preceded(ws_and_comments, specialization_targets),
+        preceded(ws_and_notes, crate::parser::lex::spelled_crosses_operator),
+        preceded(ws_and_notes, specialization_targets),
     )
         .parse(input)?;
     let span = span_from_to(before, input);
@@ -670,8 +664,8 @@ pub(crate) fn cross_subsetting(
 pub(crate) fn intersecting(input: Input<'_>) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
     let before = input;
     let (input, target) = preceded(
-        preceded(ws_and_comments, tag(&b"intersects"[..])),
-        preceded(ws_and_comments, specialization_targets),
+        preceded(ws_and_notes, tag(&b"intersects"[..])),
+        preceded(ws_and_notes, specialization_targets),
     )
     .parse(input)?;
     let span = span_from_to(before, input);
@@ -751,7 +745,7 @@ fn specialization_clauses_with(
     let mut out = SpecializationClauses::default();
     let mut input = input;
     loop {
-        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_ws, _) = ws_and_notes(input)?;
         if let Ok((rest, (relationship, value))) =
             subsetting_clause(after_ws, subsetting_takes_value)
         {
@@ -810,7 +804,7 @@ fn feature_specializations_with(
     let mut input = input;
     let mut out = Vec::new();
     loop {
-        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_ws, _) = ws_and_notes(input)?;
         let (after_typing, typing) = optional_typings(after_ws)?;
         if let Some((span, is_conjugated, targets, spelling)) = typing {
             let relationship = Node::new(
@@ -921,7 +915,7 @@ pub(crate) fn multiplicity_modifier_slots_after(
 ) -> IResult<Input<'_>, crate::ast::MultiplicityModifiers> {
     // Terminates: every iteration that continues fills one of two slots that is not yet filled.
     loop {
-        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_ws, _) = ws_and_notes(input)?;
         let Some((rest, slot, span)) = multiplicity_slot_keyword(after_ws) else {
             // Leave the whitespace before a non-modifier token unconsumed, as `preceded` did.
             break;

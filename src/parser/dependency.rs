@@ -1,7 +1,7 @@
 //! Dependency parsing (BNF Dependency, DependencyDeclaration).
 
 use crate::ast::{Dependency, Identification, Node, QualifiedReferenceId};
-use crate::parser::lex::{name, qualified_reference, ws1, ws_and_comments};
+use crate::parser::lex::{name, qualified_reference, ws1, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -14,14 +14,14 @@ use nom::Parser;
 
 fn reference_list(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
     separated_list1(
-        preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b","[..])),
+        preceded(ws_and_notes, qualified_reference),
     )
     .parse(input)
 }
 
 fn to_suppliers(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     reference_list(input)
 }
@@ -33,14 +33,14 @@ fn to_suppliers(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId
 /// | QualifiedName (',' QualifiedName)* 'to' …
 pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"dependency"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"dependency"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `Dependency = 'dependency' ( Identification? 'from' )? ...`: a short name belongs to that
     // optional `Identification`, so when one is written the `from` keyword must follow it (with
     // or without a declared name in between).
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let anonymous = short_name.map(|short_name| Identification {
         short_name: Some(short_name),
         name: None,
@@ -59,8 +59,8 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
         ),
         map(
             (
-                preceded(ws_and_comments, name),
-                preceded(ws_and_comments, tag(&b"from"[..])),
+                preceded(ws_and_notes, name),
+                preceded(ws_and_notes, tag(&b"from"[..])),
                 ws1,
                 reference_list,
                 to_suppliers,

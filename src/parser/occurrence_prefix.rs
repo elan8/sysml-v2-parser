@@ -24,7 +24,7 @@ use crate::ast::{
     OccurrencePortionKind, OccurrenceUsagePrefix, OccurrenceUsagePrefixHead, OwnedCrossUsage,
     RefPrefix, Span, UsageExtensionKeyword,
 };
-use crate::parser::lex::{starts_with_keyword, ws_and_comments};
+use crate::parser::lex::{starts_with_keyword, ws_and_notes};
 use crate::parser::span::with_span;
 use crate::parser::{node_from_to, Input};
 use nom::bytes::complete::tag;
@@ -35,7 +35,7 @@ use nom::Parser;
 ///
 /// [`starts_with_keyword`] supplies the token boundary -- `in` cannot match the first two bytes of
 /// a declaration named `input`, nor `ref` the first three of `reference` -- so the separator
-/// itself is [`ws_and_comments`] rather than `ws1`. That distinction is load-bearing: `ws1`
+/// itself is [`ws_and_notes`] rather than `ws1`. That distinction is load-bearing: `ws1`
 /// consumes whitespace but stops at `/`, so a comment between two of a production's keywords would
 /// be left sitting in front of the next one and `in /* why */ derived occurrence o;` would fail to
 /// parse even though the same comment is trivia everywhere else.
@@ -50,7 +50,7 @@ pub(crate) fn keyword_token<'a>(
     input: Input<'a>,
     keyword: &'static [u8],
 ) -> IResult<Input<'a>, Span> {
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     if !starts_with_keyword(after_ws.fragment(), keyword) {
         return Err(nom::Err::Error(nom::error::Error::new(
             after_ws,
@@ -58,7 +58,7 @@ pub(crate) fn keyword_token<'a>(
         )));
     }
     let (rest, (span, _)) = with_span(tag(keyword)).parse(after_ws)?;
-    let (rest, _) = ws_and_comments(rest)?;
+    let (rest, _) = ws_and_notes(rest)?;
     Ok((rest, span))
 }
 
@@ -91,7 +91,7 @@ pub(crate) fn slot_keyword<'a>(
     let (rest, (span, _)) = with_span(tag::<_, _, nom::error::Error<Input<'a>>>(keyword))
         .parse(input)
         .ok()?;
-    let (rest, _) = ws_and_comments(rest).ok()?;
+    let (rest, _) = ws_and_notes(rest).ok()?;
     Some((rest, span))
 }
 
@@ -186,7 +186,7 @@ fn basic_usage_prefix(input: Input<'_>) -> (Input<'_>, BasicUsagePrefix) {
 pub(crate) fn usage_extension_keyword(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<UsageExtensionKeyword>> {
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     let (rest, (hash_span, annotation)) =
         crate::parser::metadata_annotation::metadata_keyword_head(after_ws)?;
     Ok((
@@ -234,7 +234,7 @@ pub(crate) fn starts_contended_prefix(input: Input<'_>) -> bool {
     ];
     let mut cursor = input;
     loop {
-        let Ok((after_ws, _)) = ws_and_comments(cursor) else {
+        let Ok((after_ws, _)) = ws_and_notes(cursor) else {
             return false;
         };
         let fragment = after_ws.fragment();
@@ -282,7 +282,7 @@ pub(crate) fn could_start_occurrence_usage(input: Input<'_>) -> bool {
         b"snapshot",
         b"timeslice",
     ];
-    let Ok((cursor, _)) = ws_and_comments(input) else {
+    let Ok((cursor, _)) = ws_and_notes(input) else {
         return false;
     };
     let fragment = cursor.fragment();
@@ -364,7 +364,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
         b"snapshot",
         b"timeslice",
     ];
-    let Ok((mut cursor, _)) = ws_and_comments(input) else {
+    let Ok((mut cursor, _)) = ws_and_notes(input) else {
         return false;
     };
     loop {
@@ -398,7 +398,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
             else {
                 return false;
             };
-            let Ok((rest, _)) = ws_and_comments(rest) else {
+            let Ok((rest, _)) = ws_and_notes(rest) else {
                 return false;
             };
             cursor = rest;
@@ -415,7 +415,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
             else {
                 return false;
             };
-            let Ok((rest, _)) = ws_and_comments(rest) else {
+            let Ok((rest, _)) = ws_and_notes(rest) else {
                 return false;
             };
             cursor = rest;
@@ -463,7 +463,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
         else {
             return false;
         };
-        let Ok((rest, _)) = ws_and_comments(rest) else {
+        let Ok((rest, _)) = ws_and_notes(rest) else {
             return false;
         };
         cursor = rest;
@@ -476,7 +476,7 @@ fn scan_prefix_for(input: Input<'_>, is_target: impl Fn(&[u8]) -> bool) -> bool 
 /// is a declaration label uses this to refuse a sibling family's kind keyword instead of reading
 /// it as a name. A *quoted* name is never a keyword, so `'individual'` still declares one.
 pub(crate) fn next_word_is_reserved(input: Input<'_>) -> bool {
-    let Ok((after_ws, _)) = ws_and_comments(input) else {
+    let Ok((after_ws, _)) = ws_and_notes(input) else {
         return false;
     };
     let fragment = after_ws.fragment();
@@ -570,7 +570,7 @@ fn owned_cross_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OwnedCrossUsag
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (rest, _) = ws_and_comments(input)?;
+    let (rest, _) = ws_and_notes(input)?;
     if !next_word_is_reserved(rest) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
@@ -624,7 +624,7 @@ pub(crate) fn occurrence_usage_prefix(
 ) -> IResult<Input<'_>, OccurrenceUsagePrefix> {
     // Consume leading trivia once; every slot below then probes trivia-free input and
     // re-establishes that invariant after its own token. See [`slot_keyword`].
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if !starts_a_prefix_slot(input.fragment()) {
         return Ok((input, OccurrenceUsagePrefix::default()));
     }
@@ -675,7 +675,7 @@ pub(crate) fn usage_extension_keywords(
             break;
         };
         extension_keywords.push(keyword);
-        let Ok((rest, _)) = ws_and_comments(rest) else {
+        let Ok((rest, _)) = ws_and_notes(rest) else {
             break;
         };
         input = rest;
@@ -691,7 +691,7 @@ pub(crate) fn usage_extension_keywords(
 /// inside a [`reference_transaction`](crate::parser::span::reference_transaction). Returns
 /// trivia-free input.
 pub(crate) fn control_node_prefix(input: Input<'_>) -> IResult<Input<'_>, ControlNodePrefix> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if !starts_a_prefix_slot(input.fragment()) {
         return Ok((input, ControlNodePrefix::default()));
     }

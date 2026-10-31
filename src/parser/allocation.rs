@@ -1,7 +1,7 @@
 use crate::ast::{AllocationDef, AllocationUsage, Membership, Node};
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{visibility_prefix, ws1, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::usage::feature_usage_header;
 use crate::parser::Input;
@@ -48,7 +48,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
 pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"allocation"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -65,19 +65,19 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     // `ConnectorPart = BinaryConnectorPart | NaryConnectorPart`: `allocate ( logical ::> l,
     // physical ::> p )` names two or more ends in parentheses (SysML 8.2.2.14).
     let (input, nary_ends) = {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if crate::parser::lex::starts_with_keyword(peek.fragment(), b"allocate") {
             let (after, _) = tag(&b"allocate"[..]).parse(peek)?;
-            let (open, _) = ws_and_comments(after)?;
+            let (open, _) = ws_and_notes(after)?;
             if open.fragment().starts_with(b"(") {
                 let (rest, _) = tag(&b"("[..]).parse(open)?;
-                let (rest, first) = preceded(ws_and_comments, allocation_end_expr).parse(rest)?;
+                let (rest, first) = preceded(ws_and_notes, allocation_end_expr).parse(rest)?;
                 let (rest, more) = nom::multi::many1(preceded(
-                    preceded(ws_and_comments, tag(&b","[..])),
-                    preceded(ws_and_comments, allocation_end_expr),
+                    preceded(ws_and_notes, tag(&b","[..])),
+                    preceded(ws_and_notes, allocation_end_expr),
                 ))
                 .parse(rest)?;
-                let (rest, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(rest)?;
+                let (rest, _) = preceded(ws_and_notes, tag(&b")"[..])).parse(rest)?;
                 let mut ends = vec![first];
                 ends.extend(more);
                 (rest, ends)
@@ -92,7 +92,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     // end-name + `::>` before each allocate expression (same shape as connect ends).
     let (input, source) = if nary_ends.is_empty() {
         opt(preceded(
-            preceded(ws_and_comments, tag(&b"allocate"[..])),
+            preceded(ws_and_notes, tag(&b"allocate"[..])),
             preceded(ws1, allocation_end_expr),
         ))
         .parse(input)?
@@ -101,13 +101,13 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     };
     let (input, target) = match source {
         Some(_) => {
-            let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
             let (input, target) = preceded(ws1, allocation_end_expr).parse(input)?;
             (input, Some(target))
         }
         None => (input, None),
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
@@ -133,10 +133,10 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
 pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"allocate"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"allocate"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, source) = allocation_end_expr(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
     let (input, target) = preceded(ws1, allocation_end_expr).parse(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((

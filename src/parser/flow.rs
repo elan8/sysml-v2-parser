@@ -12,7 +12,7 @@ type ParsedFlowEndpoints<'a> = nom::IResult<
 >;
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::usage::{
     conjugated_qualified_name, multiplicity_node, optional_typings,
@@ -67,7 +67,7 @@ fn flow_usage_keyword(input: Input<'_>) -> IResult<Input<'_>, FlowUsageKind> {
 }
 
 fn payload_clause(input: Input<'_>) -> IResult<Input<'_>, Node<FlowPayloadClause>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let start = input;
     let of_start = input;
     let (input, _) = tag(&b"of"[..]).parse(input)?;
@@ -95,17 +95,17 @@ fn payload_clause(input: Input<'_>) -> IResult<Input<'_>, Node<FlowPayloadClause
 /// multiplicity too, but discards its value; this function is not built on that combinator.
 fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>> {
     let start = input;
-    if let Ok((after_name, feature_name)) = preceded(ws_and_comments, name).parse(input) {
+    if let Ok((after_name, feature_name)) = preceded(ws_and_notes, name).parse(input) {
         if let Ok((after_typing, Some((_, is_conjugated, targets, _)))) =
             optional_typings(after_name)
         {
             let type_name = targets.first().copied();
             let (rest, multiplicity) =
-                nom::combinator::opt(preceded(ws_and_comments, multiplicity_node))
+                nom::combinator::opt(preceded(ws_and_notes, multiplicity_node))
                     .parse(after_typing)?;
             // `ValuePart?` of the named alternative.
             let (rest, value) = nom::combinator::opt(preceded(
-                ws_and_comments,
+                ws_and_notes,
                 crate::parser::feature_value::feature_value_part,
             ))
             .parse(rest)?;
@@ -127,10 +127,10 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
     }
     // Bare type reference: no explicit feature name.
     let (input, (is_conjugated, target)) =
-        preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
+        preceded(ws_and_notes, conjugated_qualified_name).parse(input)?;
     let type_name = Some(target);
     let (input, multiplicity) =
-        nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        nom::combinator::opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -148,16 +148,16 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
 }
 
 fn flow_endpoints(input: Input<'_>) -> ParsedFlowEndpoints<'_> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let fragment = peek.fragment();
     if fragment.starts_with(b";") || fragment.starts_with(b"{") {
         return Ok((input, (None, None)));
     }
     if starts_with_keyword(peek.fragment(), b"from") {
-        let (input, _) = preceded(ws_and_comments, tag(&b"from"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b"from"[..])).parse(input)?;
         let (input, from) =
             preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
         let (input, to) =
             preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         return Ok((input, (Some(from), Some(to))));
@@ -165,9 +165,9 @@ fn flow_endpoints(input: Input<'_>) -> ParsedFlowEndpoints<'_> {
     // Shorthand: end `to` end (no `from` keyword).
     let start = input;
     let (input, from) = crate::parser::constraint::kerml_connector_end(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if starts_with_keyword(peek.fragment(), b"to") {
-        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
         let (input, to) =
             preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         Ok((input, (Some(from), Some(to))))
@@ -189,7 +189,7 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
         crate::parser::usage::usage_declaration_before(input, &[b"of", b"from"])?
     };
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
@@ -206,7 +206,7 @@ fn flow_usage_with_declaration(input: Input<'_>) -> IResult<Input<'_>, FlowUsage
         // parser defect rather than a valid AST state.
         (Some(_), None) | (None, Some(_)) => unreachable!("flow endpoints are coupled"),
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
@@ -233,7 +233,7 @@ fn flow_usage_endpoint_only(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             nom::error::ErrorKind::Verify,
         )));
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
@@ -253,11 +253,11 @@ fn flow_usage_endpoint_only(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
 pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>> {
     let start = input;
     // `( SourceSuccessionMember )? …UsageMember`: `then message m of M from a to b;`.
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, then_span) =
         crate::parser::occurrence_prefix::optional_keyword_token(input, b"then")?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, kind) = flow_usage_keyword(input)?;
     let (input, _) = ws1(input)?;

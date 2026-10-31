@@ -3,7 +3,7 @@
 use crate::ast::{Node, QualifiedReferenceId, Span, TypingKind, TypingRelationship};
 use crate::parser::lex::{
     qualified_reference, specialization_operator, starts_with_keyword, take_until_terminator,
-    ws_and_comments,
+    ws_and_notes,
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::tag;
@@ -46,16 +46,16 @@ pub(crate) fn parse_optional_definition_specialization(
 ) -> IResult<Input<'_>, Option<Node<TypingRelationship>>> {
     let before_specializes = input;
     let (input, opt_first) = opt((
-        preceded(ws_and_comments, specialization_operator),
-        preceded(ws_and_comments, qualified_name_target),
+        preceded(ws_and_notes, specialization_operator),
+        preceded(ws_and_notes, qualified_name_target),
     ))
     .parse(input)?;
     let Some((spelling, first)) = opt_first else {
         return Ok((input, None));
     };
     let (input, rest) = many0(preceded(
-        preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, qualified_name_target),
+        preceded(ws_and_notes, tag(&b","[..])),
+        preceded(ws_and_notes, qualified_name_target),
     ))
     .parse(input)?;
     let mut bases = vec![first];
@@ -93,9 +93,9 @@ fn typing_node(
 /// `Some((target, true))`. Returns `None` if nothing usable follows the colon.
 fn typing_target_from_header(input: Input<'_>) -> IResult<Input<'_>, (QualifiedReferenceId, bool)> {
     let (input, _) = tag(&b":"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, conjugated) = opt(tag(&b"~"[..])).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, target) = qualified_name_target(input)?;
     let is_conjugated = conjugated.is_some();
     Ok((input, (target, is_conjugated)))
@@ -121,12 +121,12 @@ fn specializes_from_header_input(
         nom::bytes::complete::take::<usize, Input<'_>, nom::error::Error<Input<'_>>>(tail_offset)
             .parse(input)
             .ok()?;
-    let (tail_input, _) = ws_and_comments(tail_input).ok()?;
+    let (tail_input, _) = ws_and_notes(tail_input).ok()?;
     let (_, targets) = (
         qualified_name_target,
         many0(preceded(
-            preceded(ws_and_comments, tag(&b","[..])),
-            preceded(ws_and_comments, qualified_name_target),
+            preceded(ws_and_notes, tag(&b","[..])),
+            preceded(ws_and_notes, qualified_name_target),
         )),
     )
         .parse(tail_input)
@@ -151,7 +151,7 @@ fn specializes_from_header_input(
 pub(crate) fn parse_optional_definition_header_with_raw(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (Option<Node<TypingRelationship>>, Option<Span>)> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b":>") || starts_with_keyword(input.fragment(), b"specializes")
     {
         let (input, specializes) = parse_optional_definition_specialization(input)?;

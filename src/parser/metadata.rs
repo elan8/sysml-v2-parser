@@ -4,7 +4,7 @@ use crate::ast::{Membership, MetadataDef, MetadataUsage, Node};
 use crate::parser::attribute::metadata_body as attribute_metadata_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::qualified_reference;
-use crate::parser::lex::{starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{starts_with_keyword, visibility_prefix, ws1, ws_and_notes};
 use crate::parser::metadata_annotation::{metadata_declared_name, parse_about_targets};
 use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
@@ -62,7 +62,7 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
 fn metadata_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"metadata"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     if starts_with_keyword(input.fragment(), b"def") {
@@ -76,7 +76,7 @@ fn metadata_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataUsa
         ),
         None => (None, None),
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, type_reference) = qualified_reference(input)?;
     let (input, about_targets) = parse_about_targets(input)?;
     let (input, body) = metadata_body(input)?;

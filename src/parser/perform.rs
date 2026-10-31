@@ -1,6 +1,6 @@
 //! The shared SysML `PerformActionUsageDeclaration` production (8.2.2.17.2).
 use crate::ast::{FeatureValue, Node, PerformActionTarget};
-use crate::parser::lex::{reference_path, ws_and_comments};
+use crate::parser::lex::{reference_path, ws_and_notes};
 use crate::parser::Input;
 use nom::{IResult, Parser};
 
@@ -42,7 +42,7 @@ pub(crate) fn perform_action_declaration(
             )
         };
         let (input, value) = nom::combinator::opt(nom::sequence::preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::feature_value::feature_value_part,
         ))
         .parse(input)?;

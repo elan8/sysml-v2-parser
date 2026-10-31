@@ -10,7 +10,7 @@ use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
     identification, name, qualified_reference, skip_statement_or_block, visibility_prefix, ws1,
-    ws_and_comments, USE_CASE_BODY_STARTERS,
+    ws_and_notes, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::{parse_requirement_usage_payload, subject_decl};
@@ -69,8 +69,8 @@ mod use_case_member_tests {
 
 fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"subject"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((input, node_from_to(start, input, SubjectRef {})))
 }
 
@@ -78,7 +78,7 @@ pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<Incl
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"include") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -91,7 +91,7 @@ pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<Incl
 
 fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"include"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     // `'include' ( OwnedReferenceSubsetting FeatureSpecializationPart? | UseCaseUsageKeyword
     // UsageDeclaration? )` (SysML BNF 2300-2306) is a choice. The `use case` keyword pair selects
@@ -120,7 +120,7 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
         (input, None, None, Some(reference), None)
     };
     let (input, mult) = opt(multiplicity_node).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
         input,
@@ -142,7 +142,7 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
 
 fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenIncludeUseCase>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, include) = include_use_case(input)?;
     Ok((
@@ -183,7 +183,7 @@ fn use_case_usage_tail(
 
 fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"use"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"use"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -204,7 +204,7 @@ fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUs
 
 fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, use_case) = use_case_usage_in_body(input)?;
     Ok((
@@ -217,7 +217,7 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"ref") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -230,12 +230,12 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
 
 fn ref_redefinition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"ref"[..])).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"ref"[..])).parse(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b":>>"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, target) = qualified_reference(input)?;
-    let (body_start, _) = ws_and_comments(input)?;
+    let (body_start, _) = ws_and_notes(input)?;
     let (input, body) = use_case_def_body(body_start)?;
     Ok((
         input,
@@ -262,10 +262,10 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
 
 fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     // Reject `return ref ...` — that's handled by return_ref.
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     if crate::parser::lex::starts_with_keyword(after_ws.fragment(), b"ref") {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -273,7 +273,7 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
         )));
     }
     // Optional `attribute` / `part` keywords (`return part :>> selectedAlternative : Engine;`).
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, feature_kind) = opt(alt((
         map(nom::bytes::complete::tag(&b"attribute"[..]), |_| {
             crate::ast::CaseReturnFeatureKind::Attribute
@@ -283,7 +283,7 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
         }),
     )))
     .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // Optional `:>>` redefine — may appear before or after the feature-kind keyword; we already
     // consumed the keyword above, so only the post-keyword form remains here.
     let (input, is_redefine) = if input.fragment().starts_with(b":>>") {
@@ -292,7 +292,7 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
     } else {
         (input, false)
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // A `:>>` form carries a semantic target, not a declaration name. Ordinary and anonymous
     // return declarations keep those grammar alternatives structurally distinct.
     let (input, (declaration_name, target)) = if is_redefine {
@@ -305,17 +305,17 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
         (input, (Some(declaration_name), None))
     };
     // Optional `: type` or `:> type`.
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (is_subsetting, type_name)) = if input.fragment().starts_with(b":>>") {
         (input, (false, None))
     } else if input.fragment().starts_with(b":>") {
         let (input, _) = tag(&b":>"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         let (input, tn) = crate::parser::lex::qualified_reference(input)?;
         (input, (true, Some(tn)))
     } else if input.fragment().starts_with(b":") {
         let (input, _) = tag(&b":"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         let (input, tn) = crate::parser::lex::qualified_reference(input)?;
         (input, (false, Some(tn)))
     } else {
@@ -325,17 +325,14 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
     // Trailing `:>>` on a named declaration: `return verdict : VerdictKind :>> result;`
     // (Systems Library `VerificationCases.sysml:22`). The leading form is handled above, where
     // the target stands in for the declaration name; here a name was already written.
-    let (input, redefines) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::redefinition,
-    ))
-    .parse(input)?;
+    let (input, redefines) =
+        opt(preceded(ws_and_notes, crate::parser::usage::redefinition)).parse(input)?;
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -393,7 +390,7 @@ fn return_ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRe
 }
 
 fn return_ref_body(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBody>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let start = input;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
@@ -437,7 +434,7 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
 
 fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -449,8 +446,8 @@ fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
             name: n,
         },
     ) = crate::parser::lex::identification(input)?;
-    let (input, mult) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, mult) = opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = return_ref_body(input)?;
     Ok((
         input,
@@ -536,7 +533,7 @@ pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActorDecl>
     let (input, _) = tag(&b"actor"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = identification(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -552,7 +549,7 @@ pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActorDecl>
 /// use case name ( : type )? CaseBody
 pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -821,7 +818,7 @@ pub(crate) fn use_case_def_body_element(
                     UseCaseDefBodyElement::DefaultReferenceUsage(Box::new(n))
                 }),
                 |i| {
-                    let (i, _) = ws_and_comments(i)?;
+                    let (i, _) = ws_and_notes(i)?;
                     // Don't steal declaration keywords as FeatureRef expressions.
                     if is_use_case_statement_keyword(i.fragment()) {
                         return Err(nom::Err::Error(nom::error::Error::new(
@@ -893,8 +890,8 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
 fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
+        preceded(ws_and_notes, visibility_prefix).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"actor"[..])).parse(input)?;
     // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` (SysML BNF 42), reached
     // through `ActorUsage : PartUsage = 'actor' Usage`, so both halves are optional and either
     // may be written alone.
@@ -905,8 +902,8 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     // The typing is optional: `actor environment;` / `actor passenger [0..4];` (OMG spec
     // Annex A; spec42 Gap 46). Identification may also be empty.
     let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
@@ -919,11 +916,11 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     // `ActorUsage : PartUsage = 'actor' Usage`, whose `UsageDeclaration ValuePart?` gives an
     // actor a value: `actor user = UseSystem::user;`.
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -944,7 +941,7 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
 
 pub(crate) fn objective(input: Input<'_>) -> IResult<Input<'_>, Node<Objective>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, visibility) = opt(alt((
         map(preceded(tag(&b"private"[..]), ws1), |_| Visibility::Private),
         map(preceded(tag(&b"protected"[..]), ws1), |_| {

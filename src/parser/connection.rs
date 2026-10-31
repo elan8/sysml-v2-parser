@@ -6,7 +6,7 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
-use crate::parser::lex::{ws_and_comments, CONNECTION_DEF_BODY_STARTERS};
+use crate::parser::lex::{ws_and_notes, CONNECTION_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
 use crate::parser::occurrence_body::{
     assert_constraint_member, occurrence_usage, succession_usage,
@@ -154,7 +154,7 @@ fn connection_def_body_recovery(
 }
 
 pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;

@@ -5,7 +5,7 @@ use super::usage::part_usage;
 /// Part definition: ( 'abstract' | 'variation' )? 'part' 'def' Identification ( (':>' | 'specializes') qualified_name )? body
 pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, definition_prefix) =
         crate::parser::definition_prefix::parse_basic_definition_prefix(

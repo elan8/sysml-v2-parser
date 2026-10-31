@@ -585,15 +585,6 @@ pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
     Ok((input, ()))
 }
 
-/// Skip whitespace and comments (block, single-line). Use between tokens and at body boundaries.
-/// Does NOT consume "doc /* ... */" — that is a body element (PackageBodyElement::Doc etc.) and must
-/// be parsed explicitly so it appears in the AST. //* ... */ is tried before line_comment so that
-/// "//*" starts a block comment, not a line comment.
-pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let skipped = note_trivia_len(input.fragment());
-    Ok((crate::parser::span::advance(input, skipped), ()))
-}
-
 /// Skip whitespace and *notes* only, leaving a `/* ... */` block comment for the caller.
 ///
 /// The pinned grammar defines three lexical forms and only two of them are notes:
@@ -687,11 +678,7 @@ pub(crate) fn ws1(input: Input<'_>) -> IResult<Input<'_>, ()> {
 pub(crate) fn skip_to_next_sync_point(input: Input<'_>) -> IResult<Input<'_>, ()> {
     alt((
         map(
-            (
-                take_until(&b"\n"[..]),
-                opt(tag(&b"\n"[..])),
-                ws_and_comments,
-            ),
+            (take_until(&b"\n"[..]), opt(tag(&b"\n"[..])), ws_and_notes),
             |_| (),
         ),
         value((), rest),
@@ -805,7 +792,7 @@ pub(crate) fn skip_to_next_root_element(mut input: Input<'_>) -> IResult<Input<'
         if input.fragment().is_empty() {
             return Ok((input, ()));
         }
-        let (after_ws, _) = ws_and_comments(input).unwrap_or((input, ()));
+        let (after_ws, _) = ws_and_notes(input).unwrap_or((input, ()));
         let frag = after_ws.fragment();
         if frag.len() >= 8 && (frag.starts_with(b"package ") || frag.starts_with(b"namespace ")) {
             return Ok((after_ws, ()));
@@ -875,7 +862,7 @@ pub(crate) fn contains_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
 }
 
 fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Option<Input<'a>> {
-    let (input, _) = ws_and_comments(input).ok()?;
+    let (input, _) = ws_and_notes(input).ok()?;
     let fragment = input.fragment();
     if fragment.is_empty() {
         return Some(input);
@@ -953,7 +940,7 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
                 nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos)
                     .parse(input)
                     .ok()?;
-            let (candidate, _) = ws_and_comments(candidate).unwrap_or((candidate, ()));
+            let (candidate, _) = ws_and_notes(candidate).unwrap_or((candidate, ()));
             if (candidate.fragment().is_empty()
                 || candidate.fragment().starts_with(b"}")
                 || starts_with_any_keyword(candidate.fragment(), starters))
@@ -979,7 +966,7 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
                         nom::bytes::complete::take::<_, _, nom::error::Error<Input<'a>>>(pos + 1)
                             .parse(input)
                             .ok()?;
-                    let (after_ws, _) = ws_and_comments(after_brace).unwrap_or((after_brace, ()));
+                    let (after_ws, _) = ws_and_notes(after_brace).unwrap_or((after_brace, ()));
                     let following = after_ws.fragment();
                     if following.starts_with(b"}") || starts_with_any_keyword(following, starters) {
                         if after_brace.location_offset() != input.location_offset() {
@@ -1022,7 +1009,7 @@ pub(crate) fn skip_to_next_body_element_or_end<'a>(
     starters: &[&[u8]],
 ) -> IResult<Input<'a>, ()> {
     loop {
-        let (after_ws, _) = ws_and_comments(input).unwrap_or((input, ()));
+        let (after_ws, _) = ws_and_notes(input).unwrap_or((input, ()));
         input = after_ws;
         if input.fragment().is_empty()
             || input.fragment().starts_with(b"}")
@@ -1195,11 +1182,11 @@ fn source_backed_reference(
     require_qualification: bool,
     reject_reserved_segments: bool,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let reference_start = input;
     let (mut rest, absolute) = if input.fragment().starts_with(b"$::") {
         let (input, _) = tag(&b"$::"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         (input, true)
     } else {
         (input, false)
@@ -1218,7 +1205,7 @@ fn source_backed_reference(
     let mut is_qualified = absolute;
 
     loop {
-        let (after_ws, _) = ws_and_comments(rest)?;
+        let (after_ws, _) = ws_and_notes(rest)?;
         let separator = if after_ws.fragment().starts_with(b"::") {
             Some((ReferenceSeparator::ColonColon, &b"::"[..]))
         } else if allow_dot && after_ws.fragment().starts_with(b".") {
@@ -1231,7 +1218,7 @@ fn source_backed_reference(
         };
 
         let (after_separator, _) = tag(token).parse(after_ws)?;
-        let (after_separator_ws, _) = ws_and_comments(after_separator)?;
+        let (after_separator_ws, _) = ws_and_notes(after_separator)?;
         // A `::*`/`::**` import suffix and malformed/trailing separators belong to the caller.
         // Only commit the separator after proving that another authored name follows it.
         if reject_reserved_segments && segment_is_reserved_keyword(after_separator_ws) {
@@ -1273,7 +1260,7 @@ fn source_backed_reference(
             first = false;
             None
         } else {
-            let (after_ws, _) = ws_and_comments(cursor).ok()?;
+            let (after_ws, _) = ws_and_notes(cursor).ok()?;
             let (after_separator, separator) = if after_ws.fragment().starts_with(b"::") {
                 let (next, _) = tag::<_, _, nom::error::Error<Input<'_>>>(&b"::"[..])
                     .parse(after_ws)
@@ -1285,7 +1272,7 @@ fn source_backed_reference(
                     .ok()?;
                 (next, ReferenceSeparator::Dot)
             };
-            let (after_ws, _) = ws_and_comments(after_separator).ok()?;
+            let (after_ws, _) = ws_and_notes(after_separator).ok()?;
             cursor = after_ws;
             Some(separator)
         };
@@ -1490,7 +1477,7 @@ fn starts_new_declaration_after_newline(fragment: &[u8], newline_end: usize) -> 
 /// Identification: ( '<' ShortName '>' )? ( Name )?
 pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identification> {
     let (input, short_name) = short_name_prefix(input)?;
-    let (input, decl_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    let (input, decl_name) = opt(preceded(ws_and_notes, name)).parse(input)?;
     Ok((
         input,
         Identification {
@@ -1511,7 +1498,7 @@ pub(crate) fn identification_before<'a>(
     follow: &[&[u8]],
 ) -> IResult<Input<'a>, Identification> {
     let (input, short_name) = short_name_prefix(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if follow
         .iter()
         .any(|keyword| starts_with_keyword(peek.fragment(), keyword))
@@ -1524,7 +1511,7 @@ pub(crate) fn identification_before<'a>(
             },
         ));
     }
-    let (input, decl_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    let (input, decl_name) = opt(preceded(ws_and_notes, name)).parse(input)?;
     Ok((
         input,
         Identification {
@@ -1540,9 +1527,9 @@ pub(crate) fn identification_before<'a>(
 /// `identification` wholesale since the name half isn't a plain `opt(name)` for them.
 pub(crate) fn short_name_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<DeclarationName>> {
     opt(delimited(
-        preceded(ws_and_comments, tag(&b"<"[..])),
-        preceded(ws_and_comments, name),
-        preceded(ws_and_comments, tag(&b">"[..])),
+        preceded(ws_and_notes, tag(&b"<"[..])),
+        preceded(ws_and_notes, name),
+        preceded(ws_and_notes, tag(&b">"[..])),
     ))
     .parse(input)
 }
@@ -1556,7 +1543,7 @@ pub(crate) fn gap_before_declared_name(
     short_name: Option<DeclarationName>,
 ) -> IResult<Input<'_>, ()> {
     if short_name.is_some() {
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         Ok((input, ()))
     } else {
         let (input, _) = ws1(input)?;
@@ -1602,7 +1589,7 @@ pub(crate) fn visibility_prefix(
     // Whitespace or a comment ends the keyword; either way the next token starts after them.
     let (input, visibility) = opt(|input| {
         let (keyword_end, visibility) = visibility_indicator(input)?;
-        let (rest, _) = ws_and_comments(keyword_end)?;
+        let (rest, _) = ws_and_notes(keyword_end)?;
         if rest.location_offset() == keyword_end.location_offset() {
             return Err(nom::Err::Error(nom::error::Error::new(
                 keyword_end,
@@ -1690,7 +1677,7 @@ pub(crate) fn take_until_terminator<'a>(
 /// This is used as a recovery mechanism inside body parsers so we can continue
 /// parsing later known elements instead of aborting the entire enclosing body.
 pub(crate) fn skip_statement_or_block(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let frag = input.fragment();
     if frag.is_empty() {
         return Ok((input, ()));
@@ -1701,7 +1688,7 @@ pub(crate) fn skip_statement_or_block(input: Input<'_>) -> IResult<Input<'_>, ()
     if frag[0] == b'{' {
         let (input, _) = tag(&b"{"[..]).parse(input)?;
         let (input, _) = skip_until_brace_end(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b"}"[..])).parse(input)?;
         return Ok((input, ()));
     }
 
@@ -1907,7 +1894,7 @@ pub(crate) fn conjugates_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// DECIMAL_VALUE: integer or real literal text (for BNF DECIMAL_VALUE / EXPONENTIAL_VALUE).
 #[allow(dead_code)] // used by BNF lexical conformance tests in `bnf_surface`
 pub(crate) fn decimal_value_text(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, raw) = take_while1(|c: u8| {
         c.is_ascii_digit() || c == b'.' || c == b'e' || c == b'E' || c == b'+' || c == b'-'
     })
@@ -2131,47 +2118,47 @@ mod lexical_bnf_tests {
     }
 
     #[test]
-    fn ws_and_comments_skips_notes_and_stops_at_a_regular_comment() {
+    fn ws_and_notes_skips_notes_and_stops_at_a_regular_comment() {
         let input = span_input("  // line\n  //* note */  /* comment */ part");
-        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        let (rest, _) = ws_and_notes(input).expect("WHITE_SPACE");
         assert!(rest.fragment().starts_with(b"/* comment */"));
     }
 
     #[test]
-    fn ws_and_comments_starts_a_block_comment_at_slash_slash_star() {
+    fn ws_and_notes_starts_a_block_comment_at_slash_slash_star() {
         // `//*` is a block comment, so the newline inside it does not end it.
         let input = span_input("//* still\n comment */ part");
-        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        let (rest, _) = ws_and_notes(input).expect("WHITE_SPACE");
         assert_eq!(*rest.fragment(), &b"part"[..]);
     }
 
     #[test]
-    fn ws_and_comments_treats_unterminated_slash_slash_star_as_a_line_comment() {
+    fn ws_and_notes_treats_unterminated_slash_slash_star_as_a_line_comment() {
         let input = span_input("//* never closed\npart");
-        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        let (rest, _) = ws_and_notes(input).expect("WHITE_SPACE");
         assert_eq!(*rest.fragment(), &b"part"[..]);
     }
 
     #[test]
-    fn ws_and_comments_leaves_an_unterminated_block_comment_for_the_caller() {
+    fn ws_and_notes_leaves_an_unterminated_block_comment_for_the_caller() {
         // An unterminated `/*` is not trivia: the scan stops in front of it so the caller can
         // report it rather than silently consuming the rest of the document.
         let input = span_input("  /* never closed\npart");
-        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        let (rest, _) = ws_and_notes(input).expect("WHITE_SPACE");
         assert!(rest.fragment().starts_with(b"/* never closed"));
     }
 
     #[test]
-    fn ws_and_comments_consumes_runs_of_mixed_trivia() {
+    fn ws_and_notes_consumes_runs_of_mixed_trivia() {
         let input = span_input("\r\n\t // a\r// b\n//* c */\n//* d */\t part");
-        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        let (rest, _) = ws_and_notes(input).expect("WHITE_SPACE");
         assert_eq!(*rest.fragment(), &b"part"[..]);
     }
 
     #[test]
-    fn ws_and_comments_is_a_no_op_on_a_token() {
+    fn ws_and_notes_is_a_no_op_on_a_token() {
         let input = span_input("part p;");
-        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        let (rest, _) = ws_and_notes(input).expect("WHITE_SPACE");
         assert_eq!(rest.location_offset(), 0);
     }
 

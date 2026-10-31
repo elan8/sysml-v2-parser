@@ -8,7 +8,7 @@ use crate::parser::attribute::attribute_body;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{identification, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{identification, visibility_prefix, ws1, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::usage::{feature_usage_header, multiplicity_node};
 use crate::parser::with_span;
@@ -29,15 +29,15 @@ use nom::Parser;
 /// ValuePart, then UsageBody.
 fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let mut input = input;
     let mut extension_keywords = Vec::new();
     while input.fragment().starts_with(b"#") {
         let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
         extension_keywords.push(keyword);
-        let (rest, _) = ws_and_comments(rest)?;
+        let (rest, _) = ws_and_notes(rest)?;
         input = rest;
     }
     let (input, enum_keyword_span) = opt(with_span(|input| {
@@ -86,7 +86,7 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue
 /// malformed member becomes an `Error` node at its authored position and the values after it
 /// still parse.
 fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         return crate::parser::body::semicolon_body(input);
     }
@@ -174,7 +174,7 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
 /// separate `EndDecl`/`end_decl` named-connector-end construct.
 pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
     let is_end = is_end.is_some();

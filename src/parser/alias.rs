@@ -1,7 +1,7 @@
 //! Alias definition parsing.
 
 use crate::ast::{AliasBody, AliasDef, Node};
-use crate::parser::lex::{qualified_reference, ws1, ws_and_comments};
+use crate::parser::lex::{qualified_reference, ws1, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::span::reference_transaction;
 use crate::parser::Input;
@@ -30,14 +30,14 @@ pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> 
 
 fn alias_def_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"alias"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // `'alias' Identification 'for'`: an anonymous `alias <'A'> for T;` must not read `for` as
     // its name.
     let (input, identification) = crate::parser::lex::identification_before(input, &[b"for"])?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"for"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = qualified_reference(input)?;
     let (input, body) = alias_body(input)?;

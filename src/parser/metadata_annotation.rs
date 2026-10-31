@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::parser::attribute::metadata_body as attribute_metadata_body;
 use crate::parser::lex::{
-    identification, qualified_reference, starts_with_keyword, ws1, ws_and_comments,
+    identification, qualified_reference, starts_with_keyword, ws1, ws_and_notes,
 };
 use crate::parser::metadata_body::metadata_body;
 use crate::parser::node_from_to;
@@ -25,14 +25,14 @@ use nom::Parser;
 pub(crate) fn parse_about_targets(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Vec<crate::ast::QualifiedReferenceId>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if !starts_with_keyword(input.fragment(), b"about") {
         return Ok((input, Vec::new()));
     }
     let (input, _) = tag(&b"about"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     separated_list1(
-        preceded(ws_and_comments, preceded(tag(&b","[..]), ws_and_comments)),
+        preceded(ws_and_notes, preceded(tag(&b","[..]), ws_and_notes)),
         qualified_reference,
     )
     .parse(input)
@@ -49,7 +49,7 @@ pub(crate) fn parse_about_targets(
 /// introducer, or the `metadata` keyword. One check gates every annotation-family dispatch arm,
 /// so the ordinary keyword-led members skip the whole family without a transaction each.
 pub(crate) fn starts_annotation_member(input: Input<'_>) -> bool {
-    let Ok((cursor, _)) = ws_and_comments(input) else {
+    let Ok((cursor, _)) = ws_and_notes(input) else {
         return false;
     };
     let fragment = cursor.fragment();
@@ -82,9 +82,9 @@ pub(crate) fn metadata_annotation(
 pub(crate) fn metadata_declared_name(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataDeclaredName>> {
-    let (start, _) = ws_and_comments(input)?;
+    let (start, _) = ws_and_notes(input)?;
     let (input, ident) = identification(start)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let separator_start = input;
     let (input, typed_by) = if input.fragment().starts_with(b":")
         && !input.fragment().starts_with(b":>")
@@ -120,9 +120,8 @@ pub(crate) fn metadata_declared_name(
 fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataAnnotation>> {
     let start = input;
     let (input, prefixes) =
-        nom::multi::many0(preceded(ws_and_comments, extended_definition_prefix_tag))
-            .parse(input)?;
-    let (introducer_start, _) = ws_and_comments(input)?;
+        nom::multi::many0(preceded(ws_and_notes, extended_definition_prefix_tag)).parse(input)?;
+    let (introducer_start, _) = ws_and_notes(input)?;
     let (input, introducer) = if introducer_start.fragment().starts_with(b"@") {
         let (input, _) = tag(&b"@"[..]).parse(introducer_start)?;
         (
@@ -146,7 +145,7 @@ fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
         )));
     };
     let (input, declared_name) = opt(metadata_declared_name).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (type_span, type_reference)) = with_span(qualified_reference).parse(input)?;
     let (input, about_targets) = parse_about_targets(input)?;
     let (input, body) = metadata_body(input)?;
@@ -177,10 +176,10 @@ fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
 pub(crate) fn metadata_keyword_head(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (crate::ast::Span, crate::ast::QualifiedReferenceId)> {
-    let (hash_start, _) = ws_and_comments(input)?;
+    let (hash_start, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"#"[..]).parse(hash_start)?;
     let hash_span = crate::parser::span::span_from_to(hash_start, input);
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, reference) = crate::parser::lex::qualified_reference_without_reserved_names(input)?;
     Ok((input, (hash_span, reference)))
 }
@@ -203,7 +202,7 @@ pub(crate) fn metadata_keyword_usage(
 /// Speculated at many member starts; refuse on the first non-trivia byte before entering an
 /// arena transaction for a `#` that is not there.
 fn refuse_unless_hash(input: Input<'_>) -> Result<(), nom::Err<nom::error::Error<Input<'_>>>> {
-    let (after_trivia, _) = ws_and_comments(input)?;
+    let (after_trivia, _) = ws_and_notes(input)?;
     if after_trivia.fragment().first() == Some(&b'#') {
         Ok(())
     } else {
@@ -219,7 +218,7 @@ fn metadata_keyword_usage_inner(
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
     let start = input;
     let (input, (hash_span, reference)) = metadata_keyword_head(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if !(peek.fragment().starts_with(b";") || peek.fragment().starts_with(b"{")) {
         return Err(nom::Err::Error(nom::error::Error::new(
             peek,
@@ -296,7 +295,7 @@ pub(crate) fn extended_definition(
 
 fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, definition_prefix) =
         crate::parser::definition_prefix::parse_basic_definition_prefix(
@@ -304,10 +303,10 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
             crate::parser::definition_prefix::BasicPrefixSlot::Basic,
         )?;
     let (input, prefix_keywords) =
-        many1(preceded(ws_and_comments, extended_definition_prefix_tag)).parse(input)?;
+        many1(preceded(ws_and_notes, extended_definition_prefix_tag)).parse(input)?;
     // `def` is required: the keyword-less `#Tag name …` spelling is `ExtendedUsage`
     // (SysML BNF 341), owned by [`extended_usage`].
-    let (input, _) = preceded(preceded(ws_and_comments, tag(&b"def"[..])), ws1).parse(input)?;
+    let (input, _) = preceded(preceded(ws_and_notes, tag(&b"def"[..])), ws1).parse(input)?;
     let (input, ident) = identification(input)?;
     let (input, specializes) = parse_optional_definition_specialization(input)?;
     let (input, body) = package_body(input)?;
@@ -359,9 +358,9 @@ pub(crate) fn extended_usage(
 
 fn extended_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ExtendedUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, occurrence_prefix) =
         crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     // The shared prefix parser also collects the keyword run, and refuses the slots
@@ -389,7 +388,7 @@ fn extended_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast:
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if peek.fragment().starts_with(b";")
         || peek.fragment().starts_with(b"{")
         || crate::parser::occurrence_prefix::next_word_is_reserved(peek)
@@ -401,7 +400,7 @@ fn extended_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast:
     }
     let (input, declaration) = crate::parser::usage::usage_declaration(peek)?;
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
@@ -464,7 +463,7 @@ fn prefixed_member_follows(input: Input<'_>) -> bool {
     let Ok((rest, _)) = crate::parser::lex::name(input) else {
         return false;
     };
-    ws_and_comments(rest).is_ok_and(|(next, _)| {
+    ws_and_notes(rest).is_ok_and(|(next, _)| {
         let next = next.fragment();
         next.first()
             .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_' || *b == b'\'')
@@ -477,7 +476,7 @@ fn metadata_keyword_prefix_inner(
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
     let start = input;
     let (input, (hash_span, reference)) = metadata_keyword_head(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if !prefixed_member_follows(peek) {
         return Err(nom::Err::Error(nom::error::Error::new(
             peek,

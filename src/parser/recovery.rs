@@ -285,7 +285,7 @@ fn classify_recovery(
     let raw_consumed = &input.fragment()[..consumed_len];
     let consumed = trim_ascii_end(raw_consumed);
     let recovered_to_boundary = recovery_end.location_offset() > input.location_offset() && {
-        let (next, _) = lex::ws_and_comments(recovery_end).unwrap_or((recovery_end, ()));
+        let (next, _) = lex::ws_and_notes(recovery_end).unwrap_or((recovery_end, ()));
         next.fragment().is_empty()
             || next.fragment().starts_with(b"}")
             || lex::starts_with_any_keyword(next.fragment(), starters)

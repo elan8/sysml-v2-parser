@@ -35,7 +35,7 @@ use crate::ast::{
     DefinitionPrefix, Identification, Node, TypingRelationship, UsageExtensionKeyword, Visibility,
 };
 use crate::parser::definition_header::parse_definition_header_after_ident;
-use crate::parser::lex::{contains_keyword, identification, ws1, ws_and_comments};
+use crate::parser::lex::{contains_keyword, identification, ws1, ws_and_notes};
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -256,7 +256,7 @@ pub(crate) fn parse_definition_prefix(
     input: Input<'_>,
     options: DefinitionPrefixOptions,
 ) -> IResult<Input<'_>, DefinitionPrefixResult> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
 
     let (input, visibility, visibility_span) = match options.visibility {
         VisibilityPrefix::None => (input, None, crate::parser::span_from_to(input, input)),
@@ -285,7 +285,7 @@ pub(crate) fn parse_definition_prefix(
                 let (rest, keyword) =
                     crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
                 keywords.push(keyword);
-                let (rest, _) = ws_and_comments(rest)?;
+                let (rest, _) = ws_and_notes(rest)?;
                 input = rest;
             }
             (input, keywords)

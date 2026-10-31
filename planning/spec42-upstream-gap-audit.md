@@ -189,7 +189,7 @@ not give it one.
 
 The seam is one new lexical helper, `lex::ws_and_notes`, used exactly where a member may begin: the
 root loop of both entry points, the two brace-member loops, and every `*_body_element` dispatcher.
-Every other position keeps `ws_and_comments`, so a comment between the tokens of a declaration
+Every other position keeps `ws_and_notes`, so a comment between the tokens of a declaration
 stays trivia -- the grammar has no member there for it to be. A scope whose member set cannot yet
 hold an annotating element falls back to consuming it as trivia, so this widening cannot turn a
 previously-parsing document into a recovered one.
@@ -199,7 +199,7 @@ thirteen either follow a `doc`/`comment`/`rep` keyword clause or sit at a member
 `}`, after `;`, or at the start of the file. Of the thirteen, most are the `comment about X
 /* ... */` spelling, which the keyworded parser already owned; the remainder sit between the tokens
 of a declaration (`package /* ... */ Name {`, `sysml/src/examples/Simple Tests/CommentTest.sysml:5`)
-and stay trivia, which is what leaving `ws_and_comments` in place everywhere but the member
+and stay trivia, which is what leaving `ws_and_notes` in place everywhere but the member
 boundaries preserves.
 
 Comment, documentation and textual-representation bodies keep their authored bytes in `text` and

@@ -13,7 +13,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::enumeration::enum_usage;
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
-    name, short_name_prefix, starts_with_keyword, ws1, ws_and_comments, PORT_BODY_STARTERS,
+    name, short_name_prefix, starts_with_keyword, ws1, ws_and_notes, PORT_BODY_STARTERS,
     PORT_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -30,7 +30,7 @@ use nom::Parser;
 
 /// Port body: `;` or `{` PortBodyElement* `}`.
 fn port_body(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     alt((crate::parser::body::semicolon_body, port_body_brace)).parse(input)
 }
 
@@ -176,14 +176,14 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     }
 
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `OccurrenceUsageMember = MemberPrefix ownedRelatedElement += OccurrenceUsageElement`, so
     // the visibility keyword precedes the usage's own prefix.
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"port"[..]).parse(input)?;
     // SysML allows anonymous port usages: `port: PowerPort;` (Identification may be empty).
-    let (after_kw, _) = ws_and_comments(input)?;
+    let (after_kw, _) = ws_and_notes(input)?;
     // `port def …` is a `PortDefinition`, which names `DefinitionPrefix` rather than this
     // production. Especially important for `ref port def …`, which no definition parser claims
     // (a definition prefix has no `ref`) and which would otherwise misparse as a usage named
@@ -211,7 +211,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     // Consume (not just peek) whitespace/comments after the short name's closing `>` -- see
     // `attribute::attribute_usage`'s identical fix for why this can't reuse `ws1`'s earlier
     // consumption (a short name leaves fresh un-consumed whitespace after it).
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let peek = input;
     let (input, usage_head) = if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
@@ -222,7 +222,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     } else {
         alt((
             map(
-                preceded(ws_and_comments, prefix_redefinition_target),
+                preceded(ws_and_notes, prefix_redefinition_target),
                 |(_, redefines)| PortUsageHead::PrefixRedefines { redefines },
             ),
             map(name, |name| PortUsageHead::Named { name: Some(name) }),
@@ -244,7 +244,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     // `FeatureSpecialization+ MultiplicityPart?`: the multiplicity may follow the clauses,
     // `port lugNutPort :>> lugNutPort [5];` (SysML v2 Spec Annex A SimpleVehicleModel.sysml).
     let (input, multiplicity) = if multiplicity.is_none() {
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?
     } else {
         (input, multiplicity)
     };
@@ -254,7 +254,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     // §6 G11: `port :>> pe = c1.pb;` -- a port usage may carry a feature value, which binds it to
     // another port rather than declaring a fresh one.
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
@@ -421,7 +421,7 @@ fn port_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PortDefBodyE
 
 /// Port def body: `;` or `{` PortDefBodyElement* `}`.
 fn port_def_body(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     alt((crate::parser::body::semicolon_body, port_def_body_brace)).parse(input)
 }
 
