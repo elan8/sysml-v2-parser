@@ -176,28 +176,7 @@ pub(crate) fn emit_kerml_relationship_decl(
         Kw::Conjugate => " conjugates ",
     });
     w.push_qualified_reference(&format!("{path}/target"), decl.target)?;
-    // Annotation-only RelationshipBody; `None` is the `;` form. Annotations inside the brace
-    // form are rare and re-emitted via the shared relationship-body element emitter.
-    match &decl.body {
-        None => w.push_char(';'),
-        Some(elements) if elements.is_empty() => w.push_str(" {}"),
-        Some(elements) => {
-            w.push_str(" {");
-            w.newline();
-            w.indent();
-            for (i, el) in elements.iter().enumerate() {
-                super::structure::emit_relationship_body_element_local(
-                    w,
-                    &format!("{path}/body[{i}]"),
-                    &el.value,
-                )?;
-                w.newline();
-            }
-            w.dedent();
-            w.push_char('}');
-        }
-    }
-    Ok(())
+    super::structure::emit_relationship_body(w, path, &decl.body)
 }
 
 pub(crate) fn emit_kerml_classifier_decl(
