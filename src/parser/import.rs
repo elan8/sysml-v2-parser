@@ -177,7 +177,15 @@ pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::P
 /// the reader learns that an alias membership (`alias B for A;`) is the construct that names an
 /// element differently, rather than seeing a generic unexpected-token error. The span is the `as`
 /// clause itself.
+///
+/// The import target is read with the import grammar's own productions, so comments, quoted
+/// names and filter members (whose expressions may contain `as` casts) are handled exactly as the
+/// real import parser handles them; only a complete target followed by `as` is diagnosed.
 pub(crate) fn alias_clause_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
+    crate::parser::span::reference_probe(input, alias_clause_probe)
+}
+
+fn alias_clause_probe(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
     let (cursor, _) = ws_and_comments(input).ok()?;
     let (cursor, _) = opt(crate::parser::lex::visibility_indicator)
         .parse(cursor)
@@ -186,64 +194,46 @@ pub(crate) fn alias_clause_error(input: Input<'_>) -> Option<crate::ast::ParseEr
     if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
         return None;
     }
-    let bytes = cursor.fragment();
-    let skip_space = |mut index: usize| {
-        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
-            index += 1;
-        }
-        index
-    };
-    // The import target: one token run, where a quoted name may hold spaces.
-    let mut index = skip_space(b"import".len());
-    if crate::parser::lex::starts_with_keyword(&bytes[index..], b"all") {
-        index = skip_space(index + b"all".len());
-    }
-    let target_start = index;
-    while let Some(&byte) = bytes.get(index) {
-        if byte == b'\'' {
-            index += 1 + bytes[index + 1..].iter().position(|b| *b == b'\'')?;
-        } else if byte.is_ascii_whitespace() || byte == b';' || byte == b'{' {
-            break;
-        }
-        index += 1;
-    }
-    if index == target_start {
-        return None;
-    }
-    let clause = skip_space(index);
-    if !crate::parser::lex::starts_with_keyword(&bytes[clause..], b"as") {
-        return None;
-    }
-    let mut end = skip_space(clause + b"as".len());
-    let name_start = end;
-    while let Some(&byte) = bytes.get(end) {
-        if byte == b'\'' && end == name_start {
-            end += 1 + bytes[end + 1..].iter().position(|b| *b == b'\'')?;
-        } else if byte.is_ascii_whitespace() || byte == b';' || byte == b'{' {
-            break;
-        }
-        end += 1;
-    }
-    let name = String::from_utf8_lossy(&bytes[name_start..end]).into_owned();
-    let target = String::from_utf8_lossy(&bytes[target_start..index]).into_owned();
-    let (clause_start, _) = nom::bytes::complete::take::<_, _, nom::error::Error<_>>(clause)
+    let (cursor, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
         .parse(cursor)
         .ok()?;
-    let (clause_end, _) = nom::bytes::complete::take::<_, _, nom::error::Error<_>>(end - clause)
-        .parse(clause_start)
+    let (cursor, _) = ws_and_comments(cursor).ok()?;
+    let (target_start, _) = opt(terminated(tag(&b"all"[..]), ws1)).parse(cursor).ok()?;
+    let (after_reference, _) = qualified_reference(target_start).ok()?;
+    let (after_shape, shape) = import_shape(after_reference).ok()?;
+    let target_end = import_target_end(&shape, after_reference.location_offset());
+    let (as_start, _) = ws_and_comments(after_shape).ok()?;
+    if !crate::parser::lex::starts_with_keyword(as_start.fragment(), b"as") {
+        return None;
+    }
+    let (after_as, _) = tag::<_, _, nom::error::Error<_>>(&b"as"[..])
+        .parse(as_start)
         .ok()?;
-    let suggestion = if name.is_empty() {
-        "Remove the 'as' clause, and declare an alias membership to name the element differently: \
-         'alias <name> for <target>;'."
-            .to_owned()
-    } else {
-        format!(
-            "Remove 'as {name}' and declare an alias membership instead: 'alias {name} for {target};' \
-             (with the import's visibility to re-export the name)."
-        )
+    let (after_as, _) = ws_and_comments(after_as).ok()?;
+    let renamed = crate::parser::lex::name(after_as).ok();
+    let clause_end = renamed.map_or(after_as, |(rest, _)| rest);
+    let target = {
+        let start = target_start.location_offset();
+        let relative = target_end.checked_sub(start)?;
+        String::from_utf8_lossy(target_start.fragment().get(..relative)?).into_owned()
     };
+    let suggestion = match renamed {
+        Some((_, name)) => {
+            let name = String::from_utf8_lossy(crate::parser::lex::name_bytes(after_as, name));
+            format!(
+                "Remove 'as {name}' and declare an alias membership instead: 'alias {name} for {target};'                  (with the import's visibility to re-export the name)."
+            )
+        }
+        None => "Remove the 'as' clause, and declare an alias membership to name the element differently:                  'alias <name> for <target>;'."
+            .to_owned(),
+    };
+    // The clause ends at its last authored token, not at the trivia the name parser may skip.
+    let mut clause_span = span_from_to(as_start, clause_end);
+    if renamed.is_none() {
+        clause_span.len = b"as".len();
+    }
     Some(crate::ast::ParseErrorNode {
-        diagnostic_span: Some(span_from_to(clause_start, clause_end)),
+        diagnostic_span: Some(clause_span),
         message:
             "a SysML import has no 'as' clause; an alias membership names an element differently"
                 .to_owned(),
