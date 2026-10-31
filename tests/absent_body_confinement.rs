@@ -103,10 +103,10 @@ fn other_scopes_have_no_absent_state() {
         sysml_v2_parser::ast::PackageBody::Brace {
             open_span,
             elements,
-            close_span,
+            close,
         } => {
             assert_eq!(elements.len(), 1);
-            assert!(open_span.offset < close_span.offset);
+            assert!(open_span.offset < close.span().offset);
         }
     }
 }

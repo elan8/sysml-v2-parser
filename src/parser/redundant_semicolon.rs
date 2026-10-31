@@ -15,7 +15,7 @@
 use std::collections::BTreeSet;
 
 use crate::ast::visit::{walk_default_reference_usage, Visitor};
-use crate::ast::{AttributeBody, DefaultReferenceUsage, Node, RootNamespace, Span};
+use crate::ast::{AttributeBody, BodyClose, DefaultReferenceUsage, Node, RootNamespace, Span};
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use crate::parser::diagnostic_catalog;
 
@@ -63,8 +63,10 @@ impl Visitor for Scan {
         }
     }
 
-    fn visit_body_braces<E>(&mut self, _open: &Span, _elements: &[Node<E>], close: &Span) {
-        self.close_brace_ends.insert(close.offset + close.len);
+    fn visit_body_braces<E>(&mut self, _open: &Span, _elements: &[Node<E>], close: &BodyClose) {
+        if let Some(close) = close.authored_span() {
+            self.close_brace_ends.insert(close.offset + close.len);
+        }
     }
 
     fn visit_default_reference_usage(&mut self, node: &Node<DefaultReferenceUsage>) {

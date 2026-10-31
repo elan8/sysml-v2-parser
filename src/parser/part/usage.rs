@@ -320,14 +320,13 @@ fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
         )),
     )
     .parse(input)?;
-    let (close_start, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+    let (input, close) = crate::parser::body::close_or_end_of_input(input)?;
     Ok((
         input,
         PerformBody::Brace {
             open_span,
             elements,
-            close_span: crate::parser::span::span_from_to(close_start, input),
+            close,
         },
     ))
 }

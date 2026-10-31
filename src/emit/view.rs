@@ -78,7 +78,9 @@ pub(crate) fn emit_constraint_body(
             w.push_char(';');
             Ok(())
         }
-        ConstraintDefBody::Brace { elements, .. } => {
+        ConstraintDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -87,7 +89,7 @@ pub(crate) fn emit_constraint_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -228,7 +230,9 @@ pub(crate) fn emit_calc_body(
             w.push_char(';');
             Ok(())
         }
-        CalcDefBody::Brace { elements, .. } => {
+        CalcDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -237,7 +241,7 @@ pub(crate) fn emit_calc_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -766,7 +770,9 @@ pub(crate) fn emit_view_def(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewDefBody::Brace { elements, .. } => {
+        crate::ast::ViewDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -818,7 +824,7 @@ pub(crate) fn emit_view_def(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -876,7 +882,9 @@ pub(crate) fn emit_view_usage(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewBody::Brace { elements, .. } => {
+        crate::ast::ViewBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -936,7 +944,7 @@ pub(crate) fn emit_view_usage(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -975,11 +983,15 @@ pub(crate) fn emit_view_rendering(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements, .. } if elements.is_empty() => {
-            w.push_str(" {}");
+        crate::ast::RenderingUsageBody::Brace {
+            elements, close, ..
+        } if elements.is_empty() => {
+            w.push_empty_brace_body(close);
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
+        crate::ast::RenderingUsageBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1007,7 +1019,7 @@ pub(crate) fn emit_view_rendering(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1087,7 +1099,9 @@ pub(crate) fn emit_rendering_def(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingDefBody::Brace { elements, .. } => {
+        crate::ast::RenderingDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1121,7 +1135,7 @@ pub(crate) fn emit_rendering_def(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1166,7 +1180,9 @@ pub(crate) fn emit_rendering_usage(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
+        crate::ast::RenderingUsageBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1194,7 +1210,7 @@ pub(crate) fn emit_rendering_usage(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }

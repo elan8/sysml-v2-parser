@@ -113,6 +113,19 @@ impl ProvenanceValidator<'_> {
             )),
         }
     }
+
+    /// A position recorded as end of input must be the zero-width span at the end of the source.
+    fn end_of_input(&self, span: &Span, role: &str) -> Result<(), String> {
+        let end = self.document.source.len();
+        if span.len == 0 && span.offset == end {
+            Ok(())
+        } else {
+            Err(format!(
+                "{role} at offset {} (length {}) is not the end of the source at {end}",
+                span.offset, span.len
+            ))
+        }
+    }
 }
 
 impl Visitor for ProvenanceValidator<'_> {
@@ -397,14 +410,27 @@ impl Visitor for ProvenanceValidator<'_> {
     /// could point both at any other `{ ... }` pair and still spell them correctly. The pair has
     /// to be the one belonging to this body -- inside the declaration that owns it, in order, and
     /// wrapped around its own members.
-    fn visit_body_braces<E>(&mut self, open: &Span, elements: &[Node<E>], close: &Span) {
+    ///
+    /// A body that ran to end of input has no `}` to claim; its zero-width close must sit exactly
+    /// at the end of the source, so a wire document cannot use it to hide an unclosed body
+    /// anywhere else.
+    fn visit_body_braces<E>(&mut self, open: &Span, elements: &[Node<E>], close: &BodyClose) {
         if self.error.is_some() {
             return;
         }
         self.check(self.delimiter(open, "{", "body open brace"));
-        self.check(self.delimiter(close, "}", "body close brace"));
         self.check(self.owned(open, "body open brace"));
-        self.check(self.owned(close, "body close brace"));
+        let close = match close {
+            BodyClose::Authored { span } => {
+                self.check(self.delimiter(span, "}", "body close brace"));
+                self.check(self.owned(span, "body close brace"));
+                span
+            }
+            BodyClose::MissingAtEndOfInput { at } => {
+                self.check(self.end_of_input(at, "unterminated body close"));
+                at
+            }
+        };
         if self.error.is_some() {
             return;
         }

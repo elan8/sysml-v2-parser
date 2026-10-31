@@ -91,7 +91,9 @@ pub(crate) fn expected_package_bar_brace(doc: &ParsedDocument) -> RootNamespace 
                     identification: package_id(doc, "Bar"),
                     body: PackageBody::Brace {
                         open_span: Span::dummy(),
-                        close_span: Span::dummy(),
+                        close: sysml_v2_parser::ast::BodyClose::Authored {
+                            span: Span::dummy(),
+                        },
                         elements: vec![],
                     },
                 },

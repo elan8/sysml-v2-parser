@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use sysml_v2_parser::ast::{
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RequirementDefBody,
-    RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement, UseCaseDefBody,
-    UseCaseDefBodyElement, ViewBody, ViewBodyElement,
+    BodyClose, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
+    RequirementDefBody, RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
 };
 use sysml_v2_parser::{parse_with_diagnostics, DiagnosticCategory};
 
@@ -249,9 +249,15 @@ fn fixture_unmatched_brace_reports_local_eof_error_without_extra_recovery_noise(
     );
     assert!(result.document.root.elements.iter().any(|element| {
         matches!(
-            element.value,
-            RootElement::Member(ref member)
-                if matches!(member.value, PackageBodyElement::Error(_))
+            &element.value,
+            RootElement::Package(package)
+                if matches!(
+                    package.value.body,
+                    PackageBody::Brace {
+                        close: BodyClose::MissingAtEndOfInput { .. },
+                        ..
+                    }
+                )
         )
     }));
 }

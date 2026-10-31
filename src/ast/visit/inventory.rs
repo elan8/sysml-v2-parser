@@ -46,8 +46,16 @@ macro_rules! ast_traversal {
                 &mut self,
                 _open: &$($mutability)? Span,
                 _elements: &$($mutability)? [Node<E>],
-                _close: &$($mutability)? Span,
+                _close: &$($mutability)? BodyClose,
             ) {
+            }
+
+            /// Visits how a brace body ended; the default reports the close position's span.
+            fn visit_body_close(&mut self, close: &$($mutability)? BodyClose) {
+                match close {
+                    BodyClose::Authored { span } => self.visit_span(span),
+                    BodyClose::MissingAtEndOfInput { at } => self.visit_span(at),
+                }
             }
 
             /// Called for a semicolon body's `;`, in addition to visiting its span.
@@ -2254,13 +2262,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PackageBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PackageBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_package_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -2604,13 +2612,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PartDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PartDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -2974,13 +2982,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                AttributeBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                AttributeBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_attribute_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -3151,13 +3159,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PartUsageBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PartUsageBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_usage_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -3190,13 +3198,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                MetadataBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                MetadataBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_metadata_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -3524,13 +3532,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PerformBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PerformBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_perform_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -3696,13 +3704,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PortDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PortDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_port_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -3816,13 +3824,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PortBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PortBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_port_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -3881,13 +3889,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PartUsageBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                PartUsageBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_usage_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -3912,13 +3920,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                InterfaceDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                InterfaceDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_interface_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -4108,13 +4116,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                RefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_usage_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -4159,13 +4167,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ConnectionDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ConnectionDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_connection_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -4283,13 +4291,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                EnumerationBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                EnumerationBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_enumeration_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -4662,13 +4670,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                OccurrenceUsageBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                OccurrenceUsageBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_occurrence_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -4803,13 +4811,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                DefinitionBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                DefinitionBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_definition_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -5066,13 +5074,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                AliasBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                AliasBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_relationship_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -5111,13 +5119,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ActionDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ActionDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_action_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -5390,11 +5398,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
-            if let Some(inner) = body {
-                for inner in inner {
-                    visitor.visit_action_def_body_element(inner);
-                }
-            }
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -5589,13 +5593,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ActionUsageBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ActionUsageBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_action_usage_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -5931,13 +5935,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                FirstMergeBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                FirstMergeBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_first_merge_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -6148,13 +6152,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                StateDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                StateDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_state_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -6389,13 +6393,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RequirementDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                RequirementDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_requirement_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -6825,13 +6829,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                Body::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                Body::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_interface_usage_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -6842,13 +6846,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                Body::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                Body::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_relationship_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7130,13 +7134,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                UseCaseDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                UseCaseDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_use_case_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7257,13 +7261,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ReturnRefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ReturnRefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_return_ref_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -7487,13 +7491,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ConstraintDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ConstraintDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_constraint_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7597,13 +7601,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                CalcDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                CalcDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_calc_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7750,13 +7754,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ViewDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ViewDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_view_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7839,13 +7843,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RenderingUsageBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                RenderingUsageBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_rendering_usage_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7912,13 +7916,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RenderingDefBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                RenderingDefBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_rendering_def_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -7993,13 +7997,13 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ViewBody::Brace { open_span, elements, close_span } => {
-                    visitor.visit_body_braces(open_span, elements, close_span);
+                ViewBody::Brace { open_span, elements, close } => {
+                    visitor.visit_body_braces(open_span, elements, close);
                     visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_view_body_element(inner);
                     }
-                    visitor.visit_span(close_span);
+                    visitor.visit_body_close(close);
                 }
             }
         }
@@ -8450,11 +8454,7 @@ macro_rules! ast_traversal {
             }
             visitor.visit_qualified_reference(source);
             visitor.visit_qualified_reference(target);
-            if let Some(inner) = body {
-                for inner in inner {
-                    visitor.visit_relationship_body_element(inner);
-                }
-            }
+            walk_relationship_body(visitor, body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }

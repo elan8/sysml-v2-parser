@@ -1057,7 +1057,7 @@ mod membership_tests {
     #[test]
     fn failed_return_ref_rolls_back_nested_expression_references() {
         let context = crate::parser::span::ParseContext::new();
-        let parsed = return_ref(context.input(b"return ref result { return Ghost::value;"));
+        let parsed = return_ref(context.input(b"return ref result [Ghost::value] return"));
         assert!(parsed.is_err());
         assert!(context.finish().is_empty());
     }

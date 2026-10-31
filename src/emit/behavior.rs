@@ -61,8 +61,10 @@ pub(crate) fn emit_inout_decl(
         emit_feature_value(w, value)?;
     }
     match &decl.body {
-        None => w.push_char(';'),
-        Some(elements) => {
+        crate::ast::ActionDefBody::Semicolon { .. } => w.push_char(';'),
+        crate::ast::ActionDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -71,7 +73,7 @@ pub(crate) fn emit_inout_decl(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
         }
     }
     Ok(())
@@ -414,7 +416,9 @@ pub(crate) fn emit_action_def_body(
             w.push_char(';');
             Ok(())
         }
-        ActionDefBody::Brace { elements, .. } => {
+        ActionDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -423,7 +427,7 @@ pub(crate) fn emit_action_def_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -554,7 +558,9 @@ fn emit_action_usage_body(
             w.push_char(';');
             Ok(())
         }
-        ActionUsageBody::Brace { elements, .. } => {
+        ActionUsageBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -563,7 +569,7 @@ fn emit_action_usage_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -865,7 +871,9 @@ fn emit_perform_body(
             w.push_char(';');
             Ok(())
         }
-        PerformBody::Brace { elements, .. } => {
+        PerformBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -874,7 +882,7 @@ fn emit_perform_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1046,7 +1054,9 @@ fn emit_state_def_body(
             w.push_char(';');
             Ok(())
         }
-        StateDefBody::Brace { elements, .. } => {
+        StateDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1055,7 +1065,7 @@ fn emit_state_def_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1427,9 +1437,11 @@ pub(crate) fn emit_definition_body(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::DefinitionBody::Brace { elements, .. } => {
+        crate::ast::DefinitionBody::Brace {
+            elements, close, ..
+        } => {
             if elements.is_empty() {
-                w.push_str(" {}");
+                w.push_empty_brace_body(close);
                 Ok(())
             } else {
                 w.push_str(" {");
@@ -1454,7 +1466,7 @@ pub(crate) fn emit_definition_body(
                     w.newline();
                 }
                 w.dedent();
-                w.push_char('}');
+                w.push_body_close(close);
                 Ok(())
             }
         }
@@ -1657,7 +1669,9 @@ fn emit_first_merge_body(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::FirstMergeBody::Brace { elements, .. } => {
+        crate::ast::FirstMergeBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1677,7 +1691,7 @@ fn emit_first_merge_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1832,7 +1846,9 @@ pub(crate) fn emit_occurrence_usage(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::OccurrenceUsageBody::Brace { elements, .. } => {
+        crate::ast::OccurrenceUsageBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1841,7 +1857,7 @@ pub(crate) fn emit_occurrence_usage(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }

@@ -237,9 +237,11 @@ pub(crate) fn emit_metadata_body(
             w.push_char(';');
             Ok(())
         }
-        MetadataBody::Brace { elements, .. } => {
+        MetadataBody::Brace {
+            elements, close, ..
+        } => {
             if elements.is_empty() {
-                w.push_str(" {}");
+                w.push_empty_brace_body(close);
                 return Ok(());
             }
             w.push_str(" {");
@@ -273,7 +275,7 @@ pub(crate) fn emit_metadata_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -310,7 +312,9 @@ fn emit_part_def_body(
             w.push_char(';');
             Ok(())
         }
-        PartDefBody::Brace { elements, .. } => {
+        PartDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -324,7 +328,7 @@ fn emit_part_def_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -495,11 +499,15 @@ fn emit_part_usage_body(
         // An empty brace body stays on one line, the form `emit_ref_decl` already writes for the
         // same `Body<PartUsageBodyElement>`. Without this a `connect a to b {}` and the
         // `ref x {}` beside it formatted differently.
-        PartUsageBody::Brace { elements, .. } if elements.is_empty() => {
-            w.push_str(" {}");
+        PartUsageBody::Brace {
+            elements, close, ..
+        } if elements.is_empty() => {
+            w.push_empty_brace_body(close);
             Ok(())
         }
-        PartUsageBody::Brace { elements, .. } => {
+        PartUsageBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -508,7 +516,7 @@ fn emit_part_usage_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -643,7 +651,9 @@ pub(crate) fn emit_attribute_body(
             w.push_char(';');
             Ok(())
         }
-        AttributeBody::Brace { elements, .. } => {
+        AttributeBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -652,7 +662,7 @@ pub(crate) fn emit_attribute_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -813,7 +823,9 @@ fn emit_port_def_body(
             w.push_char(';');
             Ok(())
         }
-        PortDefBody::Brace { elements, .. } => {
+        PortDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -822,7 +834,7 @@ fn emit_port_def_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -872,9 +884,11 @@ fn emit_port_body(w: &mut EmitWriter<'_>, path: &str, body: &PortBody) -> Result
             w.push_char(';');
             Ok(())
         }
-        PortBody::Brace { elements, .. } => {
+        PortBody::Brace {
+            elements, close, ..
+        } => {
             if elements.is_empty() {
-                w.push_str(" {}");
+                w.push_empty_brace_body(close);
                 Ok(())
             } else {
                 w.push_str(" {");
@@ -885,7 +899,7 @@ fn emit_port_body(w: &mut EmitWriter<'_>, path: &str, body: &PortBody) -> Result
                     w.newline();
                 }
                 w.dedent();
-                w.push_char('}');
+                w.push_body_close(close);
                 Ok(())
             }
         }
@@ -986,7 +1000,9 @@ fn emit_interface_def_body(
             w.push_char(';');
             Ok(())
         }
-        InterfaceDefBody::Brace { elements, .. } => {
+        InterfaceDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -995,7 +1011,7 @@ fn emit_interface_def_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1317,11 +1333,15 @@ fn emit_interface_usage_body(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::Body::Brace { elements, .. } if elements.is_empty() => {
-            w.push_str(" {}");
+        crate::ast::Body::Brace {
+            elements, close, ..
+        } if elements.is_empty() => {
+            w.push_empty_brace_body(close);
             Ok(())
         }
-        crate::ast::Body::Brace { elements, .. } => {
+        crate::ast::Body::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1330,7 +1350,7 @@ fn emit_interface_usage_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -1445,9 +1465,11 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
             w.push_char(';');
             Ok(())
         }
-        RefBody::Brace { elements, .. } => {
+        RefBody::Brace {
+            elements, close, ..
+        } => {
             if elements.is_empty() {
-                w.push_str(" {}");
+                w.push_empty_brace_body(close);
                 Ok(())
             } else {
                 w.push_str(" {");
@@ -1458,7 +1480,7 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                     w.newline();
                 }
                 w.dedent();
-                w.push_char('}');
+                w.push_body_close(close);
                 Ok(())
             }
         }
@@ -1903,9 +1925,11 @@ pub(crate) fn emit_relationship_body(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::Body::Brace { elements, .. } => {
+        crate::ast::Body::Brace {
+            elements, close, ..
+        } => {
             if elements.is_empty() {
-                w.push_str(" {}");
+                w.push_empty_brace_body(close);
                 Ok(())
             } else {
                 w.push_str(" {");
@@ -1920,7 +1944,7 @@ pub(crate) fn emit_relationship_body(
                     w.newline();
                 }
                 w.dedent();
-                w.push_char('}');
+                w.push_body_close(close);
                 Ok(())
             }
         }
@@ -2107,7 +2131,9 @@ pub(crate) fn emit_enum_def(
             Ok(())
         }
         crate::ast::EnumerationBody::Brace {
-            elements: values, ..
+            elements: values,
+            close,
+            ..
         } => {
             w.push_str(" {");
             w.newline();
@@ -2182,7 +2208,7 @@ pub(crate) fn emit_enum_def(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }
@@ -2398,7 +2424,9 @@ fn emit_connection_def_body(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ConnectionDefBody::Brace { elements, .. } => {
+        crate::ast::ConnectionDefBody::Brace {
+            elements, close, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -2407,7 +2435,7 @@ fn emit_connection_def_body(
                 w.newline();
             }
             w.dedent();
-            w.push_char('}');
+            w.push_body_close(close);
             Ok(())
         }
     }

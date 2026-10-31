@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Incomplete part definition with unmatched braces - formatter adds compensating braces"))
+(snapshot (type semantic) (description "Incomplete part definition with unmatched braces - the unterminated bodies keep their members, and the formatter writes no compensating braces"))
 ~~~
 # SOURCE
 ~~~sysml
@@ -19,8 +19,11 @@ package AyPkpowerTrain {
 )
 ~~~
 # FORMAT
-~~~sexpr
-(stable-idempotent)
+~~~sysml
+package AyPkpowerTrain {
+    part engine {
+        g {
+        }
 ~~~
 # AST
 ~~~sexpr
@@ -28,6 +31,6 @@ package AyPkpowerTrain {
   (name-language sysml)
   (references
   )
-  (root (malformed (code "missing_closing_brace") (found none) (span (offset 0) (line 1) (column 1) (len 56))))
+  (root (package (name "AyPkpowerTrain") (body brace (unterminated) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "engine") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (unterminated) (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name "g") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace)))))))
 )
 ~~~
