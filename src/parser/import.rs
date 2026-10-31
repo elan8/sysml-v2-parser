@@ -173,6 +173,92 @@ pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::P
     Some(missing_visibility_node(span_from_to(keyword_start, end)))
 }
 
+/// `import A as B;` is not SysML: `Import = VisibilityIndicator 'import' 'all'? ImportDeclaration
+/// RelationshipBody` (SysML BNF 8.2.2.4) has no renaming clause. Recovery owns this diagnosis so
+/// the reader learns that an alias membership (`alias B for A;`) is the construct that names an
+/// element differently, rather than seeing a generic unexpected-token error. The span is the `as`
+/// clause itself.
+///
+/// The import target is read with the import grammar's own productions, so comments, quoted
+/// names and filter members (whose expressions may contain `as` casts) are handled exactly as the
+/// real import parser handles them; only a complete target followed by `as` is diagnosed.
+pub(crate) fn alias_clause_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
+    crate::parser::span::reference_probe(input, alias_clause_probe)
+}
+
+fn alias_clause_probe(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
+    let (cursor, _) = ws_and_comments(input).ok()?;
+    let (cursor, _) = opt(crate::parser::lex::visibility_indicator)
+        .parse(cursor)
+        .ok()?;
+    let (cursor, _) = ws_and_comments(cursor).ok()?;
+    if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
+        return None;
+    }
+    let (cursor, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
+        .parse(cursor)
+        .ok()?;
+    let (cursor, _) = ws_and_comments(cursor).ok()?;
+    let (target_start, _) = opt(terminated(tag(&b"all"[..]), ws1)).parse(cursor).ok()?;
+    let (after_reference, _) = qualified_reference(target_start).ok()?;
+    let (after_shape, shape) = import_shape(after_reference).ok()?;
+    let (as_start, _) = ws_and_comments(after_shape).ok()?;
+    if !crate::parser::lex::starts_with_keyword(as_start.fragment(), b"as") {
+        return None;
+    }
+    let (after_as, _) = tag::<_, _, nom::error::Error<_>>(&b"as"[..])
+        .parse(as_start)
+        .ok()?;
+    let (after_as, _) = ws_and_comments(after_as).ok()?;
+    let renamed = crate::parser::lex::name(after_as).ok();
+    let clause_end = renamed.map_or(after_as, |(rest, _)| rest);
+    // An alias names one element, so only a plain membership target can become its target.
+    let element = match shape {
+        crate::ast::ImportShape::Membership {
+            recursive_suffix: None,
+        } => {
+            let len = after_reference
+                .location_offset()
+                .checked_sub(target_start.location_offset())?;
+            Some(String::from_utf8_lossy(target_start.fragment().get(..len)?).into_owned())
+        }
+        crate::ast::ImportShape::Membership { .. }
+        | crate::ast::ImportShape::Namespace { .. }
+        | crate::ast::ImportShape::Filter { .. } => None,
+    };
+    let renamed_name = renamed
+        .map(|(_, name)| String::from_utf8_lossy(crate::parser::lex::name_bytes(after_as, name)));
+    let suggestion = match (renamed_name, element) {
+        (Some(name), Some(element)) => format!(
+            "Remove 'as {name}' and declare an alias membership instead: \
+             'alias {name} for {element};' (with the import's visibility to re-export the name)."
+        ),
+        (Some(name), None) => format!(
+            "Remove 'as {name}'. An alias membership names one element: \
+             'alias {name} for <element>;'."
+        ),
+        (None, _) => "Remove the 'as' clause, and declare an alias membership to name the element \
+                      differently: 'alias <name> for <element>;'."
+            .to_owned(),
+    };
+    // The clause ends at its last authored token, not at the trivia the name parser may skip.
+    let mut clause_span = span_from_to(as_start, clause_end);
+    if renamed.is_none() {
+        clause_span.len = b"as".len();
+    }
+    Some(crate::ast::ParseErrorNode {
+        diagnostic_span: Some(clause_span),
+        message:
+            "a SysML import has no 'as' clause; an alias membership names an element differently"
+                .to_owned(),
+        code: crate::parser::diagnostic_catalog::IMPORT_ALIAS_CLAUSE.to_owned(),
+        expected: Some("';' or a relationship body after the import target".to_owned()),
+        found: Some("as".to_owned()),
+        suggestion: Some(suggestion),
+        category: Some(crate::error::DiagnosticCategory::ParseError),
+    })
+}
+
 /// The offset just past an import target's last authored token: its final suffix or filter member
 /// if it has one, otherwise the qualified reference itself.
 pub(crate) fn import_target_end(shape: &crate::ast::ImportShape, reference_end: usize) -> usize {
@@ -371,5 +457,51 @@ mod membership_tests {
             }
             other => panic!("expected filter shape, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod alias_clause_tests {
+    fn alias_clause_suggestion(source: &str) -> String {
+        crate::parse_for_editor(source)
+            .errors
+            .into_iter()
+            .find(|error| error.code.as_deref() == Some("import_alias_clause"))
+            .and_then(|error| error.suggestion)
+            .expect("import_alias_clause suggestion")
+    }
+
+    #[test]
+    fn alias_clause_suggestion_quotes_a_plain_target() {
+        assert_eq!(
+            alias_clause_suggestion("public import A::X as 'Y Z';"),
+            "Remove 'as 'Y Z'' and declare an alias membership instead: \
+             'alias 'Y Z' for A::X;' (with the import's visibility to re-export the name)."
+        );
+    }
+
+    #[test]
+    fn alias_clause_suggestion_never_proposes_an_alias_of_a_wildcard_or_filter() {
+        for source in [
+            "public import A::* as B;",
+            "public import A::** as B;",
+            "public import A::*::** as B;",
+            "public import A[x] as B;",
+        ] {
+            assert_eq!(
+                alias_clause_suggestion(source),
+                "Remove 'as B'. An alias membership names one element: 'alias B for <element>;'.",
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn alias_clause_suggestion_without_a_name_uses_placeholders() {
+        assert_eq!(
+            alias_clause_suggestion("public import A as ;"),
+            "Remove the 'as' clause, and declare an alias membership to name the element \
+             differently: 'alias <name> for <element>;'."
+        );
     }
 }

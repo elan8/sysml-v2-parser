@@ -35,6 +35,9 @@ pub const MISSING_BODY_OR_SEMICOLON: &str = "missing_body_or_semicolon";
 /// A `;` written directly after a member's closing `}`, which parses as an empty anonymous
 /// member rather than as a terminator of the braced declaration.
 pub const REDUNDANT_SEMICOLON_AFTER_BODY: &str = "redundant_semicolon_after_body";
+/// `import A as B;`: SysML imports have no renaming clause. An alias membership
+/// (`alias B for A;`, SysML 7.5.2) is the construct that names an element differently.
+pub const IMPORT_ALIAS_CLAUSE: &str = "import_alias_clause";
 pub const MISSING_REP_LANGUAGE: &str = "missing_rep_language";
 pub const INVALID_REP_LANGUAGE: &str = "invalid_rep_language";
 pub const NESTING_TOO_DEEP: &str = "nesting_too_deep";
@@ -68,6 +71,7 @@ pub const DOCUMENTED_CODES: &[&str] = &[
     MISSING_SEMICOLON,
     MISSING_BODY_OR_SEMICOLON,
     REDUNDANT_SEMICOLON_AFTER_BODY,
+    IMPORT_ALIAS_CLAUSE,
     MISSING_REP_LANGUAGE,
     INVALID_REP_LANGUAGE,
     NESTING_TOO_DEEP,

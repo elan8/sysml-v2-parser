@@ -361,7 +361,9 @@ pub(crate) fn build_recovery_error_node_from_span(
     scope_label: &str,
     generic_code: &str,
 ) -> ParseErrorNode {
-    if let Some(error) = super::import::missing_visibility_error(input) {
+    if let Some(error) = super::import::missing_visibility_error(input)
+        .or_else(|| super::import::alias_clause_error(input))
+    {
         return error;
     }
     match classify_recovery(input, recovery_end, starters, scope_label) {
