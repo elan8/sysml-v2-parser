@@ -824,7 +824,7 @@ applied to the short-name branch.
 **Failure mode.** Rejected into a recovery node, or (when the next member starts with `comment`)
 accepted but shredded silently.
 
-**Fix size.** **Trivial** — use `ws` rather than `ws_and_comments` for the optional name after
+**Fix size.** **Trivial** — use `ws` rather than `ws_and_notes` for the optional name after
 `'<' NAME '>'`, mirroring the existing comment on `requirement.rs:773-778`.
 
 ---
@@ -923,7 +923,7 @@ was to surface them rather than pick a side.
    `specialization_clauses` claiming it).
 3. **#9** `''` empty-name guard in `emit_default_reference_usage`. Do it *before* #2/#7, which
    will otherwise expose five new corrupt emissions.
-4. **#19** `doc <s>` name-slot lookahead (`ws` not `ws_and_comments`).
+4. **#19** `doc <s>` name-slot lookahead (`ws` not `ws_and_notes`).
 5. **#17** add `b"type"` to the nested-classifier keyword list.
 6. **#20** record the authored `dependency … from`.
 

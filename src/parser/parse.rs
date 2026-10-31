@@ -206,7 +206,7 @@ fn parse_with_diagnostics_document(
                 input = rest;
             }
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
-                let (trimmed, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
+                let (trimmed, _) = lex::ws_and_notes(input).unwrap_or((input, ()));
                 if trim_ascii_start(trimmed.fragment()).starts_with(b"}") {
                     errors.push(unexpected_closing_brace_parse_error(trimmed));
                     let skip_result = lex::skip_to_next_sync_point(trimmed);
@@ -255,7 +255,7 @@ fn parse_with_diagnostics_document(
                     break;
                 }
                 if let Some(scope) = root_body_scope(input.fragment()) {
-                    let (error_input, _) = lex::ws_and_comments(e.input).unwrap_or((e.input, ()));
+                    let (error_input, _) = lex::ws_and_notes(e.input).unwrap_or((e.input, ()));
                     if error_input.fragment().starts_with(b"{") {
                         errors.push(root_body_recovery_error(error_input, scope));
                         match lex::skip_statement_or_block(error_input) {
@@ -327,7 +327,7 @@ fn parse_with_diagnostics_document(
         }
     }
 
-    let (input, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
+    let (input, _) = lex::ws_and_notes(input).unwrap_or((input, ()));
 
     if input.fragment().is_empty()
         && !errors.iter().any(|e| {

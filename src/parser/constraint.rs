@@ -10,7 +10,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_reference, skip_statement_or_block, starts_with_any_keyword,
-    starts_with_keyword, visibility_prefix, ws1, ws_and_comments, CALC_DEF_BODY_STARTERS,
+    starts_with_keyword, visibility_prefix, ws1, ws_and_notes, CALC_DEF_BODY_STARTERS,
     CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::usage::{feature_usage_header, redefinition};
@@ -105,7 +105,7 @@ fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Constrain
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `ConstraintUsageDeclaration`'s `Identification` makes the name optional: the anonymous
     // body-only form `constraint { stateSpace.order == order }` (Domain Libraries
     // `StateSpaceRepresentation.sysml`; spec42 Gap 49a), the typed `constraint : C;` and the
@@ -150,7 +150,7 @@ fn constraint_body_recovery_element(
 
 /// A constraint body in any scope that accepts one: `;` or brace-delimited constraint members.
 pub(crate) fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -406,18 +406,18 @@ pub(crate) fn constraint_def_body_element(
             },
         )
     };
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_notes, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// SysML CalculationBody and KerML FunctionBody share ResultExpressionMember:
-/// an OwnedExpression without a terminating semicolon.
-fn result_expression_member(
+/// SysML CalculationBody and CaseBody and KerML FunctionBody share ResultExpressionMember: an
+/// OwnedExpression without a terminating semicolon, as the last member of the body.
+pub(crate) fn result_expression_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Result<Node<Expression>, Node<ParseErrorNode>>> {
     let checkpoint = input.extra.reference_checkpoint();
     let (rest, expression) = expression(input)?;
-    let (semicolon_start, _) = ws_and_comments(rest)?;
+    let (semicolon_start, _) = ws_and_notes(rest)?;
     if semicolon_start.fragment().starts_with(b";") {
         let (end, _) = tag(&b";"[..]).parse(semicolon_start)?;
         // The rejected expression's references must not survive arena publication.
@@ -432,6 +432,12 @@ fn result_expression_member(
             category: Some(crate::error::DiagnosticCategory::ParseError),
         };
         return Ok((end, Err(node_from_to(input, end, error))));
+    }
+    if !(semicolon_start.fragment().is_empty() || semicolon_start.fragment().starts_with(b"}")) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            semicolon_start,
+            nom::error::ErrorKind::Tag,
+        )));
     }
     Ok((rest, Ok(expression)))
 }
@@ -453,17 +459,17 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
 
 fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     // The whole `OccurrenceUsagePrefix` (SysML BNF 1388): `in calc eval : EvaluationFunction`
     // (`TradeStudies.sysml:61`), `abstract calc subcalculations` and `ref calc self`
     // (`Calculations.sysml`), `individual calc c`, `#Tag calc c`.
     let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
         let (input, _) = tag(&b":>>"[..]).parse(input)?;
-        let (target_start, _) = ws_and_comments(input)?;
+        let (target_start, _) = ws_and_notes(input)?;
         let (input, target) = qualified_reference(target_start)?;
         (
             input,
@@ -476,7 +482,7 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
             ),
         )
     } else {
-        // `ws_and_comments` above already skipped gaps after `calc`; do not require `ws1`
+        // `ws_and_notes` above already skipped gaps after `calc`; do not require `ws1`
         // here or `calc name …` fails once the space was consumed (validation `10c`).
         let (input, identification) = identification(input)?;
         (input, (identification, None))
@@ -484,7 +490,7 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     // `FeatureSpecializationPart = ... | MultiplicityPart FeatureSpecialization*`: the
     // multiplicity may precede the typing (`calc c[2] : C;`, #181), as on the other usages.
     let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -492,7 +498,7 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::usage::multiplicity_node,
         ))
         .parse(input)?
@@ -506,7 +512,7 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     // `Calculations.sysml`) -- only retry if the earlier attempt (right after `calc`) didn't
     // already find one, and reuse the shared comma-separated multi-target parser.
     let (input, redefines) = if redefines.is_none() {
-        opt(preceded(ws_and_comments, redefinition))
+        opt(preceded(ws_and_notes, redefinition))
             .parse(input)
             .map(|(input, r)| (input, r.map(|node| node.value.target)))?
     } else {
@@ -514,11 +520,11 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     };
     // `:>` subsets, independent of `:>>` redefines, e.g. `abstract calc subcalculations:
     // Calculation :> calculations, subactions { ... }` (Systems Library `Calculations.sysml`).
-    let (input, subsets) = opt(preceded(ws_and_comments, crate::parser::usage::subsetting))
+    let (input, subsets) = opt(preceded(ws_and_notes, crate::parser::usage::subsetting))
         .parse(input)
         .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
@@ -598,7 +604,7 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
 /// library/package alternative leave no qualified-reference arena entries behind.
 fn calc_def_body_package_member(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
     crate::parser::span::reference_transaction(input, |input| {
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         if crate::parser::occurrence_prefix::kind_keyword_follows(input, b"package") {
             let (input, package) = crate::parser::package::package_(input)?;
             Ok((
@@ -656,7 +662,7 @@ fn calc_body_with_element_parser<'a, F>(
 where
     F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<CalcDefBodyElement>>,
 {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -685,7 +691,7 @@ where
 /// this, `first f;` in a calculation body parsed as two invented members, `'first';` and `f;`,
 /// with no diagnostic at all, and formatted back that way.
 fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     // `MemberPrefix` is outside `StructureUsageMember` (SysML BNF 130-131, 262-264), so the
     // action-family gate must look through it to recognize `private message …`.  Keep parsing
     // from `peek`, rather than this lookahead remainder: `action_def_body_element` owns the
@@ -843,21 +849,21 @@ pub(crate) fn kerml_connector_end(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorEnd>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
     let (input, target) =
-        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
+        preceded(ws_and_notes, crate::parser::lex::reference_path).parse(input)?;
     // `references <chain>` / `::> <chain>` on the end itself: `from [0..*]
     // separateOccurrenceToo references elements.notIntersection to ...` (`Occurrences.kerml`),
     // `connector a ::> a.x to b;` (KerML class bodies).
     let (input, references) = opt(preceded(
         alt((
-            map((ws_and_comments, tag(&b"references"[..]), ws1), |_| ()),
-            map((ws_and_comments, tag(&b"::>"[..]), ws_and_comments), |_| ()),
+            map((ws_and_notes, tag(&b"references"[..]), ws1), |_| ()),
+            map((ws_and_notes, tag(&b"::>"[..]), ws_and_notes), |_| ()),
         )),
         crate::parser::lex::reference_path,
     ))
@@ -885,7 +891,7 @@ pub(crate) fn kerml_connector_member(
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !(starts_with_keyword(cursor.fragment(), b"connector")
             || starts_with_keyword(cursor.fragment(), b"public")
             || starts_with_keyword(cursor.fragment(), b"private")
@@ -904,7 +910,7 @@ fn kerml_connector_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorMember>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"connector"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -914,14 +920,14 @@ fn kerml_connector_member_inner(
     // bodies) -- the leading token is the first *end*, not the connector's name. Tried before
     // the named/typed declaration so an end name followed by `::>`/`to` is not misread as the
     // connector's own name.
-    let (after_all_ws, _) = ws_and_comments(input)?;
+    let (after_all_ws, _) = ws_and_notes(input)?;
     let from_keyword_next = starts_with_keyword(after_all_ws.fragment(), b"from");
     if let (false, Ok((rest, (from, to)))) = (
         from_keyword_next,
         map(
             (
                 kerml_connector_end,
-                preceded(ws_and_comments, tag(&b"to"[..])),
+                preceded(ws_and_notes, tag(&b"to"[..])),
                 ws1,
                 kerml_connector_end,
             ),
@@ -951,7 +957,7 @@ fn kerml_connector_member_inner(
     }
     // Name is optional: the common library shapes are the anonymous `connector :Type` and the
     // declaration-less `connector (all)? from a to b;`.
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     // The keyword spellings of `FeatureSpecialization` are reserved words, so one leading the
     // declaration means `Identification` was omitted (`connector typed by T from a to b;`).
     let (input, name_str) = if peek.fragment().starts_with(b":")
@@ -969,7 +975,7 @@ fn kerml_connector_member_inner(
         ) {
         (input, None)
     } else {
-        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+        let (input, n) = preceded(ws_and_notes, name).parse(input)?;
         (input, Some(n))
     };
     // The rest of `FeatureDeclaration`: `FeatureSpecializationPart` (typing, subsetting,
@@ -979,9 +985,9 @@ fn kerml_connector_member_inner(
     // transitionLink to [1..*] trigger;` (`TransitionPerformances.kerml`).
     let (input, ends) = opt(map(
         (
-            preceded(ws_and_comments, tag(&b"from"[..])),
+            preceded(ws_and_notes, tag(&b"from"[..])),
             kerml_connector_end,
-            preceded(ws_and_comments, tag(&b"to"[..])),
+            preceded(ws_and_notes, tag(&b"to"[..])),
             kerml_connector_end,
         ),
         |(_, from, _, to)| (from, to),
@@ -1025,13 +1031,13 @@ fn kerml_binding_decl_head(
         Option<Node<crate::ast::Multiplicity>>,
     ),
 > {
-    let (input, declared_name) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, declared_name) = preceded(ws_and_notes, name).parse(input)?;
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (next, _) = ws_and_comments(input)?;
+    let (next, _) = ws_and_notes(input)?;
     if !(starts_with_keyword(next.fragment(), b"of")
         || next.fragment().starts_with(b"{")
         || next.fragment().starts_with(b";"))
@@ -1048,7 +1054,7 @@ fn kerml_binding_end_pair(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBindingEndPair>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let of_start = input;
     let (input, of_span) = if starts_with_keyword(input.fragment(), b"of") {
         let (rest, _) = tag(&b"of"[..]).parse(input)?;
@@ -1057,7 +1063,7 @@ fn kerml_binding_end_pair(
         (input, None)
     };
     let (input, left) = kerml_connector_end(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let equals_start = input;
     let (input, _) = tag(&b"="[..]).parse(input)?;
     let equals_span = crate::parser::span_from_to(equals_start, input);
@@ -1089,11 +1095,11 @@ fn kerml_binding_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBindingMember>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"binding"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     let all_start = after_ws;
     let (input, all_span) = if starts_with_keyword(after_ws.fragment(), b"all") {
         let (rest, _) = tag(&b"all"[..]).parse(after_ws)?;
@@ -1113,7 +1119,7 @@ fn kerml_binding_member_inner(
         Some((declared_name, multiplicity)) => (Some(declared_name), multiplicity),
         None => (None, None),
     };
-    let (next, _) = ws_and_comments(input)?;
+    let (next, _) = ws_and_notes(input)?;
     let body_next = next.fragment().starts_with(b"{") || next.fragment().starts_with(b";");
     let (input, inline_ends) = if body_next {
         (input, None)
@@ -1158,7 +1164,7 @@ fn kerml_succession_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlSuccessionMember>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -1171,7 +1177,7 @@ fn kerml_succession_member_inner(
     // multiplicity may allocate references before `first` turns out to be absent.
     let (input, declared) = opt(|input| {
         crate::parser::span::reference_transaction(input, |input| {
-            let (peek, _) = ws_and_comments(input)?;
+            let (peek, _) = ws_and_notes(input)?;
             let (input, declared_name) = if starts_with_any_keyword(
                 peek.fragment(),
                 &[
@@ -1189,11 +1195,11 @@ fn kerml_succession_member_inner(
             {
                 (input, None)
             } else {
-                let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+                let (input, n) = preceded(ws_and_notes, name).parse(input)?;
                 (input, Some(n))
             };
             let (input, part) = kerml_feature_specialization_part(input)?;
-            let (keyword_start, _) = ws_and_comments(input)?;
+            let (keyword_start, _) = ws_and_notes(input)?;
             if !starts_with_keyword(keyword_start.fragment(), b"first") {
                 return Err(nom::Err::Error(nom::error::Error::new(
                     input,
@@ -1225,7 +1231,7 @@ fn kerml_succession_member_inner(
             ),
         };
     let (input, first) = kerml_connector_end(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"then"[..])).parse(input)?;
     // A multiplicity may follow the keyword directly: `then[0..1] endShot`.
     let (input, _) = if input.fragment().starts_with(b"[") {
         (input, ())
@@ -1233,7 +1239,7 @@ fn kerml_succession_member_inner(
         ws1(input)?
     };
     let (input, then) = kerml_connector_end(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -1262,8 +1268,7 @@ fn kerml_succession_member_inner(
 /// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
 /// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
 /// else 0;`, `private thisClock : Clock :>> self;` (Kernel Semantic Library
-/// `Occurrences.kerml`/`Observation.kerml`). Requires a typing clause, a redefinition, or a value,
-/// so plain expression statements stay on the expression arm.
+/// `Occurrences.kerml`/`Observation.kerml`). The `;` is what separates it from a result expression.
 pub(crate) fn calc_named_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
@@ -1271,9 +1276,9 @@ pub(crate) fn calc_named_binding(
     // reserved spelling there (dispatch order gives keyword-led siblings first refusal), so this
     // guard only mirrors the lexical shape: something name-like must lead at all.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         let (cursor, _) = visibility_prefix(cursor)?;
-        let (cursor, _) = ws_and_comments(cursor)?;
+        let (cursor, _) = ws_and_notes(cursor)?;
         let head = cursor.fragment().first();
         let name_like = matches!(head, Some(b'\''))
             || head.is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_');
@@ -1291,11 +1296,11 @@ fn calc_named_binding_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, name_str) = name(input)?;
     let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -1317,24 +1322,18 @@ fn calc_named_binding_inner(
     });
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::usage::multiplicity_node,
         ))
         .parse(input)?
     } else {
         (input, None)
     };
-    let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+    let (input, redefines) = opt(preceded(ws_and_notes, redefinition)).parse(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    // A declaration needs something an expression statement cannot have: a typing clause, a
-    // redefinition, or a value. `mass : Real;` is the type-only form (`constraint c { mass :
-    // Real; }`); a bare `mass` stays on the expression arm.
-    if typing.is_none() && value.is_none() && redefines.is_none() {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
-    }
+    // `DefaultReferenceUsage = RefPrefix Usage`, so `mass;` is a declaration like `mass : Real;`.
+    // A result expression has no terminator, so a bare `mass` with none stays on that arm.
+    //
     // This production accepts only the semicolon body alternative. Delegate its token capture to
     // the shared body parser so the serialized body delimiter remains source-backed.
     let (input, body) = semicolon_body(input)?;
@@ -1406,7 +1405,7 @@ fn directed_member_keyword(input: Input<'_>) -> Option<&'static [u8]> {
     // A lookahead, so the prefix metadata run it walks past is allocated and discarded rather
     // than kept: the arm this guard picks re-parses the same bytes.
     crate::parser::span::reference_probe(input, |input| {
-        let (input, _) = ws_and_comments(input).ok()?;
+        let (input, _) = ws_and_notes(input).ok()?;
         let (rest, prefix) = crate::parser::feature_prefix::feature_prefix(input).ok()?;
         prefix.direction()?;
         [&b"feature"[..], b"step", b"expr", b"bool", b"calc"]
@@ -1430,7 +1429,7 @@ fn directed_member_keyword(input: Input<'_>) -> Option<&'static [u8]> {
 fn owned_cross_feature(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::OwnedCrossFeature>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let start = input;
     let (input, prefix) = crate::parser::feature_prefix::basic_feature_prefix(input);
     // `FeatureIdentification` is optional here: `end [1] feature transferSource references
@@ -1442,13 +1441,13 @@ fn owned_cross_feature(
         (input, Some(parsed))
     };
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
     let (input, multiplicity_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, subsets) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+        opt(preceded(ws_and_notes, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
     if name_str.is_none()
         && multiplicity.is_none()
@@ -1464,7 +1463,7 @@ fn owned_cross_feature(
     }
     // The cross feature ends where the owning feature's kind keyword begins, so the trivia between
     // them is consumed here: every slot parser downstream takes trivia-free input.
-    let (rest, _) = ws_and_comments(input)?;
+    let (rest, _) = ws_and_notes(input)?;
     if !starts_with_any_keyword(
         rest.fragment(),
         &[&b"feature"[..], b"step", b"expr", b"bool"],
@@ -1530,8 +1529,8 @@ fn kerml_feature_type_relationship_part(
     // name a QualifiedName or an OwnedFeatureChain (KerML 8.2.4.3.1, `b.f`).
     let (input, first) = crate::parser::lex::reference_path(input)?;
     let (input, more) = nom::multi::many0(preceded(
-        preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, crate::parser::lex::reference_path),
+        preceded(ws_and_notes, tag(&b","[..])),
+        preceded(ws_and_notes, crate::parser::lex::reference_path),
     ))
     .parse(input)?;
     let mut targets = vec![first];
@@ -1578,7 +1577,7 @@ fn kerml_feature_relationship_parts(
 
     let mut input = input;
     loop {
-        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_ws, _) = ws_and_notes(input)?;
         if starts_with_keyword(after_ws.fragment(), b"chains") {
             let start = after_ws;
             let (rest, _) = tag(&b"chains"[..]).parse(after_ws)?;
@@ -1609,8 +1608,8 @@ fn kerml_feature_relationship_parts(
             let (rest, _) = ws1(rest)?;
             let (rest, first) = qualified_reference(rest)?;
             let (rest, more) = nom::multi::many0(preceded(
-                preceded(ws_and_comments, tag(&b","[..])),
-                preceded(ws_and_comments, qualified_reference),
+                preceded(ws_and_notes, tag(&b","[..])),
+                preceded(ws_and_notes, qualified_reference),
             ))
             .parse(rest)?;
             let mut targets = vec![first];
@@ -1666,7 +1665,7 @@ pub(crate) fn kerml_feature(
             b"end",
             b"readonly",
         ];
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         let fragment = cursor.fragment();
         if !STARTERS
             .iter()
@@ -1683,12 +1682,12 @@ pub(crate) fn kerml_feature(
 
 fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, is_member) = opt(preceded(tag(&b"member"[..]), ws1)).parse(input)?;
     // `FeaturePrefix` (KerML BNF 584). `member` is not part of it -- `TypeFeatureMember` (523)
     // puts that keyword on the membership, ahead of the whole prefix.
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, mut prefix) = crate::parser::feature_prefix::feature_prefix(input)?;
     // `OwnedCrossFeatureMember` (592) hangs off the `end` alternative only, and needs the
     // declaration parsers this scope already has, so the choice is filled in here.
@@ -1716,7 +1715,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     }
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
     // Leading redefinition may replace the name: `portion feature redefines spaceBoundary [1];`.
-    let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+    let (input, leading_redefines) = opt(preceded(ws_and_notes, redefinition)).parse(input)?;
     // The name itself is also optional when a specialization/typing/multiplicity/body follows
     // directly: `step :> monitor.startObservation { ... }`, `private composite step : add
     // { ... }` (`Observation.kerml`, `SequenceFunctions.kerml`).
@@ -1725,7 +1724,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     let (input, short_name) = if leading_redefines.is_some() {
         (input, None)
     } else {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if peek.fragment().starts_with(b"<") {
             crate::parser::lex::short_name_prefix(peek)?
         } else {
@@ -1735,7 +1734,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     let (input, name_str) = if leading_redefines.is_some() {
         (input, None)
     } else {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if peek.fragment().starts_with(b":")
             || peek.fragment().starts_with(b"[")
             || peek.fragment().starts_with(b"{")
@@ -1746,7 +1745,7 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
         {
             (input, None)
         } else {
-            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            let (input, n) = preceded(ws_and_notes, name).parse(input)?;
             (input, Some(n))
         }
     };
@@ -1816,14 +1815,14 @@ fn kerml_feature_specialization_part(
     input: Input<'_>,
 ) -> IResult<Input<'_>, KermlFeatureSpecializationPart> {
     let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
     let (input, early_specializations) = crate::parser::usage::feature_specializations(input)?;
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::usage::multiplicity_node,
         ))
         .parse(input)?
@@ -1840,7 +1839,7 @@ fn kerml_feature_specialization_part(
     let (input, post_specialization_multiplicity) =
         if leading_multiplicity.is_none() && trailing_multiplicity.is_none() {
             opt(preceded(
-                ws_and_comments,
+                ws_and_notes,
                 crate::parser::usage::multiplicity_node,
             ))
             .parse(input)?
@@ -1879,7 +1878,7 @@ fn kerml_invariant_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlInvariantMember>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     if !starts_with_keyword(input.fragment(), b"inv") {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -1890,7 +1889,7 @@ fn kerml_invariant_member_inner(
     let (input, _) = tag(&b"inv"[..]).parse(input)?;
     // `Invariant = FeaturePrefix 'inv' ( 'true' | isNegated ?= 'false' )? FeatureDeclaration
     // ValuePart? FunctionBody` (KerML 8.2.5.8.1).
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let (input, is_true, is_negated) = if starts_with_keyword(peek.fragment(), b"true") {
         (tag(&b"true"[..]).parse(peek)?.0, true, false)
     } else if starts_with_keyword(peek.fragment(), b"false")
@@ -1906,7 +1905,7 @@ fn kerml_invariant_member_inner(
         (input, false, false)
     };
     let (input, name_str) = {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if peek.fragment().starts_with(b":")
             || peek.fragment().starts_with(b"[")
             || peek.fragment().starts_with(b"{")
@@ -1915,13 +1914,13 @@ fn kerml_invariant_member_inner(
         {
             (input, None)
         } else {
-            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            let (input, n) = preceded(ws_and_notes, name).parse(input)?;
             (input, Some(n))
         }
     };
     let (input, part) = kerml_feature_specialization_part(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if !peek.fragment().starts_with(b"{") && !peek.fragment().starts_with(b";") {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -2338,7 +2337,7 @@ fn body_element(
         // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
         // `private thisClock : Clock :>> self;`) -- tried before the bare-expression arm,
         // which cannot represent the typing/redefinition. `calc_named_binding` requires a
-        // value or redefinition, so plain expression statements never land here.
+        // `;`, which a result expression never has.
         (
             next,
             CalcDefBodyElement::DefaultReferenceUsage(Box::new(binding)),
@@ -2363,7 +2362,7 @@ fn body_element(
             },
         )
     };
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_notes, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -2384,7 +2383,7 @@ fn refuses_result_expression_fallback(input: Input<'_>) -> bool {
         b"if", b"not", b"all", b"new", b"true", b"false", b"null", b"and", b"or", b"xor",
         b"implies", b"istype", b"hastype", b"as", b"meta",
     ];
-    let Ok((input, _)) = ws_and_comments(input) else {
+    let Ok((input, _)) = ws_and_notes(input) else {
         return false;
     };
     // `ResultExpressionMember = MemberPrefix OwnedExpression`, so a visibility keyword alone
@@ -2457,7 +2456,7 @@ fn malformed_feature_prefix_continuation(input: Input<'_>) -> bool {
 }
 
 fn named_in_out_missing_type(input: Input<'_>) -> bool {
-    let Ok((after_ws, _)) = ws_and_comments(input) else {
+    let Ok((after_ws, _)) = ws_and_notes(input) else {
         return false;
     };
     let direction_len = if starts_with_keyword(after_ws.fragment(), b"inout") {
@@ -2510,7 +2509,7 @@ fn named_in_out_missing_type(input: Input<'_>) -> bool {
 }
 
 fn named_return_missing_type(input: Input<'_>) -> bool {
-    let Ok((after_ws, _)) = ws_and_comments(input) else {
+    let Ok((after_ws, _)) = ws_and_notes(input) else {
         return false;
     };
     let mut rest = *after_ws.fragment();
@@ -2564,10 +2563,10 @@ fn named_return_missing_type(input: Input<'_>) -> bool {
 
 /// `return sum(parts.massKg);` — expression return (SysML calc / return-ref body), not `return name : Type;`.
 pub(crate) fn return_expression_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, expr) = expression(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_notes, tag(&b";"[..]))).parse(input)?;
     Ok((input, expr))
 }
 
@@ -2603,11 +2602,11 @@ pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDec
 fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     let start = input;
     let (input, _) = tag(&b"return"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `return :>> name : Type = expr;`
     let (input, is_redefine) = if input.fragment().starts_with(b":>>") {
         let (input, _) = tag(&b":>>"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         (input, true)
     } else {
         (input, false)
@@ -2624,7 +2623,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     )))
     .parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // A leading `return :>> <target> ...` names a semantic redefinition target -- which may be
     // `::`-qualified (`return :>> ISQ::power = ...;`, Apollo 11) -- not a new declaration, so it
     // is parsed as a reference and stored on `redefines`, mirroring `case_return_decl_inner`.
@@ -2654,17 +2653,17 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
         let (input, n) = name(input)?;
         (input, Some(n), None)
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // The typing is optional on named results: `return result [1..1];`, `return sampling =
     // new SampledFunction(...);` (Domain Libraries `SampledFunctions.sysml`).
     let (input, is_subsetting, type_name) =
         if input.fragment().starts_with(b":>") && !input.fragment().starts_with(b":>>") {
             let (input, _) = tag(&b":>"[..]).parse(input)?;
-            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
             (input, true, Some(target))
         } else if input.fragment().starts_with(b":") {
             let (input, _) = tag(&b":"[..]).parse(input)?;
-            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
             (input, false, Some(target))
         } else if n.is_none() && leading_redefines.is_none() {
             // Nothing declared at all -- not a return declaration.
@@ -2678,7 +2677,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     // Multiplicity and `ordered`/`nonunique` after the type: `return : Real[1] = x;`,
     // `return : Anything[0..*] ordered nonunique;` (Kernel Function Library).
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -2687,7 +2686,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     // values;`, `FeatureReferencingPerformances.kerml`).
     let mut input = input;
     let mut redefines: Option<Node<crate::ast::SubsettingRelationship>> = leading_redefines;
-    while let Ok((rest, clause)) = preceded(ws_and_comments, redefinition).parse(input) {
+    while let Ok((rest, clause)) = preceded(ws_and_notes, redefinition).parse(input) {
         match &mut redefines {
             None => redefines = Some(clause),
             Some(existing) => {

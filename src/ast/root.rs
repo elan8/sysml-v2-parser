@@ -684,7 +684,7 @@ mod serde_tests {
 
     #[test]
     fn parsed_document_rejects_tampered_import_suffix_token_provenance() {
-        let document = crate::parse("private import A:: /* wildcard */ *;").expect("parse import");
+        let document = crate::parse("private import A:: //* wildcard */ *;").expect("parse import");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
         let marker = find_field_mut(&mut encoded, "marker_span").expect("marker span");
         marker["len"] = serde_json::json!(2);
@@ -696,7 +696,7 @@ mod serde_tests {
 
     #[test]
     fn parsed_document_rejects_tampered_combined_suffix_provenance() {
-        let document = crate::parse("private import A::* /* gap */ ::**;").expect("parse import");
+        let document = crate::parse("private import A::* //* gap */ ::**;").expect("parse import");
         let mut encoded = serde_json::to_value(document).expect("serialize document");
         let combined = find_field_mut(&mut encoded, "combined_recursive_suffix_span")
             .expect("combined suffix span");
@@ -710,7 +710,7 @@ mod serde_tests {
     #[test]
     fn parsed_document_rejects_tampered_expose_filter_delimiter_provenance() {
         let document = crate::parse(
-            "package P { view v : V { expose Filtered [ /* gap */ Filters::One ]; } }",
+            "package P { view v : V { expose Filtered [ //* gap */ Filters::One ]; } }",
         )
         .expect("parse expose filter");
         let mut encoded = serde_json::to_value(document).expect("serialize document");

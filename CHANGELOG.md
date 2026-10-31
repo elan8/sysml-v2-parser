@@ -2030,7 +2030,7 @@ re-parse against this schema rather than reuse a cached 0.55.0-era AST.
   - A comment between the production's keywords is trivia again. `assert /* why */ satisfy r by p;`
     failed because the separator after `assert` was `ws1`, which consumes whitespace but stops at
     `/`, leaving the comment in front of `satisfy`; the shared keyword token now separates with
-    `ws_and_comments`. A keyword *abutting* a comment (`satisfy/* c */ r`) is still rejected by the
+    `ws_and_notes`. A keyword *abutting* a comment (`satisfy/* c */ r`) is still rejected by the
     crate-wide keyword-boundary predicate, exactly as `part/* c */ a;` is.
 
 - **The `@` and `#` metadata sigils are typed and source-backed; the last opaque annotation node
@@ -6092,7 +6092,7 @@ Six items against `src/ast/core.rs`'s `Expression` enum and `src/parser/expr.rs`
   only `Expression::FeatureRef`/`Expression::MemberAccess` folded chains into nested expression
   nodes with no reusable, standalone shape. New `FeatureChain { segments: Vec<String>, span: Span
   }` in `src/ast/feature_chain.rs`, with a `parser::feature_chain` parser in
-  `src/parser/feature_chain.rs` built on the existing `name`/`ws_and_comments` lexer helpers.
+  `src/parser/feature_chain.rs` built on the existing `name`/`ws_and_notes` lexer helpers.
   Deliberately **not** wired into `Expression` or `src/parser/expr.rs` — PAR-005 (complete
   expression AST) is expected to adopt this type for its own `path_expression` parsing once it
   lands, without needing to touch `expr.rs`. The parser function is unused today

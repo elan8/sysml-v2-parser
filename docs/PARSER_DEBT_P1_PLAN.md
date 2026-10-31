@@ -91,7 +91,7 @@ pub(crate) fn parse_definition_prefix(
 
 **Behavior (order)**
 
-1. `ws_and_comments`
+1. `ws_and_notes`
 2. Optional `#name` when `AnnotationMode::HashIdentifier`
 3. Optional `abstract` when `abstract_allowed`
 4. Optional `private` when configured (see constraint outlier below)

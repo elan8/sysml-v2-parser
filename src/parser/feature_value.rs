@@ -6,7 +6,7 @@
 
 use crate::ast::{Expression, FeatureValue, FeatureValueKind, Node};
 use crate::parser::expr::expression;
-use crate::parser::lex::{ws1, ws_and_comments};
+use crate::parser::lex::{ws1, ws_and_notes};
 use crate::parser::{node_from_to, Input};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -35,7 +35,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                     is_default: false,
                     has_operator: true,
                 },
-                ws_and_comments,
+                ws_and_notes,
             ),
         ),
         // `:= expr`
@@ -47,7 +47,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                     is_default: false,
                     has_operator: true,
                 },
-                ws_and_comments,
+                ws_and_notes,
             ),
         ),
         // `default` (`=` | `:=`)? expr
@@ -62,7 +62,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                             is_default: true,
                             has_operator: true,
                         },
-                        ws_and_comments,
+                        ws_and_notes,
                     ),
                 ),
                 preceded(
@@ -73,7 +73,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                             is_default: true,
                             has_operator: true,
                         },
-                        ws_and_comments,
+                        ws_and_notes,
                     ),
                 ),
                 nom::combinator::value(
@@ -82,7 +82,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                         is_default: true,
                         has_operator: false,
                     },
-                    ws_and_comments,
+                    ws_and_notes,
                 ),
             )),
         ),
@@ -115,12 +115,12 @@ pub(crate) fn wrap_bind_expression(expr: Node<Expression>) -> Node<FeatureValue>
 /// `default expr`. Shared by attribute def/usage, part usage, and ref decl value clauses.
 pub(crate) fn feature_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureValue>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, prefix) = feature_value_prefix(input)?;
     // A `{ ... }` after the prefix is a standalone KerML `BodyExpression` value, e.g. the pin
     // initializers `default {true}` / `default {false}` (Systems Library `Actions.sysml`) --
     // previously consumed as an opaque brace and discarded by `in_out_decl`.
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let (input, expression): (Input<'_>, Node<Expression>) = if peek.fragment().starts_with(b"{") {
         let (input, body) = crate::parser::expr::body_expression(input)?;
         let span = body.span;

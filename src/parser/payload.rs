@@ -6,7 +6,7 @@ use crate::ast::{
 use crate::parser::action::action_usage_body;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_notes,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -21,9 +21,9 @@ use nom::Parser;
 /// Required typed payload: `name : qualified_name`.
 pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, PayloadClause> {
     let (input, name) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b":"[..])).parse(input)?;
     let (input, (type_span, type_name)) =
-        preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
+        preceded(ws_and_notes, with_span(qualified_reference)).parse(input)?;
     Ok((
         input,
         PayloadClause {
@@ -51,7 +51,7 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"accept") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -63,7 +63,7 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
 }
 
 fn transition_accept_inner(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"accept"[..])).parse(input)?;
     accept_parameter_part(input, true)
 }
 
@@ -113,12 +113,12 @@ fn accept_parameter_part(
     let payload_name = name(input).ok().map(|(_, value)| value);
     let (input, expr_node) = expression(input)?;
     let (input, type_suffix) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, with_span(qualified_reference)),
+        preceded(ws_and_notes, tag(&b":"[..])),
+        preceded(ws_and_notes, with_span(qualified_reference)),
     ))
     .parse(input)?;
     let (input, via) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws_and_notes, tag(&b"via"[..])),
         preceded(ws1, expression),
     ))
     .parse(input)?;
@@ -155,7 +155,7 @@ fn control_node_payload_stmt<'a>(
     keyword: &'a [u8],
 ) -> IResult<Input<'a>, Node<ActionUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(keyword).parse(input)?;
     let is_send = keyword == b"send";
 
@@ -164,7 +164,7 @@ fn control_node_payload_stmt<'a>(
         // Peek for `via`/`to` first: neither is reserved in `name`/`expression`, so an empty
         // payload (BNF `EmptyParameterMember`) would otherwise be greedily consumed as a bare
         // feature reference instead of being left for the `via`/`to` clauses below.
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         let payload_follows = !starts_with_any_keyword(peek.fragment(), &[b"via", b"to"]);
         let (input, payload) = if payload_follows {
             opt(alt((
@@ -195,7 +195,7 @@ fn control_node_payload_stmt<'a>(
 
     let (input, via) = if is_send {
         opt(preceded(
-            preceded(ws_and_comments, tag(&b"via"[..])),
+            preceded(ws_and_notes, tag(&b"via"[..])),
             preceded(ws1, expression),
         ))
         .parse(input)?
@@ -204,7 +204,7 @@ fn control_node_payload_stmt<'a>(
     };
     let (input, to) = if is_send {
         opt(preceded(
-            preceded(ws_and_comments, tag(&b"to"[..])),
+            preceded(ws_and_notes, tag(&b"to"[..])),
             preceded(ws1, expression),
         ))
         .parse(input)?
@@ -212,7 +212,7 @@ fn control_node_payload_stmt<'a>(
         (input, None)
     };
 
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = action_usage_body(input)?;
     Ok((
         input,
@@ -254,7 +254,7 @@ fn control_node_payload_stmt<'a>(
 }
 
 pub(crate) fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let frag = peek.fragment();
     if starts_with_keyword(frag, b"accept") {
         return control_node_payload_stmt(input, b"accept");

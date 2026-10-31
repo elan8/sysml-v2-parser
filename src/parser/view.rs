@@ -10,7 +10,7 @@ use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
+    name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_notes,
     VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::requirement_def_body;
@@ -183,7 +183,7 @@ fn rendering_usage_body_recovery(
 }
 
 fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -210,8 +210,8 @@ pub(crate) fn view_rendering_usage(
 ) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"render"[..])).parse(input)?;
+        preceded(ws_and_notes, visibility_prefix).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"render"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     // BNF `ViewRenderingUsage`'s second alternative: `('rendering' | UsageExtensionKeyword+)
     // Usage` -- explicit typed usage declaration, vs. the first alternative's bare reference-
@@ -259,7 +259,7 @@ fn view_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewDefBodyE
 }
 
 fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -395,7 +395,7 @@ fn rendering_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<Renderi
 }
 
 fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -510,7 +510,7 @@ pub(crate) fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeM
 
 fn expose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"expose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let target_start = input;
     let (after_reference, reference) = reference_path(input)?;
@@ -555,7 +555,7 @@ fn view_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewBodyElement>
 }
 
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -607,7 +607,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
 
 fn view_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     // `keyword_token` supplies the token boundary, so `viewpoint` is not claimed here, and it
@@ -621,7 +621,7 @@ fn view_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
         )));
     }
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let fragment = input.fragment();
     let opens_clause = [b":".as_slice(), b"[", b";", b"{", b"="]
         .iter()
@@ -651,7 +651,7 @@ fn view_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
         .subsetting_value
         .map(crate::parser::feature_value::wrap_bind_expression);
     let (input, explicit_value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
@@ -682,7 +682,7 @@ fn view_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
 
 pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewpointUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
@@ -716,7 +716,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
 
 pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, is_abstract) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -724,10 +724,10 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     // The declaration name is optional: the anonymous redefinition form `rendering :>>
     // subrenderings[0..*] = columnView.viewRendering;` (Systems Library `Views.sysml`) goes
     // straight to its specialization clause.
-    let (after_gap, _) = ws_and_comments(input)?;
+    let (after_gap, _) = ws_and_notes(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (after_gap, input) = if short_name.is_some() {
-        let (after_gap, _) = ws_and_comments(input)?;
+        let (after_gap, _) = ws_and_notes(input)?;
         (after_gap, after_gap)
     } else {
         (after_gap, input)
@@ -749,13 +749,10 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     // Header clauses, each retained: leading `:>>` redefinition (the anonymous form), typing,
     // multiplicity (before or after the typing), and a `:>` subsets clause -- `asTreeDiagram :
     // GraphicalRendering[1] :> renderings { ... }` (Systems Library `Views.sysml`).
-    let (input, leading_redefines) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::redefinition,
-    ))
-    .parse(input)?;
+    let (input, leading_redefines) =
+        opt(preceded(ws_and_notes, crate::parser::usage::redefinition)).parse(input)?;
     let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -763,7 +760,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let type_name = type_result.and_then(|(_, _, targets, _)| targets.first().copied());
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::usage::multiplicity_node,
         ))
         .parse(input)?
@@ -772,16 +769,12 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     };
     let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, redefines) = if leading_redefines.is_none() {
-        opt(preceded(
-            ws_and_comments,
-            crate::parser::usage::redefinition,
-        ))
-        .parse(input)?
+        opt(preceded(ws_and_notes, crate::parser::usage::redefinition)).parse(input)?
     } else {
         (input, leading_redefines)
     };
     let (input, subsets) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+        opt(preceded(ws_and_notes, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
     // Optional value clause: `= columnView.viewRendering` (Systems Library `Views.sysml`).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;

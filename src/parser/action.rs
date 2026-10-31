@@ -18,7 +18,7 @@ use crate::parser::expr::{expression, path_expression};
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::lex::{
     name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
-    ws1, ws_and_comments,
+    ws1, ws_and_notes,
 };
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
@@ -104,7 +104,7 @@ const UNTIL_SEMI_OR_BRACE: &[u8] = b";{";
 /// keeps it from reaching the member parser as unrecognized content.
 fn annotating_member_stmt(input: Input<'_>) -> IResult<Input<'_>, crate::ast::AnnotatingMember> {
     let (input, member) = crate::parser::body::annotating_member(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_notes, tag(&b";"[..]))).parse(input)?;
     Ok((input, member))
 }
 
@@ -136,7 +136,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     };
 
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = opt(alt((
         preceded(tag(&b"public"[..]), ws1),
         preceded(tag(&b"private"[..]), ws1),
@@ -163,7 +163,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
     let (input, parsed_name) = opt(name).parse(input)?;
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -203,15 +203,15 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
     // ActionUsage :> Metadata::metadataItems;`. Without this the clause reached the
     // skip-to-terminator below and was swallowed whole.
     let (input, subsets) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::subsetting_before_value,
     ))
     .parse(input)?;
     // The whole `ValuePart` (`=`, `:=`, `default`, `default :=`), as the part-body route keeps
     // it. Only `= expr` was read here, so `ref :>> x default y;` lost its value to the skip
     // below with no diagnostic (#173).
-    let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
-    let (mut input, _) = ws_and_comments(input)?;
+    let (input, value) = opt(preceded(ws_and_notes, feature_value_part)).parse(input)?;
+    let (mut input, _) = ws_and_notes(input)?;
 
     // Accept and skip any remaining unmodeled shorthand before the body/terminator.
     if !input.fragment().is_empty()
@@ -348,7 +348,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         // Past `MemberPrefix`: `private in x : Real;`.
         let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
         if !(starts_with_keyword(cursor.fragment(), b"in")
@@ -366,7 +366,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
 
 fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let membership = crate::ast::Membership::feature(visibility, visibility_span);
     let (input, direction) = alt((
@@ -378,7 +378,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     // `in item …` / `in part …` are StructureUsageMembers and `in occurrence …` is an
     // OccurrenceUsageMember, not plain InOutDecl parameters. Fail here (before the unstructured
     // fallback) so action-body dispatch can try those arms.
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if starts_with_keyword(peek.fragment(), b"item")
         || starts_with_keyword(peek.fragment(), b"part")
         || starts_with_keyword(peek.fragment(), b"occurrence")
@@ -397,7 +397,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     // multiplicity form (`in :>> payload [0..*];`) and the comma-separated multi-target form
     // (`in :>> MessageTransfer::payload, MessageAction::payload;`), both from Systems Library
     // `Actions.sysml`'s `SendAction`/`TransitionAction`.
-    let (peek_redef, _) = ws_and_comments(input)?;
+    let (peek_redef, _) = ws_and_notes(input)?;
     if peek_redef.fragment().starts_with(b":>>")
         || starts_with_keyword(peek_redef.fragment(), b"redefines")
     {
@@ -406,12 +406,11 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // `out attribute :>> a_out : AccelerationValue = Acceleration(dt, tm, tp);`
         // (Systems Library-adjacent Analysis Examples/Dynamics.sysml:64, GH-86).
         let (input, type_name) = opt(preceded(
-            preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, qualified_reference),
+            preceded(ws_and_notes, tag(&b":"[..])),
+            preceded(ws_and_notes, qualified_reference),
         ))
         .parse(input)?;
-        let (input, multiplicity) =
-            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        let (input, multiplicity) = opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
         let (input, modifiers) = multiplicity_modifier_slots(input)?;
         let (input, value) = opt(feature_value_part).parse(input)?;
         let (input, body) = crate::parser::body::semicolon_body(input)?;
@@ -458,12 +457,12 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // The parameter's `UsageDeclaration` reaches `Identification`, so a short name may
         // precede the name or stand alone: `in <'X1'> x : T;`, `in <'X1'> : T;`.
         let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-        let (peek_anon, _) = ws_and_comments(input)?;
+        let (peek_anon, _) = ws_and_notes(input)?;
         let (input, param_name) =
             if peek_anon.fragment().starts_with(b":") && !peek_anon.fragment().starts_with(b":>") {
                 (input, None)
             } else {
-                let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+                let (input, n) = preceded(ws_and_notes, name).parse(input)?;
                 (input, Some(n))
             };
         // BNF `FeatureSpecializationPart` allows the `MultiplicityPart` before or after the
@@ -471,7 +470,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // `States.sysml`) vs `inout replacementValues : Anything[0..*] nonunique;`
         // (`Actions.sysml`). Accept one multiplicity clause in either position.
         let (input, leading_multiplicity) =
-            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+            opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
         let (input, modifiers) = multiplicity_modifier_slots(input)?;
         // In action usages, pin declarations may omit the type (e.g. `out videoStream;`)
         // to reference the corresponding typed parameter on the referenced action definition.
@@ -484,13 +483,11 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         let subsets_start = input;
         let subsets_attempt =
             (|| -> IResult<Input<'_>, Node<crate::ast::SubsettingRelationship>> {
-                let (i, _) = preceded(ws_and_comments, crate::parser::lex::subset_operator)
+                let (i, _) = preceded(ws_and_notes, crate::parser::lex::subset_operator)
                     .parse(subsets_start)?;
-                let (i, targets) = preceded(
-                    ws_and_comments,
-                    crate::parser::usage::specialization_targets,
-                )
-                .parse(i)?;
+                let (i, targets) =
+                    preceded(ws_and_notes, crate::parser::usage::specialization_targets)
+                        .parse(i)?;
                 let span = crate::parser::span_from_to(subsets_start, i);
                 Ok((
                     i,
@@ -507,14 +504,14 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         };
         let (input, type_name) = nom::combinator::opt(map(
             (
-                preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, qualified_reference),
+                preceded(ws_and_notes, tag(&b":"[..])),
+                preceded(ws_and_notes, qualified_reference),
             ),
             |(_, tn)| tn,
         ))
         .parse(input)?;
         let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
-            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+            opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?
         } else {
             (input, None)
         };
@@ -524,14 +521,14 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // multi-target form: `in transitionLinkSource[1]: StateAction :>>
         // TransitionAction::transitionLinkSource, StateTransitionPerformance::
         // transitionLinkSource;` (Systems Library `States.sysml`).
-        let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+        let (input, redefines) = opt(preceded(ws_and_notes, redefinition)).parse(input)?;
         // The typing may trail the redefinition target: `in enclosingItem :>> 'frame' :
         // SpatialItem[1];` (Domain Libraries `SpatialItems.sysml`).
         let (input, type_name) = if type_name.is_none() && redefines.is_some() {
             opt(map(
                 (
-                    preceded(ws_and_comments, tag(&b":"[..])),
-                    preceded(ws_and_comments, qualified_reference),
+                    preceded(ws_and_notes, tag(&b":"[..])),
+                    preceded(ws_and_notes, qualified_reference),
                 ),
                 |(_, tn)| tn,
             ))
@@ -541,7 +538,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         };
         let (input, trailing_multiplicity) =
             if trailing_multiplicity.is_none() && leading_multiplicity.is_none() {
-                opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+                opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?
             } else {
                 (input, trailing_multiplicity)
             };
@@ -583,7 +580,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 
 /// Action def body: `;` or `{` ActionDefBodyElement* `}`
 pub(crate) fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     alt((crate::parser::body::semicolon_body, action_def_body_brace)).parse(input)
 }
 
@@ -628,19 +625,19 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
 
 fn assign_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, is_then) = opt(map(preceded(tag(&b"then"[..]), ws1), |_| true)).parse(input)?;
     let is_then = is_then.unwrap_or(false);
     let (input, prefix) = action_node_prefix_before(input, &[b"assign"])?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"assign"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"assign"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
 
     // LHS: structured feature-chain target (SysML v2 `AssignmentTargetParameter`).
     let (input, lhs) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b":="[..])).parse(input)?;
 
-    let (after_rhs, rhs) = preceded(ws_and_comments, expression).parse(input)?;
-    let (after_semi, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(after_rhs)?;
+    let (after_rhs, rhs) = preceded(ws_and_notes, expression).parse(input)?;
+    let (after_semi, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(after_rhs)?;
 
     Ok((
         after_semi,
@@ -677,17 +674,17 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
 fn for_loop_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let start = input;
     let (input, prefix) = action_node_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"for"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, variable) = for_variable_declaration(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (in_span, _)) = with_span(tag(&b"in"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     // A successfully parsed loop always owns a typed node parameter. If it is malformed, the
     // complete production fails so the containing editor body inserts an explicit recovery node;
     // `reference_transaction` also discards any references allocated before that failure.
     let (input, expression) = expression(input)?;
-    let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+    let (input, body) = preceded(ws_and_notes, action_body_parameter).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -732,7 +729,7 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
             with_span(|i| {
                 nom::sequence::terminated(
                     crate::parser::payload::transition_accept,
-                    preceded(ws_and_comments, tag(&b";"[..])),
+                    preceded(ws_and_notes, tag(&b";"[..])),
                 )
                 .parse(i)
             }),
@@ -765,7 +762,7 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         // structure instead of being recovered as an unrecognized succession target.
         map(if_stmt, ThenTarget::If),
         map(
-            nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
+            nom::sequence::terminated(path_expression, preceded(ws_and_notes, tag(&b";"[..]))),
             ThenTarget::Feature,
         ),
     ))
@@ -775,7 +772,7 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
 /// `send ...` as a `then` succession target -- only the `send` control-node form, so the other
 /// control keywords keep their own arms.
 fn then_send_target(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if !starts_with_keyword(peek.fragment(), b"send") {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -787,7 +784,7 @@ fn then_send_target(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
 
 pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = then_or_else_target(input)?;
@@ -817,7 +814,7 @@ fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Action
     if let Ok(result) = crate::parser::payload::control_node_action_usage(input) {
         return Ok(result);
     }
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if starts_with_any_keyword(peek.fragment(), CONTROL_NODE_KEYWORDS) {
         return visibility_action_usage(input);
     }
@@ -855,7 +852,7 @@ pub(crate) fn action_def_body_element(
     use crate::parser::state::state_usage;
 
     // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's annotating
-    // member, which is the `Comment` production's keyword-less spelling. `ws_and_comments` here
+    // member, which is the `Comment` production's keyword-less spelling. `ws_and_notes` here
     // consumed it as trivia before any alternative could claim it.
     let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
@@ -1271,7 +1268,7 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let frag = peek.fragment();
     // GH-92.3: unnamed `succession : Type first a then b;` (a `:` type clause with no name at
     // all) -- previously only "no name, multiplicity/`first` follows directly" was recognized as
@@ -1283,20 +1280,20 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     {
         (input, None)
     } else {
-        let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+        let (input, parsed_name) = preceded(ws_and_notes, name).parse(input)?;
         (input, Some(parsed_name))
     };
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let (input, succession_type) =
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_notes, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
         };
     let (input, succession_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     Ok((
         input,
         (
@@ -1315,7 +1312,7 @@ pub(crate) fn guarded_succession(input: Input<'_>) -> IResult<Input<'_>, Node<Gu
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !(starts_with_keyword(cursor.fragment(), b"first")
             || starts_with_keyword(cursor.fragment(), b"succession"))
         {
@@ -1330,11 +1327,11 @@ pub(crate) fn guarded_succession(input: Input<'_>) -> IResult<Input<'_>, Node<Gu
 
 fn guarded_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<GuardedSuccession>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, succession) = if starts_with_keyword(input.fragment(), b"succession") {
         let (input, (keyword_span, _)) = with_span(tag(&b"succession"[..])).parse(input)?;
         let (input, _) = ws1(input)?;
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         // `UsageDeclaration`'s identification is optional in the Pilot grammar and its pinned
         // shape can begin directly with a specialization or multiplicity. Keep that zero-width
         // authored declaration explicit rather than fabricating one after parsing the tail.
@@ -1356,22 +1353,17 @@ fn guarded_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Guarded
     } else {
         (input, None)
     };
-    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, first) =
-        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
-    let (input, (if_span, _)) =
-        preceded(ws_and_comments, with_span(tag(&b"if"[..]))).parse(input)?;
+    let (input, first) = preceded(ws_and_notes, crate::parser::lex::reference_path).parse(input)?;
+    let (input, (if_span, _)) = preceded(ws_and_notes, with_span(tag(&b"if"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, guard) = preceded(ws_and_comments, expression).parse(input)?;
+    let (input, guard) = preceded(ws_and_notes, expression).parse(input)?;
     let (input, (then_span, _)) =
-        preceded(ws_and_comments, with_span(tag(&b"then"[..]))).parse(input)?;
+        preceded(ws_and_notes, with_span(tag(&b"then"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, target) = preceded(
-        ws_and_comments,
-        crate::parser::constraint::kerml_connector_end,
-    )
-    .parse(input)?;
+    let (input, target) =
+        preceded(ws_and_notes, crate::parser::constraint::kerml_connector_end).parse(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
@@ -1396,7 +1388,7 @@ pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         if !(starts_with_keyword(cursor.fragment(), b"first")
             || starts_with_keyword(cursor.fragment(), b"succession"))
         {
@@ -1411,23 +1403,23 @@ pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>
 
 fn first_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, succession) = opt(succession_prefix).parse(input)?;
     let (succession_short_name, succession_name, succession_type, succession_multiplicity) =
         succession.unwrap_or((None, None, None, None));
-    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, first_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, first_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
+    let (input, first_expr) = preceded(ws_and_notes, path_expression).parse(input)?;
     // §6 G13: `then` is optional -- `first start;` on its own marks an initial node without
     // declaring a succession (OMG spec Annex `3a-Function-based Behavior-2.sysml`, where the
     // following `then merge continue;` / `then action ...;` lines supply the targets).
     let (input, then_parts) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"then"[..])),
+        preceded(ws_and_notes, tag(&b"then"[..])),
         (
-            opt(preceded(ws_and_comments, multiplicity_node)),
-            preceded(ws_and_comments, path_expression),
+            opt(preceded(ws_and_notes, multiplicity_node)),
+            preceded(ws_and_notes, path_expression),
         ),
     ))
     .parse(input)?;
@@ -1620,13 +1612,13 @@ pub(crate) fn terminate_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<Termin
 
 fn terminate_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, is_then) = opt(map(preceded(tag(&b"then"[..]), ws1), |_| true)).parse(input)?;
     let is_then = is_then.unwrap_or(false);
     let (input, prefix) = action_node_prefix_before(input, &[b"terminate"])?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"terminate"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"terminate"[..])).parse(input)?;
     let (input, target) = opt(preceded(ws1, path_expression)).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -1767,7 +1759,7 @@ fn action_body_parameter(input: Input<'_>) -> IResult<Input<'_>, ActionBodyParam
     } else {
         (input, None)
     };
-    let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+    let (input, body) = preceded(ws_and_notes, action_def_body_brace).parse(input)?;
     Ok((
         input,
         ActionBodyParameter {
@@ -1781,15 +1773,15 @@ fn action_body_parameter(input: Input<'_>) -> IResult<Input<'_>, ActionBodyParam
 /// present its expression and terminator are mandatory; accepting only the keyword would split a
 /// malformed loop across unrelated recovery nodes.
 fn optional_until_parameter(input: Input<'_>) -> IResult<Input<'_>, Option<UntilParameter>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if !starts_with_keyword(peek.fragment(), b"until") {
         return Ok((input, None));
     }
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (until_span, _)) = with_span(tag(&b"until"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, expression) = expression(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (semicolon_span, _)) = with_span(tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -1821,12 +1813,12 @@ fn while_or_loop_stmt(input: Input<'_>) -> IResult<Input<'_>, WhileOrLoop> {
     crate::parser::span::reference_transaction(input, |input| {
         let start = input;
         let (input, prefix) = action_node_prefix(input)?;
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if starts_with_keyword(peek.fragment(), b"while") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"while"[..])).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b"while"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
             let (input, condition) = expression(input)?;
-            let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+            let (input, body) = preceded(ws_and_notes, action_body_parameter).parse(input)?;
             let (input, until) = optional_until_parameter(input)?;
             return Ok((
                 input,
@@ -1842,8 +1834,8 @@ fn while_or_loop_stmt(input: Input<'_>) -> IResult<Input<'_>, WhileOrLoop> {
                 )),
             ));
         }
-        let (input, _) = preceded(ws_and_comments, tag(&b"loop"[..])).parse(input)?;
-        let (input, body) = preceded(ws_and_comments, action_body_parameter).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b"loop"[..])).parse(input)?;
+        let (input, body) = preceded(ws_and_notes, action_body_parameter).parse(input)?;
         let (input, until) = optional_until_parameter(input)?;
         Ok((
             input,
@@ -1896,12 +1888,12 @@ fn if_stmt_branch(node: Node<IfStmt>) -> crate::ast::ActionBranchBody {
 /// can itself be a nested `IfNode`, not just a body.
 fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"if"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, condition) = expression(input)?;
     let (input, then_body) = preceded(
-        ws_and_comments,
+        ws_and_notes,
         alt((
             map(action_def_body_brace, crate::ast::ActionBranchBody::Braced),
             map(then_action, then_action_branch),
@@ -1909,9 +1901,9 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     )
     .parse(input)?;
     let (input, else_body) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"else"[..])),
+        preceded(ws_and_notes, tag(&b"else"[..])),
         preceded(
-            ws_and_comments,
+            ws_and_notes,
             alt((
                 map(action_def_body_brace, crate::ast::ActionBranchBody::Braced),
                 map(if_stmt, if_stmt_branch),
@@ -1940,7 +1932,7 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
 /// `None` is that third case. The grammar requires a terminator, so recording its absence keeps
 /// the parser's leniency visible instead of fabricating a `;` nobody wrote.
 pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, Option<ActionUsageBody>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     alt((
         map(crate::parser::body::semicolon_body, Some),
         map(action_usage_body_brace, Some),
@@ -1952,7 +1944,7 @@ pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, Option<A
 /// Succeeds without consuming input when the next token cannot continue this usage header/body
 /// and instead begins a sibling action-body statement or closes the enclosing brace.
 fn peek_implicit_action_usage_body_end(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let frag = peek.fragment();
     if frag.starts_with(b"}")
         || starts_with_any_keyword(
@@ -2471,7 +2463,7 @@ fn is_anonymous_accept_or_send_payload(fragment: &[u8]) -> bool {
 /// Action usage: `(visibility)? (abstract|variation)? (ref)? action` name header (`accept` …)? body
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     // BNF `RefPrefix`: `( isAbstract ?= 'abstract' | isVariation ?= 'variation' )?`
     let (input, abstract_or_variation) = opt(alt((
@@ -2493,7 +2485,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     // SysML allows anonymous action usages: `action: Runner;` (Identification may be empty).
-    let (after_gap, _) = ws_and_comments(input)?;
+    let (after_gap, _) = ws_and_notes(input)?;
     // `action def …` is a definition, not a usage named `def`.
     if starts_with_keyword(after_gap.fragment(), b"def") {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -2555,10 +2547,10 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
     // `ActionUsageDeclaration = UsageDeclaration ValuePart?`.
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+        nom::combinator::opt(preceded(ws_and_notes, crate::parser::feature_value_part))
             .parse(input)?;
     let (input, accept) = nom::combinator::opt(preceded(
-        preceded(ws_and_comments, tag(&b"accept"[..])),
+        preceded(ws_and_notes, tag(&b"accept"[..])),
         crate::parser::payload::action_accept_parameter,
     ))
     .parse(input)?;
@@ -2574,13 +2566,13 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // clause correctly even when the payload is absent.
     let (input, saw_send_keyword, send) = if accept.is_none() {
         let (input, send_kw) =
-            nom::combinator::opt(preceded(ws_and_comments, tag(&b"send"[..]))).parse(input)?;
+            nom::combinator::opt(preceded(ws_and_notes, tag(&b"send"[..]))).parse(input)?;
         if send_kw.is_some() {
             // Peek for the `via`/`to` keywords first: neither is reserved in `name`/`expression`,
             // so without this guard an empty payload (BNF `EmptyParameterMember`) would greedily
             // swallow `via`/`to` itself as a bare feature reference instead of leaving it for the
             // `via`/`to` clauses below (GH-86, `action snd2 send via this to aa.target;`).
-            let (peek, _) = ws_and_comments(input)?;
+            let (peek, _) = ws_and_notes(input)?;
             let payload_follows = !starts_with_any_keyword(peek.fragment(), &[b"via", b"to"]);
             let (input, send) = if payload_follows {
                 nom::combinator::opt(preceded(
@@ -2615,7 +2607,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         .or(type_ref_span);
     let (input, via) = if saw_send_keyword {
         nom::combinator::opt(preceded(
-            preceded(ws_and_comments, tag(&b"via"[..])),
+            preceded(ws_and_notes, tag(&b"via"[..])),
             preceded(ws1, expression),
         ))
         .parse(input)?
@@ -2624,14 +2616,14 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     };
     let (input, to) = if saw_send_keyword {
         nom::combinator::opt(preceded(
-            preceded(ws_and_comments, tag(&b"to"[..])),
+            preceded(ws_and_notes, tag(&b"to"[..])),
             preceded(ws1, expression),
         ))
         .parse(input)?
     } else {
         (input, None)
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = action_usage_body(input)?;
     Ok((
         input,

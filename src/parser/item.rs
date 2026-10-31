@@ -4,7 +4,7 @@ use crate::ast::{ItemDef, ItemUsage, Node};
 use crate::parser::attribute::attribute_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, short_name_prefix, ws_and_comments};
+use crate::parser::lex::{name, short_name_prefix, ws_and_notes};
 use crate::parser::node_from_to;
 use crate::parser::occurrence_prefix::next_word_is_reserved;
 use crate::parser::usage::multiplicity_node;
@@ -68,7 +68,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
 
 fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `MemberPrefix` precedes the usage's own prefix.
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     // The whole shared `OccurrenceUsagePrefix`, not a hand-rolled subset: this parser previously
@@ -93,12 +93,12 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     let (input, name) = if next_word_is_reserved(input) {
         (input, None)
     } else {
-        opt(preceded(ws_and_comments, name)).parse(input)?
+        opt(preceded(ws_and_notes, name)).parse(input)?
     };
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, value) = opt(nom::sequence::preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value_part,
     ))
     .parse(input)?;
@@ -112,11 +112,11 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
         let (input, trailing) = crate::parser::usage::post_body_specialization(input)?;
         match trailing {
             Some((crate::ast::SubsettingKind::Redefines, relationship)) => {
-                let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+                let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
                 (input, Some(relationship), header.subsets)
             }
             Some((_, relationship)) => {
-                let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+                let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
                 (input, header.redefines, Some(relationship))
             }
             None => (input, header.redefines, header.subsets),

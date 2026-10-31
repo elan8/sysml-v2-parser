@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::parser::body::relationship_body;
 use crate::parser::expr::expression;
-use crate::parser::lex::{qualified_reference, ws1, ws_and_comments};
+use crate::parser::lex::{qualified_reference, ws1, ws_and_notes};
 use crate::parser::span::reference_transaction;
 use crate::parser::Input;
 use crate::parser::{node_from_to, span_from_to, with_span};
@@ -18,12 +18,12 @@ use nom::IResult;
 use nom::Parser;
 
 fn filter_package_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterPackageMember>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let start = input;
     let (input, (open_bracket_span, _)) = with_span(tag(&b"["[..]))(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, expression) = expression(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (close_bracket_span, _)) = with_span(tag(&b"]"[..]))(input)?;
     Ok((
         input,
@@ -49,7 +49,7 @@ fn import_suffix<'a>(
 ) -> IResult<Input<'a>, ImportSuffixSpans> {
     let start = input;
     let (input, (separator_span, _)) = with_span(tag(&b"::"[..]))(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (marker_span, _)) = with_span(tag(marker))(input)?;
     Ok((
         input,
@@ -63,10 +63,10 @@ fn import_suffix<'a>(
 
 /// Parse the typed suffix shared by import and expose targets.
 pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b"::") {
         let (marker_input, _) = tag(&b"::"[..]).parse(input)?;
-        let (marker_input, _) = ws_and_comments(marker_input)?;
+        let (marker_input, _) = ws_and_notes(marker_input)?;
         if marker_input.fragment().starts_with(b"**") {
             let (input, recursive_suffix) = import_suffix(input, b"**")?;
             let (input, members) = opt(filter_package_members).parse(input)?;
@@ -86,10 +86,8 @@ pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> 
         if marker_input.fragment().starts_with(b"*") {
             let suffix_start = input;
             let (input, wildcard_suffix) = import_suffix(input, b"*")?;
-            let (input, recursive_suffix) = opt(preceded(ws_and_comments, |input| {
-                import_suffix(input, b"**")
-            }))
-            .parse(input)?;
+            let (input, recursive_suffix) =
+                opt(preceded(ws_and_notes, |input| import_suffix(input, b"**"))).parse(input)?;
             let combined_recursive_suffix_span = recursive_suffix
                 .as_ref()
                 .map(|_| span_from_to(suffix_start, input));
@@ -130,9 +128,9 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     // Speculated at many member starts; refuse unless `import` follows the optional
     // visibility keyword, before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         let (cursor, _) = opt(crate::parser::lex::visibility_indicator).parse(cursor)?;
-        let (cursor, _) = crate::parser::lex::ws_and_comments(cursor)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(cursor)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -163,7 +161,7 @@ pub(crate) fn missing_visibility_node(
 /// Recovery owns this diagnosis for a bare import that could not be kept typed: its target is
 /// malformed, or the scope has no imports. A typed one reports through the recovery scan.
 pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
-    let (keyword_start, _) = ws_and_comments(input).ok()?;
+    let (keyword_start, _) = ws_and_notes(input).ok()?;
     if !crate::parser::lex::starts_with_keyword(keyword_start.fragment(), b"import") {
         return None;
     }
@@ -187,29 +185,29 @@ pub(crate) fn alias_clause_error(input: Input<'_>) -> Option<crate::ast::ParseEr
 }
 
 fn alias_clause_probe(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
-    let (cursor, _) = ws_and_comments(input).ok()?;
+    let (cursor, _) = ws_and_notes(input).ok()?;
     let (cursor, _) = opt(crate::parser::lex::visibility_indicator)
         .parse(cursor)
         .ok()?;
-    let (cursor, _) = ws_and_comments(cursor).ok()?;
+    let (cursor, _) = ws_and_notes(cursor).ok()?;
     if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"import") {
         return None;
     }
     let (cursor, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
         .parse(cursor)
         .ok()?;
-    let (cursor, _) = ws_and_comments(cursor).ok()?;
+    let (cursor, _) = ws_and_notes(cursor).ok()?;
     let (target_start, _) = opt(terminated(tag(&b"all"[..]), ws1)).parse(cursor).ok()?;
     let (after_reference, _) = qualified_reference(target_start).ok()?;
     let (after_shape, shape) = import_shape(after_reference).ok()?;
-    let (as_start, _) = ws_and_comments(after_shape).ok()?;
+    let (as_start, _) = ws_and_notes(after_shape).ok()?;
     if !crate::parser::lex::starts_with_keyword(as_start.fragment(), b"as") {
         return None;
     }
     let (after_as, _) = tag::<_, _, nom::error::Error<_>>(&b"as"[..])
         .parse(as_start)
         .ok()?;
-    let (after_as, _) = ws_and_comments(after_as).ok()?;
+    let (after_as, _) = ws_and_notes(after_as).ok()?;
     let renamed = crate::parser::lex::name(after_as).ok();
     let clause_end = renamed.map_or(after_as, |(rest, _)| rest);
     // An alias names one element, so only a plain membership target can become its target.
@@ -298,10 +296,10 @@ pub(crate) fn import_target_end(shape: &crate::ast::ImportShape, reference_end: 
 
 fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, authored_visibility) =
         opt(crate::parser::lex::visibility_indicator).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (import_keyword_span, _)) = with_span(tag(&b"import"[..]))(input)?;
     // The grammar requires the prefix. Keeping the typed import lets its target resolve; the
     // recovery scan reports the missing prefix on the keyword.
@@ -311,7 +309,7 @@ fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             import_keyword_span,
         },
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let target_start = input;
     let (input, all) = opt(terminated(with_span(tag(&b"all"[..])), ws1)).parse(input)?;
     let all_span = all.map(|(span, _)| span);
@@ -393,7 +391,7 @@ mod membership_tests {
     fn import_suffixes_are_typed_and_reference_excludes_wildcards() {
         let context = ParseContext::new();
         let source = crate::ast::SourceStorage::from(
-            "private import $::A::B:: /* wildcard */ * /* recurse */ :: /* marker */ **;",
+            "private import $::A::B:: //* wildcard */ * //* recurse */ :: //* marker */ **;",
         );
         let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
         assert!(rest.fragment().is_empty());
@@ -407,19 +405,19 @@ mod membership_tests {
         };
         assert_eq!(
             source.slice(&wildcard_suffix.span),
-            Some(":: /* wildcard */ *")
+            Some(":: //* wildcard */ *")
         );
         assert_eq!(source.slice(&wildcard_suffix.separator_span), Some("::"));
         assert_eq!(source.slice(&wildcard_suffix.marker_span), Some("*"));
         assert_eq!(
             source.slice(&recursive_suffix.span),
-            Some(":: /* marker */ **")
+            Some(":: //* marker */ **")
         );
         assert_eq!(source.slice(&recursive_suffix.separator_span), Some("::"));
         assert_eq!(source.slice(&recursive_suffix.marker_span), Some("**"));
         assert_eq!(
             source.slice(combined_span),
-            Some(":: /* wildcard */ * /* recurse */ :: /* marker */ **")
+            Some(":: //* wildcard */ * //* recurse */ :: //* marker */ **")
         );
         let arena = context.finish();
         let view = arena
@@ -433,7 +431,7 @@ mod membership_tests {
     fn filter_import_retains_typed_expression_members() {
         let context = ParseContext::new();
         let source = crate::ast::SourceStorage::from(
-            "private import A /* before */ [ /* left */ x /* right */ ] [y];",
+            "private import A //* before */ [ //* left */ x //* right */ ] [y];",
         );
         let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
         assert!(rest.fragment().is_empty());
@@ -446,7 +444,7 @@ mod membership_tests {
                 assert_eq!(members.len(), 2);
                 assert_eq!(
                     source.slice(&members[0].span),
-                    Some("[ /* left */ x /* right */ ]")
+                    Some("[ //* left */ x //* right */ ]")
                 );
                 assert_eq!(source.slice(&members[0].value.open_bracket_span), Some("["));
                 assert_eq!(

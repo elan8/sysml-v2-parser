@@ -25,7 +25,7 @@ use crate::parser::individual::individual_def;
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     name, qualified_declaration_name, recover_body_element, starts_with_any_keyword,
-    starts_with_keyword, visibility_indicator, ws1, ws_and_comments,
+    starts_with_keyword, visibility_indicator, ws1, ws_and_notes,
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
@@ -62,13 +62,13 @@ fn required_package_identification(
     input: Input<'_>,
 ) -> IResult<Input<'_>, QualifiedIdentification> {
     let (input, short_name) = opt(delimited(
-        preceded(ws_and_comments, tag(&b"<"[..])),
-        preceded(ws_and_comments, name),
-        preceded(ws_and_comments, tag(&b">"[..])),
+        preceded(ws_and_notes, tag(&b"<"[..])),
+        preceded(ws_and_notes, name),
+        preceded(ws_and_notes, tag(&b">"[..])),
     ))
     .parse(input)?;
     let (input, decl_name) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         alt((
             map(qualified_declaration_name, NamespaceName::Qualified),
             map(name, NamespaceName::Simple),
@@ -99,7 +99,7 @@ fn package_member_prefix(input: Input<'_>) -> IResult<Input<'_>, Membership> {
     let start = input;
     match opt(visibility_indicator).parse(input)? {
         (input, Some((span, visibility))) => {
-            let (input, _) = ws_and_comments(input)?;
+            let (input, _) = ws_and_notes(input)?;
             Ok((input, Membership::owning(Some(visibility), span)))
         }
         (input, None) => Ok((
@@ -125,24 +125,14 @@ pub(crate) fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<Libr
 
 fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, membership) = package_member_prefix(input)?;
-    // Accept both `standard library package` (current SysML v2 stdlib)
-    // and legacy `library standard package`.
-    let (input, is_standard) = if input.fragment().starts_with(b"standard") {
-        let (input, _) = tag(&b"standard"[..]).parse(input)?;
-        let (input, _) = ws1(input)?;
-        let (input, _) = tag(&b"library"[..]).parse(input)?;
-        let (input, _) = ws1(input)?;
-        (input, true)
-    } else {
-        let (input, _) = tag(&b"library"[..]).parse(input)?;
-        let (input, _) = ws1(input)?;
-        let (input, is_standard) = opt(preceded(tag(&b"standard"[..]), ws1))
-            .parse(input)
-            .map(|(i, o)| (i, o.is_some()))?;
-        (input, is_standard)
-    };
+    // `standard` precedes `library`. The BNF prints the group with no `?`, but KerML 7.2 shows a
+    // plain `library package`, and `standard` further identifies some of them.
+    let (input, standard) = opt(preceded(tag(&b"standard"[..]), ws_and_notes)).parse(input)?;
+    let is_standard = standard.is_some();
+    let (input, _) = tag(&b"library"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
     let (input, _) = keyword_package(input)?;
     let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;
@@ -209,7 +199,7 @@ fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
 
 fn namespace_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"namespace"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"namespace"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;
@@ -357,7 +347,7 @@ fn package_body_member_alternatives(
 fn package_body_member_alternatives_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<PackageBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let frag = input.fragment();
 
     if starts_with_keyword(frag, b"part")
@@ -427,7 +417,7 @@ fn binding_connector_usage(
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"binding") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -442,7 +432,7 @@ fn binding_connector_usage_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"binding"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, all) = opt(preceded(tag(&b"all"[..]), ws1))
@@ -451,7 +441,7 @@ fn binding_connector_usage_inner(
     // `'binding' UsageDeclaration`: its `Identification` may carry a short name, with or without
     // a declared name (`binding <'B1'> b bind x = y;`, `binding <'B1'> bind x = y;`).
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let frag = peek.fragment();
     let (input, binding_name) = if all
         || frag.starts_with(b"[")
@@ -460,36 +450,36 @@ fn binding_connector_usage_inner(
     {
         (input, None)
     } else {
-        let (input, binding_name) = preceded(ws_and_comments, name).parse(input)?;
+        let (input, binding_name) = preceded(ws_and_notes, name).parse(input)?;
         (input, Some(binding_name))
     };
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let (input, uses_of_keyword) = if starts_with_keyword(peek.fragment(), b"of") {
-        let (input, _) = preceded(ws_and_comments, tag(&b"of"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b"of"[..])).parse(input)?;
         let (input, _) = ws1(input)?;
         (input, true)
     } else {
         (input, false)
     };
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let (input, uses_bind_keyword) =
         if !uses_of_keyword && starts_with_keyword(peek.fragment(), b"bind") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"bind"[..])).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b"bind"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
             (input, true)
         } else {
             (input, false)
         };
     let (input, left) =
-        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+        preceded(ws_and_notes, crate::parser::lex::qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"="[..])).parse(input)?;
     let (input, right) =
-        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+        preceded(ws_and_notes, crate::parser::lex::qualified_reference).parse(input)?;
     let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
@@ -521,7 +511,7 @@ fn kerml_bare_declaration(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBareDeclaration>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (keyword_bytes, keyword) = crate::ast::KermlBareDeclarationKeyword::starters()
         .iter()
         .find(|(kw, _)| starts_with_keyword(input.fragment(), kw))
@@ -532,12 +522,11 @@ fn kerml_bare_declaration(
     let keyword = *keyword;
     let (input, bare_name) = opt(preceded(ws1, name)).parse(input)?;
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, _) =
-        preceded(ws_and_comments, nom::bytes::complete::tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, nom::bytes::complete::tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -578,9 +567,9 @@ pub(crate) fn kerml_relationship_decl(
             b"inverse",
             b"featuring",
         ];
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
-        let (cursor, _) = ws_and_comments(cursor)?;
+        let (cursor, _) = ws_and_notes(cursor)?;
         let fragment = cursor.fragment();
         if !STARTERS
             .iter()
@@ -598,7 +587,7 @@ pub(crate) fn kerml_relationship_decl(
 /// Whether the next word is one of `Specialization`-family relationship keywords, which are not
 /// in the reserved-word table and would otherwise be read as the relationship's identification.
 fn relationship_keyword_follows(input: Input<'_>) -> bool {
-    let Ok((after_ws, _)) = ws_and_comments(input) else {
+    let Ok((after_ws, _)) = ws_and_notes(input) else {
         return false;
     };
     [
@@ -621,7 +610,7 @@ fn kerml_relationship_decl_inner(
 ) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
     use crate::ast::KermlRelationshipKeyword as Kw;
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
 
     // Optional declaration-prefix keyword with its identification.
@@ -675,7 +664,7 @@ fn kerml_relationship_decl_inner(
         } else {
             (input, None, None)
         };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
 
     // The relationship keyword and its fixed connective.
     let (input, keyword) = if starts_with_keyword(input.fragment(), b"subtype") {
@@ -732,7 +721,7 @@ fn kerml_relationship_decl_inner(
         let (input, doubled) = opt(map(
             (
                 crate::parser::lex::identification,
-                ws_and_comments,
+                ws_and_notes,
                 tag(keyword_bytes),
                 ws1,
             ),
@@ -749,7 +738,7 @@ fn kerml_relationship_decl_inner(
         let (input, named) = opt(map(
             (
                 crate::parser::lex::identification,
-                preceded(ws_and_comments, tag(&b"of"[..])),
+                preceded(ws_and_notes, tag(&b"of"[..])),
                 ws1,
             ),
             |(identification, _, _)| identification,
@@ -761,8 +750,8 @@ fn kerml_relationship_decl_inner(
     };
 
     let (input, source) =
-        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+        preceded(ws_and_notes, crate::parser::lex::reference_path).parse(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let input = match keyword {
         Kw::Subtype | Kw::Subclassifier => {
             let (input, _) = crate::parser::lex::specialization_operator(input)?;
@@ -801,7 +790,7 @@ fn kerml_relationship_decl_inner(
         }
     };
     let (input, target) =
-        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
+        preceded(ws_and_notes, crate::parser::lex::reference_path).parse(input)?;
     let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
@@ -827,9 +816,9 @@ pub(crate) fn kerml_classifier_structured(
     // Refuse unless a classifier keyword follows the optional visibility/`abstract` prefix,
     // before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         let (cursor, _) = crate::parser::lex::visibility_prefix(cursor)?;
-        let (cursor, _) = crate::parser::lex::ws_and_comments(cursor)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(cursor)?;
         let fragment = cursor.fragment();
         let fragment = if starts_with_keyword(fragment, b"abstract") {
             crate::parser::diagnostics::trim_ascii_start(&fragment[b"abstract".len()..])
@@ -889,7 +878,7 @@ const KERML_CLASSIFIER_KEYWORDS: &[(&[u8], crate::ast::KermlClassifierKeyword)] 
 /// keyword list here beside the parser that owns the classifier production rather than giving
 /// every body scope a second copy of its FIRST set.
 pub(crate) fn starts_abstract_kerml_classifier(input: Input<'_>) -> bool {
-    let Ok((input, _)) = ws_and_comments(input) else {
+    let Ok((input, _)) = ws_and_notes(input) else {
         return false;
     };
     let Ok((input, _)) = crate::parser::lex::visibility_prefix(input) else {
@@ -913,7 +902,7 @@ pub(crate) fn kerml_type_relationship_clauses(
     let mut input = input;
     loop {
         let before = input;
-        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_ws, _) = ws_and_notes(input)?;
         let (rest, keyword) = if starts_with_keyword(after_ws.fragment(), b"disjoint") {
             let (rest, _) = tag(&b"disjoint"[..]).parse(after_ws)?;
             let (rest, _) = ws1(rest)?;
@@ -937,8 +926,8 @@ pub(crate) fn kerml_type_relationship_clauses(
         };
         let (rest, first) = crate::parser::lex::qualified_reference(rest)?;
         let (rest, more) = nom::multi::many0(preceded(
-            preceded(ws_and_comments, tag(&b","[..])),
-            preceded(ws_and_comments, crate::parser::lex::qualified_reference),
+            preceded(ws_and_notes, tag(&b","[..])),
+            preceded(ws_and_notes, crate::parser::lex::qualified_reference),
         ))
         .parse(rest)?;
         let mut targets = vec![first];
@@ -960,7 +949,7 @@ fn kerml_classifier_structured_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (keyword_bytes, keyword) = KERML_CLASSIFIER_KEYWORDS
@@ -985,7 +974,7 @@ fn kerml_classifier_structured_inner(
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
     let (input, identification) = crate::parser::lex::identification(input)?;
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -1003,12 +992,12 @@ fn kerml_classifier_structured_inner(
     // `bool earlierFirstIncomingTransferSort : IncomingTransferSort { ... }`
     // (`Occurrences.kerml`). The relationship kind distinguishes the authored operator.
     let (input, specializes) = if specializes.is_none() && conjugates.is_none() {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let before = input;
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b":"[..])).parse(input)?;
             let (input, target) =
-                preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+                preceded(ws_and_notes, crate::parser::lex::qualified_reference).parse(input)?;
             let span = crate::parser::span_from_to(before, input);
             (
                 input,
@@ -1072,7 +1061,7 @@ fn kerml_classifier_structured_inner(
 pub(crate) fn kerml_conjugation_part(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<Node<crate::ast::Conjugation>>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     // The clause span starts at the keyword, not at the trivia before it.
     let before = peek;
     let spelling = if starts_with_keyword(peek.fragment(), b"conjugates") {
@@ -1093,7 +1082,7 @@ pub(crate) fn kerml_conjugation_part(
         }
     };
     let (input, target) =
-        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+        preceded(ws_and_notes, crate::parser::lex::qualified_reference).parse(input)?;
     let span = crate::parser::span_from_to(before, input);
     Ok((
         input,
@@ -1113,7 +1102,7 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
 }
 
 fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
-    let (open_start, _) = ws_and_comments(input)?;
+    let (open_start, _) = ws_and_notes(input)?;
     let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
@@ -1230,7 +1219,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition = OwnedExpression ';'
 pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterMember>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, visibility) = opt(alt((
         map(preceded(tag(&b"public"[..]), ws1), |_| Visibility::Public),
         map(preceded(tag(&b"private"[..]), ws1), |_| Visibility::Private),
@@ -1242,7 +1231,7 @@ pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterM
     let (input, _) = tag(&b"filter"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, condition) = expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -2338,7 +2327,7 @@ mod tests {
             .expect("fixture should contain Display part");
         let tail = &input.as_bytes()[start..];
         let located = crate::parser::span::test_input(std::str::from_utf8(tail).unwrap());
-        let (located, _) = ws_and_comments(located).expect("leading ws");
+        let (located, _) = ws_and_notes(located).expect("leading ws");
 
         let result = part_def_or_usage(located);
         assert!(

@@ -819,6 +819,8 @@ pub struct IncludeUseCase {
     /// existing use case. Mirrors how [`crate::ast::RequireConstraint`] models the same shape of
     /// choice.
     pub use_case_keyword_span: Option<Span>,
+    /// Declared short name of the `use case` form. `None` for the reference form.
+    pub short_name: Option<DeclarationName>,
     /// Declared name of the `use case` form. `None` for the reference form and for an anonymous
     /// declaration.
     pub name: Option<DeclarationName>,

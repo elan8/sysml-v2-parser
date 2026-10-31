@@ -33,7 +33,7 @@ use crate::ast::{
     BasicFeaturePrefix, EndFeaturePrefix, FeaturePortionKind, FeaturePrefix, FeaturePrefixHead,
     FeatureVariability, Node,
 };
-use crate::parser::lex::{starts_with_any_keyword, ws_and_comments};
+use crate::parser::lex::{starts_with_any_keyword, ws_and_notes};
 use crate::parser::occurrence_prefix::{optional_alternative, optional_direction, slot_keyword};
 use crate::parser::Input;
 use nom::IResult;
@@ -174,7 +174,7 @@ fn metadata_keyword_run(
     while input.fragment().starts_with(b"#") {
         let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
         keywords.push(keyword);
-        let (rest, _) = ws_and_comments(rest)?;
+        let (rest, _) = ws_and_notes(rest)?;
         input = rest;
     }
     if keywords.is_empty()

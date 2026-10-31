@@ -7,7 +7,7 @@ use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::constraint::constraint_usage;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
-use crate::parser::lex::{ws_and_comments, INTERFACE_DEF_BODY_STARTERS};
+use crate::parser::lex::{ws_and_notes, INTERFACE_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def, port_usage};
 use crate::parser::Input;
@@ -161,7 +161,7 @@ fn interface_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<Interfa
 /// a real `Error` element via a recovery callback for the same situation. Now routed through the
 /// same shared recovery machinery.
 fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;

@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::feature_value::feature_value_part;
-use crate::parser::lex::{qualified_reference, starts_with_keyword, ws1, ws_and_comments};
+use crate::parser::lex::{qualified_reference, starts_with_keyword, ws1, ws_and_notes};
 use crate::parser::{build_recovery_error_node_from_span, node_from_to, with_span, Input};
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -32,7 +32,7 @@ pub(crate) fn metadata_body_usage(input: Input<'_>) -> IResult<Input<'_>, Node<M
 
 fn metadata_body_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataBodyUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, ref_span) = if starts_with_keyword(input.fragment(), b"ref") {
         let (input, (span, _)) = with_span(tag(&b"ref"[..])).parse(input)?;
         let (input, _) = ws1(input)?;
@@ -40,10 +40,10 @@ fn metadata_body_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
     } else {
         (input, None)
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, operator) = if input.fragment().starts_with(b":>>") {
         let (input, (span, _)) = with_span(tag(&b":>>"[..])).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         (
             input,
             Some(MetadataBodyRedefinitionOperator::ColonGreaterGreater { span }),
@@ -59,7 +59,7 @@ fn metadata_body_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
         (input, None)
     };
     let (input, target) = qualified_reference(input)?;
-    let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
+    let (input, value) = opt(preceded(ws_and_notes, feature_value_part)).parse(input)?;
     let (input, body) = metadata_body(input)?;
     Ok((
         input,
@@ -159,7 +159,7 @@ fn metadata_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<MetadataBody
 
 /// `MetadataBody = ';' | '{' MetadataBodyElement* '}'`.
 pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, MetadataBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;

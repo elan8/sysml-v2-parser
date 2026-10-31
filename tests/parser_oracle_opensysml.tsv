@@ -27,7 +27,7 @@ both-reject	negative/grammar/g16-expose-without-name.sysml
 both-reject	negative/grammar/g17-render-without-usage.sysml
 theirs-rejects	negative/grammar/g18-require-without-constraint.sysml
 theirs-rejects	negative/grammar/g19-frame-without-concern.sysml
-theirs-rejects	negative/grammar/g20-include-without-target.sysml
+both-reject	negative/grammar/g20-include-without-target.sysml
 both-reject	negative/grammar/g21-filter-without-expression.sysml
 both-reject	negative/grammar/g22-dependency-without-to.sysml
 both-reject	negative/grammar/g23-rep-without-language.sysml
@@ -76,7 +76,7 @@ both-reject	negative/grammar/g65-entry-action-outside-state-body.sysml
 theirs-rejects	negative/grammar/g66-render-outside-view-body.sysml
 both-reject	negative/grammar/g67-expose-outside-view-body.sysml
 both-reject	negative/grammar/g68-definition-in-enumeration-body.sysml
-theirs-rejects	negative/grammar/g69-calc-body-second-result-expression.sysml
+both-reject	negative/grammar/g69-calc-body-second-result-expression.sysml
 both-reject	negative/grammar/g70-name-before-usage-keyword.sysml
 both-reject	negative/grammar/k01-specializes-without-target.kerml
 theirs-rejects	negative/grammar/k02-sysml-keyword-in-kerml.kerml
@@ -97,7 +97,7 @@ both-reject	negative/grammar/k16-redefinition-without-target.kerml
 both-reject	negative/grammar/k17-unions-without-target.kerml
 both-reject	negative/grammar/k18-connector-end-without-reference.kerml
 both-reject	negative/grammar/k19-metadata-typing-without-name.kerml
-theirs-rejects	negative/grammar/k20-function-body-second-result-expression.kerml
+both-reject	negative/grammar/k20-function-body-second-result-expression.kerml
 theirs-rejects	negative/grammar/k21-name-before-feature-keyword.kerml
 ours-rejects	negative/semantic/k26-binary-connector-three-ends.kerml
 ours-rejects	negative/semantic/k49-binding-connector-with-three-ends.kerml

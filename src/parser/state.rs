@@ -9,7 +9,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
-    visibility_prefix, ws1, ws_and_comments, STATE_BODY_STARTERS,
+    visibility_prefix, ws1, ws_and_notes, STATE_BODY_STARTERS,
 };
 
 const UNTIL_BODY: &[u8] = b";{";
@@ -33,7 +33,7 @@ use nom::{IResult, Parser};
 pub(crate) fn state_body_modifier(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<Node<StateBodyModifier>>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let start = input;
     let keyword: IResult<Input<'_>, StateBodyModifier> = alt((
         map(tag(&b"parallel"[..]), |_| StateBodyModifier::Parallel),
@@ -132,7 +132,7 @@ fn declared_state_effect(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Sta
             input,
             STATE_EFFECT_KEYWORDS,
         )?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         if !starts_with_any_keyword(input.fragment(), STATE_EFFECT_KEYWORDS) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -154,7 +154,7 @@ fn declared_state_effect(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Sta
 fn state_behavior_action_target(
     input: Input<'_>,
 ) -> IResult<Input<'_>, crate::ast::StateActionUsage> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
         return Ok((input, crate::ast::StateActionUsage::Empty));
     }
@@ -190,7 +190,7 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"entry") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -205,7 +205,7 @@ fn entry_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>>
     let start = input;
     let (input, _) = tag(&b"entry"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
@@ -218,7 +218,7 @@ fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"do") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -233,7 +233,7 @@ fn do_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     let start = input;
     let (input, _) = tag(&b"do"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
@@ -246,7 +246,7 @@ fn exit_action(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"exit") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -261,7 +261,7 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     let start = input;
     let (input, _) = tag(&b"exit"[..]).parse(input)?;
     let (input, head) = state_behavior_action_target(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = crate::parser::action::action_def_body(input)?;
     Ok((
         input,
@@ -314,7 +314,7 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let kind_keyword = kind_keyword.flatten();
     let (input, name) = opt(name).parse(input)?;
     let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -332,7 +332,7 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // leading position parsed above. Accept both positions but keep one authoritative slot.
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
-            ws_and_comments,
+            ws_and_notes,
             crate::parser::usage::multiplicity_node,
         ))
         .parse(input)?
@@ -351,14 +351,14 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         (input, None)
     };
     let redefines = leading_redefines.or(trailing_redefines);
-    let (input, subsets) = opt(preceded(ws_and_comments, subsetting))
+    let (input, subsets) = opt(preceded(ws_and_notes, subsetting))
         .parse(input)
         .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
 
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (mut input, value) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"="[..])),
-        preceded(ws_and_comments, expression),
+        preceded(ws_and_notes, tag(&b"="[..])),
+        preceded(ws_and_notes, expression),
     ))
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
@@ -371,7 +371,7 @@ fn state_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         input = next;
     }
 
-    let (input, body) = preceded(ws_and_comments, crate::parser::part::ref_body).parse(input)?;
+    let (input, body) = preceded(ws_and_notes, crate::parser::part::ref_body).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -405,7 +405,7 @@ fn then_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"then") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -421,7 +421,7 @@ fn then_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, state_reference) = crate::parser::lex::reference_path(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, ThenStmt { state_reference }),
@@ -435,7 +435,7 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, state_name) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((input, node_from_to(start, input, FinalState { state_name })))
 }
 
@@ -590,7 +590,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let start = input;
     // `( SourceSuccessionMember )? …UsageMember`: `then` precedes the membership. It is taken
     // only when `state` follows the prefix, so `then stateful;` stays a `then` reference.
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, then_span) = if starts_with_keyword(input.fragment(), b"then")
         && crate::parser::occurrence_prefix::kind_keyword_follows(input, b"state")
     {
@@ -599,7 +599,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
         (input, None)
     };
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, direction) =
         nom::combinator::opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, is_derived) =
@@ -619,7 +619,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     // SysML allows anonymous state usages: `state: Mode;` (Identification may be empty), and a
     // short name with or without a declared name: `state <'S1'> s1;`, `state <'S1'> : Mode;`.
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (after_gap, _) = ws_and_comments(input)?;
+    let (after_gap, _) = ws_and_notes(input)?;
     // `state def …` is a definition, not a usage named `def`.
     if starts_with_keyword(after_gap.fragment(), b"def") {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -659,7 +659,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
     // Optional modifier before body: `parallel` or `initial` (SysML state usage)
     let (input, body_modifier) = state_body_modifier(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -700,7 +700,7 @@ fn transition_effect_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<crate::ast::ActionDefBody>> {
     opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::action::action_def_body_brace,
     ))
     .parse(input)
@@ -711,8 +711,8 @@ fn transition_effect_type_suffix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Option<crate::ast::QualifiedReferenceId>> {
     opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)
 }
@@ -741,7 +741,7 @@ fn transition_effect_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionEf
     let (input, payload) = expression(input)?;
     let (input, type_name) = transition_effect_type_suffix(input)?;
     let (input, via) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws_and_notes, tag(&b"via"[..])),
         preceded(ws1, expression),
     ))
     .parse(input)?;
@@ -764,12 +764,12 @@ fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffe
     let (input, payload) = expression(input)?;
     let (input, type_name) = transition_effect_type_suffix(input)?;
     let (input, via) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws_and_notes, tag(&b"via"[..])),
         preceded(ws1, expression),
     ))
     .parse(input)?;
     let (input, to) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"to"[..])),
+        preceded(ws_and_notes, tag(&b"to"[..])),
         preceded(ws1, expression),
     ))
     .parse(input)?;
@@ -790,8 +790,8 @@ fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffe
 fn transition_effect_assign(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
     let (input, _) = preceded(tag(&b"assign"[..]), ws1).parse(input)?;
     let (input, lhs) = expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
-    let (input, rhs) = preceded(ws_and_comments, expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b":="[..])).parse(input)?;
+    let (input, rhs) = preceded(ws_and_notes, expression).parse(input)?;
     let (input, body) = transition_effect_body(input)?;
     Ok((input, TransitionEffect::Assign { lhs, rhs, body }))
 }
@@ -799,7 +799,7 @@ fn transition_effect_assign(input: Input<'_>) -> IResult<Input<'_>, TransitionEf
 /// Transition `do` effect: structured `action`/`accept`/`send`/`assign` action usage, or a bare
 /// expression shorthand (e.g. a reference to an existing action usage).
 fn transition_effect(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, effect) = alt((
         transition_effect_perform,
         transition_effect_accept,
@@ -811,7 +811,7 @@ fn transition_effect(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
     // Lenient: some models write a trailing `;` after the effect action usage even though
     // the grammar's TransitionUsage has no separator before `then` (matches spec examples,
     // e.g. `do action powerUp : PowerUp;\nthen on;`).
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_notes, tag(&b";"[..]))).parse(input)?;
     Ok((input, effect))
 }
 
@@ -823,7 +823,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     // `Identification` may carry a short name, with or without a declared name.
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, n) = {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if starts_with_keyword(peek.fragment(), b"first")
             || starts_with_keyword(peek.fragment(), b"accept")
             || starts_with_keyword(peek.fragment(), b"if")
@@ -832,7 +832,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
         {
             (input, None)
         } else {
-            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            let (input, n) = preceded(ws_and_notes, name).parse(input)?;
             (input, Some(n))
         }
     };
@@ -843,7 +843,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
 /// `accept … [if …] [do …] then target;` or `first … then …;` / `if … then …;` / `then …;`.
 fn transition_shorthand(input: Input<'_>) -> IResult<Input<'_>, Node<Transition>> {
     let start = input;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     if !(starts_with_keyword(peek.fragment(), b"first")
         || starts_with_keyword(peek.fragment(), b"accept")
         || starts_with_keyword(peek.fragment(), b"if")
@@ -866,7 +866,7 @@ fn transition_tail<'a>(
 ) -> IResult<Input<'a>, Node<Transition>> {
     // Optional: `first` source with optional `accept` trigger.
     let (input, first_clause) = opt((
-        preceded(ws_and_comments, tag(&b"first"[..])),
+        preceded(ws_and_notes, tag(&b"first"[..])),
         ws1,
         expression,
         opt(transition_accept),
@@ -886,22 +886,22 @@ fn transition_tail<'a>(
     };
     // Optional: `if` guard and `do` effect before `then`
     let (input, guard) = opt((
-        preceded(ws_and_comments, tag(&b"if"[..])),
+        preceded(ws_and_notes, tag(&b"if"[..])),
         preceded(ws1, expression),
     ))
     .parse(input)?;
     let guard = guard.map(|(_, expr)| expr);
     let (input, effect) = opt((
-        preceded(ws_and_comments, tag(&b"do"[..])),
+        preceded(ws_and_notes, tag(&b"do"[..])),
         preceded(ws1, transition_effect),
     ))
     .parse(input)?;
     let effect = effect.map(|(_, eff)| eff);
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;
     let (input, body) =
-        preceded(ws_and_comments, crate::parser::action::action_def_body).parse(input)?;
+        preceded(ws_and_notes, crate::parser::action::action_def_body).parse(input)?;
     Ok((
         input,
         node_from_to(

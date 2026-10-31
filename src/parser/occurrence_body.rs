@@ -13,7 +13,7 @@ use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::lex::{
     name, qualified_reference, recover_body_element, reference_path, starts_with_keyword,
-    visibility_prefix, ws1, ws_and_comments,
+    visibility_prefix, ws1, ws_and_notes,
 };
 use crate::parser::node_from_to;
 use crate::parser::occurrence_prefix::{
@@ -100,7 +100,7 @@ fn occurrence_definition_body_with_labels<'a>(
     scope_label: &'static str,
     recovery_code: &'static str,
 ) -> IResult<Input<'a>, DefinitionBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -197,7 +197,7 @@ pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occu
 }
 
 fn occurrence_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // The node's own span has to start at the first authored token, not at the kind keyword:
     // every prefix span it now records sits ahead of the declaration, and deserialization checks
     // that each one lies inside the node that owns it.
@@ -255,7 +255,7 @@ fn occurrence_usage_tail(
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // §6 G22: `occurrence :>> causes;` redefines an inherited occurrence without renaming it, so
     // the declaration name is optional. The keyword-less event form instead references an
     // existing occurrence and may use a dotted/qualified path.
@@ -273,7 +273,7 @@ fn occurrence_usage_tail(
     // Libraries/Analysis/StateSpaceRepresentation.sysml). The emitter canonicalizes it to the
     // after-type position, which reparses below into the same AST.
     let (input, early_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_parser)).parse(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
     let type_is_conjugated = type_name
@@ -283,7 +283,7 @@ fn occurrence_usage_tail(
     // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
     // multiplicity`'s doc comment.
     let (input, late_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_parser)).parse(input)?;
     let multiplicity = early_multiplicity.or(late_multiplicity);
     // `#73`: `abstract occurrence situations : Situation[*] nonunique;` — feature modifiers after
     // multiplicity; without skipping them the usage fails and becomes `KermlFeatureDecl`.
@@ -338,7 +338,7 @@ fn occurrence_usage_tail(
 /// True when the next token starts a specialization clause, a typing clause, or the body -- i.e.
 /// the usage has no name of its own.
 fn starts_specialization_or_body(input: Input<'_>) -> bool {
-    let Ok((peek, _)) = ws_and_comments(input) else {
+    let Ok((peek, _)) = ws_and_notes(input) else {
         return false;
     };
     let frag = peek.fragment();
@@ -346,7 +346,7 @@ fn starts_specialization_or_body(input: Input<'_>) -> bool {
 }
 
 fn occurrence_usage_body(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     alt((
         crate::parser::body::semicolon_body,
         occurrence_usage_body_brace,
@@ -612,7 +612,7 @@ pub(crate) fn occurrence_body_element(
 /// only valid inside an action body). Real usage from the SysML Systems Library
 /// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
 pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
-    let Ok((peek, _)) = ws_and_comments(input) else {
+    let Ok((peek, _)) = ws_and_notes(input) else {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -631,7 +631,7 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
 
 fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, succession_keyword_span) = optional_keyword_token(input, b"succession")?;
     // GH-51: optional name for the succession usage itself (BNF `SuccessionAsUsage`'s
@@ -651,7 +651,7 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     let (input, name) = if succession_keyword_span.is_none() {
         (input, None)
     } else {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         let frag = peek.fragment();
         // GH-92.3: a bare `:` (type clause with no name) also means "no name" here, e.g.
         // `succession : HappensJustBefore first a then b;` (`Vehicle Example/
@@ -665,7 +665,7 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
         {
             (input, None)
         } else {
-            let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+            let (input, parsed_name) = preceded(ws_and_notes, name).parse(input)?;
             (input, Some(parsed_name))
         }
     };
@@ -675,25 +675,24 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     let (input, type_name) = if succession_keyword_span.is_none() {
         (input, None)
     } else {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_notes, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
         }
     };
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
-    let (input, _) =
-        opt(preceded(ws_and_comments, preceded(tag(&b"first"[..]), ws1))).parse(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_notes, multiplicity_parser)).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_notes, preceded(tag(&b"first"[..]), ws1))).parse(input)?;
     let (input, source_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
-    let (input, source) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_parser)).parse(input)?;
+    let (input, source) = preceded(ws_and_notes, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"then"[..])).parse(input)?;
     let (input, target_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
-    let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_parser)).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, path_expression).parse(input)?;
     let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
@@ -736,8 +735,8 @@ fn assert_constraint_member_inner(
 ) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"assert"[..])).parse(input)?;
+        preceded(ws_and_notes, visibility_prefix).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"assert"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1))
         .parse(input)
@@ -747,7 +746,7 @@ fn assert_constraint_member_inner(
     // real usage (`assert massAnalysis3 { in totalMass = mass; ... }`, Simple Tests/
     // ConstraintTest.sysml:78), richer than the already-supported `assert constraint ...` form.
     let (input, constraint_keyword) =
-        opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
+        opt(preceded(tag(&b"constraint"[..]), ws_and_notes)).parse(input)?;
     // With the `constraint` keyword this declares an `AssertConstraintUsage`, whose
     // `ConstraintUsageDeclaration` carries a full `Identification` (`assert constraint <'C1'>
     // c : C;`). The keyword-less form references an existing constraint and has none.
@@ -756,7 +755,7 @@ fn assert_constraint_member_inner(
     } else {
         (input, None)
     };
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, declaration_name, target) = if input.fragment().starts_with(b"{")
         || input.fragment().starts_with(b";")
         || (short_name.is_some() && input.fragment().starts_with(b":"))
@@ -770,8 +769,8 @@ fn assert_constraint_member_inner(
         (input, None, Some(target))
     };
     let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)?;
     let (input, body) = constraint_def_body(input)?;

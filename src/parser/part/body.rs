@@ -8,7 +8,7 @@ use crate::parser::package::{library_package_, package_};
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     alt((crate::parser::body::semicolon_body, part_def_body_brace)).parse(input)
 }
 
@@ -104,9 +104,9 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
 
 fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -146,14 +146,14 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
     // same `parallel`/`initial` modifier is legal here too (OMG spec Annex `exhibit state
     // vehicleStates parallel { ... }` in `5-State-based Behavior-2.sysml`) -- GH-17.
     let (input, body_modifier) = crate::parser::state::state_body_modifier(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, body) = crate::parser::state::state_def_body(input)?;
     // `:>>` may also come *after* the body -- this predates the before-body support above (via
     // `specialization_clauses`) and stays supported; when present it wins over a before-body one.
     let before_post_body_redefines = input;
     let (input, post_body_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":>>"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)?;
     let post_body_redefines = post_body_redefines.map(|target| {
@@ -161,7 +161,7 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
         single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
     });
     let input = if post_body_redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
         input
     } else {
         input
@@ -505,13 +505,13 @@ fn connection_usage_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `OccurrenceUsageMember = MemberPrefix ownedRelatedElement += OccurrenceUsageElement`: the
     // visibility keyword precedes the usage's own `OccurrenceUsagePrefix`.
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
-    let (after_kw, _) = ws_and_comments(input)?;
+    let (after_kw, _) = ws_and_notes(input)?;
     // `connection def …` is a `ConnectionDefinition`, never this production (`ref connection
     // def …` would otherwise misparse as a usage named `def`).
     if starts_with_keyword(after_kw.fragment(), b"def") {
@@ -524,7 +524,7 @@ fn connection_usage_member_inner(
     // `connection : Derivation { … }` or `connection { … }` leads straight into its
     // specialization part or body.
     let (input, short_name) = short_name_prefix(after_kw)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let fragment = input.fragment();
     let (input, name) = if fragment.starts_with(b":")
         || fragment.starts_with(b"{")
@@ -557,13 +557,13 @@ fn connection_usage_member_inner(
     let (input, modifiers) =
         crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
     // `( 'connect' ConnectorPart )?`: `connection link : Link connect a to b;`.
     let (input, connect) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"connect"[..])),
+        preceded(ws_and_notes, tag(&b"connect"[..])),
         preceded(ws1, connect_ends),
     ))
     .parse(input)?;
@@ -580,8 +580,8 @@ fn connection_usage_member_inner(
     let before_subsets = input;
     let (input, trailing_subsets) = if clauses.subsets.is_none() {
         opt(preceded(
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, qualified_reference),
+            preceded(ws_and_notes, tag(&b":>"[..])),
+            preceded(ws_and_notes, qualified_reference),
         ))
         .parse(input)?
     } else {
@@ -597,8 +597,8 @@ fn connection_usage_member_inner(
     let before_redefines = input;
     let (input, trailing_redefines) = if clauses.redefines.is_none() {
         opt(preceded(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            preceded(ws_and_comments, qualified_reference),
+            preceded(ws_and_notes, tag(&b":>>"[..])),
+            preceded(ws_and_notes, qualified_reference),
         ))
         .parse(input)?
     } else {
@@ -613,7 +613,7 @@ fn connection_usage_member_inner(
         ));
     }
     let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
         input
     } else {
         input

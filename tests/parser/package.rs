@@ -1,7 +1,6 @@
 //! Parser tests: package
 
 use super::common::*;
-use sysml_v2_parser::ast::Span;
 use sysml_v2_parser::ast::*;
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -53,32 +52,8 @@ fn test_standard_library_package_header_parses() {
 }
 
 #[test]
-fn test_legacy_library_standard_package_header_still_parses() {
-    let input = "library standard package LegacyStd;";
-    let result = parse(input).expect("parse should succeed");
-    assert_eq!(
-        result.root.normalize_for_test_comparison(),
-        RootNamespace {
-            elements: vec![n_len(
-                input.len(),
-                RootElement::LibraryPackage(n_len(
-                    input.len(),
-                    LibraryPackage {
-                        membership: sysml_v2_parser::ast::Membership::owning(
-                            None,
-                            sysml_v2_parser::ast::Span::dummy(),
-                        ),
-                        is_standard: true,
-                        identification: package_id(&result, "LegacyStd"),
-                        body: PackageBody::Semicolon {
-                            semicolon_span: Span::dummy(),
-                        },
-                    }
-                ))
-            )]
-        }
-        .normalize_for_test_comparison()
-    );
+fn test_standard_cannot_follow_library() {
+    assert!(parse("library standard package LegacyStd;").is_err());
 }
 
 #[test]

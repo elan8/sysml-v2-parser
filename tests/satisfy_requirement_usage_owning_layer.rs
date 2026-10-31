@@ -244,36 +244,32 @@ fn recovery_stops_at_a_prefixed_satisfy_in_every_owning_scope() {
     }
 }
 
-/// A comment between two of the production's keywords is trivia, like a space.
-///
-/// `assert /* why */ satisfy r by p;` used to fail: the separator after `assert` was `ws1`, which
-/// consumes whitespace but stops at `/`, leaving the comment in front of `satisfy`. The keyword
-/// token now separates with `ws_and_comments`. The abutting spelling (`satisfy/* c */ r`) is still
-/// rejected by the crate-wide keyword-boundary predicate, which behaves identically for `part`,
-/// `import` and every other keyword; that is a separate lexical seam, asserted here so the shared
-/// behaviour is visible rather than assumed.
+/// A note between two of the production's keywords is trivia, like a space. The abutting spelling
+/// (`satisfy//* c */ r`) is still rejected by the crate-wide keyword-boundary predicate, which
+/// behaves identically for `part`, `import` and every other keyword; that is a separate lexical
+/// seam, asserted here so the shared behaviour is visible rather than assumed.
 #[test]
-fn a_comment_may_separate_the_production_keywords() {
+fn a_note_may_separate_the_production_keywords() {
     for source in [
-        "package P {\n    assert /* why */ satisfy r by p;\n}\n",
-        "package P {\n    not /* why */ satisfy r by p;\n}\n",
-        "package P {\n    assert /* a */ not /* b */ satisfy r by p;\n}\n",
-        "package P {\n    satisfy /* why */ r by p;\n}\n",
-        "package P {\n    satisfy r by /* why */ p;\n}\n",
-        "package P {\n    satisfy requirement /* why */ x by p;\n}\n",
+        "package P {\n    assert //* why */ satisfy r by p;\n}\n",
+        "package P {\n    not //* why */ satisfy r by p;\n}\n",
+        "package P {\n    assert //* a */ not //* b */ satisfy r by p;\n}\n",
+        "package P {\n    satisfy //* why */ r by p;\n}\n",
+        "package P {\n    satisfy r by //* why */ p;\n}\n",
+        "package P {\n    satisfy requirement //* why */ x by p;\n}\n",
     ] {
         let result = parse_for_editor(source);
         assert!(
             result.errors.is_empty(),
-            "a comment between keywords must be trivia, got {:?} for:\n{source}",
+            "a note between keywords must be trivia, got {:?} for:\n{source}",
             result.errors
         );
     }
     // Comments are lexical token boundaries even without surrounding whitespace.
     for source in [
-        "package P { satisfy/* c */ r by p; }",
-        "package P { assert/* c */ satisfy r by p; }",
-        "package P { private/* c */import/* c */A::*; }",
+        "package P { satisfy//* c */ r by p; }",
+        "package P { assert//* c */ satisfy r by p; }",
+        "package P { private//* c */import//* c */A::*; }",
     ] {
         assert!(
             parse_for_editor(source).errors.is_empty(),

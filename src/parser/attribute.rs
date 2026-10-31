@@ -8,7 +8,7 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
     identification, name, qualified_reference, short_name_prefix, starts_with_keyword,
-    subset_operator, ws1, ws_and_comments,
+    subset_operator, ws1, ws_and_notes,
 };
 use crate::parser::node_from_to;
 use crate::parser::usage::{
@@ -163,7 +163,7 @@ fn is_reserved_shorthand_starter(name: &[u8]) -> bool {
 /// Keep exactly that extension recoverable in SysML-owned bodies; KerML's distinct `end feature`
 /// production has a different following keyword and is not selected by this guard.
 pub(crate) fn is_pilot_end_default_reference(input: Input<'_>) -> bool {
-    let Ok((input, _)) = ws_and_comments(input) else {
+    let Ok((input, _)) = ws_and_notes(input) else {
         return false;
     };
     if !starts_with_keyword(input.fragment(), b"end") {
@@ -172,7 +172,7 @@ pub(crate) fn is_pilot_end_default_reference(input: Input<'_>) -> bool {
     let Ok((input, _)) = tag::<_, _, nom::error::Error<Input<'_>>>(&b"end"[..]).parse(input) else {
         return false;
     };
-    let Ok((input, _)) = ws_and_comments(input) else {
+    let Ok((input, _)) = ws_and_notes(input) else {
         return false;
     };
     input.fragment().starts_with(b":")
@@ -231,7 +231,7 @@ fn feature_modifiers_after(
         // production's; leave it for recovery.
         already @ Some(_) => (input, already),
         None => {
-            let (after_ws, _) = ws_and_comments(input)?;
+            let (after_ws, _) = ws_and_notes(input)?;
             match multiplicity_node(after_ws) {
                 Ok((rest, node)) => (rest, Some(node)),
                 // No range here: leave the whitespace before the next token unconsumed, as
@@ -421,7 +421,7 @@ pub(crate) fn attribute_body_element(
 /// The keyword carries no information the AST doesn't already hold, so it is consumed and dropped.
 fn value_keyword_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"value"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, binding) = attribute_feature_binding(input)?;
@@ -436,21 +436,21 @@ pub(crate) fn attribute_feature_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, prefix) = nom::combinator::opt(alt((
         // GH-92.1: accept the literal `redefines` keyword too, not just `:>>` -- both are
         // synonyms per `redefine_operator` (already used elsewhere, e.g. `part_usage`), e.g.
         // `redefines mass = 1000 [kg];` (`Mass Roll-up Example/Vehicles.sysml:26`).
         map(
-            preceded(ws_and_comments, crate::parser::lex::redefine_operator),
+            preceded(ws_and_notes, crate::parser::lex::redefine_operator),
             |_| MetadataBindingPrefix::Redefines,
         ),
-        map(preceded(ws_and_comments, subset_operator), |_| {
+        map(preceded(ws_and_notes, subset_operator), |_| {
             MetadataBindingPrefix::Subsets
         }),
     )))
     .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (_, target_spelling) = name(input)?;
     let target_bytes = crate::parser::lex::name_bytes(input, target_spelling);
     // The prefixed forms take the same comma-separated multi-target list as every other
@@ -479,7 +479,7 @@ pub(crate) fn attribute_feature_binding(
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+        nom::combinator::opt(preceded(ws_and_notes, crate::parser::feature_value_part))
             .parse(input)?;
     let (input, mods) = feature_modifiers_after(mods, input)?;
     let (input, body) = attribute_body(input)?;
@@ -563,7 +563,7 @@ pub(crate) fn default_reference_usage(
             b"variation",
             b"constant",
         ];
-        let (mut cursor, _) = ws_and_comments(input)?;
+        let (mut cursor, _) = ws_and_notes(input)?;
         loop {
             let fragment = cursor.fragment();
             match fragment.first() {
@@ -587,7 +587,7 @@ pub(crate) fn default_reference_usage(
                 let (rest, _) =
                     nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(slot.len())
                         .parse(cursor)?;
-                let (rest, _) = ws_and_comments(rest)?;
+                let (rest, _) = ws_and_notes(rest)?;
                 cursor = rest;
                 continue;
             }
@@ -613,9 +613,9 @@ fn default_reference_usage_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, prefix) = crate::parser::occurrence_prefix::ref_prefix(input);
     let identification_start = input;
     let (input, identification) = identification(input)?;
@@ -643,7 +643,7 @@ fn default_reference_usage_inner(
         .subsetting_value
         .map(crate::parser::feature_value::wrap_bind_expression);
     let (input, value) =
-        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+        opt(preceded(ws_and_notes, crate::parser::feature_value_part)).parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -679,7 +679,7 @@ fn default_reference_usage_inner(
 pub(crate) fn default_reference_value_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     // `:`, `:>` and `:>>` only: `::>`, `::` and `:=` start no declaration this entry point owns.
     let fragment = peek.fragment();
     // DefaultReferenceUsage is nullable up to its UsageBody. A bare semicolon is therefore an
@@ -703,7 +703,7 @@ pub(crate) fn default_reference_value_binding(
 pub(crate) fn default_reference_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<DefaultReferenceUsage>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let directed = [&b"in"[..], b"out", b"inout"]
         .iter()
         .any(|keyword| starts_with_keyword(peek.fragment(), keyword));
@@ -724,7 +724,7 @@ pub(crate) fn default_reference_member(
 pub(crate) fn redefinition_feature_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AttributeUsage>> {
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     // `MemberPrefix` visibility: `private redefines b = 1;`, `protected :>> c = 2;` (#178).
     let (after_visibility, (visibility_span, visibility)) =
         crate::parser::lex::visibility_prefix(peek)?;
@@ -764,7 +764,7 @@ fn attribute_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBo
 
 /// Attribute body: `;` or `{` AttributeBodyElement* `}`.
 pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -792,7 +792,7 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
 /// scope; a def-less attribute is always a usage, including at package level.
 pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     // `AttributeDefinition = DefinitionPrefix 'attribute' 'def' Definition` (SysML BNF 510; Pilot
     // `SysML.xtext` 746), and `DefinitionPrefix` (BNF 225) reaches `BasicDefinitionPrefix` (BNF
@@ -849,7 +849,7 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
         (typing_span, typing, None)
     };
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+        nom::combinator::opt(preceded(ws_and_notes, crate::parser::feature_value_part))
             .parse(input)?;
     let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
     let value_span = value.as_ref().map(|node| node.span);
@@ -899,7 +899,7 @@ pub(crate) fn directed_attribute_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, direction) = direction_prefix(input)?;
     let (input, mut usage) = attribute_usage(input)?;
     usage.value.direction = Some(direction);
@@ -940,7 +940,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     }
 
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     // `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix` (BNF §8.2.2.6.2):
     // `end` and the `RefPrefix` keywords below are mutually exclusive alternatives, not
@@ -973,7 +973,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     } = prefix;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     // SysML allows anonymous attribute usages: `attribute: Real;` (Identification may be empty).
-    let (after_kw, _) = ws_and_comments(input)?;
+    let (after_kw, _) = ws_and_notes(input)?;
     let input = if (after_kw.fragment().starts_with(b":")
         && !after_kw.fragment().starts_with(b":>")
         && !after_kw.fragment().starts_with(b":>>"))
@@ -993,7 +993,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     // whatever follows -- `short_name_prefix` only skips ws *inside* the `< ... >` brackets, so a
     // short name leaves fresh un-consumed whitespace here that wasn't present in the no-short-name
     // path (where `ws1` above already fully consumed it).
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let peek = input;
     let (input, usage_head) =
         if let Ok((input, references)) = crate::parser::usage::reference_subsetting(peek) {
@@ -1010,7 +1010,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         } else {
             alt((
                 map(
-                    preceded(ws_and_comments, prefix_redefinition_target),
+                    preceded(ws_and_notes, prefix_redefinition_target),
                     |(redefines_span, redefines)| AttributeUsageHead::PrefixRedefines {
                         redefines_span,
                         redefines,
@@ -1020,7 +1020,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 // own tag would otherwise be partially matched by this one) since `:>` is a strict
                 // prefix of `:>>`.
                 map(
-                    preceded(ws_and_comments, crate::parser::usage::subsetting),
+                    preceded(ws_and_notes, crate::parser::usage::subsetting),
                     |(subsets, subsets_value)| AttributeUsageHead::PrefixSubsets {
                         subsets,
                         subsets_value,
@@ -1142,7 +1142,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .and_then(|(_, value)| value.clone())
         .or(head_subsets_value);
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+        nom::combinator::opt(preceded(ws_and_notes, crate::parser::feature_value_part))
             .parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
     let (input, mods) = feature_modifiers_after(mods, input)?;
@@ -1291,7 +1291,7 @@ fn metadata_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBod
 
 /// Metadata annotation/usage body: `;` or `{` members `}` (structured attribute bindings).
 pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;

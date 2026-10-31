@@ -15,7 +15,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::import::import_;
 use crate::parser::lex::{
     identification, name, qualified_reference, recover_body_element, short_name_prefix,
-    starts_with_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
+    starts_with_keyword, ws, ws1, ws_and_notes, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::occurrence_prefix::{
@@ -190,7 +190,7 @@ fn requirement_def_body_element(
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
     {
-        let (after_ws, _) = ws_and_comments(input)?;
+        let (after_ws, _) = ws_and_notes(input)?;
         if crate::parser::occurrence_prefix::starts_contended_prefix(after_ws) {
             if let Ok((next, usage)) = satisfy(after_ws) {
                 let elem = RequirementDefBodyElement::Satisfy(Box::new(usage));
@@ -365,7 +365,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract(
     input: Input<'_>,
     already_abstract: bool,
 ) -> IResult<Input<'_>, RequirementUsage> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // Support usage extension keywords where this parser already tolerates them.
     let (input, abstract_kws) = many0(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let is_abstract = already_abstract || !abstract_kws.is_empty();
@@ -373,7 +373,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract(
     // Without this, the `<…>` form fails `name()` and falls through to `ExtendedLibraryDecl`.
     let (input, short_name) = short_name_prefix(input)?;
     let (input, name) = {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         let starts_body_or_spec = peek.fragment().starts_with(b":")
             || peek.fragment().starts_with(b";")
             || peek.fragment().starts_with(b"{")
@@ -386,21 +386,21 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract(
         if starts_body_or_spec {
             (input, None)
         } else {
-            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            let (input, n) = preceded(ws_and_notes, name).parse(input)?;
             (input, Some(n))
         }
     };
     let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, value) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
     let (input, body) = requirement_def_body(input)?;
     let (input, post_body_specialization) = specialization_clauses(input)?;
     let input = if post_body_specialization.had_any {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
         input
     } else {
         input
@@ -440,7 +440,7 @@ pub(crate) fn verify_requirement(
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"verify") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -453,7 +453,7 @@ pub(crate) fn verify_requirement(
 
 fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequirementMember>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"verify"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"verify"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, member) = if let Ok((input, _)) =
         tag::<_, _, nom::error::Error<Input>>(&b"requirement"[..]).parse(input)
@@ -474,12 +474,12 @@ fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyR
         // an expression. `qualified_reference` refuses `.`, so `verify rss.recoverFromStall;`
         // used to fall through to `recovered_requirement_body_element`.
         let (input, target) = crate::parser::lex::reference_path(input)?;
-        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = ws_and_notes(input)?;
         if input.fragment().starts_with(b":>>") {
             let (input, _) = tag(&b":>>"[..]).parse(input)?;
             let (input, redefines) =
-                preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
-            let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+                preceded(ws_and_notes, crate::parser::lex::reference_path).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
             (
                 input,
                 VerifyRequirementMember {
@@ -490,7 +490,7 @@ fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyR
                 },
             )
         } else {
-            let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
             (
                 input,
                 VerifyRequirementMember {
@@ -528,7 +528,7 @@ fn stakeholder_shorthand_member(input: Input<'_>) -> IResult<Input<'_>, Node<Sta
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"stakeholder") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -543,10 +543,10 @@ fn stakeholder_shorthand_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"stakeholder"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"stakeholder"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -569,7 +569,7 @@ fn stakeholder_redefinition_member(
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"stakeholder") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -584,11 +584,11 @@ fn stakeholder_redefinition_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"stakeholder"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"stakeholder"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b":>>"[..]).parse(input)?;
-    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -616,8 +616,8 @@ fn stakeholder_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMe
 
 fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"subject"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((input, node_from_to(start, input, SubjectRef {})))
 }
 
@@ -625,7 +625,7 @@ fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"purpose") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -638,16 +638,16 @@ fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
 
 fn purpose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"purpose"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"purpose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((input, node_from_to(start, input, PurposeMember { target })))
 }
 
 fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"frame"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"frame"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, concern_keyword) = opt(preceded(tag(&b"concern"[..]), ws1)).parse(input)?;
     let (input, ident) = identification(input)?;
@@ -678,7 +678,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"subject") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -691,9 +691,9 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
 
 fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"subject"[..])).parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
 
     // `UsageDeclaration`'s `Identification` is optional. The complete shared
     // `FeatureSpecializationPart` follows it and owns all legal specialization positions around
@@ -808,10 +808,10 @@ fn requirement_parameter_decl<'a>(
     input: Input<'a>,
     keyword: &'a [u8],
 ) -> IResult<Input<'a>, RequirementParameterDecl> {
-    let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(keyword)).parse(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, n) = {
-        let (after_gap, _) = ws_and_comments(input)?;
+        let (after_gap, _) = ws_and_notes(input)?;
         if after_gap.fragment().starts_with(b":") {
             (after_gap, None)
         } else {
@@ -820,10 +820,10 @@ fn requirement_parameter_decl<'a>(
             (input, Some(n))
         }
     };
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b":"[..])).parse(input)?;
+    let (input, type_name) = preceded(ws_and_notes, qualified_reference).parse(input)?;
     let (input, multiplicity) = opt(preceded(
-        ws_and_comments,
+        ws_and_notes,
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
@@ -842,7 +842,7 @@ fn requirement_parameter_decl<'a>(
 pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<RequireConstraint>> {
     let start = input;
     let (input, assume_kw) = preceded(
-        ws_and_comments,
+        ws_and_notes,
         alt((
             map(tag(&b"assume"[..]), |_| true),
             map(tag(&b"require"[..]), |_| false),
@@ -863,7 +863,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
         (input, input)
     };
     let declares = has_constraint_keyword || !extension_keywords.is_empty();
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `#73` / validation `08`: `assume constraint fuelConstraint { … }` — optional name before
     // body. The keyword-less `require <name>;` form instead *references* an existing
     // constraint, so it captures an arena-backed qualified reference (spec42 gap 29); the
@@ -901,7 +901,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
         let (input, specializations) =
             crate::parser::usage::feature_specializations_before_value(input)?;
         let (input, value) =
-            opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+            opt(preceded(ws_and_notes, crate::parser::feature_value_part)).parse(input)?;
         (input, specializations, value.map(Box::new))
     } else {
         (input, Vec::new(), None)
@@ -928,7 +928,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
 
 /// KerML STRING_VALUE: double-quoted string, kept as a span over the authored token.
 fn string_value(input: Input<'_>) -> IResult<Input<'_>, crate::ast::StringLiteral> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let token_start = input;
     let (input, _) = tag(&b"\""[..]).parse(input)?;
     let frag = input.fragment();
@@ -955,11 +955,11 @@ fn string_value(input: Input<'_>) -> IResult<Input<'_>, crate::ast::StringLitera
 
 /// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 /// We only parse optional Identification and locale when the next token is not "/*", so that
-/// ws_and_comments inside identification does not consume the doc body.
+/// ws_and_notes inside identification does not consume the doc body.
 pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocComment>> {
     use crate::parser::lex::ws_and_notes;
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"doc"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"doc"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = ws_and_notes(input)?;
     let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
@@ -1029,7 +1029,7 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
 /// authored text together with the span it occupies.
 ///
 /// Takes trivia-free input: callers must stop trivia handling before the member's own regular
-/// comment body rather than skipping it with `ws_and_comments`.
+/// comment body rather than skipping it with `ws_and_notes`.
 fn comment_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::CommentBody> {
     let (input, _) = tag(&b"/*"[..]).parse(input)?;
     let body_start = input;
@@ -1041,10 +1041,10 @@ fn comment_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::CommentBody>
 
 pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"locale"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"locale"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, locale) = string_value(input)?;
-    // Use ws (not ws_and_comments) so we don't consume the comment body as a block comment.
+    // Use ws (not ws_and_notes) so we don't consume the comment body as a block comment.
     let (input, body) = preceded(ws, comment_body).parse(input)?;
     Ok((
         input,
@@ -1072,7 +1072,7 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
     // Speculated at member starts it does not own; refuse unless one of this production's
     // leading words follows the trivia, before entering an arena transaction.
     {
-        let (cursor, _) = crate::parser::lex::ws_and_comments(input)?;
+        let (cursor, _) = crate::parser::lex::ws_and_notes(input)?;
         if !starts_with_keyword(cursor.fragment(), b"comment") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -1085,7 +1085,7 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
 
 fn comment_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
-    let (keyword_start, _) = ws_and_comments(input)?;
+    let (keyword_start, _) = ws_and_notes(input)?;
     let (input, keyword) = tag(&b"comment"[..]).parse(keyword_start)?;
     let keyword_span = node_from_to(keyword_start, input, ()).span;
     let _ = keyword;
@@ -1115,7 +1115,7 @@ fn comment_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Comment
     } else {
         (input, Vec::new())
     };
-    // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the search
+    // `ws`, not `ws_and_notes`: this member's own `/* ... */` body must terminate the search
     // for an optional `locale`. Skipping comments walked straight past the body and found the
     // *next* member's `locale`, fusing two members into one and discarding this one's text with
     // no diagnostic -- `comment named /* two */` followed by `locale "en_US" /* three */` became
@@ -1179,18 +1179,18 @@ pub(crate) fn textual_representation(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<TextualRepresentation>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // BNF: `('rep' Identification)?` is entirely optional -- a bare `language "alf" /* ... */`
     // with no `rep` prefix is valid on its own (GH-86, e.g. `action def setX { language "alf"
     // /* c.x = newX; */ }`, Simple Tests/TextualRepresentationTest.sysml). Previously `rep` was
     // parsed as an unconditional mandatory tag, so this bare form failed even wherever
     // `textual_representation` itself was already dispatched.
     let (input, rep_identification) = {
-        let (peek, _) = ws_and_comments(input)?;
+        let (peek, _) = ws_and_notes(input)?;
         if crate::parser::lex::starts_with_keyword(peek.fragment(), b"rep") {
             let (input, _) = tag(&b"rep"[..]).parse(input)?;
             let (input, _) = ws1(input)?;
-            let (peek, _) = ws_and_comments(input)?;
+            let (peek, _) = ws_and_notes(input)?;
             if crate::parser::lex::starts_with_keyword(peek.fragment(), b"language") {
                 (input, None)
             } else {
@@ -1214,9 +1214,9 @@ pub(crate) fn textual_representation(
     // error collector) rather than a hard parse failure.
     let (input, language) = {
         let peek = input;
-        let (peek, _) = ws_and_comments(peek)?;
+        let (peek, _) = ws_and_notes(peek)?;
         if crate::parser::lex::starts_with_keyword(peek.fragment(), b"language") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"language"[..])).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b"language"[..])).parse(input)?;
             let (input, _) = ws1(input)?;
             let (input, language) = string_value(input)?;
             (input, Some(language))
@@ -1270,7 +1270,7 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequir
 /// mutually exclusive requirement clauses. The `requirement` keyword is what selects between
 /// them, so the choice is made once here rather than inferred later from which field is set.
 fn satisfied_requirement(input: Input<'_>) -> IResult<Input<'_>, SatisfiedRequirement> {
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     if let Ok((rest, keyword_span)) = keyword_token(after_ws, b"requirement") {
         let (rest, identification) = usage_declaration_identification(rest)?;
         return Ok((
@@ -1302,7 +1302,7 @@ fn usage_declaration_identification(
     input: Input<'_>,
 ) -> IResult<Input<'_>, crate::ast::Identification> {
     let (input, short_name) = short_name_prefix(input)?;
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     if next_word_is_reserved(after_ws) {
         return Ok((
             input,
@@ -1312,7 +1312,7 @@ fn usage_declaration_identification(
             },
         ));
     }
-    let (input, declared_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    let (input, declared_name) = opt(preceded(ws_and_notes, name)).parse(input)?;
     Ok((
         input,
         crate::ast::Identification {
@@ -1327,7 +1327,7 @@ fn usage_declaration_identification(
 /// The membership chain bottoms out at `FeatureChainMember = [QualifiedName] |
 /// OwnedFeatureChainMember`, so the subject is a source-backed reference path.
 fn satisfaction_subject(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfactionSubject>> {
-    let (after_ws, _) = ws_and_comments(input)?;
+    let (after_ws, _) = ws_and_notes(input)?;
     let (rest, by_span) = keyword_token(after_ws, b"by")?;
     let (rest, reference) = crate::parser::lex::reference_path(rest)?;
     Ok((
@@ -1338,7 +1338,7 @@ fn satisfaction_subject(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfactio
 
 fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirementUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `BehaviorUsageMember : FeatureMembership = MemberPrefix ownedRelatedElement +=
     // BehaviorUsageElement`: the visibility keyword belongs to the membership and precedes the
     // usage's own `OccurrenceUsagePrefix`.
@@ -1391,7 +1391,7 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirement
 
 pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConcernUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -1427,7 +1427,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
 
 pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -1437,7 +1437,7 @@ pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Req
     let (input, variation_kw) =
         nom::combinator::opt(preceded(tag(&b"variation"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"requirement"[..]).parse(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let input = if peek.fragment().starts_with(b";") || peek.fragment().starts_with(b"{") {
         peek
     } else {

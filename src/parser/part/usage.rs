@@ -42,7 +42,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
 
 fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // `DefinitionBodyItem`/`NonBehaviorBodyItem` = `( SourceSuccessionMember )? …UsageMember`, so
     // `then` precedes the membership, and `OccurrenceUsageMember = MemberPrefix …`, so the
     // visibility keyword precedes the usage's own prefix. All three in that order.
@@ -52,7 +52,7 @@ fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
     // Allow `part: Type` with no whitespace (anonymous UsageDeclaration).
-    let (after_kw, _) = ws_and_comments(input)?;
+    let (after_kw, _) = ws_and_notes(input)?;
     // `part def …` is a definition. Especially important for `ref part def …`, which would
     // otherwise not be claimed by `part_def` (no leading `ref`) and misparse as a usage named
     // `def`.
@@ -81,13 +81,13 @@ fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
         ],
     )?;
     let (input, mut header) = crate::parser::usage::feature_usage_header(input)?;
-    let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
+    let (input, value) = opt(preceded(ws_and_notes, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     // Retain the established body-trailing specialization spelling used by the Apollo corpus.
     // Every relationship uses the same target merge as the declaration's shared clause parser.
     let (input, trailing) = specialization_clauses(input)?;
     let input = if trailing.had_any {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
         if let Some((relationship, value)) = trailing.subsets {
             header.subsets = crate::parser::usage::merge_groups(header.subsets, Some(relationship));
             header.subsetting_value = header.subsetting_value.or(value);
@@ -134,7 +134,7 @@ fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
 
 /// Part usage body: ';' or '{' PartUsageBodyElement* '}'
 pub(crate) fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let frag = input.fragment();
     log::debug!(
         "part_usage_body: first 40 bytes: {:?}",
@@ -192,7 +192,7 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
 /// call this rather than parsing the same body through their own member grammar and recording
 /// which parser ran in the AST.
 pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
         let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
@@ -249,7 +249,7 @@ fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformIn
 
 fn perform_in_out_binding_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, direction) = alt((
         value(InOut::In, tag(&b"in"[..])),
         value(InOut::Out, tag(&b"out"[..])),
@@ -257,9 +257,9 @@ fn perform_in_out_binding_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Per
     .parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = reference_path(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
-    let (input, value_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"="[..])).parse(input)?;
+    let (input, value_expr) = preceded(ws_and_notes, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -306,7 +306,7 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
 
 /// Perform body: `{` PerformBodyElement* `}`.
 fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let open_start = input;
     let (input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
@@ -347,7 +347,7 @@ fn perform_usage_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<Definitio
 
 fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     preceded(
-        ws_and_comments,
+        ws_and_notes,
         alt((crate::parser::body::semicolon_body, perform_body)),
     )
     .parse(input)
@@ -369,7 +369,7 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
 
 fn perform_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -400,9 +400,9 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
     // `action`. A `perform <path>` member is the sibling `perform_usage` form and refuses here
     // without an arena transaction.
     {
-        let (cursor, _) = ws_and_comments(input)?;
+        let (cursor, _) = ws_and_notes(input)?;
         let (cursor, _) = perform_usage_prefix(cursor)?;
-        let (cursor, _) = ws_and_comments(cursor)?;
+        let (cursor, _) = ws_and_notes(cursor)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"perform") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -412,7 +412,7 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
         let (cursor, _) =
             nom::bytes::complete::take::<_, _, nom::error::Error<Input<'_>>>(b"perform".len())
                 .parse(cursor)?;
-        let (cursor, _) = ws_and_comments(cursor)?;
+        let (cursor, _) = ws_and_notes(cursor)?;
         if !crate::parser::lex::starts_with_keyword(cursor.fragment(), b"action") {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -430,12 +430,12 @@ fn perform_action_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Perfor
 /// Allocate: `allocate` source `to` target body.
 pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"allocate"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, source) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, path_expression).parse(input)?;
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -470,25 +470,25 @@ fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
     let (input, _) = tag(&b"binding"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let frag = peek.fragment();
     let (input, binding_name) = if starts_with_keyword(frag, b"bind") || frag.starts_with(b"[") {
         (input, None)
     } else {
-        let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+        let (input, parsed_name) = preceded(ws_and_notes, name).parse(input)?;
         (input, Some(parsed_name))
     };
-    let (peek, _) = ws_and_comments(input)?;
+    let (peek, _) = ws_and_notes(input)?;
     let (input, binding_type) =
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let (input, _) = preceded(ws_and_notes, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_notes, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
         };
     let (input, binding_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     Ok((
         input,
         (short_name, binding_name, binding_type, binding_multiplicity),
@@ -501,18 +501,18 @@ fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
 /// [0..*] be;` in Systems Library `Domain Libraries/Geometry/ShapeItems.sysml` (13 occurrences).
 pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, prefix) = opt(binding_prefix).parse(input)?;
     let (binding_short_name, binding_name, binding_type, binding_multiplicity) =
         prefix.unwrap_or((None, None, None, None));
-    let (input, _) = preceded(ws_and_comments, tag(&b"bind"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"bind"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, left_multiplicity) = opt(multiplicity_node).parse(input)?;
-    let (input, left) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, left) = preceded(ws_and_notes, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"="[..])).parse(input)?;
     let (input, right_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, right) = preceded(ws_and_comments, path_expression).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
+    let (input, right) = preceded(ws_and_notes, path_expression).parse(input)?;
     let mut body_parser = alt((
         crate::parser::body::semicolon_body,
         map(consume_part_usage_structured_brace, |members| {
@@ -555,24 +555,22 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 
 fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // §6 G24: each endpoint may carry its own multiplicity -- `connect [0..1] a.p1 to [1] b.p2;`.
-    let (input, from_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, from_multiplicity) = opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     let (input, from_name) = crate::parser::connector::connector_end_name(input)?;
-    let (input, from_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, to_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, from_expr) = preceded(ws_and_notes, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"to"[..])).parse(input)?;
+    let (input, to_multiplicity) = opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     let (input, to_name) = crate::parser::connector::connector_end_name(input)?;
-    let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let (input, to_expr) = preceded(ws_and_notes, path_expression).parse(input)?;
     let (input, body) = ref_body(input)?;
     let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":>"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)?;
     let subsets = trailing_subsets.map(|target| {
@@ -581,8 +579,8 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     });
     let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":>>"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)?;
     let redefines = trailing_redefines.map(|target| {
@@ -590,7 +588,7 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
         single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
     });
     let input = if subsets.is_some() || redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
         input
     } else {
         input
@@ -756,12 +754,12 @@ fn interface_usage_ref_redef(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":>>"[..])).parse(input)?;
-    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
-    let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b":>>"[..])).parse(input)?;
+    let (input, target) = preceded(ws_and_notes, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_notes, tag(&b"="[..])).parse(input)?;
+    let (input, value) = preceded(ws_and_notes, expression).parse(input)?;
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -786,7 +784,7 @@ fn interface_usage_ref_redef(
 fn interface_usage_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, crate::ast::Body<InterfaceUsageBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b";") {
         return crate::parser::body::semicolon_body(input);
     }
@@ -837,15 +835,15 @@ fn interface_end(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
 
 fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
+    let (input, _) = ws_and_notes(input)?;
     // A named end and a direct qualified reference share their first identifier.  Commit to the
     // named shape only after its grammar-owned `::>` / `references` separator is visible;
     // otherwise a failed optional branch would silently consume the label as a direct endpoint
     // and leave the operator for the enclosing `InterfacePart`.
     let (input, target) = if let Ok((after_name, end_name)) = name(input) {
-        let (after_trivia, _) = ws_and_comments(after_name)?;
+        let (after_trivia, _) = ws_and_notes(after_name)?;
         let operator = if after_trivia.fragment().starts_with(b"::>") {
             let (after_operator, (span, _)) = with_span(tag(&b"::>"[..])).parse(after_trivia)?;
             Some((
@@ -863,8 +861,7 @@ fn interface_end_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceEnd
             None
         };
         if let Some((after_operator, operator)) = operator {
-            let (input, target) =
-                preceded(ws_and_comments, reference_path).parse(after_operator)?;
+            let (input, target) = preceded(ws_and_notes, reference_path).parse(after_operator)?;
             (
                 input,
                 InterfaceEndTarget::Named {
@@ -901,7 +898,7 @@ fn interface_part(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
 
 fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePart>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b"(") {
         let open_start = input;
         let (mut input, _) = tag(&b"("[..]).parse(input)?;
@@ -913,7 +910,7 @@ fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePa
             end: first,
         }];
         loop {
-            let (next, _) = ws_and_comments(input)?;
+            let (next, _) = ws_and_notes(input)?;
             input = next;
             if input.fragment().starts_with(b")") {
                 let close_start = input;
@@ -949,7 +946,7 @@ fn interface_part_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfacePa
         }
     }
     let (input, from) = interface_end(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     let to_start = input;
     let (input, _) = tag(&b"to"[..]).parse(input)?;
     let to_span = crate::parser::span::span_from_to(to_start, input);
@@ -1006,15 +1003,15 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
     // then run unchanged on what follows it.
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = if short_name.is_some() {
-        ws_and_comments(input)?
+        ws_and_notes(input)?
     } else {
         (input, ())
     };
     let (input, named_interface) = opt((
         name,
         opt(multiplicity_node),
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_reference),
+        preceded(ws_and_notes, tag(&b":"[..])),
+        preceded(ws_and_notes, qualified_reference),
     ))
     .parse(input)?;
     let (input, iface_name, leading_multiplicity, interface_type) =
@@ -1032,7 +1029,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
             let (input, bare_named) = opt((
                 name,
                 opt(multiplicity_node),
-                preceded(ws_and_comments, nom::combinator::peek(tag(&b"connect"[..]))),
+                preceded(ws_and_notes, nom::combinator::peek(tag(&b"connect"[..]))),
             ))
             .parse(input)?;
             if let Some((iface_name, multiplicity, _)) = bare_named {
@@ -1051,7 +1048,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
                     name,
                     opt(multiplicity_node),
                     preceded(
-                        ws_and_comments,
+                        ws_and_notes,
                         nom::combinator::peek(alt((
                             tag(&b";"[..]),
                             tag(&b"{"[..]),
@@ -1068,7 +1065,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
                 } else {
                     let (input, interface_type) = opt(preceded(
                         tag(&b":"[..]),
-                        preceded(ws_and_comments, qualified_reference),
+                        preceded(ws_and_notes, qualified_reference),
                     ))
                     .parse(input)?;
                     (input, None, None, interface_type)
@@ -1093,7 +1090,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
     let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
     let subsets = spec.subsets.map(|(target, _)| target);
     let redefines = spec.redefines;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
         let (input, _) = ws1(input)?;
@@ -1204,7 +1201,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // An anonymous leading `:>> target` is a redefinition relationship, not punctuation before
     // a declaration label. Leave that form to `connector::ref_decl`, which retains it in
     // `RefDecl::redefines`; consuming it here would turn the target into `RefDecl::name`.
-    let (after_ref, _) = ws_and_comments(input)?;
+    let (after_ref, _) = ws_and_notes(input)?;
     if after_ref.fragment().starts_with(b":>>") {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -1217,9 +1214,9 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // and left the whole member to recovery; `connector::ref_decl`, which owns the same
     // production in the definition-body scopes, already reads it.
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
-    let (input, name_str) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, name_str) = preceded(ws_and_notes, name).parse(input)?;
     let (input, leading_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (type_ref_span, _, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
@@ -1227,11 +1224,8 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // (Systems Library `Parts.sysml`). The typing may equally follow the redefinition -- the
     // canonical emitted order and a legal `FeatureSpecializationPart` ordering -- so retry the
     // typing after the redefinition when it wasn't already written before it.
-    let (input, redefines) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::redefinition,
-    ))
-    .parse(input)?;
+    let (input, redefines) =
+        opt(preceded(ws_and_notes, crate::parser::usage::redefinition)).parse(input)?;
     let (input, type_ref_span, typing) = if typing.is_none() && redefines.is_some() {
         let (input, type_result) = crate::parser::usage::optional_typings(input)?;
         let (type_ref_span, _, typing) =
@@ -1243,15 +1237,15 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // `:>` subsets, independent of and in addition to `:>>` redefines (mirrors
     // `connector::ref_decl`).
     let (input, trailing_multiplicity) =
-        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        opt(preceded(ws_and_notes, multiplicity_node)).parse(input)?;
     let (input, multiplicity_modifiers) =
         usage_ordered_modifier(crate::ast::MultiplicityModifiers::default(), input)?;
     let (input, subsets) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+        opt(preceded(ws_and_notes, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
     let (input, value) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"="[..])),
-        preceded(ws_and_comments, expression),
+        preceded(ws_and_notes, tag(&b"="[..])),
+        preceded(ws_and_notes, expression),
     ))
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
@@ -1524,7 +1518,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
     // :>> a; }`, `q` referring to the sibling `part q : Q;`) and
     // `Variability Examples/VehicleVariabilityModel.sysml:78` (`variant '6cylEngine' { ... }`).
     let (input, reference) = reference_path(input)?;
-    let (input, body) = preceded(ws_and_comments, part_usage_body).parse(input)?;
+    let (input, body) = preceded(ws_and_notes, part_usage_body).parse(input)?;
     let body = match body {
         PartUsageBody::Semicolon { .. } => None,
         brace @ PartUsageBody::Brace { .. } => Some(brace),
