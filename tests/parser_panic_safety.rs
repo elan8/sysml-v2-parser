@@ -25,7 +25,7 @@ fn malformed_inputs() -> Vec<&'static str> {
         "package P { ]]]]]",
         "package P { @@@ ??? ### }",
         "package P { transition then first / * + - }",
-        "library standard package LegacyStd {",
+        "standard library package Std {",
         "import Views::*",
         "package P; garbage tokens that should fail strictly",
         "package P { action def A { in x : T out y : U }",

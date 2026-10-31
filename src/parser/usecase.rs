@@ -8,7 +8,6 @@ use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_reference, skip_statement_or_block, visibility_prefix, ws1,
     ws_and_comments, USE_CASE_BODY_STARTERS,
@@ -109,15 +108,16 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
         Ok((rest, (span, ()))) => (rest, Some(span)),
         Err(_) => (input, None),
     };
-    let (input, name, target, typing) = if use_case_keyword_span.is_some() {
+    let (input, short_name, name, target, typing) = if use_case_keyword_span.is_some() {
         let (input, _) = ws1(input)?;
-        let (input, declared) = opt(preceded(ws_and_comments, name)).parse(input)?;
+        let (input, identity) = crate::parser::lex::identification_before(input, &[])?;
         let (input, result) = crate::parser::usage::optional_typings(input)?;
         let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(result);
-        (input, declared, None, typing)
+        (input, identity.short_name, identity.name, None, typing)
     } else {
-        let (input, reference) = qualified_reference(input)?;
-        (input, None, Some(reference), None)
+        // `OwnedReferenceSubsetting` is a qualified name or a feature chain.
+        let (input, reference) = crate::parser::lex::reference_path(input)?;
+        (input, None, None, Some(reference), None)
     };
     let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -129,6 +129,7 @@ fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUs
             input,
             IncludeUseCase {
                 use_case_keyword_span,
+                short_name,
                 name,
                 typing,
                 target,
@@ -814,28 +815,29 @@ pub(crate) fn use_case_def_body_element(
             nom::branch::alt((
                 // Keyword-less feature usage with an explicit typing / redefinition / value
                 // (`launchVehicle : SaturnV = ...;`, Apollo 11 `analysis` body; official Vehicle
-                // Analysis Demo). `calc_named_binding` requires one of those, so a bare `name;`
-                // still falls through to the expression arm below. Ordered before it so the name
-                // is not consumed as a lone `FeatureRef` expression.
+                // Analysis Demo), and a bare `name;`. Ordered before the expression arm so the
+                // name is not consumed as a lone `FeatureRef` expression.
                 map(crate::parser::constraint::calc_named_binding, |n| {
                     UseCaseDefBodyElement::DefaultReferenceUsage(Box::new(n))
                 }),
-                map(
-                    |i| {
-                        let (i, _) = ws_and_comments(i)?;
-                        // Don't steal declaration keywords as FeatureRef expressions.
-                        if is_use_case_statement_keyword(i.fragment()) {
-                            return Err(nom::Err::Error(nom::error::Error::new(
-                                i,
-                                nom::error::ErrorKind::Tag,
-                            )));
-                        }
-                        let (i, expr) = expression(i)?;
-                        let (i, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(i)?;
-                        Ok((i, expr))
-                    },
-                    UseCaseDefBodyElement::Expression,
-                ),
+                |i| {
+                    let (i, _) = ws_and_comments(i)?;
+                    // Don't steal declaration keywords as FeatureRef expressions.
+                    if is_use_case_statement_keyword(i.fragment()) {
+                        return Err(nom::Err::Error(nom::error::Error::new(
+                            i,
+                            nom::error::ErrorKind::Tag,
+                        )));
+                    }
+                    let (i, result) = crate::parser::constraint::result_expression_member(i)?;
+                    Ok((
+                        i,
+                        match result {
+                            Ok(expression) => UseCaseDefBodyElement::Expression(expression),
+                            Err(error) => UseCaseDefBodyElement::Error(error),
+                        },
+                    ))
+                },
             )),
             other_use_case_body_element,
         )),

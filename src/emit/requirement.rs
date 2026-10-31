@@ -757,6 +757,11 @@ pub(crate) fn emit_include_use_case(
         Some(target) => w.push_qualified_reference(&format!("{path}/target"), target)?,
         None => {
             w.push_str("use case");
+            if let Some(short_name) = include.short_name {
+                w.push_str(" <");
+                w.push_declaration_name(&format!("{path}/include/short_name"), short_name)?;
+                w.push_char('>');
+            }
             if let Some(name) = include.name {
                 w.push_char(' ');
                 w.push_declaration_name(&format!("{path}/include/name"), name)?;
@@ -907,11 +912,8 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::RequirementUsage(r) => emit_requirement_usage(w, path, &r.value),
         UseCaseDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
-        UseCaseDefBodyElement::Expression(e) => {
-            emit_expression(w, &e.value)?;
-            w.push_char(';');
-            Ok(())
-        }
+        // `ResultExpressionMember` has no terminator.
+        UseCaseDefBodyElement::Expression(e) => emit_expression(w, &e.value),
         UseCaseDefBodyElement::DefaultReferenceUsage(d) => {
             super::structure::emit_default_reference_usage(w, path, &d.value)
         }

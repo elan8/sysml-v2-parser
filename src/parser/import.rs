@@ -393,7 +393,7 @@ mod membership_tests {
     fn import_suffixes_are_typed_and_reference_excludes_wildcards() {
         let context = ParseContext::new();
         let source = crate::ast::SourceStorage::from(
-            "private import $::A::B:: /* wildcard */ * /* recurse */ :: /* marker */ **;",
+            "private import $::A::B:: //* wildcard */ * //* recurse */ :: //* marker */ **;",
         );
         let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
         assert!(rest.fragment().is_empty());
@@ -407,19 +407,19 @@ mod membership_tests {
         };
         assert_eq!(
             source.slice(&wildcard_suffix.span),
-            Some(":: /* wildcard */ *")
+            Some(":: //* wildcard */ *")
         );
         assert_eq!(source.slice(&wildcard_suffix.separator_span), Some("::"));
         assert_eq!(source.slice(&wildcard_suffix.marker_span), Some("*"));
         assert_eq!(
             source.slice(&recursive_suffix.span),
-            Some(":: /* marker */ **")
+            Some(":: //* marker */ **")
         );
         assert_eq!(source.slice(&recursive_suffix.separator_span), Some("::"));
         assert_eq!(source.slice(&recursive_suffix.marker_span), Some("**"));
         assert_eq!(
             source.slice(combined_span),
-            Some(":: /* wildcard */ * /* recurse */ :: /* marker */ **")
+            Some(":: //* wildcard */ * //* recurse */ :: //* marker */ **")
         );
         let arena = context.finish();
         let view = arena
@@ -433,7 +433,7 @@ mod membership_tests {
     fn filter_import_retains_typed_expression_members() {
         let context = ParseContext::new();
         let source = crate::ast::SourceStorage::from(
-            "private import A /* before */ [ /* left */ x /* right */ ] [y];",
+            "private import A //* before */ [ //* left */ x //* right */ ] [y];",
         );
         let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
         assert!(rest.fragment().is_empty());
@@ -446,7 +446,7 @@ mod membership_tests {
                 assert_eq!(members.len(), 2);
                 assert_eq!(
                     source.slice(&members[0].span),
-                    Some("[ /* left */ x /* right */ ]")
+                    Some("[ //* left */ x //* right */ ]")
                 );
                 assert_eq!(source.slice(&members[0].value.open_bracket_span), Some("["));
                 assert_eq!(

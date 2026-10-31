@@ -973,10 +973,10 @@ fn analysis_body_accepts_bare_typed_valued_feature() {
     assert!(usage.value.is_some(), "the `= …` value should be retained");
 }
 
-/// Negative control: a bare `name;` in a use-case-family body stays a result expression, not a
-/// (nameless) feature usage.
+/// `name;` in a use-case-family body is a `DefaultReferenceUsage`: a result expression has no
+/// terminator.
 #[test]
-fn analysis_body_bare_name_is_still_an_expression() {
+fn analysis_body_bare_name_is_a_default_reference_usage() {
     let input = "package P {\nanalysis A {\nvehicle;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
@@ -999,8 +999,11 @@ fn analysis_body_bare_name_is_still_an_expression() {
         panic!("expected analysis body");
     };
     assert!(
-        matches!(elements[0].value, UseCaseDefBodyElement::Expression(_)),
-        "bare `vehicle;` should stay an expression, got {:?}",
+        matches!(
+            elements[0].value,
+            UseCaseDefBodyElement::DefaultReferenceUsage(_)
+        ),
+        "bare `vehicle;` should be a default reference usage, got {:?}",
         elements[0].value
     );
 }

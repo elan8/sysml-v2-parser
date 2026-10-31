@@ -309,6 +309,7 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
 
 pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"@",
+    b"attribute",
     b"doc",
     b"in",
     b"out",
@@ -589,7 +590,7 @@ pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// be parsed explicitly so it appears in the AST. //* ... */ is tried before line_comment so that
 /// "//*" starts a block comment, not a line comment.
 pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let skipped = trivia_len(input.fragment());
+    let skipped = note_trivia_len(input.fragment());
     Ok((crate::parser::span::advance(input, skipped), ()))
 }
 
@@ -608,9 +609,9 @@ pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// (KerML BNF 199) is optional -- so a bare `/* ... */` at a member position is an
 /// `AnnotatingElement`, i.e. syntax, not trivia.
 ///
-/// Used exactly where a member may begin: the structured brace-member loop and
-/// [`crate::parser::body::annotating_member`]. Everywhere else keeps [`ws_and_comments`], because
-/// the grammar has no member between the tokens of a declaration for a comment there to be.
+/// Only tokens are significant (KerML 8.2.1), and `REGULAR_COMMENT` is a token the grammar places
+/// nowhere but as such a body. So between the tokens of a declaration it is an error like any other
+/// misplaced token, not something to skip.
 pub(crate) fn ws_and_notes(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let skipped = note_trivia_len(input.fragment());
     Ok((crate::parser::span::advance(input, skipped), ()))
@@ -618,8 +619,7 @@ pub(crate) fn ws_and_notes(input: Input<'_>) -> IResult<Input<'_>, ()> {
 
 /// Byte length of the whitespace-and-notes run at the start of `bytes`.
 ///
-/// Mirrors [`trivia_len`] minus its `/* ... */` arm. An unterminated `//*` is an ordinary line
-/// note, exactly as there.
+/// An unterminated `//*` is an ordinary line note.
 fn note_trivia_len(bytes: &[u8]) -> usize {
     let mut pos = 0usize;
     loop {
@@ -633,45 +633,6 @@ fn note_trivia_len(bytes: &[u8]) -> usize {
 
         let rest = &bytes[pos..];
         if rest.starts_with(b"//") {
-            if rest.starts_with(b"//*") {
-                if let Some(end) = block_comment_end(rest, 3) {
-                    pos += end;
-                    continue;
-                }
-            }
-            pos += line_comment_len(rest);
-        } else {
-            return pos;
-        }
-    }
-}
-
-/// Byte length of the trivia run at the start of `bytes`.
-///
-/// This is the parser's hottest lexical routine: it runs before every token and again for every
-/// alternative that backtracks over the same position, so it is written as one explicit scan
-/// rather than composed combinators. The recognized forms and their precedence match the grammar
-/// documented on [`ws_and_comments`]: whitespace, a terminated `/* ... */`, a terminated
-/// `//* ... */`, and `//` to end of line. An unterminated `/*` is not trivia and stops the scan,
-/// leaving it for the caller to report; an unterminated `//*` is an ordinary line comment.
-fn trivia_len(bytes: &[u8]) -> usize {
-    let mut pos = 0usize;
-    loop {
-        while let Some(&byte) = bytes.get(pos) {
-            if byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r' {
-                pos += 1;
-            } else {
-                break;
-            }
-        }
-
-        let rest = &bytes[pos..];
-        if rest.starts_with(b"/*") {
-            match block_comment_end(rest, 2) {
-                Some(end) => pos += end,
-                None => return pos,
-            }
-        } else if rest.starts_with(b"//") {
             if rest.starts_with(b"//*") {
                 if let Some(end) = block_comment_end(rest, 3) {
                     pos += end;
@@ -1216,7 +1177,7 @@ pub(crate) enum ReferencePathKind {
 /// name is not a keyword however it is spelled, so `#'part'` is a legitimate reference and `#part`
 /// is not. Used only where a reference sits directly in front of another production's keyword --
 /// see [`qualified_reference_without_reserved_names`].
-fn segment_is_reserved_keyword(input: Input<'_>) -> bool {
+pub(crate) fn segment_is_reserved_keyword(input: Input<'_>) -> bool {
     let fragment = input.fragment();
     if fragment.first().is_some_and(|byte| *byte == b'\'') {
         return false;
@@ -1638,8 +1599,19 @@ pub(crate) fn visibility_prefix(
     if !input.fragment().starts_with(b"p") {
         return Ok((input, (crate::parser::span_from_to(start, input), None)));
     }
-    let (input, visibility) =
-        opt(nom::sequence::terminated(visibility_indicator, ws1)).parse(input)?;
+    // Whitespace or a comment ends the keyword; either way the next token starts after them.
+    let (input, visibility) = opt(|input| {
+        let (keyword_end, visibility) = visibility_indicator(input)?;
+        let (rest, _) = ws_and_comments(keyword_end)?;
+        if rest.location_offset() == keyword_end.location_offset() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                keyword_end,
+                nom::error::ErrorKind::MultiSpace,
+            )));
+        }
+        Ok((rest, visibility))
+    })
+    .parse(input)?;
     Ok((
         input,
         (
@@ -2159,10 +2131,10 @@ mod lexical_bnf_tests {
     }
 
     #[test]
-    fn ws_and_comments_skip_line_and_block() {
-        let input = span_input("  // line\n  /* block */  part");
+    fn ws_and_comments_skips_notes_and_stops_at_a_regular_comment() {
+        let input = span_input("  // line\n  //* note */  /* comment */ part");
         let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
-        assert!(rest.fragment().starts_with(b"part"));
+        assert!(rest.fragment().starts_with(b"/* comment */"));
     }
 
     #[test]
@@ -2191,7 +2163,7 @@ mod lexical_bnf_tests {
 
     #[test]
     fn ws_and_comments_consumes_runs_of_mixed_trivia() {
-        let input = span_input("\r\n\t // a\r// b\n/* c */\n//* d */\t part");
+        let input = span_input("\r\n\t // a\r// b\n//* c */\n//* d */\t part");
         let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
         assert_eq!(*rest.fragment(), &b"part"[..]);
     }

@@ -127,22 +127,12 @@ fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPac
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, membership) = package_member_prefix(input)?;
-    // Accept both `standard library package` (current SysML v2 stdlib)
-    // and legacy `library standard package`.
-    let (input, is_standard) = if input.fragment().starts_with(b"standard") {
-        let (input, _) = tag(&b"standard"[..]).parse(input)?;
-        let (input, _) = ws1(input)?;
-        let (input, _) = tag(&b"library"[..]).parse(input)?;
-        let (input, _) = ws1(input)?;
-        (input, true)
-    } else {
-        let (input, _) = tag(&b"library"[..]).parse(input)?;
-        let (input, _) = ws1(input)?;
-        let (input, is_standard) = opt(preceded(tag(&b"standard"[..]), ws1))
-            .parse(input)
-            .map(|(i, o)| (i, o.is_some()))?;
-        (input, is_standard)
-    };
+    // `standard` precedes `library`. The BNF prints the group with no `?`, but KerML 7.2 shows a
+    // plain `library package`, and `standard` further identifies some of them.
+    let (input, standard) = opt(preceded(tag(&b"standard"[..]), ws_and_comments)).parse(input)?;
+    let is_standard = standard.is_some();
+    let (input, _) = tag(&b"library"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
     let (input, _) = keyword_package(input)?;
     let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;

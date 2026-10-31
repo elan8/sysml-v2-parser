@@ -128,7 +128,7 @@ package '10a-Analysis' {
             objective  : MassAnalysisObjective {
                 subject = MassAnalysisCase::result;
             }
-            vehicle.mass;
+            vehicle.mass
         }
         analysis def AnalysisPlan {
             subject vehicle : Vehicle;

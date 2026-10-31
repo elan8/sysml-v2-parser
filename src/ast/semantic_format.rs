@@ -6870,7 +6870,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         match include.target {
             Some(reference) => self.write_reference(reference),
             None => {
-                self.writer.write_str("(use-case (name ")?;
+                self.writer.write_str("(use-case (short-name ")?;
+                self.write_optional_name(include.short_name)?;
+                self.writer.write_str(") (name ")?;
                 self.write_optional_name(include.name)?;
                 self.writer.write_str(") (typing ")?;
                 match &include.typing {

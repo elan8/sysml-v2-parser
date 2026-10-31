@@ -439,8 +439,8 @@ fn extended_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast:
 /// This intentionally doesn't attempt to resolve whether the keyword is actually a declared
 /// `metadata def <keyword> ...` short name (that semantic check, plus a package-local short-name
 /// index, is the larger deferred 1.5b item in PARSER_BACKLOG_ROADMAP.md §2.1) -- syntactically,
-/// any bare `#<name>` immediately followed by what looks like the start of another declaration
-/// (an identifier) is accepted. Stacked prefixes (`#Approval #Classified part def X;`) are
+/// any bare `#<name>` immediately followed by the start of another declaration is accepted (see
+/// [`prefixed_member_follows`]). Stacked prefixes (`#Approval #Classified part def X;`) are
 /// accepted the same way -- each `#tag` is a separate `MetadataKeywordUsage` prefix, so a
 /// following `#` (the start of the next stacked tag) must be accepted here too, or the whole
 /// second `#tag` onward is left for `metadata_keyword_usage`/`metadata_keyword_prefix` to retry
@@ -452,17 +452,33 @@ pub(crate) fn metadata_keyword_prefix(
     crate::parser::span::reference_transaction(input, metadata_keyword_prefix_inner)
 }
 
+/// Whether `input`, at the token after a `#tag`, can start a member the tag prefixes: another
+/// tag, a keyword, or a word that a name or typing continues (a KerML `feature z;` is not reserved
+/// in a SysML document). A lone name is not one: `#tag x` with a terminator is `ExtendedUsage`,
+/// and without one it would otherwise become a result expression the tag cannot prefix.
+fn prefixed_member_follows(input: Input<'_>) -> bool {
+    if input.fragment().starts_with(b"#") || crate::parser::lex::segment_is_reserved_keyword(input)
+    {
+        return true;
+    }
+    let Ok((rest, _)) = crate::parser::lex::name(input) else {
+        return false;
+    };
+    ws_and_comments(rest).is_ok_and(|(next, _)| {
+        let next = next.fragment();
+        next.first()
+            .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_' || *b == b'\'')
+            || (next.starts_with(b":") && !next.starts_with(b"::"))
+    })
+}
+
 fn metadata_keyword_prefix_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
     let start = input;
     let (input, (hash_span, reference)) = metadata_keyword_head(input)?;
     let (peek, _) = ws_and_comments(input)?;
-    if !peek
-        .fragment()
-        .first()
-        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_' || *b == b'\'' || *b == b'#')
-    {
+    if !prefixed_member_follows(peek) {
         return Err(nom::Err::Error(nom::error::Error::new(
             peek,
             nom::error::ErrorKind::Tag,

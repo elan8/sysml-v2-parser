@@ -410,9 +410,9 @@ pub(crate) fn constraint_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// SysML CalculationBody and KerML FunctionBody share ResultExpressionMember:
-/// an OwnedExpression without a terminating semicolon.
-fn result_expression_member(
+/// SysML CalculationBody and CaseBody and KerML FunctionBody share ResultExpressionMember: an
+/// OwnedExpression without a terminating semicolon, as the last member of the body.
+pub(crate) fn result_expression_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Result<Node<Expression>, Node<ParseErrorNode>>> {
     let checkpoint = input.extra.reference_checkpoint();
@@ -432,6 +432,12 @@ fn result_expression_member(
             category: Some(crate::error::DiagnosticCategory::ParseError),
         };
         return Ok((end, Err(node_from_to(input, end, error))));
+    }
+    if !(semicolon_start.fragment().is_empty() || semicolon_start.fragment().starts_with(b"}")) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            semicolon_start,
+            nom::error::ErrorKind::Tag,
+        )));
     }
     Ok((rest, Ok(expression)))
 }
@@ -1262,8 +1268,7 @@ fn kerml_succession_member_inner(
 /// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
 /// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
 /// else 0;`, `private thisClock : Clock :>> self;` (Kernel Semantic Library
-/// `Occurrences.kerml`/`Observation.kerml`). Requires a typing clause, a redefinition, or a value,
-/// so plain expression statements stay on the expression arm.
+/// `Occurrences.kerml`/`Observation.kerml`). The `;` is what separates it from a result expression.
 pub(crate) fn calc_named_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
@@ -1326,15 +1331,9 @@ fn calc_named_binding_inner(
     };
     let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    // A declaration needs something an expression statement cannot have: a typing clause, a
-    // redefinition, or a value. `mass : Real;` is the type-only form (`constraint c { mass :
-    // Real; }`); a bare `mass` stays on the expression arm.
-    if typing.is_none() && value.is_none() && redefines.is_none() {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
-    }
+    // `DefaultReferenceUsage = RefPrefix Usage`, so `mass;` is a declaration like `mass : Real;`.
+    // A result expression has no terminator, so a bare `mass` with none stays on that arm.
+    //
     // This production accepts only the semicolon body alternative. Delegate its token capture to
     // the shared body parser so the serialized body delimiter remains source-backed.
     let (input, body) = semicolon_body(input)?;
@@ -2338,7 +2337,7 @@ fn body_element(
         // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
         // `private thisClock : Clock :>> self;`) -- tried before the bare-expression arm,
         // which cannot represent the typing/redefinition. `calc_named_binding` requires a
-        // value or redefinition, so plain expression statements never land here.
+        // `;`, which a result expression never has.
         (
             next,
             CalcDefBodyElement::DefaultReferenceUsage(Box::new(binding)),

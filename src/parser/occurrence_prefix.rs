@@ -857,9 +857,9 @@ mod tests {
     }
 
     #[test]
-    fn a_comment_between_two_slots_is_trivia() {
+    fn a_note_between_two_slots_is_trivia() {
         let (rest, prefix) =
-            occurrence_usage_prefix(input("in /* why */ derived occurrence o1;")).expect("prefix");
+            occurrence_usage_prefix(input("in //* why */ derived occurrence o1;")).expect("prefix");
         assert!(prefix
             .basic()
             .expect("basic head")

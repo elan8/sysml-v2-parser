@@ -68,7 +68,7 @@ package AnalysisTest {
         objective obj  : AnalysisObjective {
             subject = result;
         }
-        v.m;
+        v.m
     }
     analysis def AnalysisPlan {
         subject v : V;
