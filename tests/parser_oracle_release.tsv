@@ -4,7 +4,6 @@ ours-rejects	kerml/src/examples/Association Examples/ProductSelection_N_ary.kerm
 ours-rejects	kerml/src/examples/Behavior Examples/TakePicture.kerml
 ours-rejects	kerml/src/examples/KerML Spec Annex A Examples/A-3-8-ChangingFeatureValues.kerml
 ours-rejects	kerml/src/examples/Simple Tests/Connectors.kerml
-ours-rejects	kerml/src/examples/Simple Tests/Imports.kerml
 ours-rejects	kerml/src/examples/Simple Tests/Redefinition.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/Enhancements/TimeVaryingFeaturesEnhanced.kerml
 ours-rejects	kerml/src/examples/Variable Feature Examples/TimeVaryingCarDriver.kerml
