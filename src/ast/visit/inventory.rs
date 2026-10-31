@@ -5413,11 +5413,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
-            if let Some(inner) = body {
-                for inner in inner {
-                    visitor.visit_action_def_body_element(inner);
-                }
-            }
+            visitor.visit_action_def_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -8471,11 +8467,7 @@ macro_rules! ast_traversal {
             }
             visitor.visit_qualified_reference(source);
             visitor.visit_qualified_reference(target);
-            if let Some(inner) = body {
-                for inner in inner {
-                    visitor.visit_relationship_body_element(inner);
-                }
-            }
+            walk_relationship_body(visitor, body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }

@@ -802,7 +802,7 @@ fn kerml_relationship_decl_inner(
     };
     let (input, target) =
         preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
-    let (input, body) = crate::parser::body::relationship_body_annotations(input)?;
+    let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
         node_from_to(

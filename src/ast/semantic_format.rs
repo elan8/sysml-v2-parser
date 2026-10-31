@@ -3371,12 +3371,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.writer.write_str("none")?;
                 }
                 self.writer.write_str(")")?;
-                if let Some(body) = &declaration.value.body {
-                    // Like a dependency body this is a `Vec`, not an `ast::Body<E>`, so it has no
-                    // marker of its own -- but a present one was written with braces, and every
-                    // other body in this projection says so.
-                    self.writer.write_str(" (body brace")?;
-                    for element in body {
+                if let super::ActionDefBody::Brace {
+                    elements, close, ..
+                } = &declaration.value.body
+                {
+                    self.writer.write_char(' ')?;
+                    self.open_brace_body(Some(close))?;
+                    for element in elements {
                         self.writer.write_char(' ')?;
                         self.write_first_merge_member(&element.value, &element.span)?;
                     }

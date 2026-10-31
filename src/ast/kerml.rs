@@ -551,7 +551,7 @@ pub struct KermlRelationshipDecl {
     /// The general/type/subsetted/disjoining/inverting/featuring element.
     pub target: crate::ast::QualifiedReferenceId,
     /// `;` or the annotation-only `RelationshipBody`.
-    pub body: Option<Vec<Node<crate::ast::RelationshipBodyElement>>>,
+    pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
     pub membership: crate::ast::Membership,
 }
 

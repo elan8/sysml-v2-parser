@@ -290,10 +290,10 @@ pub struct InOutDecl {
     /// `FeatureValue`), e.g. `in target : Occurrence[1] default that as Occurrence { ... }`
     /// (Systems Library `Actions.sysml`).
     pub value: Option<Node<FeatureValue>>,
-    /// Retained `{ ... }` terminator body elements (`in occ ... { doc ... }`); `None` for the
-    /// `;`-terminated form. Parameter bodies share the action-body member grammar, matching the
-    /// parser, which always dispatched brace terminators through the action-body machinery.
-    pub body: Option<Vec<Node<ActionDefBodyElement>>>,
+    /// The `;` terminator or a `{ ... }` body (`in occ ... { doc ... }`). Parameter bodies share
+    /// the action-body member grammar, matching the parser, which always dispatched brace
+    /// terminators through the action-body machinery.
+    pub body: ActionDefBody,
     /// `MemberPrefix` visibility: `private in x : Real;`. Every body member may carry one; without
     /// this slot the keyword had nowhere to go and the member was rejected or shredded (#178).
     pub membership: crate::ast::Membership,

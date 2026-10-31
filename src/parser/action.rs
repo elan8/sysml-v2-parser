@@ -414,7 +414,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, modifiers) = multiplicity_modifier_slots(input)?;
         let (input, value) = opt(feature_value_part).parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let (input, body) = crate::parser::body::semicolon_body(input)?;
         return Ok((
             input,
             node_from_to(
@@ -434,7 +434,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                     multiplicity_modifiers: modifiers,
                     redefines: Some(redefines),
                     value,
-                    body: None,
+                    body,
                     membership,
                 },
             ),
@@ -554,16 +554,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 
         // Standard library sometimes uses braced pin bodies without a trailing semicolon.
         // Accept either `;` or a `{ ... }` body as a terminator, retaining the body elements.
-        let (input, body) = preceded(
-            ws_and_comments,
-            alt((
-                map(tag(&b";"[..]), |_| None),
-                map(consume_action_structured_brace, |members| {
-                    Some(members.elements)
-                }),
-            )),
-        )
-        .parse(input)?;
+        let (input, body) = action_def_body(input)?;
         Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((
             input,
             InOutDecl {
@@ -616,31 +607,6 @@ pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Acti
         },
     )?;
     Ok((input, members.into_body()))
-}
-
-/// Parse a `{` action-body `}`, returning the parsed member elements. The enclosing span stays
-/// available at the caller.
-fn consume_action_structured_brace(
-    input: Input<'_>,
-) -> IResult<Input<'_>, crate::parser::body::ParsedBraceMembers<ActionDefBodyElement>> {
-    parse_structured_brace_members(
-        input,
-        ACTION_BODY_STARTERS,
-        "action body",
-        "recovered_action_body_element",
-        action_def_body_element,
-        |start, end| {
-            let recovery = build_recovery_error_node_from_span(
-                start,
-                end,
-                ACTION_BODY_STARTERS,
-                "action body",
-                "recovered_action_body_element",
-            );
-            let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-            node_from_to(start, end, ActionDefBodyElement::Error(node))
-        },
-    )
 }
 
 /// `AssignmentNode = OccurrenceUsagePrefix ( ActionNodeUsageDeclaration )? 'assign' …`
@@ -2768,7 +2734,7 @@ mod in_out_decl_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let value = node.value.value.as_ref().expect("feature value");
         assert!(value.value.is_default);
-        let body = node.value.body.as_ref().expect("retained body");
+        let body = node.value.body.braced_elements().expect("retained body");
         assert_eq!(body.len(), 1);
         assert!(matches!(
             body[0].value,
