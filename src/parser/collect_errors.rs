@@ -66,17 +66,10 @@ pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec
             });
         }
         RecoveryContent::MissingImportVisibility(span) => {
-            errors.push(
-                ParseError::new("an import requires an explicit visibility indicator")
-                    .with_location(span.offset, span.line, span.column)
-                    .with_length(span.len)
-                    .with_code("missing_import_visibility")
-                    .with_severity(DiagnosticSeverity::Error)
-                    .with_category(DiagnosticCategory::ParseError)
-                    .with_expected("'public', 'private', or 'protected' before 'import'")
-                    .with_found("import")
-                    .with_suggestion("Specify the import visibility explicitly."),
-            );
+            errors.push(parse_error_from_recovery_node(
+                &span,
+                &super::import::missing_visibility_node(span),
+            ));
         }
         // The document-level brace balance reports `missing_closing_brace` once, however many
         // bodies are open.

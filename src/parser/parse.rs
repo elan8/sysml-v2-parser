@@ -269,19 +269,22 @@ fn parse_with_diagnostics_document(
                         }
                     }
                 }
-                let pe = missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
+                let grammar_diagnostic = super::import::missing_visibility_error(input);
+                let pe = grammar_diagnostic.as_ref().map(|error| {
+                    super::recovery::parse_error_from_recovery_node(&crate::parser::span_from_to(input, input), error)
+                }).unwrap_or_else(|| missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
                     nom_err_to_parse_error(
                         &e,
                         None,
                         Some("package-body element at root (package, namespace, import, definition, or usage)"),
                     )
-                });
+                }));
                 let recovery_start = input;
                 errors.push(pe.clone());
                 let skip_result = lex::skip_to_next_balanced_sync_point(recovery_start);
                 match skip_result {
                     Ok((rest, _)) if rest.location_offset() > recovery_start.location_offset() => {
-                        let recovery = ParseErrorNode {
+                        let recovery = grammar_diagnostic.unwrap_or_else(|| ParseErrorNode {
                             diagnostic_span: None,
                             message: pe.message,
                             code: pe
@@ -291,7 +294,7 @@ fn parse_with_diagnostics_document(
                             found: pe.found,
                             suggestion: pe.suggestion,
                             category: pe.category,
-                        };
+                        });
                         let error =
                             PackageBodyElement::Error(node_from_to(recovery_start, rest, recovery));
                         let member = node_from_to(recovery_start, rest, error);

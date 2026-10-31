@@ -654,6 +654,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         Ok(())
     }
 
+    fn write_import(&mut self, import: &super::Import) -> io::Result<()> {
+        self.writer.write_str("(import (visibility ")?;
+        match import.visibility {
+            super::ImportVisibility::Authored { visibility, .. } => {
+                self.writer.write_str(visibility_name(Some(visibility)))?
+            }
+            super::ImportVisibility::Missing { .. } => self.writer.write_str("missing")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_import_target(&import.target)?;
+        self.writer.write_char(' ')?;
+        self.write_relationship_body(&import.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_import_target(&mut self, target: &ImportTarget) -> io::Result<()> {
         self.writer.write_str("(target (span ")?;
         write_span(self.writer, &target.span)?;
@@ -944,9 +959,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         RequirementDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(import ")?;
-                            self.write_import_target(&import.value.target)?;
-                            self.writer.write_char(')')?;
+                            self.write_import(&import.value)?;
                         }
                         RequirementDefBodyElement::SubjectDecl(subject) => {
                             self.write_item_prefix(&mut first)?;
@@ -1203,9 +1216,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         UseCaseDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(import ")?;
-                            self.write_import_target(&import.value.target)?;
-                            self.writer.write_char(')')?;
+                            self.write_import(&import.value)?;
                         }
                         UseCaseDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -1902,9 +1913,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         PartDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(import ")?;
-                            self.write_import_target(&import.value.target)?;
-                            self.writer.write_char(')')?;
+                            self.write_import(&import.value)?;
                         }
                         PartDefBodyElement::ActionUsage(_usage) => {
                             self.write_marker(&mut first, "action-usage")?;
@@ -3234,8 +3243,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.write_item_prefix(&mut first)?;
                     self.write_flow_usage(&member.value)?;
                 }
-                super::CalcDefBodyElement::Import(_member) => {
-                    self.write_marker(&mut first, "import")?;
+                super::CalcDefBodyElement::Import(import) => {
+                    self.write_item_prefix(&mut first)?;
+                    self.write_import(&import.value)?;
                 }
                 super::CalcDefBodyElement::AliasDef(alias) => {
                     self.write_item_prefix(&mut first)?;
@@ -3315,11 +3325,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             ActionDefBodyElement::ExtendedUsage(member) => self.write_extended_usage(&member.value),
             ActionDefBodyElement::Error(error) => self.write_malformed(&error.value, span),
-            ActionDefBodyElement::Import(import) => {
-                self.writer.write_str("(import ")?;
-                self.write_import_target(&import.value.target)?;
-                self.writer.write_char(')')
-            }
+            ActionDefBodyElement::Import(import) => self.write_import(&import.value),
             ActionDefBodyElement::InOutDecl(declaration) => {
                 self.writer.write_str("(in-out ")?;
                 // Written only when authored, so undecorated parameters keep their projection.
@@ -4274,9 +4280,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         super::ActionUsageBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(import ")?;
-                            self.write_import_target(&import.value.target)?;
-                            self.writer.write_char(')')?;
+                            self.write_import(&import.value)?;
                         }
                         super::ActionUsageBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -5166,9 +5170,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         super::MetadataBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(import ")?;
-                            self.write_import_target(&import.value.target)?;
-                            self.writer.write_char(')')?;
+                            self.write_import(&import.value)?;
                         }
                     }
                 }
@@ -7495,9 +7497,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::Import(import) => {
                 self.write_item_prefix(first)?;
-                self.writer.write_str("(import ")?;
-                self.write_import_target(&import.value.target)?;
-                self.writer.write_char(')')
+                self.write_import(&import.value)
             }
             PackageBodyElement::PartDef(definition) => {
                 self.write_item_prefix(first)?;
@@ -7865,9 +7865,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 }
                 RootElement::Import(import) => {
                     self.write_item_prefix(&mut first)?;
-                    self.writer.write_str("(import ")?;
-                    self.write_import_target(&import.value.target)?;
-                    self.writer.write_char(')')?;
+                    self.write_import(&import.value)?;
                 }
                 RootElement::Member(member) => {
                     self.write_package_element(member, &mut first)?;
