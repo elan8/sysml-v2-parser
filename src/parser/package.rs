@@ -1,8 +1,8 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    FilterMember, LibraryPackage, NamespaceDecl, NamespaceName, Node, Package, PackageBody,
-    PackageBodyElement, QualifiedIdentification, RootElement, Visibility,
+    FilterMember, LibraryPackage, Membership, NamespaceDecl, NamespaceName, Node, Package,
+    PackageBody, PackageBodyElement, QualifiedIdentification, RootElement, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
 use crate::parser::alias::alias_def;
@@ -25,7 +25,7 @@ use crate::parser::individual::individual_def;
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     name, qualified_declaration_name, recover_body_element, starts_with_any_keyword,
-    starts_with_keyword, ws1, ws_and_comments,
+    starts_with_keyword, visibility_indicator, ws1, ws_and_comments,
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
@@ -91,19 +91,34 @@ fn required_package_identification(
     }
 }
 
+/// `MemberPrefix` of a package member, recording the exact visibility token.
+///
+/// Takes input at the member start: a bare comment there is its own `Comment` member, so only
+/// the trivia after the prefix is skipped.
+fn package_member_prefix(input: Input<'_>) -> IResult<Input<'_>, Membership> {
+    let start = input;
+    match opt(visibility_indicator).parse(input)? {
+        (input, Some((span, visibility))) => {
+            let (input, _) = ws_and_comments(input)?;
+            Ok((input, Membership::owning(Some(visibility), span)))
+        }
+        (input, None) => Ok((
+            input,
+            Membership::owning(None, crate::parser::span_from_to(start, start)),
+        )),
+    }
+}
+
 /// [standard] library package Identification PackageBody (BNF LibraryPackage)
 pub(crate) fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
-    // Refuse unless `library` or `standard` leads, before entering an arena transaction.
+    // Refuse unless `library` or `standard` follows the optional visibility prefix.
+    if !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"library")
+        && !crate::parser::occurrence_prefix::kind_keyword_follows(input, b"standard")
     {
-        let (after_trivia, _) = crate::parser::lex::ws_and_comments(input)?;
-        let fragment = after_trivia.fragment();
-        if !starts_with_keyword(fragment, b"library") && !starts_with_keyword(fragment, b"standard")
-        {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     }
     crate::parser::span::reference_transaction(input, library_package_inner)
 }
@@ -111,6 +126,7 @@ pub(crate) fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<Libr
 fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, membership) = package_member_prefix(input)?;
     // Accept both `standard library package` (current SysML v2 stdlib)
     // and legacy `library standard package`.
     let (input, is_standard) = if input.fragment().starts_with(b"standard") {
@@ -136,6 +152,7 @@ fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPac
             start,
             input,
             LibraryPackage {
+                membership,
                 is_standard,
                 identification,
                 body,
@@ -144,7 +161,7 @@ fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPac
     ))
 }
 
-/// package Identification PackageBody
+/// MemberPrefix package Identification PackageBody
 pub(crate) fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
     // Speculated at member starts it does not own; refuse by lookahead before entering an
     // arena transaction. See [`kind_keyword_follows`](crate::parser::occurrence_prefix::kind_keyword_follows).
@@ -159,6 +176,7 @@ pub(crate) fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
 
 fn package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
     let start = input;
+    let (input, membership) = package_member_prefix(input)?;
     let (input, _) = keyword_package(input)?;
     let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;
@@ -168,6 +186,7 @@ fn package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
             start,
             input,
             Package {
+                membership,
                 identification,
                 body,
             },
@@ -2569,5 +2588,35 @@ mod package_metadata_and_connect_tests {
             panic!("expected ConnectionUsage, got {:?}", node.value);
         };
         assert_eq!(usage.value.prefix.extension_keywords.len(), 1);
+    }
+
+    #[test]
+    fn package_body_accepts_a_visibility_prefix_on_a_nested_package() {
+        let (rest, node) =
+            package_body_element(input("private package Vault { part def Treasure; }"))
+                .expect("private package");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PackageBodyElement::Package(package) = node.value else {
+            panic!("expected Package, got {:?}", node.value);
+        };
+        assert_eq!(
+            package.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert!(package.value.identification.simple_name().is_some());
+    }
+
+    #[test]
+    fn package_body_accepts_a_visibility_prefix_on_a_nested_library_package() {
+        let (rest, node) =
+            package_body_element(input("private library package Hidden { }")).expect("library");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PackageBodyElement::LibraryPackage(package) = node.value else {
+            panic!("expected LibraryPackage, got {:?}", node.value);
+        };
+        assert_eq!(
+            package.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
     }
 }

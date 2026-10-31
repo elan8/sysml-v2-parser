@@ -36,6 +36,6 @@ package TimeVaryingAttribute {
   (references
     (reference r0 (scope relative) (span (offset 126) (line 4) (column 33) (len 6)) (segments (segment 0 (token "PwrCmd") (name "PwrCmd") (separator none) (span (offset 126) (line 4) (column 33) (len 6)))))
   )
-  (root (package (name "TimeVaryingAttribute") (body brace (item-def (name "PwrCmd") (modifiers) (individual false) (specializes none) (body semicolon)) (part-def (name "Transport2") (modifiers) (body brace (item-usage (prefix (direction out) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "pwrCmd") (short-name none) (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)))))))
+  (root (package (visibility none) (name "TimeVaryingAttribute") (body brace (item-def (name "PwrCmd") (modifiers) (individual false) (specializes none) (body semicolon)) (part-def (name "Transport2") (modifiers) (body brace (item-usage (prefix (direction out) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "pwrCmd") (short-name none) (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body semicolon)))))))
 )
 ~~~

@@ -30,6 +30,6 @@ package Live::Valid;
   (references
     (reference r0 (scope relative) (span (offset 42) (line 2) (column 9) (len 11)) (segments (segment 0 (token "Live") (name "Live") (separator none) (span (offset 42) (line 2) (column 9) (len 4))) (segment 1 (token "Valid") (name "Valid") (separator colon-colon) (span (offset 48) (line 2) (column 15) (len 5)))))
   )
-  (root (malformed (code "expected_alt") (found "package Ghost::Broken unexpected;") (span (offset 0) (line 1) (column 1) (len 33))) (package (name (qualified-declaration (ref r0))) (body semicolon)))
+  (root (malformed (code "expected_alt") (found "package Ghost::Broken unexpected;") (span (offset 0) (line 1) (column 1) (len 33))) (package (visibility none) (name (qualified-declaration (ref r0))) (body semicolon)))
 )
 ~~~

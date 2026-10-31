@@ -32,6 +32,6 @@ package Unclosed {
     (reference r0 (scope relative) (span (offset 40) (line 2) (column 22) (len 6)) (segments (segment 0 (token "Lib") (name "Lib") (separator none) (span (offset 40) (line 2) (column 22) (len 3))) (segment 1 (token "A") (name "A") (separator colon-colon) (span (offset 45) (line 2) (column 27) (len 1)))))
     (reference r1 (scope relative) (span (offset 70) (line 3) (column 20) (len 6)) (segments (segment 0 (token "Lib") (name "Lib") (separator none) (span (offset 70) (line 3) (column 20) (len 3))) (segment 1 (token "B") (name "B") (separator colon-colon) (span (offset 75) (line 3) (column 25) (len 1)))))
   )
-  (root (package (name "Unclosed") (body brace (unterminated) (alias (name "Closed") (target (ref r0)) (body brace (element-count 0))) (alias (name "Open") (target (ref r1)) (body brace (unterminated) (element-count 0))))))
+  (root (package (visibility none) (name "Unclosed") (body brace (unterminated) (alias (name "Closed") (target (ref r0)) (body brace (element-count 0))) (alias (name "Open") (target (ref r1)) (body brace (unterminated) (element-count 0))))))
 )
 ~~~

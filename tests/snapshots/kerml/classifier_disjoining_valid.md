@@ -28,6 +28,6 @@ package P {
   (name-language kerml)
   (references
   )
-  (root (package (name "P") (body brace (kerml-classifier (keyword behavior) (abstract true) (name "A") (multiplicity none) (specializes none) (conjugates none) (body semicolon)) (kerml-classifier (keyword behavior) (abstract true) (name "B") (multiplicity none) (specializes none) (conjugates none) (body semicolon)))))
+  (root (package (visibility none) (name "P") (body brace (kerml-classifier (keyword behavior) (abstract true) (name "A") (multiplicity none) (specializes none) (conjugates none) (body semicolon)) (kerml-classifier (keyword behavior) (abstract true) (name "B") (multiplicity none) (specializes none) (conjugates none) (body semicolon)))))
 )
 ~~~

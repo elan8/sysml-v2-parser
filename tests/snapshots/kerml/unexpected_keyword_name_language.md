@@ -30,6 +30,6 @@ package KermlKeywordDiagnostic {
   (name-language kerml)
   (references
   )
-  (root (package (name "KermlKeywordDiagnostic") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "C") (multiplicity none) (specializes none) (conjugates none) (body brace (malformed (code "unexpected_keyword_in_scope") (found "feature x y z;") (span (offset 60) (line 3) (column 9) (len 19))))))))
+  (root (package (visibility none) (name "KermlKeywordDiagnostic") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "C") (multiplicity none) (specializes none) (conjugates none) (body brace (malformed (code "unexpected_keyword_in_scope") (found "feature x y z;") (span (offset 60) (line 3) (column 9) (len 19))))))))
 )
 ~~~

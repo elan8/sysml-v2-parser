@@ -594,32 +594,22 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
 
 /// KerML `TypeBodyElement -> NonFeatureMember -> MemberPrefix Package|LibraryPackage`.
 ///
-/// `Package` itself has no membership slot: visibility belongs to the containing type-body
-/// member. Parse the prefix once, then invoke the existing source-backed package parser from the
-/// exact remainder. The enclosing transaction makes a refused library/package alternative leave
-/// no qualified-reference arena entries behind.
+/// Visibility is stored on the package itself. The enclosing transaction makes a refused
+/// library/package alternative leave no qualified-reference arena entries behind.
 fn calc_def_body_package_member(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
     crate::parser::span::reference_transaction(input, |input| {
         let (input, _) = ws_and_comments(input)?;
-        let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-        let membership = Membership::owning(visibility, visibility_span);
-        if starts_with_keyword(input.fragment(), b"package") {
+        if crate::parser::occurrence_prefix::kind_keyword_follows(input, b"package") {
             let (input, package) = crate::parser::package::package_(input)?;
             Ok((
                 input,
-                CalcDefBodyElement::Package(CalcDefBodyPackageMember {
-                    membership,
-                    package,
-                }),
+                CalcDefBodyElement::Package(CalcDefBodyPackageMember { package }),
             ))
         } else {
             let (input, package) = crate::parser::package::library_package_(input)?;
             Ok((
                 input,
-                CalcDefBodyElement::LibraryPackage(CalcDefBodyLibraryPackageMember {
-                    membership,
-                    package,
-                }),
+                CalcDefBodyElement::LibraryPackage(CalcDefBodyLibraryPackageMember { package }),
             ))
         }
     })

@@ -30,6 +30,6 @@ package P {
   (references
     (reference r0 (scope relative) (span (offset 41) (line 1) (column 42) (len 17)) (segments (segment 0 (token "MaximizeObjective") (name "MaximizeObjective") (separator none) (span (offset 41) (line 1) (column 42) (len 17)))))
   )
-  (root (package (name "P") (body brace (use-case-def (name "U") (modifiers) (body brace (objective (visibility none) (name none) (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)))))))
+  (root (package (visibility none) (name "P") (body brace (use-case-def (name "U") (modifiers) (body brace (objective (visibility none) (name none) (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)))))))
 )
 ~~~

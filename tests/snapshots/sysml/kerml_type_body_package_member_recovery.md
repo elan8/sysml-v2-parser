@@ -32,6 +32,6 @@ package TypeBodyPackageRecovery {
   (references
     (reference r0 (scope relative) (span (offset 117) (line 4) (column 38) (len 5)) (segments (segment 0 (token "Outer") (name "Outer") (separator none) (span (offset 117) (line 4) (column 38) (len 5)))))
   )
-  (root (package (name "TypeBodyPackageRecovery") (body brace (kerml-classifier (keyword class) (abstract false) (name "Outer") (multiplicity none) (specializes none) (conjugates none) (body brace (malformed (code "unexpected_keyword_in_scope") (found "private package { }") (span (offset 60) (line 3) (column 9) (len 28))) (alias (name "afterBrokenPackage") (target (ref r0)) (body semicolon)))))))
+  (root (package (visibility none) (name "TypeBodyPackageRecovery") (body brace (kerml-classifier (keyword class) (abstract false) (name "Outer") (multiplicity none) (specializes none) (conjugates none) (body brace (malformed (code "unexpected_keyword_in_scope") (found "private package { }") (span (offset 60) (line 3) (column 9) (len 28))) (alias (name "afterBrokenPackage") (target (ref r0)) (body semicolon)))))))
 )
 ~~~

@@ -56,6 +56,6 @@ package MultiplicityModifiers {
   (name-language sysml)
   (references
   )
-  (root (package (name "MultiplicityModifiers") (body brace (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (malformed (code "recovered_package_body_element") (found "attribute notAModifier : Real[0..*] orderedBy;") (span (offset 444) (line 10) (column 5) (len 46))) (malformed (code "unrecognized_declaration_in_scope") (found "readonly attribute rejectedReadonly : Real;") (span (offset 495) (line 11) (column 5) (len 43))) (attribute-usage) (malformed (code "unrecognized_declaration_in_scope") (found "variable attribute rejectedVariable : Real;") (span (offset 579) (line 13) (column 5) (len 43))) (attribute-usage))))
+  (root (package (visibility none) (name "MultiplicityModifiers") (body brace (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (attribute-usage) (malformed (code "recovered_package_body_element") (found "attribute notAModifier : Real[0..*] orderedBy;") (span (offset 444) (line 10) (column 5) (len 46))) (malformed (code "unrecognized_declaration_in_scope") (found "readonly attribute rejectedReadonly : Real;") (span (offset 495) (line 11) (column 5) (len 43))) (attribute-usage) (malformed (code "unrecognized_declaration_in_scope") (found "variable attribute rejectedVariable : Real;") (span (offset 579) (line 13) (column 5) (len 43))) (attribute-usage))))
 )
 ~~~

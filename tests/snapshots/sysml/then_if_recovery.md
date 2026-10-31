@@ -33,6 +33,6 @@ package ThenIfRecovery {
   (name-language sysml)
   (references
   )
-  (root (package (name "ThenIfRecovery") (body brace (action-def (name "Owner") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "then if {") (span (offset 56) (line 3) (column 9) (len 65))) (then-control (join (prefix (direction none) (derived false) (variance none) (constant false) (individual false) (portion none) (extensions)) (declaration anonymous) (body semicolon (span (span (offset 130) (line 6) (column 18) (len 1)))))))))))
+  (root (package (visibility none) (name "ThenIfRecovery") (body brace (action-def (name "Owner") (modifiers) (specializes none) (body brace (malformed (code "recovered_action_body_element") (found "then if {") (span (offset 56) (line 3) (column 9) (len 65))) (then-control (join (prefix (direction none) (derived false) (variance none) (constant false) (individual false) (portion none) (extensions)) (declaration anonymous) (body semicolon (span (span (offset 130) (line 6) (column 18) (len 1)))))))))))
 )
 ~~~

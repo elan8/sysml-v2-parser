@@ -26,6 +26,6 @@ package MyPkg {
   (name-language sysml)
   (references
   )
-  (root (package (name "MyPkg") (body brace)))
+  (root (package (visibility none) (name "MyPkg") (body brace)))
 )
 ~~~

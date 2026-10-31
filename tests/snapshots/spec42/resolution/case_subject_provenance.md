@@ -31,6 +31,6 @@ package M {
   (references
     (reference r0 (scope relative) (span (offset 69) (line 4) (column 21) (len 1)) (segments (segment 0 (token "P") (name "P") (separator none) (span (offset 69) (line 4) (column 21) (len 1)))))
   )
-  (root (package (name "M") (body brace (part-def (name "P") (modifiers) (body semicolon)) (analysis-case-def (name "A") (modifiers) (body brace (subject (name "s") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))))))
+  (root (package (visibility none) (name "M") (body brace (part-def (name "P") (modifiers) (body semicolon)) (analysis-case-def (name "A") (modifiers) (body brace (subject (name "s") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))))))
 )
 ~~~

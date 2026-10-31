@@ -2263,7 +2263,8 @@ macro_rules! ast_traversal {
         pub fn walk_package<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Package>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Package { identification, body } = &$($mutability)? node.value;
+            let Package { membership, identification, body } = &$($mutability)? node.value;
+            visitor.visit_membership(membership);
             visitor.visit_qualified_identification(identification);
             visitor.visit_package_body(body);
             visitor.leave_node(&$($mutability)? node.span);
@@ -2289,8 +2290,9 @@ macro_rules! ast_traversal {
         pub fn walk_library_package<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<LibraryPackage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let LibraryPackage { is_standard, identification, body } = &$($mutability)? node.value;
+            let LibraryPackage { membership, is_standard, identification, body } = &$($mutability)? node.value;
             let _ = is_standard;
+            visitor.visit_membership(membership);
             visitor.visit_qualified_identification(identification);
             visitor.visit_package_body(body);
             visitor.leave_node(&$($mutability)? node.span);
@@ -7645,11 +7647,9 @@ macro_rules! ast_traversal {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
                 CalcDefBodyElement::Package(field_0) => {
-                    visitor.visit_membership(&$($mutability)? field_0.membership);
                     visitor.visit_package(&$($mutability)? field_0.package);
                 }
                 CalcDefBodyElement::LibraryPackage(field_0) => {
-                    visitor.visit_membership(&$($mutability)? field_0.membership);
                     visitor.visit_library_package(&$($mutability)? field_0.package);
                 }
                 CalcDefBodyElement::KermlFeature(field_0) => {

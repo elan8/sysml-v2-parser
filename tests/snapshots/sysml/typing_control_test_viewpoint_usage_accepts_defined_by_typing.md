@@ -31,6 +31,6 @@ package P {
   (references
     (reference r0 (scope relative) (span (offset 40) (line 2) (column 29) (len 24)) (segments (segment 0 (token "Mission") (name "Mission") (separator none) (span (offset 40) (line 2) (column 29) (len 7))) (segment 1 (token "SafetyViewpoint") (name "SafetyViewpoint") (separator colon-colon) (span (offset 49) (line 2) (column 38) (len 15)))))
   )
-  (root (package (name "P") (body brace (viewpoint-usage (name "safety") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace)))))
+  (root (package (visibility none) (name "P") (body brace (viewpoint-usage (name "safety") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace)))))
 )
 ~~~

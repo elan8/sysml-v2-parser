@@ -29,6 +29,6 @@ package P {
   (name-language sysml)
   (references
   )
-  (root (package (name "P") (body brace (binding-connector-usage))))
+  (root (package (visibility none) (name "P") (body brace (binding-connector-usage))))
 )
 ~~~

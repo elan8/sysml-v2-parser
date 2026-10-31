@@ -261,11 +261,9 @@ pub(crate) fn emit_calc_body_element(
             super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
         }
         CalcDefBodyElement::Package(member) => {
-            emit_visibility(w, member.membership.visibility);
             super::root::emit_package(w, path, &member.package.value)
         }
         CalcDefBodyElement::LibraryPackage(member) => {
-            emit_visibility(w, member.membership.visibility);
             super::root::emit_library_package(w, path, &member.package.value)
         }
         CalcDefBodyElement::ActionMember(n) => {

@@ -40,6 +40,6 @@ package Unclosed {
     (reference r2 (scope relative) (span (offset 122) (line 3) (column 33) (len 1)) (segments (segment 0 (token "C") (name "C") (separator none) (span (offset 122) (line 3) (column 33) (len 1)))))
     (reference r3 (scope relative) (span (offset 136) (line 3) (column 47) (len 1)) (segments (segment 0 (token "D") (name "D") (separator none) (span (offset 136) (line 3) (column 47) (len 1)))))
   )
-  (root (package (name "Unclosed") (body brace (unterminated) (kerml-relationship (keyword subtype) (declaration-keyword true) (source (ref r0)) (target (ref r1))) (kerml-relationship (keyword subtype) (declaration-keyword true) (source (ref r2)) (target (ref r3))))))
+  (root (package (visibility none) (name "Unclosed") (body brace (unterminated) (kerml-relationship (keyword subtype) (declaration-keyword true) (source (ref r0)) (target (ref r1))) (kerml-relationship (keyword subtype) (declaration-keyword true) (source (ref r2)) (target (ref r3))))))
 )
 ~~~

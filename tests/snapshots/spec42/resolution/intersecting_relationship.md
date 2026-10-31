@@ -30,6 +30,6 @@ package IntersectCoverage {
   (name-language sysml)
   (references
   )
-  (root (package (name "IntersectCoverage") (body brace (part-def (name "Base") (modifiers) (body semicolon)) (attribute-usage) (attribute-usage) (attribute-usage))))
+  (root (package (visibility none) (name "IntersectCoverage") (body brace (part-def (name "Base") (modifiers) (body semicolon)) (attribute-usage) (attribute-usage) (attribute-usage))))
 )
 ~~~

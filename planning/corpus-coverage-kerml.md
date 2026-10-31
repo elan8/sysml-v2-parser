@@ -14,6 +14,7 @@
 > | Bare `/* … */` member shredding the following member in a KerML type body (ranked #1, 14 occurrences) | Fixed by `ec47463`; verified clean across all 11 KerML classifier keywords |
 > | `intersects` on a feature silently dropped | Fixed by `ec47463`; `feature f : T intersects g;` parses and round-trips |
 > | `flow` / bare `redefines` in a KerML type body (excluded from its ranking as in-flight) | Fixed by `6d54b85` |
+> | Visibility prefix on a nested `package` / `library package` in a package body (entry #14) | Fixed: `Package`/`LibraryPackage` store `MemberPrefix` on `membership` |
 >
 > Verified **still live** on `3941261`, so the rest of the ranking stands: `featured by`
 > (`unsupported_grammar_form`, 72 occurrences — the largest single item in either corpus),

@@ -29,6 +29,6 @@ package LiteralInfinityRecovery {
   (name-language kerml)
   (references
   )
-  (root (package (name "LiteralInfinityRecovery") (body brace (malformed (code "recovered_package_body_element") (found "feature broken = **;") (span (offset 38) (line 2) (column 5) (len 20))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "infinite") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 82) (line 3) (column 24) (len 1)) (infinity))))) (body semicolon)))))
+  (root (package (visibility none) (name "LiteralInfinityRecovery") (body brace (malformed (code "recovered_package_body_element") (found "feature broken = **;") (span (offset 38) (line 2) (column 5) (len 20))) (kerml-feature (prefix (head basic) (direction none) (derived false) (abstract false) (portion none) (variability none) (metadata)) (kind feature) (member false) (all false) (name "infinite") (specializations) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (relationships) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 82) (line 3) (column 24) (len 1)) (infinity))))) (body semicolon)))))
 )
 ~~~
