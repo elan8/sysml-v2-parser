@@ -210,6 +210,11 @@ macro_rules! ast_traversal {
                 walk_import_shape(self, node)
             }
 
+            /// Visits [`ImportVisibility`]; the default implementation walks its children.
+            fn visit_import_visibility(&mut self, node: &$($mutability)? ImportVisibility) {
+                walk_import_visibility(self, node)
+            }
+
             /// Visits [`ImportTarget`]; the default implementation walks its children.
             fn visit_import_target(&mut self, node: &$($mutability)? ImportTarget) {
                 walk_import_target(self, node)
@@ -2047,6 +2052,18 @@ macro_rules! ast_traversal {
             }
         }
 
+        pub fn walk_import_visibility<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ImportVisibility) {
+            match node {
+                ImportVisibility::Authored { visibility, span } => {
+                    visitor.visit_visibility(visibility);
+                    visitor.visit_span(span);
+                }
+                ImportVisibility::Missing { import_keyword_span } => {
+                    visitor.visit_span(import_keyword_span);
+                }
+            }
+        }
+
         pub fn walk_import_target<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ImportTarget) {
             let ImportTarget { span, all_span, reference, shape } = node;
             visitor.visit_span(span);
@@ -2060,14 +2077,10 @@ macro_rules! ast_traversal {
         pub fn walk_import<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Import>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Import { membership, target, body_elements } = &$($mutability)? node.value;
-            visitor.visit_membership(membership);
+            let Import { visibility, target, body } = &$($mutability)? node.value;
+            visitor.visit_import_visibility(visibility);
             visitor.visit_import_target(target);
-            if let Some(inner) = body_elements {
-                for inner in inner {
-                    visitor.visit_relationship_body_element(inner);
-                }
-            }
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

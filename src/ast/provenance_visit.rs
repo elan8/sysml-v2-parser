@@ -153,35 +153,24 @@ impl Visitor for ProvenanceValidator<'_> {
     }
 
     fn visit_import(&mut self, node: &Node<Import>) {
-        match node.value.membership.visibility {
-            Some(visibility) => {
-                if !self
-                    .document
-                    .source
-                    .validates_span(&node.value.membership.span)
-                {
-                    self.check(Err(
-                        "import visibility is not a valid source span".to_owned()
-                    ));
-                }
+        let (span, keyword, role) = match &node.value.visibility {
+            ImportVisibility::Authored { visibility, span } => {
                 let keyword = match visibility {
                     Visibility::Private => "private",
                     Visibility::Protected => "protected",
                     Visibility::Public => "public",
                 };
-                self.check(self.delimiter(
-                    &node.value.membership.span,
-                    keyword,
-                    "import visibility",
-                ));
-                self.check(sigil_within(
-                    &node.value.membership.span,
-                    &node.span,
-                    "import visibility",
-                ));
+                (span, keyword, "import visibility")
             }
-            None => self.check(Err("an import requires explicit visibility".to_owned())),
+            ImportVisibility::Missing {
+                import_keyword_span,
+            } => (import_keyword_span, "import", "import keyword"),
+        };
+        if !self.document.source.validates_span(span) {
+            self.check(Err(format!("{role} is not a valid source span")));
         }
+        self.check(self.delimiter(span, keyword, role));
+        self.check(sigil_within(span, &node.span, role));
         super::visit::walk_import(self, node);
     }
     fn visit_parse_error_node_value(&mut self, error: &ParseErrorNode) {

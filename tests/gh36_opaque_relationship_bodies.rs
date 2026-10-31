@@ -7,7 +7,7 @@
 //! body survives into the AST instead of silently vanishing.
 
 use sysml_v2_parser::ast::{
-    AliasBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
+    AliasBody, AnnotatingMember, Body, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
     PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
     RefBody, RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
@@ -64,10 +64,10 @@ fn import_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected import");
-    let body_elements = import
-        .body_elements
-        .as_ref()
-        .expect("expected Some body_elements for a braced import body");
+    let body_elements = match &import.body {
+        Body::Brace { elements, .. } => elements,
+        other => panic!("expected a braced import body, got {other:?}"),
+    };
     assert!(
         body_elements.iter().any(|e| matches!(
             &e.value,

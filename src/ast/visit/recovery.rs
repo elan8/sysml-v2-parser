@@ -9,17 +9,21 @@
 //! fails to compile until both decide what it means.
 
 use super::{
-    walk_parse_error_node, walk_textual_representation, walk_unsupported_grammar_node, Visitor,
+    walk_import_visibility, walk_parse_error_node, walk_textual_representation,
+    walk_unsupported_grammar_node, Visitor,
 };
 use crate::ast::{
-    DeclarationName, DeclarationNameState, Node, ParseErrorNode, RootNamespace,
-    TextualRepresentation, UnsupportedGrammarNode,
+    DeclarationName, DeclarationNameState, ImportVisibility, Node, ParseErrorNode, RootNamespace,
+    Span, TextualRepresentation, UnsupportedGrammarNode,
 };
 
 /// A node [`scan_recovery_content`] reports, in traversal order.
 pub(crate) enum RecoveryContent<'a> {
     /// An unquoted declaration name spelled as a reserved keyword, retained as malformed syntax.
     ReservedDeclarationName(DeclarationName),
+    /// An import written without its required visibility prefix; the span is its `import`
+    /// keyword. The import itself is typed and retained.
+    MissingImportVisibility(Span),
     /// Text the parser could not recognize, kept in place with its authored span.
     ParseError(&'a Node<ParseErrorNode>),
     /// A spec production that parses but has no structural representation yet.
@@ -46,6 +50,18 @@ impl<F: FnMut(RecoveryContent<'_>)> Visitor for Scan<F> {
                 (self.0)(RecoveryContent::ReservedDeclarationName(*name))
             }
         }
+    }
+
+    fn visit_import_visibility(&mut self, visibility: &ImportVisibility) {
+        match visibility {
+            ImportVisibility::Authored { .. } => {}
+            ImportVisibility::Missing {
+                import_keyword_span,
+            } => (self.0)(RecoveryContent::MissingImportVisibility(
+                *import_keyword_span,
+            )),
+        }
+        walk_import_visibility(self, visibility);
     }
 
     fn visit_parse_error_node(&mut self, node: &Node<ParseErrorNode>) {

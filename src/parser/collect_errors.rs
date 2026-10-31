@@ -65,6 +65,19 @@ pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec
                 None => diagnostic,
             });
         }
+        RecoveryContent::MissingImportVisibility(span) => {
+            errors.push(
+                ParseError::new("an import requires an explicit visibility indicator")
+                    .with_location(span.offset, span.line, span.column)
+                    .with_length(span.len)
+                    .with_code("missing_import_visibility")
+                    .with_severity(DiagnosticSeverity::Error)
+                    .with_category(DiagnosticCategory::ParseError)
+                    .with_expected("'public', 'private', or 'protected' before 'import'")
+                    .with_found("import")
+                    .with_suggestion("Specify the import visibility explicitly."),
+            );
+        }
         RecoveryContent::ParseError(node) => {
             errors.push(parse_error_from_recovery_node(&node.span, &node.value));
         }

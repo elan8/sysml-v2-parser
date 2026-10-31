@@ -1,5 +1,4 @@
 use crate::ast::core::{Expression, Node, Span, StringLiteral};
-use crate::ast::membership::Membership;
 use crate::ast::QualifiedReferenceId;
 #[cfg(feature = "serde")]
 use crate::ast::{QualifiedReferenceArena, SourceStorage};
@@ -498,30 +497,32 @@ fn span_end(span: &Span, role: &'static str) -> Result<usize, ImportTargetValida
         .ok_or(ImportTargetValidationError::InvalidSpan { role })
 }
 
-/// Import: `private`? `import` `all`? QualifiedName (`::` `*`)? or FilterPackage form.
+/// The visibility prefix of an [`Import`].
+///
+/// Both pinned grammars require `VisibilityIndicator` before `import`. An import written without
+/// one is still a typed import, so its target resolves as authored, and parsing reports the
+/// missing prefix (`missing_import_visibility`) on the `import` keyword. Emission refuses it like
+/// other malformed syntax.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ImportVisibility {
+    /// `private`, `protected`, or `public`, with the span of that keyword.
+    Authored { visibility: Visibility, span: Span },
+    /// No prefix was written; `import_keyword_span` covers the `import` keyword it should precede.
+    Missing { import_keyword_span: Span },
+}
+
+/// Import: VisibilityIndicator `import` `all`? QualifiedName (`::` `*`)? or FilterPackage form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Import {
-    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
-    /// always [`crate::ast::MembershipKind::Import`] -- the variant reserved for this struct since
-    /// `Membership`'s introduction, previously unconstructed.
-    ///
-    /// **Design decision**: this *replaces* the pre-existing `visibility: Option<Visibility>`
-    /// field (rather than adding `membership` alongside it, the other option the prior
-    /// `AttributeDef`/`AttributeUsage` increment's scope-boundary note left open) -- `Import`'s old
-    /// `visibility` field already captured exactly the same information
-    /// `Membership::visibility` does (an optional `private`/`protected`/`public` prefix, with no
-    /// separate ownership/kind data to preserve alongside it), and grepping the whole crate
-    /// (`src/`, `tests/`) found no in-crate consumer reading `Import.visibility` other than its own
-    /// constructor in `import.rs` -- so a dual-field design would only have added a redundant,
-    /// confusing field with no compatibility benefit. This is a breaking `PARSE_AST_VERSION` change
-    /// either way, matching every other struct this rollout has touched.
-    pub membership: Membership,
+    /// The required visibility prefix, or the typed record that it was not written.
+    pub visibility: ImportVisibility,
     pub target: ImportTarget,
-    /// Real annotation content from a braced body (BNF `RelationshipBody`: doc/comment/metadata
-    /// only). `None` when the body is a semicolon terminator.
-    pub body_elements: Option<Vec<Node<crate::ast::structure::RelationshipBodyElement>>>,
+    /// `RelationshipBody`: `;` or `{` doc/comment/metadata* `}`.
+    pub body: crate::ast::Body<crate::ast::structure::RelationshipBodyElement>,
 }
+
 /// The body of a `REGULAR_COMMENT`: the authored bytes between `/*` and `*/`, as a span.
 ///
 /// The source is authoritative for the text, so nothing is copied. Resolve through
