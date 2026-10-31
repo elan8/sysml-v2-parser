@@ -28,6 +28,6 @@ package Vehicles {
   (name-language sysml)
   (references
   )
-  (root (package (name "Vehicles") (body brace (part-def (name "Car") (modifiers) (body semicolon)) (part-def (name "Truck") (modifiers) (body semicolon)))))
+  (root (package (visibility none) (name "Vehicles") (body brace (part-def (name "Car") (modifiers) (body semicolon)) (part-def (name "Truck") (modifiers) (body semicolon)))))
 )
 ~~~

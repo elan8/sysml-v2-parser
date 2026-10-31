@@ -29,6 +29,6 @@ package OccurrenceBodyBind {
   (name-language sysml)
   (references
   )
-  (root (package (name "OccurrenceBodyBind") (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "Transfer") (short-name none) (target none) (body brace (bind))))))
+  (root (package (visibility none) (name "OccurrenceBodyBind") (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "Transfer") (short-name none) (target none) (body brace (bind))))))
 )
 ~~~

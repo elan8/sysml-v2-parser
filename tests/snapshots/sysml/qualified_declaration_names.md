@@ -32,6 +32,6 @@ standard library package Kernel::Types;
     (reference r1 (scope relative) (span (offset 47) (line 3) (column 11) (len 14)) (segments (segment 0 (token "Mission") (name "Mission") (separator none) (span (offset 47) (line 3) (column 11) (len 7))) (segment 1 (token "Views") (name "Views") (separator colon-colon) (span (offset 56) (line 3) (column 20) (len 5)))))
     (reference r2 (scope relative) (span (offset 89) (line 5) (column 26) (len 13)) (segments (segment 0 (token "Kernel") (name "Kernel") (separator none) (span (offset 89) (line 5) (column 26) (len 6))) (segment 1 (token "Types") (name "Types") (separator colon-colon) (span (offset 97) (line 5) (column 34) (len 5)))))
   )
-  (root (package (name (qualified-declaration (ref r0))) (body semicolon)) (namespace (name (qualified-declaration (ref r1))) (body semicolon)) (library-package (name (qualified-declaration (ref r2))) (standard true) (body semicolon)))
+  (root (package (visibility none) (name (qualified-declaration (ref r0))) (body semicolon)) (namespace (name (qualified-declaration (ref r1))) (body semicolon)) (library-package (visibility none) (name (qualified-declaration (ref r2))) (standard true) (body semicolon)))
 )
 ~~~

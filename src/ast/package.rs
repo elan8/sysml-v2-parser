@@ -83,19 +83,24 @@ impl QualifiedIdentification {
     }
 }
 
-/// A package declaration: `package` Identification PackageBody
+/// A package declaration: MemberPrefix `package` Identification PackageBody
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Package {
+    /// `PackageMember` / `NonFeatureMember` prefix. `visibility` is `None` when no indicator was
+    /// written; `kind` is always [`crate::ast::MembershipKind::OwningMembership`].
+    pub membership: crate::ast::Membership,
     pub identification: QualifiedIdentification,
     pub body: PackageBody,
 }
 /// Package body: either `;` or `{` PackageBodyElement* `}`
 pub type PackageBody = Body<PackageBodyElement>;
-/// Library package: `library` (optional `standard`) `package` Identification PackageBody (BNF LibraryPackage).
+/// Library package: MemberPrefix `library` (optional `standard`) `package` Identification PackageBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LibraryPackage {
+    /// Same `MemberPrefix` as [`Package`]: a nested `private library package` is legal.
+    pub membership: crate::ast::Membership,
     pub is_standard: bool,
     pub identification: QualifiedIdentification,
     pub body: PackageBody,

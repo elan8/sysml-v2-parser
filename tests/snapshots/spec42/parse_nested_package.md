@@ -30,6 +30,6 @@ package Outer {
   (name-language sysml)
   (references
   )
-  (root (package (name "Outer") (body brace (package (name "Inner") (body brace)))))
+  (root (package (visibility none) (name "Outer") (body brace (package (visibility none) (name "Inner") (body brace)))))
 )
 ~~~

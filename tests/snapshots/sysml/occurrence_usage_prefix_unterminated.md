@@ -40,6 +40,6 @@ package OccurrencePrefixUnterminated {
   (name-language sysml)
   (references
   )
-  (root (package (name "OccurrencePrefixUnterminated") (body brace (unterminated) (part-def (name "UnmatchedBrace") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual true) (portion none) (extensions)) (declaration "unterminated") (short-name none) (target none) (body brace)) (part-def (name "AfterUnmatchedBrace") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "recovered") (short-name none) (target none) (body semicolon)))))))))
+  (root (package (visibility none) (name "OccurrencePrefixUnterminated") (body brace (unterminated) (part-def (name "UnmatchedBrace") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference true) (individual true) (portion none) (extensions)) (declaration "unterminated") (short-name none) (target none) (body brace)) (part-def (name "AfterUnmatchedBrace") (modifiers) (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "recovered") (short-name none) (target none) (body semicolon)))))))))
 )
 ~~~

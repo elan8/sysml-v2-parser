@@ -35,6 +35,6 @@ standard library package <USCU> USCustomaryUnits {
   (name-language sysml)
   (references
   )
-  (root (library-package (name "USCustomaryUnits") (standard true) (body brace (attribute-usage))))
+  (root (library-package (visibility none) (name "USCustomaryUnits") (standard true) (body brace (attribute-usage))))
 )
 ~~~

@@ -30,6 +30,6 @@ package SysmlKeywordDiagnostic {
   (name-language sysml)
   (references
   )
-  (root (package (name "SysmlKeywordDiagnostic") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "C") (multiplicity none) (specializes none) (conjugates none) (body brace (malformed (code "unrecognized_declaration_in_scope") (found "feature x y z;") (span (offset 60) (line 3) (column 9) (len 19))))))))
+  (root (package (visibility none) (name "SysmlKeywordDiagnostic") (body brace (kerml-classifier (keyword classifier) (abstract false) (name "C") (multiplicity none) (specializes none) (conjugates none) (body brace (malformed (code "unrecognized_declaration_in_scope") (found "feature x y z;") (span (offset 60) (line 3) (column 9) (len 19))))))))
 )
 ~~~

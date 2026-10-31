@@ -212,13 +212,10 @@ pub type CalcDefBody = Body<CalcDefBodyElement>;
 
 /// A `Package` admitted through KerML `TypeBodyElement -> NonFeatureMember`.
 ///
-/// The membership belongs to this occurrence in the containing type body, while the package
-/// node owns only its declaration and body. Keeping them together here preserves an authored
-/// visibility prefix without making every package declaration carry a context-dependent field.
+/// Visibility lives on [`Package::membership`]: every package occurrence is a `PackageMember`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDefBodyPackageMember {
-    pub membership: Membership,
     pub package: Node<Package>,
 }
 
@@ -226,7 +223,6 @@ pub struct CalcDefBodyPackageMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDefBodyLibraryPackageMember {
-    pub membership: Membership,
     pub package: Node<LibraryPackage>,
 }
 

@@ -64,6 +64,10 @@ fn test_legacy_library_standard_package_header_still_parses() {
                 RootElement::LibraryPackage(n_len(
                     input.len(),
                     LibraryPackage {
+                        membership: sysml_v2_parser::ast::Membership::owning(
+                            None,
+                            sysml_v2_parser::ast::Span::dummy(),
+                        ),
                         is_standard: true,
                         identification: package_id(&result, "LegacyStd"),
                         body: PackageBody::Semicolon {

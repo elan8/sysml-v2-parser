@@ -43,6 +43,7 @@ pub(crate) fn emit_package(
     path: &str,
     pkg: &Package,
 ) -> Result<(), EmitError> {
+    emit_visibility(w, pkg.membership.visibility);
     w.push_str("package ");
     emit_qualified_identification(w, path, &pkg.identification)?;
     emit_package_body(w, path, &pkg.body)
@@ -53,6 +54,7 @@ pub(crate) fn emit_library_package(
     path: &str,
     pkg: &LibraryPackage,
 ) -> Result<(), EmitError> {
+    emit_visibility(w, pkg.membership.visibility);
     if pkg.is_standard {
         w.push_str("standard ");
     }

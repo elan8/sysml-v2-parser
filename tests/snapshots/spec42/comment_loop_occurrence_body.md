@@ -30,6 +30,6 @@ package CommentLoopOccurrence {
   (name-language sysml)
   (references
   )
-  (root (package (name "CommentLoopOccurrence") (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "subject") (short-name none) (target none) (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 79) (line 3) (column 11) (len 25)) (normalized "occurrence body comment "))) (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion snapshot) (extensions)) (declaration "instant") (short-name none) (target none) (body semicolon)))))))
+  (root (package (visibility none) (name "CommentLoopOccurrence") (body brace (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "subject") (short-name none) (target none) (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 79) (line 3) (column 11) (len 25)) (normalized "occurrence body comment "))) (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion snapshot) (extensions)) (declaration "instant") (short-name none) (target none) (body semicolon)))))))
 )
 ~~~

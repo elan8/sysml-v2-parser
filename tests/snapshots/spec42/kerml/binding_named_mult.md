@@ -30,6 +30,6 @@ package BindingNamedMult {
   (name-language kerml)
   (references
   )
-  (root (package (name "BindingNamedMult") (body brace (binding-connector-usage) (binding-connector-usage) (binding-connector-usage) (binding-connector-usage))))
+  (root (package (visibility none) (name "BindingNamedMult") (body brace (binding-connector-usage) (binding-connector-usage) (binding-connector-usage) (binding-connector-usage))))
 )
 ~~~

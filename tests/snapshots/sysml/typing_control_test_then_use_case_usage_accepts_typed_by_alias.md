@@ -33,6 +33,6 @@ package P {
   (name-language sysml)
   (references
   )
-  (root (package (name "P") (body brace (use-case-def (name "U") (modifiers) (body brace (then-use-case))))))
+  (root (package (visibility none) (name "P") (body brace (use-case-def (name "U") (modifiers) (body brace (then-use-case))))))
 )
 ~~~

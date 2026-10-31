@@ -70,6 +70,10 @@ pub(crate) fn expected_package_foo_semicolon(doc: &ParsedDocument) -> RootNamesp
             RootElement::Package(n_len(
                 12,
                 Package {
+                    membership: sysml_v2_parser::ast::Membership::owning(
+                        None,
+                        sysml_v2_parser::ast::Span::dummy(),
+                    ),
                     identification: package_id(doc, "Foo"),
                     body: PackageBody::Semicolon {
                         semicolon_span: Span::dummy(),
@@ -88,6 +92,10 @@ pub(crate) fn expected_package_bar_brace(doc: &ParsedDocument) -> RootNamespace 
             RootElement::Package(n_len(
                 15,
                 Package {
+                    membership: sysml_v2_parser::ast::Membership::owning(
+                        None,
+                        sysml_v2_parser::ast::Span::dummy(),
+                    ),
                     identification: package_id(doc, "Bar"),
                     body: PackageBody::Brace {
                         open_span: Span::dummy(),

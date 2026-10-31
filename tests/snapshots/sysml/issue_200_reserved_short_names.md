@@ -29,6 +29,6 @@ package ShortNames {
   (name-language sysml)
   (references
   )
-  (root (package (name "ShortNames") (body brace (attribute-usage) (attribute-usage))))
+  (root (package (visibility none) (name "ShortNames") (body brace (attribute-usage) (attribute-usage))))
 )
 ~~~

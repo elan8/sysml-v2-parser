@@ -34,6 +34,6 @@ standard library package SI {
   (name-language sysml)
   (references
   )
-  (root (library-package (name "SI") (standard true) (body brace (attribute-usage))))
+  (root (library-package (visibility none) (name "SI") (standard true) (body brace (attribute-usage))))
 )
 ~~~

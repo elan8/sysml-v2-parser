@@ -34,6 +34,6 @@ package AnnotatingMemberUnterminated {
   (name-language sysml)
   (references
   )
-  (root (package (name "AnnotatingMemberUnterminated") (body brace (unterminated) (part-def (name "Unterminated") (modifiers) (body brace (unterminated) (malformed (code "recovered_part_def_body_element") (found "comment /* never closed") (span (offset 75) (line 3) (column 9) (len 82))))))))
+  (root (package (visibility none) (name "AnnotatingMemberUnterminated") (body brace (unterminated) (part-def (name "Unterminated") (modifiers) (body brace (unterminated) (malformed (code "recovered_part_def_body_element") (found "comment /* never closed") (span (offset 75) (line 3) (column 9) (len 82))))))))
 )
 ~~~

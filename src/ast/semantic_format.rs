@@ -3185,23 +3185,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 }
                 super::CalcDefBodyElement::Package(member) => {
                     self.write_item_prefix(&mut first)?;
-                    write!(
-                        self.writer,
-                        "(package-member (visibility {}) ",
-                        visibility_name(member.membership.visibility)
-                    )?;
                     self.write_package(&member.package.value)?;
-                    self.writer.write_char(')')?;
                 }
                 super::CalcDefBodyElement::LibraryPackage(member) => {
                     self.write_item_prefix(&mut first)?;
-                    write!(
-                        self.writer,
-                        "(library-package-member (visibility {}) ",
-                        visibility_name(member.membership.visibility)
-                    )?;
                     self.write_library_package(&member.package.value)?;
-                    self.writer.write_char(')')?;
                 }
                 super::CalcDefBodyElement::ActionMember(member) => {
                     self.write_item_prefix(&mut first)?;
@@ -7410,7 +7398,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_library_package(&mut self, package: &super::LibraryPackage) -> io::Result<()> {
-        self.writer.write_str("(library-package (name ")?;
+        write!(
+            self.writer,
+            "(library-package (visibility {}) (name ",
+            visibility_name(package.membership.visibility)
+        )?;
         self.write_qualified_identification_name(&package.identification)?;
         write!(self.writer, ") (standard {}) ", package.is_standard)?;
         self.write_package_body(&package.body)?;
@@ -7418,7 +7410,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_package(&mut self, package: &super::Package) -> io::Result<()> {
-        self.writer.write_str("(package (name ")?;
+        write!(
+            self.writer,
+            "(package (visibility {}) (name ",
+            visibility_name(package.membership.visibility)
+        )?;
         self.write_qualified_identification_name(&package.identification)?;
         self.writer.write_str(") ")?;
         self.write_package_body(&package.body)?;

@@ -36,6 +36,6 @@ package ViewTest {
   (references
     (reference r0 (scope relative) (span (offset 110) (line 4) (column 38) (len 1)) (segments (segment 0 (token "R") (name "R") (separator none) (span (offset 110) (line 4) (column 38) (len 1)))))
   )
-  (root (package (name "ViewTest") (body brace (rendering-def (name "R") (short-name none) (modifiers) (specializes none) (body semicolon)) (view-def (name "V") (short-name none) (modifiers) (specializes none) (body brace (view-rendering (form inline "r1") (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity (lower (expression (span (offset 112) (line 4) (column 40) (len 1)) (integer 0))) (upper (expression (span (offset 115) (line 4) (column 43) (len 1)) (integer 1)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body semicolon)))))))
+  (root (package (visibility none) (name "ViewTest") (body brace (rendering-def (name "R") (short-name none) (modifiers) (specializes none) (body semicolon)) (view-def (name "V") (short-name none) (modifiers) (specializes none) (body brace (view-rendering (form inline "r1") (type (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity (lower (expression (span (offset 112) (line 4) (column 40) (len 1)) (integer 0))) (upper (expression (span (offset 115) (line 4) (column 43) (len 1)) (integer 1)))) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (body semicolon)))))))
 )
 ~~~
