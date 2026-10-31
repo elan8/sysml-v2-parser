@@ -143,21 +143,6 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     reference_transaction(input, import_inner)
 }
 
-/// The Import production requires VisibilityIndicator in both pinned grammars.
-///
-/// Recovery owns this diagnosis for a bare import that could not be kept typed: its target is
-/// malformed, or the scope has no imports. A typed one reports through the recovery scan.
-pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
-    let (keyword_start, _) = ws_and_comments(input).ok()?;
-    if !crate::parser::lex::starts_with_keyword(keyword_start.fragment(), b"import") {
-        return None;
-    }
-    let (end, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
-        .parse(keyword_start)
-        .ok()?;
-    Some(missing_visibility_node(span_from_to(keyword_start, end)))
-}
-
 /// `missing_import_visibility` on the `import` keyword.
 pub(crate) fn missing_visibility_node(
     keyword_span: crate::ast::Span,
@@ -171,6 +156,21 @@ pub(crate) fn missing_visibility_node(
         suggestion: Some("Specify the import visibility explicitly.".to_owned()),
         category: Some(crate::error::DiagnosticCategory::ParseError),
     }
+}
+
+/// The Import production requires VisibilityIndicator in both pinned grammars.
+///
+/// Recovery owns this diagnosis for a bare import that could not be kept typed: its target is
+/// malformed, or the scope has no imports. A typed one reports through the recovery scan.
+pub(crate) fn missing_visibility_error(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
+    let (keyword_start, _) = ws_and_comments(input).ok()?;
+    if !crate::parser::lex::starts_with_keyword(keyword_start.fragment(), b"import") {
+        return None;
+    }
+    let (end, _) = tag::<_, _, nom::error::Error<_>>(&b"import"[..])
+        .parse(keyword_start)
+        .ok()?;
+    Some(missing_visibility_node(span_from_to(keyword_start, end)))
 }
 
 /// The offset just past an import target's last authored token: its final suffix or filter member
