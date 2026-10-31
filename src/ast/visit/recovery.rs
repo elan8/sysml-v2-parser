@@ -12,7 +12,7 @@ use super::{
     walk_parse_error_node, walk_textual_representation, walk_unsupported_grammar_node, Visitor,
 };
 use crate::ast::{
-    DeclarationName, DeclarationNameState, Node, ParseErrorNode, RootNamespace,
+    BodyClose, DeclarationName, DeclarationNameState, Node, ParseErrorNode, RootNamespace, Span,
     TextualRepresentation, UnsupportedGrammarNode,
 };
 
@@ -20,6 +20,8 @@ use crate::ast::{
 pub(crate) enum RecoveryContent<'a> {
     /// An unquoted declaration name spelled as a reserved keyword, retained as malformed syntax.
     ReservedDeclarationName(DeclarationName),
+    /// A brace body still open at end of input; the span is the zero-width end of the source.
+    UnterminatedBody(Span),
     /// Text the parser could not recognize, kept in place with its authored span.
     ParseError(&'a Node<ParseErrorNode>),
     /// A spec production that parses but has no structural representation yet.
@@ -44,6 +46,15 @@ impl<F: FnMut(RecoveryContent<'_>)> Visitor for Scan<F> {
             DeclarationNameState::Parsed => {}
             DeclarationNameState::ReservedKeyword => {
                 (self.0)(RecoveryContent::ReservedDeclarationName(*name))
+            }
+        }
+    }
+
+    fn visit_body_braces<E>(&mut self, _open: &Span, _elements: &[Node<E>], close: &BodyClose) {
+        match close {
+            BodyClose::Authored { .. } => {}
+            BodyClose::MissingAtEndOfInput { at } => {
+                (self.0)(RecoveryContent::UnterminatedBody(*at))
             }
         }
     }

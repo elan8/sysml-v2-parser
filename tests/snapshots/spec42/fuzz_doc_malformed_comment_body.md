@@ -30,6 +30,6 @@ alias Foo for Bar {
   (references
     (reference r0 (scope relative) (span (offset 14) (line 1) (column 15) (len 3)) (segments (segment 0 (token "Bar") (name "Bar") (separator none) (span (offset 14) (line 1) (column 15) (len 3)))))
   )
-  (root (alias (name "Foo") (target (ref r0)) (body brace (element-count 1))))
+  (root (alias (name "Foo") (target (ref r0)) (body brace (unterminated) (element-count 1))))
 )
 ~~~

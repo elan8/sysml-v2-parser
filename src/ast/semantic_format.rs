@@ -3670,8 +3670,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (body ")?;
         match &definition.body {
             super::AliasBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
-            super::AliasBody::Brace { elements, .. } => {
-                write!(self.writer, "brace (element-count {})", elements.len())?;
+            super::AliasBody::Brace {
+                elements, close, ..
+            } => {
+                self.writer.write_str("brace ")?;
+                match close {
+                    BodyClose::Authored { .. } => {}
+                    BodyClose::MissingAtEndOfInput { .. } => {
+                        self.writer.write_str("(unterminated) ")?
+                    }
+                }
+                write!(self.writer, "(element-count {})", elements.len())?;
             }
         }
         self.writer.write_str("))")
