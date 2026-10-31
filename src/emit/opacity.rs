@@ -44,6 +44,8 @@ pub fn opacity_report(root: &RootNamespace) -> OpacityReport {
             }
             // Reprinting it would present an import the grammar rejects as valid source.
             RecoveryContent::MissingImportVisibility(span) => (span, OpacityKind::ParseError),
+            // Reprinting it without the `}` would present unbalanced text as formatted source.
+            RecoveryContent::UnterminatedBody(at) => (at, OpacityKind::ParseError),
             RecoveryContent::ParseError(node) => (node.span, OpacityKind::ParseError),
             RecoveryContent::UnsupportedGrammar(node) => {
                 (node.span, OpacityKind::UnsupportedGrammar)
@@ -60,6 +62,21 @@ pub fn opacity_report(root: &RootNamespace) -> OpacityReport {
 #[cfg(test)]
 mod tests {
     use super::{opacity_report, OpacityKind};
+
+    #[test]
+    fn unterminated_body_makes_the_document_opaque() {
+        let parsed = crate::parse_for_editor("package P { part def Q;");
+
+        let hits = opacity_report(&parsed.document.root).hits;
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert_eq!(hits[0].kind, OpacityKind::ParseError);
+        assert_eq!((hits[0].span.offset, hits[0].span.len), (23, 0));
+        assert!(crate::emit_sysml(&parsed.document).is_err());
+        assert_eq!(
+            crate::emit_recovered_sysml(&parsed.document).as_deref(),
+            Ok("package P {\n    part def Q;\n\n")
+        );
+    }
 
     #[test]
     fn reports_recovery_nested_inside_interface_definition() {

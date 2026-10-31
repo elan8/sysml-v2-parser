@@ -78,6 +78,9 @@ pub(crate) fn collect_recovery_errors(source: &str, root: &RootNamespace) -> Vec
                     .with_suggestion("Specify the import visibility explicitly."),
             );
         }
+        // The document-level brace balance reports `missing_closing_brace` once, however many
+        // bodies are open.
+        RecoveryContent::UnterminatedBody(_) => {}
         RecoveryContent::ParseError(node) => {
             errors.push(parse_error_from_recovery_node(&node.span, &node.value));
         }
