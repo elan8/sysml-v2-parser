@@ -201,7 +201,6 @@ fn alias_clause_probe(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
     let (target_start, _) = opt(terminated(tag(&b"all"[..]), ws1)).parse(cursor).ok()?;
     let (after_reference, _) = qualified_reference(target_start).ok()?;
     let (after_shape, shape) = import_shape(after_reference).ok()?;
-    let target_end = import_target_end(&shape, after_reference.location_offset());
     let (as_start, _) = ws_and_comments(after_shape).ok()?;
     if !crate::parser::lex::starts_with_keyword(as_start.fragment(), b"as") {
         return None;
@@ -212,19 +211,33 @@ fn alias_clause_probe(input: Input<'_>) -> Option<crate::ast::ParseErrorNode> {
     let (after_as, _) = ws_and_comments(after_as).ok()?;
     let renamed = crate::parser::lex::name(after_as).ok();
     let clause_end = renamed.map_or(after_as, |(rest, _)| rest);
-    let target = {
-        let start = target_start.location_offset();
-        let relative = target_end.checked_sub(start)?;
-        String::from_utf8_lossy(target_start.fragment().get(..relative)?).into_owned()
-    };
-    let suggestion = match renamed {
-        Some((_, name)) => {
-            let name = String::from_utf8_lossy(crate::parser::lex::name_bytes(after_as, name));
-            format!(
-                "Remove 'as {name}' and declare an alias membership instead: 'alias {name} for {target};'                  (with the import's visibility to re-export the name)."
-            )
+    // An alias names one element, so only a plain membership target can become its target.
+    let element = match shape {
+        crate::ast::ImportShape::Membership {
+            recursive_suffix: None,
+        } => {
+            let len = after_reference
+                .location_offset()
+                .checked_sub(target_start.location_offset())?;
+            Some(String::from_utf8_lossy(target_start.fragment().get(..len)?).into_owned())
         }
-        None => "Remove the 'as' clause, and declare an alias membership to name the element differently:                  'alias <name> for <target>;'."
+        crate::ast::ImportShape::Membership { .. }
+        | crate::ast::ImportShape::Namespace { .. }
+        | crate::ast::ImportShape::Filter { .. } => None,
+    };
+    let renamed_name = renamed
+        .map(|(_, name)| String::from_utf8_lossy(crate::parser::lex::name_bytes(after_as, name)));
+    let suggestion = match (renamed_name, element) {
+        (Some(name), Some(element)) => format!(
+            "Remove 'as {name}' and declare an alias membership instead: \
+             'alias {name} for {element};' (with the import's visibility to re-export the name)."
+        ),
+        (Some(name), None) => format!(
+            "Remove 'as {name}'. An alias membership names one element: \
+             'alias {name} for <element>;'."
+        ),
+        (None, _) => "Remove the 'as' clause, and declare an alias membership to name the element \
+                      differently: 'alias <name> for <element>;'."
             .to_owned(),
     };
     // The clause ends at its last authored token, not at the trivia the name parser may skip.
@@ -424,5 +437,51 @@ mod membership_tests {
             }
             other => panic!("expected filter shape, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod alias_clause_tests {
+    fn alias_clause_suggestion(source: &str) -> String {
+        crate::parse_for_editor(source)
+            .errors
+            .into_iter()
+            .find(|error| error.code.as_deref() == Some("import_alias_clause"))
+            .and_then(|error| error.suggestion)
+            .expect("import_alias_clause suggestion")
+    }
+
+    #[test]
+    fn alias_clause_suggestion_quotes_a_plain_target() {
+        assert_eq!(
+            alias_clause_suggestion("public import A::X as 'Y Z';"),
+            "Remove 'as 'Y Z'' and declare an alias membership instead: \
+             'alias 'Y Z' for A::X;' (with the import's visibility to re-export the name)."
+        );
+    }
+
+    #[test]
+    fn alias_clause_suggestion_never_proposes_an_alias_of_a_wildcard_or_filter() {
+        for source in [
+            "public import A::* as B;",
+            "public import A::** as B;",
+            "public import A::*::** as B;",
+            "public import A[x] as B;",
+        ] {
+            assert_eq!(
+                alias_clause_suggestion(source),
+                "Remove 'as B'. An alias membership names one element: 'alias B for <element>;'.",
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn alias_clause_suggestion_without_a_name_uses_placeholders() {
+        assert_eq!(
+            alias_clause_suggestion("public import A as ;"),
+            "Remove the 'as' clause, and declare an alias membership to name the element \
+             differently: 'alias <name> for <element>;'."
+        );
     }
 }
