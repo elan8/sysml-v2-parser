@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-11-01
+
+This release updates the serialized AST from version **284 to 289**. It follows the pinned grammar
+more strictly, so some text that used to parse is now an error, and keeps more of a document
+while it is being typed. See the [migration guide](docs/MIGRATION_0_59.md) before updating
+consumers or reusing cached documents.
+
+### Changed
+
+- A `/* */` comment between the tokens of a declaration is an error. It is a `REGULAR_COMMENT`
+  token, so only `//` and `//* */` notes are trivia. At a member position it stays a `Comment`
+  member.
+- A result expression has no terminator and closes its body. In case, calculation and constraint
+  bodies, `1 + 2;` reports `result_expression_semicolon` and an expression before another member is
+  malformed.
+- `library standard package` is an error; write `standard library package`. Plain `library package`
+  stays valid.
+- A bare `name;` in those bodies is a `DefaultReferenceUsage` rather than an expression.
+- `#tag name` with no terminator reports `missing_semicolon`.
+- A `;` written directly after a member's closing `}` is reported, as an error or as a warning about
+  a likely redundant semicolon. Diagnostic lists can therefore hold non-fatal warnings.
+- `emit_sysml` refuses a document with an unterminated body or a bare import;
+  `emit_recovered_sysml` still reprints it.
+- The formatter writes no `;` after a case result expression, which reparsed as a usage.
+
+### Added
+
+- A body still open at end of input keeps the members written before it, with
+  `BodyClose::MissingAtEndOfInput`, instead of turning the whole declaration into one recovery node.
+- A bare import stays a typed import with its target and reports `missing_import_visibility` on the
+  keyword.
+- A nested package or library package keeps its `public`, `private` or `protected` prefix.
+- Case bodies accept control nodes, `item` members and structured action nodes, and `include`
+  accepts feature chains and a full usage declaration.
+- Named assign and terminate action nodes and `then terminate` parse as single nodes.
+- `import_alias_clause` explains `import A as B` and suggests an alias membership where the grammar
+  accepts one.
+- `//` and `//* */` notes may follow a visibility keyword on definitions, aliases and packages.
+
+### Fixed
+
+- Calculation body recovery stops at `attribute` rather than consuming a valid sibling.
+- The formatter no longer invents a `}` for an unterminated parameter or KerML relationship body.
+
 ## [0.58.0] - 2026-10-17
 
 This release updates the serialized AST from version **260 to 284** and requires **Rust 1.88**.

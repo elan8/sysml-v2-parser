@@ -1,10 +1,8 @@
 # Preparing and cutting a parser release
 
-The next prepared release is **v0.58.0**, with **AST schema 284** and **Rust 1.88** as the MSRV.
-The release includes the issue #200 implementation merged in
-[PR #202](https://github.com/elan8/sysml-v2-parser/pull/202). Land the release-preparation
-changes on `main` before cutting the tag. Preparing the PR does not publish a crate or create
-a tag.
+The next prepared release is **v0.59.0**, with **AST schema 289** and **Rust 1.88** as the MSRV.
+Land the release-preparation changes on `main` before cutting the tag. Preparing the PR does not
+publish a crate or create a tag.
 
 ## Preparation
 
@@ -37,7 +35,7 @@ when validating release readiness. Use `cargo package --list` to inspect the arc
 ## Release execution
 
 After the release-preparation PR is merged, a maintainer checks out the intended `main` commit,
-confirms the manifest version is `0.58.0`, and creates and pushes the matching `v0.58.0` tag.
+confirms the manifest version is `0.59.0`, and creates and pushes the matching `v0.59.0` tag.
 Do this as a separate publishing action; do not tag an unmerged preparation branch.
 
 [The release workflow](../.github/workflows/release.yml) runs on `v*` tags. It validates,
@@ -48,5 +46,5 @@ validates/packages but skips the tag-gated publish and GitHub Release steps.
 
 After publishing, verify the crates.io version, GitHub release assets and docs.rs build. Then
 update downstream version or revision pins in their own PRs, using
-[the v0.58.0 migration guide](MIGRATION_0_58.md). Do not infer compatibility of a particular
+[the v0.59.0 migration guide](MIGRATION_0_59.md). Do not infer compatibility of a particular
 Spec42 or domain-library release from the parser's version number alone.
