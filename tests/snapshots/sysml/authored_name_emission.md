@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Exact source-backed declaration-name tokens preserve their authored quotes and escapes through formatting: part, attribute, port, ref, action and payload, binding connector, connection end, final state, case return, collection-operator parameter, and a KerML bare declaration. SysML Identification (pinned BNF 42-44) admits both BASIC_NAME and UNRESTRICTED_NAME, while the pinned Pilot grammar has the same Name alternative; these owners already retain the exact token span, unlike aggregate Identification spans deliberately outside this migration."))
+(snapshot (type semantic) (description "Exact source-backed declaration-name tokens preserve their authored quotes and escapes through formatting: part, attribute, port, ref, action and payload, binding connector, connection end, case return, collection-operator parameter, and a KerML bare declaration. SysML Identification (pinned BNF 42-44) admits both BASIC_NAME and UNRESTRICTED_NAME, while the pinned Pilot grammar has the same Name alternative; these owners already retain the exact token span, unlike aggregate Identification spans deliberately outside this migration."))
 ~~~
 # SOURCE
 ~~~sysml
