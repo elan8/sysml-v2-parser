@@ -1,6 +1,6 @@
 # Parser backlog & roadmap
 
-**v0.58.0 status (2026-10-17):** AST schema 284; permissive declaration fallbacks are
+**v0.59.0 status (2026-11-01):** AST schema 289; permissive declaration fallbacks are
 removed. Current release/API and corpus evidence live in [MIGRATION_0_58.md](MIGRATION_0_58.md),
 [SYSML_V2_COMPLIANCE_GAP.md](SYSML_V2_COMPLIANCE_GAP.md) and [CONFORMANCE.md](CONFORMANCE.md).
 The dated audits and completion notes below are historical design context. Check
