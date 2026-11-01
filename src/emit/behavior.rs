@@ -1112,12 +1112,6 @@ fn emit_state_def_body_element(
             w.push_char(';');
             Ok(())
         }
-        StateDefBodyElement::FinalState(f) => {
-            w.push_str("final ");
-            w.push_declaration_name(&format!("{path}/final-name"), f.value.state_name)?;
-            w.push_char(';');
-            Ok(())
-        }
         StateDefBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         StateDefBodyElement::StateUsage(s) => emit_state_usage(w, path, &s.value),
         StateDefBodyElement::RequirementUsage(r) => {

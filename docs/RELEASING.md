@@ -1,6 +1,6 @@
 # Preparing and cutting a parser release
 
-The next prepared release is **v0.59.0**, with **AST schema 289** and **Rust 1.88** as the MSRV.
+The next prepared release is **v0.59.0**, with **AST schema 290** and **Rust 1.88** as the MSRV.
 Land the release-preparation changes on `main` before cutting the tag. Preparing the PR does not
 publish a crate or create a tag.
 

@@ -246,7 +246,6 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"do",
     b"entry",
     b"exit",
-    b"final",
     b"first",
     b"if",
     b"in",

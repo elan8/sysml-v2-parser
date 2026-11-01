@@ -130,7 +130,6 @@ payloads!(
     FeatureVariability,
     FilterMember,
     FilterPackageMember,
-    FinalState,
     FirstMergeBodyElement,
     FirstStmt,
     FlowDef,

@@ -1175,8 +1175,6 @@ pub enum StateDefBodyElement {
     Exit(Node<ExitAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
-    /// `final` / `final state` name `;` - explicit final state.
-    FinalState(Node<FinalState>),
     /// `ref` name `:` type body – reference binding in state.
     Ref(Box<Node<RefDecl>>),
     RequirementUsage(Node<RequirementUsage>),
@@ -1251,19 +1249,6 @@ pub struct ExitAction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenStmt {
     pub state_reference: QualifiedReferenceId,
-}
-
-/// Final state: `final` name `;` or `final state` name `;`
-#[derive(Debug, Clone, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct FinalState {
-    pub state_name: DeclarationName,
-}
-
-impl PartialEq for FinalState {
-    fn eq(&self, other: &Self) -> bool {
-        self.state_name == other.state_name
-    }
 }
 
 /// State usage: `OccurrenceUsagePrefix` subset `state` name (`:` type)? (`:>`/` :>>` …)? body.

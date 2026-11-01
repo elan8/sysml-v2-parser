@@ -1492,9 +1492,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.writer.write_str("))")?;
                         }
 
-                        StateDefBodyElement::FinalState(_state) => {
-                            self.write_marker(&mut first, "final-state")?;
-                        }
                         StateDefBodyElement::Ref(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;

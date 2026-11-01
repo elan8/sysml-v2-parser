@@ -74,30 +74,8 @@ fn transition_accept_retained_with_spans() {
 }
 
 #[test]
-fn final_state_members_parsed() {
-    let root = parse(&fixture("final-state.sysml")).expect("parse");
-    let pkg = first_package(&root);
-    let state_def = match &package_body_elements(pkg)[0].value {
-        PackageBodyElement::StateDef(sd) => &sd.value,
-        other => panic!("expected state def, got {other:?}"),
-    };
-    let finals: Vec<&FinalState> = match &state_def.body {
-        StateDefBody::Brace { elements, .. } => elements
-            .iter()
-            .filter_map(|e| match &e.value {
-                StateDefBodyElement::FinalState(f) => Some(&f.value),
-                _ => None,
-            })
-            .collect(),
-        _ => panic!("expected brace state body"),
-    };
-    assert_eq!(finals.len(), 2);
-    assert_eq!(root.declaration_name(finals[0].state_name), Some("expired"));
-    assert_eq!(
-        root.declaration_name(finals[1].state_name),
-        Some("completed")
-    );
-    assert!(finals[0].state_name.span().len > 0);
+fn final_state_syntax_is_rejected() {
+    assert!(parse(&fixture("final-state.sysml")).is_err());
 }
 
 #[test]

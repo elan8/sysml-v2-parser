@@ -1102,11 +1102,6 @@ macro_rules! ast_traversal {
                 walk_then_stmt(self, node)
             }
 
-            /// Visits [`FinalState`]; the default implementation walks its children.
-            fn visit_final_state(&mut self, node: &$($mutability)? Node<FinalState>) {
-                walk_final_state(self, node)
-            }
-
             /// Visits [`StateUsage`]; the default implementation walks its children.
             fn visit_state_usage(&mut self, node: &$($mutability)? Node<StateUsage>) {
                 walk_state_usage(self, node)
@@ -6211,9 +6206,6 @@ macro_rules! ast_traversal {
                 }
 
 
-                StateDefBodyElement::FinalState(field_0) => {
-                    visitor.visit_final_state(field_0);
-                }
                 StateDefBodyElement::Ref(field_0) => {
                     visitor.visit_ref_decl(&$($mutability)? **field_0);
                 }
@@ -6296,14 +6288,6 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let ThenStmt { state_reference } = &$($mutability)? node.value;
             visitor.visit_qualified_reference(state_reference);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_final_state<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FinalState>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let FinalState { state_name } = &$($mutability)? node.value;
-            visitor.visit_declaration_name(state_name);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

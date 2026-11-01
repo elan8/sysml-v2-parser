@@ -1,8 +1,8 @@
 # Migrating to v0.59.0
 
 This guide covers upgrading from v0.58.0. The crate version is `0.59.0`, the minimum Rust version
-stays **1.88**, and `PARSE_AST_VERSION` moves from **284 to 289**. The intermediate AST numbers in
-commit trailers describe development changes within this release; 289 is the released schema to
+stays **1.88**, and `PARSE_AST_VERSION` moves from **284 to 290**. The intermediate AST numbers in
+commit trailers describe development changes within this release; 290 is the released schema to
 target. Reparse source documents to rebuild caches. Serialized v0.58.0 envelopes are rejected
 rather than upgraded by deserialization.
 
@@ -16,6 +16,7 @@ Text that used to parse is now an error, because the pinned grammar does not all
 | `case def C { 1 + 2; }` | Remove the `;` from the result expression |
 | `calc def C { 1 + 2 attribute a; }` | Move the result expression to the end of the body |
 | `library standard package P;` | `standard library package P;` |
+| `final completed;` in a state body | `state completed;`, with a transition to `done` |
 
 A `/* */` comment at a member position stays a `Comment` member.
 
@@ -37,6 +38,8 @@ A `/* */` comment at a member position stays a `Comment` member.
   only.
 - `AssignStmt` and `TerminateStmt` gain a `prefix: ActionNodePrefix` field, and `TerminateStmt` gains
   `is_then`.
+- `StateDefBodyElement::FinalState`, the `FinalState` node and `Visitor::visit_final_state` are
+  removed.
 - `UseCaseDefBodyElement` gains `ActionMember`. A bare `name;` in a case, calculation or constraint
   body is now a `DefaultReferenceUsage`, not an expression.
 - Diagnostic lists can contain non-fatal warnings. Use `ParseResult::is_ok` or

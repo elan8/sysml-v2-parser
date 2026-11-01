@@ -2,7 +2,7 @@
 
 This document describes the current recovery architecture after the language-server-oriented recovery improvements.
 
-Current for v0.59.0, AST schema 289. State entry/do/exit subactions own `ActionDefBody`;
+Current for v0.59.0, AST schema 290. State entry/do/exit subactions own `ActionDefBody`;
 malformed members there produce action-body diagnostics while the enclosing state and later
 packages remain intact. Declaration-name and missing-token diagnostics can highlight a narrower
 `diagnostic_span` without changing the source slice used for recovered emission.
