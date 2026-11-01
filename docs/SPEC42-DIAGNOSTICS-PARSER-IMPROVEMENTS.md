@@ -119,6 +119,9 @@ Parser gaps therefore produce either **silent omissions** (check never runs) or 
 
 ### 2. Explicit `final state` syntax
 
+> **Withdrawn.** Neither pinned grammar has a `final` state member, so AST 290 removed it. A state
+> machine finishes with a transition to `done` (SysML 7.18). The request below is kept as history.
+
 **Spec42 today**
 
 - `multiple_initial_states` / `missing_initial_state` use `RelationshipKind::InitialState` from standalone `then name;` members.

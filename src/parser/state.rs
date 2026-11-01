@@ -1,5 +1,5 @@
 use crate::ast::{
-    DeclarationName, DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl,
+    DeclarationName, DoAction, EntryAction, ExitAction, Membership, Node, RefDecl,
     StateBodyModifier, StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt,
     Transition, TransitionEffect,
 };
@@ -428,17 +428,6 @@ fn then_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
     ))
 }
 
-/// Final state: `final` name `;` or `final state` name `;`
-fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
-    let start = input;
-    let (input, _) = tag(&b"final"[..]).parse(input)?;
-    let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, state_name) = name(input)?;
-    let (input, _) = preceded(ws_and_notes, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, FinalState { state_name })))
-}
-
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
     if let Ok((next, member)) = crate::parser::metadata_annotation::extended_definition(input) {
         return Ok((
@@ -514,9 +503,6 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         }),
         map(then_stmt, |n| {
             node_from_to(start, input, StateDefBodyElement::Then(n))
-        }),
-        map(final_stmt, |n| {
-            node_from_to(start, input, StateDefBodyElement::FinalState(n))
         }),
         map(state_ref, |n| {
             node_from_to(start, input, StateDefBodyElement::Ref(Box::new(n)))

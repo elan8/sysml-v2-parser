@@ -1,6 +1,6 @@
 # BNF coverage and structured-AST baseline
 
-Current for **v0.59.0**, AST schema **289**. The authority for production classification is
+Current for **v0.59.0**, AST schema **290**. The authority for production classification is
 [`bnf_coverage.map`](bnf_coverage.map), checked against both pinned BNF files identified by
 [`conformance-target`](conformance-target). This document does not maintain a second set of
 per-family status labels.

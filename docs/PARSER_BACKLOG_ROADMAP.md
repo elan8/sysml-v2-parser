@@ -1,6 +1,6 @@
 # Parser backlog & roadmap
 
-**v0.59.0 status (2026-11-01):** AST schema 289; permissive declaration fallbacks are
+**v0.59.0 status (2026-11-01):** AST schema 290; permissive declaration fallbacks are
 removed. Current release/API and corpus evidence live in [MIGRATION_0_58.md](MIGRATION_0_58.md),
 [SYSML_V2_COMPLIANCE_GAP.md](SYSML_V2_COMPLIANCE_GAP.md) and [CONFORMANCE.md](CONFORMANCE.md).
 The dated audits and completion notes below are historical design context. Check
@@ -159,7 +159,6 @@ Parser changes unlock diagnostics only after Spec42 projects new AST fields. **H
 | ------------------ | ------------------- | ----------- | ---------- |
 | `accept_payload_incompatible` on transitions | Yes — `Transition.accept`, `PayloadClause` | Graph: transition trigger `payloadType`; collector | [DIAGNOSTIC-CHECKS-ROADMAP](https://github.com/spec42/spec42/blob/main/docs/engineering/DIAGNOSTIC-CHECKS-ROADMAP.md) |
 | `send_payload_incompatible` | Yes — `ActionUsage.send` | Graph: control-node send payload | same |
-| Final-state cardinality (`multiple_final_states`, …) | Yes — `FinalState` member | Graph: final-state edges; drop sink heuristics | same |
 | `metadata_keyword_unresolved` (`#Tag`) | Yes — `MetadataKeywordUsage` (simple `#name`) | Walk new node in part/state/requirement builders | [AST-SEMANTIC-COVERAGE](https://github.com/spec42/spec42/blob/main/docs/engineering/AST-SEMANTIC-COVERAGE.md) |
 | `viewpoint_reference_unresolved` (stakeholder/purpose) | Yes — `StakeholderMember`, `PurposeMember` | Extend collector for new ref spans | same |
 | `viewpoint_rep_language_unresolved` | Partial — `rep` in requirement body | Wire `TextualRep` + `language_span` in graph | same |
@@ -428,7 +427,7 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 | # | Item | Key types / files | Test |
 | - | ---- | ----------------- | ---- |
 | P0 §1 | Transition `accept` | `TransitionAccept`, `PayloadClause`, [`payload.rs`](../src/parser/payload.rs) | `transition_accept_retained_with_spans` |
-| P0 §2 | Final state | `FinalState`, `StateDefBodyElement::FinalState` | `final_state_members_parsed` |
+| P0 §2 | Final state | Removed in AST 290: neither grammar has it | `final_state_syntax_is_rejected` |
 | P0 §3 | Send payload | `ActionUsage.send`, `control_node_action_usage` | `send_payload_on_control_node_action` |
 | P0 §4 | `#keyword` (bodies) | `MetadataKeywordUsage` | `metadata_keyword_usage_in_part_body` |
 | P0 §5 | Stakeholder / purpose | `StakeholderMember`, `PurposeMember` | `viewpoint_stakeholder_and_purpose_members` |

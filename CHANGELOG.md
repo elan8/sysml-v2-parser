@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.59.0] - 2026-11-01
 
-This release updates the serialized AST from version **284 to 289**. It follows the pinned grammar
+This release updates the serialized AST from version **284 to 290**. It follows the pinned grammar
 more strictly, so some text that used to parse is now an error, and keeps more of a document
 while it is being typed. See the [migration guide](docs/MIGRATION_0_59.md) before updating
 consumers or reusing cached documents.
@@ -24,6 +24,8 @@ consumers or reusing cached documents.
   malformed.
 - `library standard package` is an error; write `standard library package`. Plain `library package`
   stays valid.
+- `final name;` and `final state name;` are errors. Neither is in the grammar: declare a state usage
+  and transition to `done`.
 - A bare `name;` in those bodies is a `DefaultReferenceUsage` rather than an expression.
 - `#tag name` with no terminator reports `missing_semicolon`.
 - A `;` written directly after a member's closing `}` is reported, as an error or as a warning about
