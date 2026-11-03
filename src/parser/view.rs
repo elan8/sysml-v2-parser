@@ -69,6 +69,10 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     }
     let (input, elem) = alt((
         map(
+            crate::parser::attribute::attribute_usage,
+            ViewDefBodyElement::AttributeUsage,
+        ),
+        map(
             crate::parser::body::annotating_member,
             ViewDefBodyElement::Annotating,
         ),
@@ -480,6 +484,10 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
         }
     }
     let (input, elem) = alt((
+        map(
+            crate::parser::attribute::attribute_usage,
+            ViewBodyElement::AttributeUsage,
+        ),
         map(
             crate::parser::body::annotating_member,
             ViewBodyElement::Annotating,

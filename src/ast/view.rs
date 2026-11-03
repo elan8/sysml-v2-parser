@@ -422,6 +422,8 @@ pub type ViewDefBody = Body<ViewDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
+    /// AttributeUsage admitted through DefinitionBodyItem (SysML 8.2.2.26).
+    AttributeUsage(Node<crate::ast::AttributeUsage>),
     ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
     ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
 
@@ -628,6 +630,8 @@ pub type ViewBody = Body<ViewBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
+    /// AttributeUsage admitted through DefinitionBodyItem (SysML 8.2.2.26).
+    AttributeUsage(Node<crate::ast::AttributeUsage>),
     ExtendedDefinition(Box<Node<crate::ast::ExtendedDefinition>>),
     ExtendedUsage(Box<Node<crate::ast::ExtendedUsage>>),
 

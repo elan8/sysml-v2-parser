@@ -421,6 +421,7 @@ pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] =
 /// `SatisfyRequirementUsage`; the list had none of the three, so a malformed member before any
 /// satisfy usage in a view definition body consumed it.
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"attribute",
     b"@",
     b"alias",
     b"assert",
@@ -450,6 +451,7 @@ pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
+    b"attribute",
     b"alias",
     b"assert",
     b"doc",
