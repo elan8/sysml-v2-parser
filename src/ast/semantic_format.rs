@@ -1135,6 +1135,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_extended_definition(&member.value)?;
                         }
+                        ViewBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
                         ViewBodyElement::ExtendedUsage(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_extended_usage(&member.value)?;
@@ -6431,6 +6435,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ViewDefBodyElement::ExtendedDefinition(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_extended_definition(&member.value)?;
+                        }
+                        super::ViewDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
                         }
                         super::ViewDefBodyElement::ExtendedUsage(member) => {
                             self.write_item_prefix(&mut first)?;

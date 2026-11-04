@@ -779,6 +779,9 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::ExtendedDefinition(member) => {
                         super::root::emit_extended_definition(w, path, &member.value)?;
                     }
+                    crate::ast::ViewDefBodyElement::AttributeUsage(usage) => {
+                        crate::emit::structure::emit_attribute_usage(w, path, &usage.value)?;
+                    }
                     crate::ast::ViewDefBodyElement::ExtendedUsage(member) => {
                         super::structure::emit_extended_usage(w, path, &member.value)?;
                     }
@@ -890,6 +893,9 @@ pub(crate) fn emit_view_usage(
                 match &el.value {
                     crate::ast::ViewBodyElement::ExtendedDefinition(member) => {
                         super::root::emit_extended_definition(w, path, &member.value)?;
+                    }
+                    crate::ast::ViewBodyElement::AttributeUsage(usage) => {
+                        crate::emit::structure::emit_attribute_usage(w, path, &usage.value)?;
                     }
                     crate::ast::ViewBodyElement::ExtendedUsage(member) => {
                         super::structure::emit_extended_usage(w, path, &member.value)?;
