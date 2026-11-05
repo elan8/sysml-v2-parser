@@ -504,6 +504,12 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         map(then_stmt, |n| {
             node_from_to(start, input, StateDefBodyElement::Then(n))
         }),
+        // Keep referential ports on the same PortUsage path as other structure bodies,
+        // before generic RefDecl can consume `ref port`. Retain the complete member span.
+        map(crate::parser::port::port_usage, |n| Node {
+            span: n.span,
+            value: StateDefBodyElement::PortUsage(Box::new(n)),
+        }),
         map(state_ref, |n| {
             node_from_to(start, input, StateDefBodyElement::Ref(Box::new(n)))
         }),

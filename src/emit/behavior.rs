@@ -1127,6 +1127,7 @@ fn emit_state_def_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         StateDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
+        StateDefBodyElement::PortUsage(p) => structure::emit_port_usage(w, path, &p.value),
         StateDefBodyElement::ConstraintUsage(c) => {
             super::view::emit_constraint_usage(w, path, &c.value)
         }

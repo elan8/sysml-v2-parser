@@ -1529,6 +1529,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
                         }
+                        StateDefBodyElement::PortUsage(usage) => {
+                            self.write_port_usage_member(&mut first, &usage.value)?;
+                        }
                         StateDefBodyElement::ConstraintUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_constraint_usage(&usage.value)?;
