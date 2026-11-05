@@ -6233,6 +6233,9 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::PartUsage(field_0) => {
                     visitor.visit_part_usage(&$($mutability)? **field_0);
                 }
+                StateDefBodyElement::PortUsage(field_0) => {
+                    visitor.visit_port_usage(&$($mutability)? **field_0);
+                }
                 StateDefBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(&$($mutability)? **field_0);
                 }

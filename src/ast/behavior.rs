@@ -1196,6 +1196,8 @@ pub enum StateDefBodyElement {
     /// 910-917, 262-264, 356-363, 623).  It keeps the existing source-backed PartUsage shape
     /// rather than treating a state body as a special spelling of a part body.
     PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// A structural port member admitted by StateBodyItem's NonBehaviorBodyItem branch.
+    PortUsage(Box<Node<crate::ast::PortUsage>>),
     /// `constraint` usage through the state body's `BehaviorUsageMember` branch (SysML BNF
     /// 1200-1205, 266-268, 374-389, 1382-1395).  ConstraintUsage already owns its complete
     /// occurrence prefix, specialization clauses, and CalculationBody.

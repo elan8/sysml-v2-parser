@@ -253,6 +253,7 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"individual",
     b"out",
     b"part",
+    b"port",
     b"ref",
     b"snapshot",
     b"state",
