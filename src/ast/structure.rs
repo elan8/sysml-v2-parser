@@ -1835,6 +1835,29 @@ pub enum ConnectionDefBodyElement {
     /// fuelEconomy = 35[mph];` or `in massActual :> ISQ::mass;`. Every `DefinitionBody` and
     /// `UsageBody` owns it through `UsageElement`.
     DefaultReferenceUsage(Box<Node<DefaultReferenceUsage>>),
+    /// `action def` through `DefinitionMember -> DefinitionElement -> ActionDefinition` (SysML
+    /// BNF 183-211, 246-248). A connection definition body is a `DefinitionBody` (BNF 664, 234),
+    /// so it admits the same behavior members a part definition body does.
+    ActionDef(Node<ActionDef>),
+    /// `action` usage through `OccurrenceUsageMember -> OccurrenceUsageElement ->
+    /// BehaviorUsageElement -> ActionUsage` (SysML BNF 258-260, 354-378).
+    ActionUsage(Box<Node<ActionUsage>>),
+    /// `state def` through `DefinitionElement -> StateDefinition`.
+    StateDef(Node<crate::ast::behavior::StateDef>),
+    /// `state` usage through `BehaviorUsageElement -> StateUsage`.
+    StateUsage(Node<StateUsage>),
+    /// `exhibit state` through `BehaviorUsageElement -> ExhibitStateUsage`.
+    ExhibitState(Node<ExhibitState>),
+    /// `calc def` through `DefinitionElement -> CalculationDefinition`.
+    CalcDef(Node<crate::ast::view::CalcDef>),
+    /// `calc` usage through `BehaviorUsageElement -> CalculationUsage`.
+    CalcUsage(Node<CalcUsage>),
+    /// `constraint def` through `DefinitionElement -> ConstraintDefinition`.
+    ConstraintDef(Node<ConstraintDef>),
+    /// `constraint` usage through `BehaviorUsageElement -> ConstraintUsage`.
+    ConstraintUsage(Node<ConstraintUsage>),
+    /// `perform` usage through `BehaviorUsageElement -> PerformActionUsage`.
+    Perform(Node<Perform>),
 }
 
 // ---------------------------------------------------------------------------
