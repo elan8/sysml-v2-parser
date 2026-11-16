@@ -2440,7 +2440,7 @@ fn is_anonymous_accept_or_send_payload(fragment: &[u8]) -> bool {
     };
     let after_kw = trim_ascii_start(&fragment[keyword.len()..]);
     // Usage-declaration continuations after a name — not a control-node payload.
-    if after_kw.is_empty()
+    let continues_declaration = after_kw.is_empty()
         || after_kw.starts_with(b";")
         || after_kw.starts_with(b"{")
         || after_kw.starts_with(b"[")
@@ -2453,11 +2453,8 @@ fn is_anonymous_accept_or_send_payload(fragment: &[u8]) -> bool {
         || starts_with_keyword(after_kw, b"crosses")
         || starts_with_keyword(after_kw, b"intersects")
         || starts_with_keyword(after_kw, b"ordered")
-        || starts_with_keyword(after_kw, b"nonunique")
-    {
-        return false;
-    }
-    true
+        || starts_with_keyword(after_kw, b"nonunique");
+    !continues_declaration
 }
 
 /// Action usage: `(visibility)? (abstract|variation)? (ref)? action` name header (`accept` …)? body
