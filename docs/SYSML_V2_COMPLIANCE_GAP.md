@@ -1,7 +1,7 @@
 # SysML v2 parser status and remaining limits
 
-Current for **v0.59.0**, AST schema **290**. Use [CONFORMANCE.md](CONFORMANCE.md) for the
-precise claim layers and [the migration guide](MIGRATION_0_58.md) for consumer changes.
+Current for **v0.60.0**, AST schema **293**. Use [CONFORMANCE.md](CONFORMANCE.md) for the
+precise claim layers and [the migration guide](MIGRATION_0_60.md) for consumer changes.
 
 ## Verified baseline
 

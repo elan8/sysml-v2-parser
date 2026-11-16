@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-11-16
+
+This release updates the serialized AST from version **290 to 293**. It accepts four forms the
+pinned grammar allows and v0.59.0 rejected; nothing that parsed before is now an error. See the
+[migration guide](docs/MIGRATION_0_60.md) before updating consumers or reusing cached documents.
+
+### Added
+
+- View definitions and usages accept attribute members.
+- State definitions and usages accept port members. Referential ports in state bodies use the same
+  typed syntax and complete spans as ordinary ports.
+- A connection usage accepts a multiplicity after its redefinition or subsetting, such as
+  `connection :>> lines[3] { ... }`.
+- Connection definitions and usages accept action, state, exhibit state, calc, constraint and
+  perform members.
+
+### Changed
+
+- `ViewDefBodyElement` and `ViewBodyElement` gain `AttributeUsage`, `StateDefBodyElement` gains
+  `PortUsage`, and `ConnectionDefBodyElement` gains `ActionDef`, `ActionUsage`, `StateDef`,
+  `StateUsage`, `ExhibitState`, `CalcDef`, `CalcUsage`, `ConstraintDef`, `ConstraintUsage` and
+  `Perform`.
+
 ## [0.59.0] - 2026-11-01
 
 This release updates the serialized AST from version **284 to 290**. It follows the pinned grammar

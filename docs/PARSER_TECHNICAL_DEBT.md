@@ -1,7 +1,7 @@
 # Parser technical debt overview
 
-**v0.59.0 status (2026-11-01):** AST schema 290; permissive declaration fallbacks are
-removed. Current release/API and corpus evidence live in [MIGRATION_0_58.md](MIGRATION_0_58.md),
+**v0.60.0 status (2026-11-16):** AST schema 293; permissive declaration fallbacks are
+removed. Current release/API and corpus evidence live in [MIGRATION_0_60.md](MIGRATION_0_60.md),
 [SYSML_V2_COMPLIANCE_GAP.md](SYSML_V2_COMPLIANCE_GAP.md) and [CONFORMANCE.md](CONFORMANCE.md).
 The dated audits and completion notes below are historical design context. Check
 [GitHub issues](https://github.com/elan8/sysml-v2-parser/issues) for live work before treating
