@@ -3971,6 +3971,42 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
                         }
+                        ConnectionDefBodyElement::ActionDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_action_definition(&definition.value)?;
+                        }
+                        ConnectionDefBodyElement::ActionUsage(_usage) => {
+                            self.write_marker(&mut first, "action-usage")?;
+                        }
+                        ConnectionDefBodyElement::StateDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_definition(&definition.value)?;
+                        }
+                        ConnectionDefBodyElement::StateUsage(_usage) => {
+                            self.write_marker(&mut first, "state-usage")?;
+                        }
+                        ConnectionDefBodyElement::ExhibitState(exhibit) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_exhibit_state(&exhibit.value)?;
+                        }
+                        ConnectionDefBodyElement::CalcDef(_definition) => {
+                            self.write_marker(&mut first, "calc-def")?;
+                        }
+                        ConnectionDefBodyElement::CalcUsage(_usage) => {
+                            self.write_marker(&mut first, "calc-usage")?;
+                        }
+                        ConnectionDefBodyElement::ConstraintDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_definition(&definition.value)?;
+                        }
+                        ConnectionDefBodyElement::ConstraintUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
+                        }
+                        ConnectionDefBodyElement::Perform(perform) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_perform(&perform.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')

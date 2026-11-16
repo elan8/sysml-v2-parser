@@ -281,4 +281,47 @@ mod tests {
             "package grammar taxonomy drift\nmissing from table: {missing:?}\nnot in derived FIRST: {extra:?}"
         );
     }
+
+    /// `ConnectionDefinition` has a `DefinitionBody` (SysML BNF 664, 234), so each keyword its
+    /// recovery table names must be in FIRST(`DefinitionBodyItem`), and the behavior members the
+    /// scope dispatches must all be listed. The converse is not asserted: this scope still
+    /// declines most of the other `DefinitionElement`s.
+    #[test]
+    fn connection_def_body_starters_are_in_definition_body_item_first() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("sysml-v2-release/bnf/SysML-textual-bnf.kebnf");
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        let grammar = super::kebnf_test_support::parse_grammar(&source);
+        let first = super::kebnf_test_support::first_terminals(&grammar, "DefinitionBodyItem");
+        let listed = crate::parser::lex::CONNECTION_DEF_BODY_STARTERS
+            .iter()
+            .filter_map(|keyword| std::str::from_utf8(keyword).ok())
+            .filter(|keyword| {
+                keyword
+                    .as_bytes()
+                    .first()
+                    .is_some_and(u8::is_ascii_alphabetic)
+            })
+            .collect::<BTreeSet<_>>();
+        let unknown = listed
+            .iter()
+            .filter(|keyword| !first.contains(**keyword))
+            .collect::<Vec<_>>();
+        assert!(
+            unknown.is_empty(),
+            "not in FIRST(DefinitionBodyItem): {unknown:?}"
+        );
+        for keyword in [
+            "action",
+            "calc",
+            "constraint",
+            "exhibit",
+            "perform",
+            "state",
+        ] {
+            assert!(first.contains(keyword), "{keyword} not in FIRST");
+            assert!(listed.contains(keyword), "{keyword} missing from the table");
+        }
+    }
 }

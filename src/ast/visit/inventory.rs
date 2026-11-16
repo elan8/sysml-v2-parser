@@ -4245,6 +4245,36 @@ macro_rules! ast_traversal {
                 ConnectionDefBodyElement::PartUsage(field_0) => {
                     visitor.visit_part_usage(&$($mutability)? **field_0);
                 }
+                ConnectionDefBodyElement::ActionDef(field_0) => {
+                    visitor.visit_action_def(field_0);
+                }
+                ConnectionDefBodyElement::ActionUsage(field_0) => {
+                    visitor.visit_action_usage(&$($mutability)? **field_0);
+                }
+                ConnectionDefBodyElement::StateDef(field_0) => {
+                    visitor.visit_state_def(field_0);
+                }
+                ConnectionDefBodyElement::StateUsage(field_0) => {
+                    visitor.visit_state_usage(field_0);
+                }
+                ConnectionDefBodyElement::ExhibitState(field_0) => {
+                    visitor.visit_exhibit_state(field_0);
+                }
+                ConnectionDefBodyElement::CalcDef(field_0) => {
+                    visitor.visit_calc_def(field_0);
+                }
+                ConnectionDefBodyElement::CalcUsage(field_0) => {
+                    visitor.visit_calc_usage(field_0);
+                }
+                ConnectionDefBodyElement::ConstraintDef(field_0) => {
+                    visitor.visit_constraint_def(field_0);
+                }
+                ConnectionDefBodyElement::ConstraintUsage(field_0) => {
+                    visitor.visit_constraint_usage(field_0);
+                }
+                ConnectionDefBodyElement::Perform(field_0) => {
+                    visitor.visit_perform(field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

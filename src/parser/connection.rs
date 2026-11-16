@@ -1,9 +1,11 @@
 //! Connection definition parsing (BNF ConnectionDefinition).
 
 use crate::ast::{ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, Node};
+use crate::parser::action::{action_def, action_usage};
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
+use crate::parser::constraint::{calc_def_required, calc_usage, constraint_def, constraint_usage};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{ws_and_notes, CONNECTION_DEF_BODY_STARTERS};
@@ -11,8 +13,9 @@ use crate::parser::node_from_to;
 use crate::parser::occurrence_body::{
     assert_constraint_member, occurrence_usage, succession_usage,
 };
-use crate::parser::part::part_usage;
+use crate::parser::part::{exhibit_state, part_usage, perform_action_decl, perform_usage};
 use crate::parser::port::{port_def, port_usage};
+use crate::parser::state::{state_def, state_usage};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -120,6 +123,24 @@ fn connection_def_body_element(
             ConnectionDefBodyElement::OccurrenceUsage(Box::new(n))
         }),
         map(succession_usage, ConnectionDefBodyElement::SuccessionUsage),
+        // A `ConnectionDefinition` body is a `DefinitionBody`, so it owns the behavior members a
+        // part definition body does (SysML BNF 664, 234-248, 354-378). Each `_def` is tried before
+        // its usage sibling, which has no guard against a bare `def` keyword.
+        alt((
+            map(exhibit_state, ConnectionDefBodyElement::ExhibitState),
+            map(action_def, ConnectionDefBodyElement::ActionDef),
+            map(action_usage, |n| {
+                ConnectionDefBodyElement::ActionUsage(Box::new(n))
+            }),
+            map(state_def, ConnectionDefBodyElement::StateDef),
+            map(state_usage, ConnectionDefBodyElement::StateUsage),
+            map(calc_def_required, ConnectionDefBodyElement::CalcDef),
+            map(calc_usage, ConnectionDefBodyElement::CalcUsage),
+            map(constraint_def, ConnectionDefBodyElement::ConstraintDef),
+            map(constraint_usage, ConnectionDefBodyElement::ConstraintUsage),
+            map(perform_action_decl, ConnectionDefBodyElement::Perform),
+            map(perform_usage, ConnectionDefBodyElement::Perform),
+        )),
         // GH-89: bare `part p;` member, e.g. `abstract connection def C { part p; end end1; }`
         // (Simple Tests/ConnectionTest.sysml:31).
         map(part_usage, |p| {

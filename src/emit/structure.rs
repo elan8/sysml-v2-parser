@@ -2499,6 +2499,38 @@ fn emit_connection_def_body_element(
         crate::ast::ConnectionDefBodyElement::SuccessionUsage(s) => {
             super::behavior::emit_succession_usage(w, path, &s.value)
         }
+        // The behavior members of a `DefinitionBody`, written by the emitters every other owning
+        // scope (a part definition body, for one) already uses.
+        crate::ast::ConnectionDefBodyElement::ActionDef(a) => {
+            super::behavior::emit_action_def(w, path, &a.value)
+        }
+        crate::ast::ConnectionDefBodyElement::ActionUsage(a) => {
+            super::behavior::emit_action_usage(w, path, &a.value)
+        }
+        crate::ast::ConnectionDefBodyElement::StateDef(s) => {
+            super::behavior::emit_state_def(w, path, &s.value)
+        }
+        crate::ast::ConnectionDefBodyElement::StateUsage(s) => {
+            super::behavior::emit_state_usage(w, path, &s.value)
+        }
+        crate::ast::ConnectionDefBodyElement::ExhibitState(e) => {
+            super::behavior::emit_exhibit_state(w, path, &e.value)
+        }
+        crate::ast::ConnectionDefBodyElement::CalcDef(c) => {
+            super::view::emit_calc_def(w, path, &c.value)
+        }
+        crate::ast::ConnectionDefBodyElement::CalcUsage(c) => {
+            super::view::emit_calc_usage(w, path, &c.value)
+        }
+        crate::ast::ConnectionDefBodyElement::ConstraintDef(c) => {
+            super::view::emit_constraint_def(w, path, &c.value)
+        }
+        crate::ast::ConnectionDefBodyElement::ConstraintUsage(c) => {
+            super::view::emit_constraint_usage(w, path, &c.value)
+        }
+        crate::ast::ConnectionDefBodyElement::Perform(p) => {
+            super::behavior::emit_perform(w, path, &p.value)
+        }
     }
 }
 

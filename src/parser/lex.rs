@@ -514,6 +514,14 @@ pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"private",
     b"protected",
     b"public",
+    // `BehaviorUsageElement` and the behavior `DefinitionElement`s a `DefinitionBody` admits (SysML
+    // BNF 183-211, 246-260, 374-391), which `connection_def_body_element` now dispatches.
+    b"action",
+    b"calc",
+    b"constraint",
+    b"exhibit",
+    b"perform",
+    b"state",
 ];
 
 /// GH-51: mirrors [`CONNECTION_DEF_BODY_STARTERS`] -- `interface_def_body` previously had no

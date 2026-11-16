@@ -543,19 +543,24 @@ fn connection_usage_member_inner(
         let (input, parsed_name) = name(input)?;
         (input, Some(parsed_name))
     };
-    // `FeatureSpecializationPart`: typings, `MultiplicityPart` and the specialization clauses,
-    // through the same shared parsers every migrated usage family uses.
-    let (input, leading_multiplicity) =
-        opt(crate::parser::usage::multiplicity_node).parse(input)?;
-    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let (_, _, typing) = crate::parser::usage::typing_reference_fields_from_result(type_result);
-    let (input, trailing_multiplicity) =
-        opt(crate::parser::usage::multiplicity_node).parse(input)?;
-    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
-    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
-    let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
-    let (input, modifiers) =
-        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
+    // `FeatureSpecializationPart = FeatureSpecialization+ MultiplicityPart? FeatureSpecialization*
+    // | MultiplicityPart FeatureSpecialization*` (SysML BNF 424-426), through the same shared
+    // header parser as every other usage family, so `connection :>> lines[3] { … }` keeps the
+    // multiplicity that follows the redefinition.
+    let (input, header) = crate::parser::usage::feature_usage_header(input)?;
+    let typing = header.typing;
+    let multiplicity = header.multiplicity;
+    let modifiers = header.multiplicity_modifiers;
+    let mut clauses = crate::parser::usage::SpecializationClauses {
+        subsets: header
+            .subsets
+            .map(|relationship| (relationship, header.subsetting_value)),
+        redefines: header.redefines,
+        references: header.references,
+        crosses: header.crosses,
+        intersects: header.intersects,
+        had_any: header.had_specialization,
+    };
     let (input, value) = opt(preceded(
         ws_and_notes,
         crate::parser::feature_value::feature_value_part,
@@ -576,7 +581,6 @@ fn connection_usage_member_inner(
     // (`connection : CapabilityToGoalDerivation { … } :> capabilityToGoals;` in the Apollo 11
     // model, `tests/apollo_regressions.rs`). It fills the same slot the header clause would, and
     // only when the header did not already author it.
-    let mut clauses = clauses;
     let before_subsets = input;
     let (input, trailing_subsets) = if clauses.subsets.is_none() {
         opt(preceded(
