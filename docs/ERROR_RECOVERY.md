@@ -2,10 +2,15 @@
 
 This document describes the current recovery architecture after the language-server-oriented recovery improvements.
 
-Current for v0.60.0, AST schema 293. State entry/do/exit subactions own `ActionDefBody`;
+Current for v0.61.0, AST schema 295. State entry/do/exit subactions own `ActionDefBody`;
 malformed members there produce action-body diagnostics while the enclosing state and later
 packages remain intact. Declaration-name and missing-token diagnostics can highlight a narrower
 `diagnostic_span` without changing the source slice used for recovered emission.
+
+State-body wrapper spans now cover the complete member, including prefixes and nested bodies.
+KerML body recovery stops at a following `binding` member so that valid siblings survive an
+unsupported connector. Bare `assert` / `assert not` without a constraint target is malformed;
+editor parsing retains that source and continues with later valid assertions.
 
 ## Current Model
 

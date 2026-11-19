@@ -7,12 +7,12 @@ resilient mode for editors, which returns a partial tree with diagnostics for an
 
 ```toml
 [dependencies]
-sysml-v2-parser = "0.60"
+sysml-v2-parser = "0.61"
 # Add `features = ["serde"]` to serialize complete documents.
 ```
 
 Requires Rust 1.88. Upgrading? See the [changelog](CHANGELOG.md) and the
-[v0.60.0 migration guide](docs/MIGRATION_0_60.md).
+[v0.61.0 migration guide](docs/MIGRATION_0_61.md).
 
 ## Usage
 
@@ -64,7 +64,7 @@ benchmarks.
 
 | Topic | Doc |
 | --- | --- |
-| Migration | [v0.60.0](docs/MIGRATION_0_60.md), [v0.59.0](docs/MIGRATION_0_59.md), [v0.58.0](docs/MIGRATION_0_58.md) |
+| Migration | [v0.61.0](docs/MIGRATION_0_61.md), [v0.60.0](docs/MIGRATION_0_60.md), [v0.59.0](docs/MIGRATION_0_59.md), [v0.58.0](docs/MIGRATION_0_58.md) |
 | Development | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
 | Release procedure | [`docs/RELEASING.md`](docs/RELEASING.md) |
 | Error recovery | [`docs/ERROR_RECOVERY.md`](docs/ERROR_RECOVERY.md) |

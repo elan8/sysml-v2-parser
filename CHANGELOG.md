@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-11-19
+
+This release updates the serialized AST from version **293 to 295**. Reference subsettings are
+retained by nine more usage families, and incomplete bare assertions now report an error. See the
+[migration guide](docs/MIGRATION_0_61.md) before updating consumers or reusing cached documents.
+
+### Fixed
+
+- Preserve `::>` / `references` on item, action, state, constraint, allocation and enumeration
+  usages through parsing, traversal, semantic projection and formatting.
+- Accept and preserve reference subsettings on calculation, interface and rendering usages,
+  including anonymous declarations and interface declarations with `connect`.
+- Accept explicit reference attribute redefinitions inside part definitions, such as
+  `ref attribute :>> quantity = value;`.
+- Preserve valid binding members after recovering from an unsupported KerML connector body.
+- Report complete state-body member ranges, including prefixed and nested members.
+- Reject incomplete bare assertions such as `assert not;`, retaining them as malformed editor
+  input while preserving later valid assertions.
+
+### Changed
+
+- `ItemUsage`, `ActionUsage`, `StateUsage`, `ConstraintUsage`, `AllocationUsage`,
+  `EnumerationUsage`, `CalcUsage`, `RenderingUsage` and the declaration variants of `InterfaceUsage`
+  gain a `references` field. Serialized documents use AST schema 295.
+- Add an optional checksum-pinned toolkit grammar audit for the abstract-item and reference-attribute
+  regression snapshots. The OMG conformance pin remains unchanged.
+- Update the test-only `rustix` lockfile dependency to 1.1.6 to resolve RUSTSEC-2026-0486.
+
+Reference and cross subsettings still accept comma-separated targets and merge repeated clauses.
+This pre-existing conformance limitation is tracked in [#236](https://github.com/elan8/sysml-v2-parser/issues/236).
+
 ## [0.60.0] - 2026-11-16
 
 This release updates the serialized AST from version **290 to 293**. It accepts four forms the

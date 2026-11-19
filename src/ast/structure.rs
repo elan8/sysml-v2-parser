@@ -2300,6 +2300,10 @@ pub enum InterfaceEndReferenceOperator {
 }
 
 /// Interface usage: typed+connect or connection form.
+// The declaration alternatives carry an additional reference-subsetting relationship compared
+// with `Connection`. Keep those fields inline, as on the other usage nodes; boxing a shared
+// prefix just to balance this enum would add an allocation and change the public AST API.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsage {
