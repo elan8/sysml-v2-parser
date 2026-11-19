@@ -205,6 +205,8 @@ pub struct CalcUsage {
     /// Redefinition targets for `calc :>> name { … }` and multi-target trailing clauses.
     pub redefines: Option<Vec<QualifiedReferenceId>>,
     /// `= expr` / `:= expr` binding (`in calc scenario = cityScenario;`, validation `10c`).
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     pub value: Option<Node<crate::ast::FeatureValue>>,
     pub body: CalcDefBody,
     pub membership: Membership,
@@ -720,6 +722,8 @@ pub struct RenderingUsage {
     /// `:>>` redefinition clause, e.g. the anonymous `rendering :>> subrenderings[0..*] = ...`
     /// (Systems Library `Views.sysml`).
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored reference subsetting.
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Optional value clause (BNF `ValuePart`), e.g. `= columnView.viewRendering`.
     pub value: Option<Node<FeatureValue>>,
     pub body: RenderingUsageBody,

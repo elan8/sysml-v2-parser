@@ -4911,7 +4911,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                InterfaceUsage::TypedConnect { prefix, name, short_name, interface_type, multiplicity, multiplicity_modifiers, subsets, redefines, part, body } => {
+                InterfaceUsage::TypedConnect { prefix, name, short_name, interface_type, multiplicity, multiplicity_modifiers, subsets, redefines, references, part, body } => {
                     visitor.visit_occurrence_usage_prefix(prefix);
                     if let Some(inner) = short_name {
                         visitor.visit_declaration_name(inner);
@@ -4927,6 +4927,9 @@ macro_rules! ast_traversal {
                     }
                     visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
                     if let Some(inner) = subsets {
+                        visitor.visit_subsetting_relationship(inner);
+                    }
+                    if let Some(inner) = references {
                         visitor.visit_subsetting_relationship(inner);
                     }
                     if let Some(inner) = redefines {
@@ -4946,7 +4949,7 @@ macro_rules! ast_traversal {
                     visitor.visit_interface_part(part);
                     walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Declaration { prefix, name, short_name, interface_type, multiplicity, multiplicity_modifiers, subsets, redefines, body } => {
+                InterfaceUsage::Declaration { prefix, name, short_name, interface_type, multiplicity, multiplicity_modifiers, subsets, redefines, references, body } => {
                     visitor.visit_occurrence_usage_prefix(prefix);
                     if let Some(inner) = short_name {
                         visitor.visit_declaration_name(inner);
@@ -4962,6 +4965,9 @@ macro_rules! ast_traversal {
                     }
                     visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
                     if let Some(inner) = subsets {
+                        visitor.visit_subsetting_relationship(inner);
+                    }
+                    if let Some(inner) = references {
                         visitor.visit_subsetting_relationship(inner);
                     }
                     if let Some(inner) = redefines {
@@ -7619,7 +7625,7 @@ macro_rules! ast_traversal {
         pub fn walk_calc_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcUsage { prefix, identification, typing, multiplicity, multiplicity_modifiers, subsets, redefines, value, body, membership } = &$($mutability)? node.value;
+            let CalcUsage { prefix, identification, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_identification(identification);
             if let Some(inner) = subsets {
@@ -7636,6 +7642,9 @@ macro_rules! ast_traversal {
                 for inner in inner {
                     visitor.visit_qualified_reference(inner);
                 }
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
@@ -8135,7 +8144,7 @@ macro_rules! ast_traversal {
         pub fn walk_rendering_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RenderingUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RenderingUsage { is_abstract, name, short_name, type_name, multiplicity, multiplicity_modifiers, subsets, redefines, value, body, membership } = &$($mutability)? node.value;
+            let RenderingUsage { is_abstract, name, short_name, type_name, multiplicity, multiplicity_modifiers, subsets, redefines, references, value, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
@@ -8154,6 +8163,9 @@ macro_rules! ast_traversal {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = value {

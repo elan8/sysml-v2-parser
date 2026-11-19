@@ -1176,6 +1176,7 @@ pub(crate) fn emit_interface_usage(
             multiplicity_modifiers,
             subsets,
             redefines,
+            references,
             part,
             body,
         } => {
@@ -1198,6 +1199,9 @@ pub(crate) fn emit_interface_usage(
             emit_multiplicity_modifiers(w, multiplicity_modifiers);
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(references) = references {
+                emit_subsetting_clause(w, &references.value)?;
             }
             if let Some(redefines) = redefines {
                 emit_subsetting_clause(w, &redefines.value)?;
@@ -1235,6 +1239,7 @@ pub(crate) fn emit_interface_usage(
             multiplicity_modifiers,
             subsets,
             redefines,
+            references,
             body,
         } => {
             emit_occurrence_usage_prefix(w, path, prefix)?;
@@ -1257,6 +1262,9 @@ pub(crate) fn emit_interface_usage(
             if let Some(subsets) = subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
             }
+            if let Some(references) = references {
+                emit_subsetting_clause(w, &references.value)?;
+            }
             if let Some(redefines) = redefines {
                 emit_subsetting_clause(w, &redefines.value)?;
             }
@@ -1264,6 +1272,7 @@ pub(crate) fn emit_interface_usage(
                 && interface_type.is_none()
                 && subsets.is_none()
                 && redefines.is_none()
+                && references.is_none()
             {
                 w.push_char(' ');
             }

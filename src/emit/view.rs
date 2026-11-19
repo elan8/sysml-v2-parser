@@ -217,6 +217,10 @@ pub(crate) fn emit_calc_usage(
     if let Some(subsets) = &usage.subsets {
         super::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
+    if let Some(references) = &usage.references {
+        w.trim_trailing_space();
+        super::structure::emit_subsetting_clause(w, &references.value)?;
+    }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
@@ -1178,6 +1182,9 @@ pub(crate) fn emit_rendering_usage(
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(references) = &usage.references {
+        super::structure::emit_subsetting_clause(w, &references.value)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;

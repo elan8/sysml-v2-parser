@@ -482,6 +482,17 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
                 Some(vec![target]),
             ),
         )
+    } else if starts_with_keyword(input.fragment(), b"references") {
+        (
+            input,
+            (
+                crate::ast::Identification {
+                    short_name: None,
+                    name: None,
+                },
+                None,
+            ),
+        )
     } else {
         // `ws_and_notes` above already skipped gaps after `calc`; do not require `ws1`
         // here or `calc name …` fails once the space was consumed (validation `10c`).
@@ -490,6 +501,8 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     };
     // `FeatureSpecializationPart = ... | MultiplicityPart FeatureSpecialization*`: the
     // multiplicity may precede the typing (`calc c[2] : C;`, #181), as on the other usages.
+    let (input, leading_references) =
+        opt(crate::parser::usage::reference_subsetting).parse(input)?;
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_notes,
         crate::parser::usage::multiplicity_node,
@@ -524,6 +537,9 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let (input, subsets) = opt(preceded(ws_and_notes, crate::parser::usage::subsetting))
         .parse(input)
         .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
+    let (input, trailing_references) =
+        opt(crate::parser::usage::reference_subsetting).parse(input)?;
+    let references = crate::parser::usage::merge_groups(leading_references, trailing_references);
     let (input, value) = opt(preceded(
         ws_and_notes,
         crate::parser::feature_value::feature_value_part,
@@ -543,6 +559,7 @@ fn calc_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                references,
                 value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),

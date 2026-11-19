@@ -2322,6 +2322,7 @@ pub enum InterfaceUsage {
         multiplicity_modifiers: crate::ast::MultiplicityModifiers,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
+        references: Option<Node<SubsettingRelationship>>,
         part: Node<InterfacePart>,
         /// The `InterfaceBody`, delimiters included. Was a `ConnectBody` marker beside a separate
         /// element list -- one body fact in two fields, with no span for either brace.
@@ -2362,6 +2363,7 @@ pub enum InterfaceUsage {
         multiplicity_modifiers: crate::ast::MultiplicityModifiers,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
+        references: Option<Node<SubsettingRelationship>>,
         /// See [`InterfaceUsage::TypedConnect`]'s body.
         body: Body<InterfaceUsageBodyElement>,
     },
