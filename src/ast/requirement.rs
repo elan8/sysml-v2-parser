@@ -495,6 +495,8 @@ pub struct ItemUsage {
     /// `:>` subsets clause, e.g. `:> objects` (Systems Library `Items.sysml`). Previously
     /// parsed by the shared usage header and discarded.
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<DeclarationName>,
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -522,6 +524,8 @@ pub struct EnumerationUsage {
     /// Every authored typing target in source order (`Typings`, SysML 8.2.2.6.5).
     pub typing: Option<Node<crate::ast::TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     /// `ValuePart`: `enum size : SizeChoice = SizeChoice::small;` (`Usage` admits it).
     pub value: Option<Node<crate::ast::FeatureValue>>,
     pub body: AttributeBody,

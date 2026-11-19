@@ -340,6 +340,9 @@ pub(crate) fn emit_action_usage(
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
+    if let Some(references) = &usage.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
     if let Some(value) = &usage.value {
         super::expr::emit_feature_value(w, value)?;
     }
@@ -992,6 +995,9 @@ pub(crate) fn emit_state_usage(
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
+    if let Some(references) = &usage.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
     emit_state_def_body(w, path, &usage.body)
 }
 
@@ -1202,6 +1208,7 @@ pub(crate) fn emit_allocation_usage(
         && usage.typing.is_none()
         && usage.subsets.is_none()
         && usage.redefines.is_none()
+        && usage.references.is_none()
         && (usage.source.is_some() || usage.target.is_some());
     if shorthand {
         w.push_str("allocate ");
@@ -1223,6 +1230,9 @@ pub(crate) fn emit_allocation_usage(
     )?;
     if let Some(typing) = &usage.typing {
         super::structure::emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(references) = &usage.references {
+        super::structure::emit_subsetting_clause(w, &references.value)?;
     }
     if let (Some(source), Some(target)) = (&usage.source, &usage.target) {
         w.push_str(" allocate ");

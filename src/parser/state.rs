@@ -619,6 +619,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
         .or(leading.subsets.clone())
         .map(|(target, _)| target);
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
+    let references = crate::parser::usage::merge_groups(leading.references, trailing.references);
     // Optional modifier before body: `parallel` or `initial` (SysML state usage)
     let (input, body_modifier) = state_body_modifier(input)?;
     let (input, _) = ws_and_notes(input)?;
@@ -645,6 +646,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                references,
                 body_modifier,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
