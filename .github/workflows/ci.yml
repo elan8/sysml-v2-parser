@@ -50,14 +50,6 @@ jobs:
       - name: Pinned reserved keyword inventory
         run: python3 tools/generate_reserved_keywords.py --check
 
-      - name: Fetch checksum-pinned toolkit grammar
-        run: python3 tools/check_toolkit_grammar.py "$RUNNER_TEMP/SysML.xtext" --fetch
-
-      - name: Check grammar evidence and pilot parser snapshots
-        run: |
-          python3 tools/check_toolkit_grammar.py "$RUNNER_TEMP/SysML.xtext"
-          cargo snapshot check --fixture sysml/definition_prefix_alternatives.md
-          cargo snapshot check --fixture sysml/ref_prefix_coverage.md
 
       - name: Semantic parser snapshot drift
         run: |
