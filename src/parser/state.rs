@@ -483,90 +483,60 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         }
     }
     let mut parser = alt((
-        map(crate::parser::body::annotating_member, |n| {
-            node_from_to(start, input, StateDefBodyElement::Annotating(n))
+        map(
+            crate::parser::body::annotating_member,
+            StateDefBodyElement::Annotating,
+        ),
+        map(
+            metadata_keyword_usage,
+            StateDefBodyElement::MetadataKeywordUsage,
+        ),
+        map(
+            metadata_keyword_prefix,
+            StateDefBodyElement::MetadataKeywordUsage,
+        ),
+        map(entry_action, StateDefBodyElement::Entry),
+        map(do_action, StateDefBodyElement::Do),
+        map(exit_action, StateDefBodyElement::Exit),
+        map(then_stmt, StateDefBodyElement::Then),
+        // Keep referential ports on the PortUsage path before the generic RefDecl.
+        map(crate::parser::port::port_usage, |n| {
+            StateDefBodyElement::PortUsage(Box::new(n))
         }),
-        map(metadata_keyword_usage, |n| {
-            node_from_to(start, input, StateDefBodyElement::MetadataKeywordUsage(n))
-        }),
-        map(metadata_keyword_prefix, |n| {
-            node_from_to(start, input, StateDefBodyElement::MetadataKeywordUsage(n))
-        }),
-        map(entry_action, |n| {
-            node_from_to(start, input, StateDefBodyElement::Entry(n))
-        }),
-        map(do_action, |n| {
-            node_from_to(start, input, StateDefBodyElement::Do(n))
-        }),
-        map(exit_action, |n| {
-            node_from_to(start, input, StateDefBodyElement::Exit(n))
-        }),
-        map(then_stmt, |n| {
-            node_from_to(start, input, StateDefBodyElement::Then(n))
-        }),
-        // Keep referential ports on the same PortUsage path as other structure bodies,
-        // before generic RefDecl can consume `ref port`. Retain the complete member span.
-        map(crate::parser::port::port_usage, |n| Node {
-            span: n.span,
-            value: StateDefBodyElement::PortUsage(Box::new(n)),
-        }),
-        map(state_ref, |n| {
-            node_from_to(start, input, StateDefBodyElement::Ref(Box::new(n)))
-        }),
-        map(requirement_usage, |n| {
-            node_from_to(start, input, StateDefBodyElement::RequirementUsage(n))
-        }),
-        map(state_usage, |n| {
-            node_from_to(start, input, StateDefBodyElement::StateUsage(n))
-        }),
-        // spec42 Gap 42: general usage members legal in a state body (Systems Library
-        // `States.sysml`): `attribute :>> isTriggerDuring;`, `action :>> subactions :> middle
-        // { ... }`, `succession stateSequencing first [0..1] ... then [0..1] ...`, and
-        // `assert constraint { ... }` -- dispatched to the same typed productions sibling body
-        // enums already use instead of falling to opaque recovery.
+        map(state_ref, |n| StateDefBodyElement::Ref(Box::new(n))),
+        map(requirement_usage, StateDefBodyElement::RequirementUsage),
+        map(state_usage, StateDefBodyElement::StateUsage),
         map(crate::parser::attribute::attribute_usage, |n| {
-            node_from_to(
-                start,
-                input,
-                StateDefBodyElement::AttributeUsage(Box::new(n)),
-            )
+            StateDefBodyElement::AttributeUsage(Box::new(n))
         }),
         map(crate::parser::action::action_usage, |n| {
-            node_from_to(start, input, StateDefBodyElement::ActionUsage(Box::new(n)))
-        }),
-        map(crate::parser::occurrence_body::succession_usage, |n| {
-            node_from_to(start, input, StateDefBodyElement::SuccessionUsage(n))
+            StateDefBodyElement::ActionUsage(Box::new(n))
         }),
         map(
-            crate::parser::occurrence_body::assert_constraint_member,
-            |n| node_from_to(start, input, StateDefBodyElement::AssertConstraint(n)),
+            crate::parser::occurrence_body::succession_usage,
+            StateDefBodyElement::SuccessionUsage,
         ),
-        // `StateBodyItem` first admits `NonBehaviorBodyItem`, whose StructureUsageMember branch
-        // owns PartUsage, then separately admits BehaviorUsageMember, whose alternatives include
-        // ConstraintUsage (SysML BNF 1200-1205, 910-920, 262-268, 356-389, 623, 1382).  Reuse
-        // those grammar-owned parsers and their source-backed nodes; a state body adds no
-        // alternate header or body spelling of either production.
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            StateDefBodyElement::AssertConstraint,
+        ),
         map(crate::parser::part::part_usage, |n| {
-            node_from_to(start, input, StateDefBodyElement::PartUsage(Box::new(n)))
+            StateDefBodyElement::PartUsage(Box::new(n))
         }),
         map(crate::parser::constraint::constraint_usage, |n| {
-            node_from_to(
-                start,
-                input,
-                StateDefBodyElement::ConstraintUsage(Box::new(n)),
-            )
+            StateDefBodyElement::ConstraintUsage(Box::new(n))
         }),
-        map(crate::parser::action::in_out_decl, |n| {
-            node_from_to(start, input, StateDefBodyElement::InOutDecl(n))
-        }),
-        map(transition, |n| {
-            node_from_to(start, input, StateDefBodyElement::Transition(Box::new(n)))
-        }),
+        map(
+            crate::parser::action::in_out_decl,
+            StateDefBodyElement::InOutDecl,
+        ),
+        map(transition, |n| StateDefBodyElement::Transition(Box::new(n))),
         map(transition_shorthand, |n| {
-            node_from_to(start, input, StateDefBodyElement::Transition(Box::new(n)))
+            StateDefBodyElement::Transition(Box::new(n))
         }),
     ));
-    parser.parse(input)
+    let (next, member) = parser.parse(input)?;
+    Ok((next, node_from_to(start, next, member)))
 }
 
 /// State usage: `OccurrenceUsagePrefix` subset `state` name (`:` type)? (`:>`/`:>>` …)? body.
@@ -1111,5 +1081,44 @@ mod state_body_member_tests {
                 .map(|n| crate::parser::lex::name_bytes(src, n)),
             Some(&b"fallbackName"[..])
         );
+    }
+}
+
+#[cfg(test)]
+mod state_body_span_tests {
+    use crate::ast::{Body, PackageBodyElement, RootElement, StateDefBodyElement};
+
+    #[test]
+    fn state_body_wrappers_cover_the_authored_members() {
+        let source = "state def Machine { private state ready { do action work; } entry action initialize; ref port p; }";
+        let document = crate::parse(source).expect("state definition");
+        let RootElement::Member(member) = &document.root.elements[0].value else {
+            panic!("expected root member");
+        };
+        let PackageBodyElement::StateDef(state) = &member.value else {
+            panic!("expected state definition");
+        };
+        let Body::Brace { elements, .. } = &state.body else {
+            panic!("expected state definition body");
+        };
+        let authored = |span: crate::ast::Span| &source[span.offset..span.offset + span.len];
+        assert_eq!(
+            elements
+                .iter()
+                .map(|node| authored(node.span))
+                .collect::<Vec<_>>(),
+            [
+                "private state ready { do action work; }",
+                "entry action initialize;",
+                "ref port p;"
+            ]
+        );
+        let StateDefBodyElement::StateUsage(nested) = &elements[0].value else {
+            panic!("expected nested state");
+        };
+        let Body::Brace { elements, .. } = &nested.body else {
+            panic!("expected nested state body");
+        };
+        assert_eq!(authored(elements[0].span), "do action work;");
     }
 }
