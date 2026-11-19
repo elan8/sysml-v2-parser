@@ -136,6 +136,7 @@ fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
                 typing: header.typing,
                 redefines,
                 subsets,
+                references: header.references,
                 multiplicity: multiplicity.or(header.multiplicity),
                 multiplicity_modifiers: header.multiplicity_modifiers.clone(),
                 value,

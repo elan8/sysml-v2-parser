@@ -499,6 +499,9 @@ pub(crate) fn emit_item_usage(
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
+    if let Some(references) = &usage.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
@@ -1051,6 +1054,9 @@ pub(crate) fn emit_enumeration_usage(
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(references) = &usage.references {
+        super::structure::emit_subsetting_clause(w, &references.value)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;

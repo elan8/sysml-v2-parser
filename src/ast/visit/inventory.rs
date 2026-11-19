@@ -5576,7 +5576,7 @@ macro_rules! ast_traversal {
         pub fn walk_action_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActionUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActionUsage { keyword, is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, value, accept, send, via, to, body, type_ref_span, membership } = &$($mutability)? node.value;
+            let ActionUsage { keyword, is_abstract, is_variation, is_reference, is_individual, name, short_name, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, value, accept, send, via, to, body, type_ref_span, membership } = &$($mutability)? node.value;
             visitor.visit_action_usage_keyword(keyword);
             let _ = is_abstract;
             let _ = is_variation;
@@ -5597,6 +5597,9 @@ macro_rules! ast_traversal {
             }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = redefines {
@@ -6134,12 +6137,15 @@ macro_rules! ast_traversal {
         pub fn walk_allocation_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AllocationUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AllocationUsage { name, short_name, typing, subsets, redefines, source, target, nary_ends, body, membership } = &$($mutability)? node.value;
+            let AllocationUsage { name, short_name, typing, subsets, redefines, references, source, target, nary_ends, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = typing {
                 visitor.visit_typing_relationship(inner);
@@ -6327,7 +6333,7 @@ macro_rules! ast_traversal {
         pub fn walk_state_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<StateUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let StateUsage { then_span, direction, is_derived, is_abstract, is_variation, is_reference, is_individual, name, short_name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, body_modifier, body, membership } = &$($mutability)? node.value;
+            let StateUsage { then_span, direction, is_derived, is_abstract, is_variation, is_reference, is_individual, name, short_name, state_reference, type_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, body_modifier, body, membership } = &$($mutability)? node.value;
             let _ = is_variation;
             if let Some(inner) = then_span {
                 visitor.visit_span(inner);
@@ -6359,6 +6365,9 @@ macro_rules! ast_traversal {
             }
             visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = redefines {
@@ -6801,7 +6810,7 @@ macro_rules! ast_traversal {
         pub fn walk_item_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ItemUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ItemUsage { prefix, name, typing, redefines, subsets, short_name, multiplicity, multiplicity_modifiers, value, body, membership } = &$($mutability)? node.value;
+            let ItemUsage { prefix, name, typing, redefines, subsets, references, short_name, multiplicity, multiplicity_modifiers, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
@@ -6813,6 +6822,9 @@ macro_rules! ast_traversal {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
                 visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = short_name {
@@ -6833,12 +6845,15 @@ macro_rules! ast_traversal {
         pub fn walk_enumeration_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumerationUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let EnumerationUsage { name, short_name, typing, multiplicity, value, body, is_end, membership } = &$($mutability)? node.value;
+            let EnumerationUsage { name, short_name, typing, multiplicity, references, value, body, is_end, membership } = &$($mutability)? node.value;
             if let Some(inner) = short_name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = typing {
                 visitor.visit_typing_relationship(inner);
@@ -7494,12 +7509,15 @@ macro_rules! ast_traversal {
         pub fn walk_constraint_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConstraintUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConstraintUsage { prefix, name, short_name, typing, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let ConstraintUsage { prefix, name, short_name, typing, multiplicity, subsets, redefines, references, body, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = name {
                 visitor.visit_declaration_name(inner);
             }
             if let Some(inner) = short_name { visitor.visit_declaration_name(inner); }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
             if let Some(inner) = typing {
                 visitor.visit_typing_relationship(inner);
             }

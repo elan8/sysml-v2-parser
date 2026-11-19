@@ -464,6 +464,8 @@ pub struct ActionUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     /// `ValuePart` of `ActionUsageDeclaration = UsageDeclaration ValuePart?` (SysML BNF
     /// `ActionUsageDeclaration`), e.g. `action :>> generateTorque = generateTorque4Cyl;`. The slot
     /// was missing, so an action usage with a value was recovered as an unexpected token.
@@ -511,6 +513,7 @@ impl PartialEq for ActionUsage {
             && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
+            && self.references == other.references
             && self.value == other.value
             && self.accept == other.accept
             && self.send == other.send
@@ -1096,6 +1099,8 @@ pub struct AllocationUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// `:>>` redefines clause. See `subsets`.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Typed `allocate <end> to <end>` ends (spec42 gap 27): each end is an optional
     /// multiplicity plus an arena-backed feature chain with an optional `::>`/`references`
     /// end-name split, the same shape connector members use -- previously opaque
@@ -1296,6 +1301,8 @@ pub struct StateUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `redefines` / `:>>` clause.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Authored `parallel`/`initial` modifier before the body, with its keyword span. See
     /// [`StateBodyModifier`].
     pub body_modifier: Option<Node<StateBodyModifier>>,

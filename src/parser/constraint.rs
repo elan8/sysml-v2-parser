@@ -126,6 +126,7 @@ fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Constrain
                 multiplicity: header.multiplicity,
                 subsets: header.subsets,
                 redefines: header.redefines,
+                references: header.references,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

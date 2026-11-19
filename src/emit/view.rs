@@ -65,6 +65,9 @@ pub(crate) fn emit_constraint_usage(
     if let Some(redefines) = &usage.redefines {
         super::structure::emit_subsetting_clause(w, &redefines.value)?;
     }
+    if let Some(references) = &usage.references {
+        super::structure::emit_subsetting_clause(w, &references.value)?;
+    }
     emit_constraint_body(w, path, &usage.body)
 }
 

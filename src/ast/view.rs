@@ -65,6 +65,8 @@ pub struct ConstraintUsage {
     /// Usage-level `:>>` redefinition, e.g. `constraint c :>> Base;`. Mirrors
     /// `ConnectionUsageMember::redefines`.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Authored reference subsetting (`::>` or `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
     pub body: ConstraintDefBody,
     pub membership: Membership,
 }

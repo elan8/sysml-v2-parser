@@ -2542,6 +2542,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         .or(leading.subsets.clone())
         .map(|(target, _)| target);
     let redefines = trailing.redefines.clone().or(leading.redefines.clone());
+    let references = crate::parser::usage::merge_groups(leading.references, trailing.references);
     // `ActionUsageDeclaration = UsageDeclaration ValuePart?`.
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_notes, crate::parser::feature_value_part))
@@ -2641,6 +2642,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                references,
                 value: value.map(Box::new),
                 accept,
                 send,

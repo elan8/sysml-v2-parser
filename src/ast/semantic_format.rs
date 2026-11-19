@@ -269,6 +269,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        if usage.references.is_some() {
+            self.writer.write_char(' ')?;
+            self.write_optional_subsetting("references", usage.references.as_ref())?;
+        }
         self.writer.write_str(" (value ")?;
         match &usage.value {
             Some(value) => self.write_feature_value(&value.value)?,
@@ -3123,6 +3127,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
+        if usage.references.is_some() {
+            self.write_optional_subsetting("references", usage.references.as_ref())?;
+            self.writer.write_char(' ')?;
+        }
         self.write_constraint_def_body(&usage.body)?;
         self.writer.write_char(')')
     }
@@ -4190,6 +4198,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
+        if usage.references.is_some() {
+            self.write_optional_subsetting("references", usage.references.as_ref())?;
+            self.writer.write_char(' ')?;
+        }
         if let Some(value) = &usage.value {
             self.writer.write_str("(value ")?;
             self.write_feature_value(&value.value)?;
@@ -4243,6 +4255,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
+        if usage.references.is_some() {
+            self.write_optional_subsetting("references", usage.references.as_ref())?;
+            self.writer.write_char(' ')?;
+        }
         self.write_state_body(&usage.body)?;
         self.writer.write_char(')')
     }
@@ -6256,6 +6272,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.short_name,
             usage.typing.as_ref(),
         )?;
+        if usage.references.is_some() {
+            self.write_optional_subsetting("references", usage.references.as_ref())?;
+            self.writer.write_char(' ')?;
+        }
         self.write_attribute_body(&usage.body)?;
         self.writer.write_char(')')
     }
@@ -6278,6 +6298,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             usage.short_name,
             usage.typing.as_ref(),
         )?;
+        if usage.references.is_some() {
+            self.write_optional_subsetting("references", usage.references.as_ref())?;
+            self.writer.write_char(' ')?;
+        }
         self.writer.write_str("(ends")?;
         for end in usage
             .source
