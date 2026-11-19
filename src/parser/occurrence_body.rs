@@ -756,9 +756,10 @@ fn assert_constraint_member_inner(
         (input, None)
     };
     let (input, _) = ws_and_notes(input)?;
-    let (input, declaration_name, target) = if input.fragment().starts_with(b"{")
-        || input.fragment().starts_with(b";")
-        || (short_name.is_some() && input.fragment().starts_with(b":"))
+    let (input, declaration_name, target) = if constraint_keyword.is_some()
+        && (input.fragment().starts_with(b"{")
+            || input.fragment().starts_with(b";")
+            || (short_name.is_some() && input.fragment().starts_with(b":")))
     {
         (input, None, None)
     } else if constraint_keyword.is_some() {
