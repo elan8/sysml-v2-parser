@@ -3172,6 +3172,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             None => self.writer.write_str("none")?,
         }
         self.writer.write_str(") ")?;
+        if let Some(references) = &usage.references {
+            self.write_optional_subsetting("references", Some(references))?;
+            self.writer.write_char(' ')?;
+        }
         self.write_calc_def_body(&usage.body)?;
         self.writer.write_char(')')
     }
@@ -5661,6 +5665,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 interface_type,
                 multiplicity,
                 multiplicity_modifiers,
+                references,
                 part,
                 body,
                 ..
@@ -5674,6 +5679,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         *interface_type,
                         multiplicity,
                         multiplicity_modifiers,
+                        references,
                     )),
                     Some(part),
                     body,
@@ -5692,6 +5698,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 interface_type,
                 multiplicity,
                 multiplicity_modifiers,
+                references,
                 body,
                 ..
             } => {
@@ -5704,6 +5711,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         *interface_type,
                         multiplicity,
                         multiplicity_modifiers,
+                        references,
                     )),
                     None,
                     body,
@@ -5712,7 +5720,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         };
         self.writer.write_str(") ")?;
         self.write_occurrence_usage_prefix(prefix)?;
-        if let Some((name, short_name, interface_type, multiplicity, modifiers)) = declaration {
+        if let Some((name, short_name, interface_type, multiplicity, modifiers, references)) =
+            declaration
+        {
             self.writer.write_str(" (name ")?;
             self.write_optional_name(name)?;
             self.writer.write_str(") (short-name ")?;
@@ -5726,6 +5736,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.write_multiplicity_clause(multiplicity.as_deref())?;
             self.writer.write_str(") ")?;
             self.write_multiplicity_modifiers(modifiers)?;
+            if let Some(references) = references {
+                self.writer.write_char(' ')?;
+                self.write_optional_subsetting("references", Some(references))?;
+            }
         }
         self.writer.write_str(" (part ")?;
         if let Some(part) = part {
@@ -6625,6 +6639,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_str("none")?;
         }
         self.writer.write_str(") ")?;
+        if let Some(references) = &usage.references {
+            self.write_optional_subsetting("references", Some(references))?;
+            self.writer.write_char(' ')?;
+        }
         self.write_rendering_usage_body(&usage.body)?;
         self.writer.write_char(')')
     }

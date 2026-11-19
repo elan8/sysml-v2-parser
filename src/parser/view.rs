@@ -741,6 +741,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
         (after_gap, input)
     };
     let (input, name_str) = if after_gap.fragment().starts_with(b":")
+        || crate::parser::lex::starts_with_keyword(after_gap.fragment(), b"references")
         || after_gap.fragment().starts_with(b"[")
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
@@ -759,6 +760,8 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     // GraphicalRendering[1] :> renderings { ... }` (Systems Library `Views.sysml`).
     let (input, leading_redefines) =
         opt(preceded(ws_and_notes, crate::parser::usage::redefinition)).parse(input)?;
+    let (input, leading_references) =
+        opt(crate::parser::usage::reference_subsetting).parse(input)?;
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_notes,
         crate::parser::usage::multiplicity_node,
@@ -784,6 +787,9 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let (input, subsets) =
         opt(preceded(ws_and_notes, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
+    let (input, trailing_references) =
+        opt(crate::parser::usage::reference_subsetting).parse(input)?;
+    let references = crate::parser::usage::merge_groups(leading_references, trailing_references);
     // Optional value clause: `= columnView.viewRendering` (Systems Library `Views.sysml`).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = rendering_usage_body(input)?;
@@ -801,6 +807,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
                 multiplicity_modifiers: modifiers,
                 subsets,
                 redefines,
+                references,
                 value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),

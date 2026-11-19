@@ -1056,6 +1056,8 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
                             tag(&b":>"[..]),
                             tag(&b"subsets"[..]),
                             tag(&b"redefines"[..]),
+                            tag(&b"::>"[..]),
+                            tag(&b"references"[..]),
                         ))),
                     ),
                 ))
@@ -1090,6 +1092,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
     let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
     let subsets = spec.subsets.map(|(target, _)| target);
     let redefines = spec.redefines;
+    let references = spec.references;
     let (input, _) = ws_and_notes(input)?;
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -1110,6 +1113,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
                     multiplicity_modifiers,
                     subsets,
                     redefines,
+                    references,
                     part,
                     body,
                 },
@@ -1118,7 +1122,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
     }
     // BNF: the bare `InterfacePart` alternative (no `connect` keyword) is only legal when there
     // is no preceding `UsageDeclaration` at all -- i.e. no name and no type were captured above.
-    if iface_name.is_none() && interface_type.is_none() && short_name.is_none() {
+    if !declared && references.is_none() {
         if let Ok((after_part, part)) = interface_part(input) {
             let (input, body) = interface_usage_body(after_part)?;
             return Ok((
@@ -1154,6 +1158,7 @@ fn interface_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceU
                 multiplicity_modifiers,
                 subsets,
                 redefines,
+                references,
                 body,
             },
         ),
