@@ -93,3 +93,20 @@ Writes (override directory with `CONFORMANCE_SCORECARD_DIR`):
 CI validation uploads both as the `conformance-scorecard` artifact. The markdown
 file is the human-readable split of what we claim vs what we explicitly do not
 claim for the pinned release.
+
+
+## Toolkit reference pilot
+
+The optional reference audit uses `SysML.xtext` from a checksum-pinned
+[Open-MBEE toolkit revision](https://github.com/Open-MBEE/sysml-toolkit/tree/7d740b37c0666be18bee2de1b467c86a234788bc/spec-refs).
+This is supplementary Pilot grammar evidence for the existing OMG release conformance target,
+for abstract item definitions and explicit reference-attribute redefinitions. Run it by hand:
+the fetched grammar is fixed by its checksum, so CI would only add a dependency on GitHub's raw
+file host. CI covers the two typed parser snapshots with the rest of the snapshot corpus.
+
+```sh
+python3 tools/check_toolkit_grammar.py .cache/SysML.xtext --fetch
+python3 tools/check_toolkit_grammar.py .cache/SysML.xtext
+cargo snapshot check --fixture sysml/definition_prefix_alternatives.md
+cargo snapshot check --fixture sysml/ref_prefix_coverage.md
+```
