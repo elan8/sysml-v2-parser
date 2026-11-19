@@ -370,6 +370,9 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 PartDefBodyElement::ActionUsage(Box::new(a))
             }),
             map(state_usage, PartDefBodyElement::StateUsage),
+            // `ref attribute :>> target` starts with `ref` but is an attribute usage.
+            map(attribute_def, PartDefBodyElement::AttributeDef),
+            map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
             // Anonymous `ref :>> target;` owns a relationship target rather than a declaration
             // name, so the shared full ref-declaration parser must get a chance after the named
@@ -379,8 +382,6 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // never dispatched here, even though `bind_` was already wired into part *usage*
             // bodies (`part_usage_body_element` below) -- mirrors that arm's placement.
             map(bind_, PartDefBodyElement::Bind),
-            map(attribute_def, PartDefBodyElement::AttributeDef),
-            map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
                 default_reference_usage,
                 PartDefBodyElement::DefaultReferenceUsage,
@@ -1086,6 +1087,19 @@ mod par_002_nested_def_tests {
             }
             other => panic!("expected PartUsage, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn part_def_body_keeps_explicit_reference_attribute_redefinition() {
+        let src = "ref attribute :>> quantity = value;";
+        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        assert!(rest.fragment().is_empty());
+        let PartDefBodyElement::AttributeUsage(usage) = node.value else {
+            panic!("expected a typed attribute usage");
+        };
+        assert!(usage.value.is_reference);
+        assert!(usage.value.redefines.is_some());
+        assert!(usage.value.value.is_some());
     }
 
     #[test]
