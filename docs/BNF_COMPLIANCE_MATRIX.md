@@ -1,6 +1,6 @@
 # BNF coverage and structured-AST baseline
 
-Current for **v0.60.0**, AST schema **293**. The authority for production classification is
+Current for **v0.61.0**, AST schema **295**. The authority for production classification is
 [`bnf_coverage.map`](bnf_coverage.map), checked against both pinned BNF files identified by
 [`conformance-target`](conformance-target). This document does not maintain a second set of
 per-family status labels.
@@ -26,7 +26,8 @@ conformance claim. See [the claim layers and corpus limits](CONFORMANCE.md).
   body-helper patterns. Labels such as `partial`, `opaque` and `fallback` remain map-format
   vocabulary but are not current classifications.
 - `CONFORMANCE_SCORECARD_L2=1 cargo test --test conformance_scorecard` verifies the 21 Systems
-  Library files and all 94 standard-library files have zero diagnostics and unstructured nodes.
+  Library files and all 94 standard-library files have zero unexpected diagnostics and unstructured
+  nodes, apart from the two exact pinned recovery controls described in [CONFORMANCE.md](CONFORMANCE.md).
 - `cargo test --test roundtrip_validation -- --include-ignored` checks all 56 pinned validation
   fixtures and the tracked examples inventory.
 - `cargo snapshot check` verifies semantic/recovery/provenance fixtures and formatting stability.

@@ -40,13 +40,20 @@ crate docs and `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
 | Layer | Claim | Evidence |
 | ----- | ----- | -------- |
 | **L1 — Syntax acceptance** | Every textual BNF production in the pinned release is classified `implemented` in [`bnf_coverage.map`](./bnf_coverage.map) | `cargo test --test bnf_compliance`; scorecard `layers.L1_syntax_acceptance` |
-| **L2 — Structured AST** | Systems Library and full `sysml.library` parse with zero diagnostics and zero unstructured nodes | ignored validation gates; scorecard `layers.L2_structured_ast` |
+| **L2 — Structured AST** | Systems Library and full `sysml.library` have zero unexpected diagnostics and unstructured nodes outside the two pinned recovery controls below | ignored validation gates; scorecard `layers.L2_structured_ast` |
 | **L2.5 — Emit fidelity** | Selected release validation fixtures roundtrip: parse → opacity-clean → emit canonical SysML → reparse → AST-eq | `cargo test --test roundtrip_validation -- --include-ignored` |
 | **L3 — Semantics** | Not claimed (Spec42 / other tools) | scorecard `layers.L3_semantics.status = not_claimed` |
 
 L2.5 does **not** claim semantic correctness. Strict parsing, a clean opacity scan, canonical
 emission and reparsing must preserve the normalized AST. Recovery and unsupported nodes fail
 this gate; raw source replay is not accepted as proof of a structured round trip.
+
+The library scorecard retains two exact pre-existing policy exceptions: `Flows.sysml:82`
+(`end occurrence source`) and `Interfaces.sysml:72` (`end port source`). If their expected primary
+and cascade diagnostics match, the scorecard excludes those diagnostics and opacity hits. A passing
+scorecard alone therefore does not prove these two files are diagnostic-free; the separate strict
+library tests require zero diagnostics without those exceptions. See `is_pinned_policy_recovery`
+in [`tests/conformance_scorecard.rs`](../tests/conformance_scorecard.rs).
 
 The pinned `2026-04` validation tree contains **56 required-pass fixtures and no known gaps**.
 `ROUNDTRIP_PASS` in `tests/roundtrip_validation.rs` records the exact inventory. The complementary

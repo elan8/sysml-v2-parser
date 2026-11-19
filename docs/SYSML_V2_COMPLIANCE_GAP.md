@@ -1,14 +1,15 @@
 # SysML v2 parser status and remaining limits
 
-Current for **v0.60.0**, AST schema **293**. Use [CONFORMANCE.md](CONFORMANCE.md) for the
-precise claim layers and [the migration guide](MIGRATION_0_60.md) for consumer changes.
+Current for **v0.61.0**, AST schema **295**. Use [CONFORMANCE.md](CONFORMANCE.md) for the
+precise claim layers and [the migration guide](MIGRATION_0_61.md) for consumer changes.
 
 ## Verified baseline
 
 The pinned target is the OMG `2026-04` release, identified by the release, production counts and
 grammar hash in [conformance-target](conformance-target). The BNF map classifies all 640 textual
 productions as implemented. The strict library gates cover 21 Systems Library files and 94
-standard-library files, requiring zero diagnostics and zero unstructured nodes. All 56 pinned
+standard-library files, requiring zero unexpected diagnostics and unstructured nodes outside the
+two exact pinned library recovery controls described in [CONFORMANCE.md](CONFORMANCE.md). All 56 pinned
 validation models round-trip; 85 of 95 broader examples are tracked round-trip passes.
 
 These are explicit corpus and coverage-map results. They do not establish acceptance of every
@@ -31,6 +32,9 @@ uses the selected SysML or KerML vocabulary.
 
 ## Remaining work
 
+- **Reference/cross subsetting cardinality:** comma lists are still accepted and repeated clauses
+  merge into one relationship. The grammar admits one target per clause; the metamodel limits
+  ownership to at most one of each relationship. See [#236](https://github.com/elan8/sysml-v2-parser/issues/236).
 - **Grammar combinations and field retention:** a coverage-map classification does not guarantee
   every nesting, prefix and specialization combination. New findings need source-based regression
   snapshots and fixes in the owning production.
